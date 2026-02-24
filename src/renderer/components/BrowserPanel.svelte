@@ -1,0 +1,180 @@
+<script lang="ts">
+  import {
+    BROWSER_EFFECTS,
+    BROWSER_GENERATORS,
+    isBrowserDeviceKind,
+    type BrowserDeviceKind,
+  } from '../services/devices';
+
+  type BrowserPointerDownPayload = {
+    kind: BrowserDeviceKind;
+    sourceEvent: PointerEvent;
+    itemEl: HTMLElement;
+  };
+
+  const noopDeviceAdd = (): void => {};
+  const noopBrowserPointerDown = (): void => {};
+
+  let {
+    onDeviceAdd = noopDeviceAdd,
+    onBrowserPointerDown = noopBrowserPointerDown,
+  } = $props<{
+    onDeviceAdd: (kind: BrowserDeviceKind) => void;
+    onBrowserPointerDown: (payload: BrowserPointerDownPayload) => void;
+  }>();
+
+  const resolveBrowserItem = (target: EventTarget | null): HTMLElement | null => {
+    if (!(target instanceof HTMLElement)) {
+      return null;
+    }
+    return target.closest<HTMLElement>('.browser-item[data-browser-kind]');
+  };
+
+  const handleDoubleClick = (event: MouseEvent): void => {
+    const item = resolveBrowserItem(event.target);
+    if (!item) {
+      return;
+    }
+
+    const kindRaw = item.dataset.browserKind;
+    if (!isBrowserDeviceKind(kindRaw)) {
+      return;
+    }
+
+    onDeviceAdd(kindRaw);
+  };
+
+  const handlePointerDown = (event: PointerEvent): void => {
+    const item = resolveBrowserItem(event.target);
+    if (!item) {
+      return;
+    }
+
+    const kindRaw = item.dataset.browserKind;
+    if (!isBrowserDeviceKind(kindRaw)) {
+      return;
+    }
+
+    onBrowserPointerDown({
+      kind: kindRaw,
+      sourceEvent: event,
+      itemEl: item,
+    });
+  };
+
+  const handleDragStart = (event: DragEvent): void => {
+    event.preventDefault();
+  };
+</script>
+
+<aside
+  class="browser-panel"
+  ondragstart={handleDragStart}
+  ondblclick={handleDoubleClick}
+  onpointerdown={handlePointerDown}
+>
+  <div
+    class="browser-view"
+  >
+    <section class="browser-group">
+      <span class="browser-group-title">Generators</span>
+      <ul class="browser-list">
+        {#each BROWSER_GENERATORS as item (item.kind)}
+          <li
+            class="browser-item"
+            data-browser-kind={item.kind}
+          >
+            <span>{item.label}</span>
+          </li>
+        {/each}
+      </ul>
+    </section>
+    <section class="browser-group">
+      <span class="browser-group-title">Effects</span>
+      <ul class="browser-list">
+        {#each BROWSER_EFFECTS as item (item.kind)}
+          <li
+            class="browser-item"
+            data-browser-kind={item.kind}
+          >
+            <span>{item.label}</span>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  </div>
+</aside>
+
+<style lang="scss">
+  .browser-panel {
+    --window-control-zone-height: var(--gap-48);
+    --window-control-zone-width: 5rem;
+    
+    flex: 0 0 var(--sidebar-width, 240px);
+    padding: var(--gap-10);
+    background: var(--neutral-10);
+    width: var(--sidebar-width, 240px);
+    min-width: 0;
+    min-height: 0;
+    overflow-y: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: var(--window-control-zone-height);
+      -webkit-app-region: drag;
+      z-index: -1;
+    }
+  }
+
+  .browser-view {
+    margin-top: var(--gap-32);
+    border-radius: var(--radius-4);
+    min-height: 0;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .browser-group {
+    margin-bottom: var(--gap-10);
+
+    &-title {
+      margin: var(--gap-0);
+      font-size: var(--text-12);
+      color: var(--neutral-50);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+  }
+
+  .browser-list {
+    margin: var(--gap-8) var(--gap-0) var(--gap-0);
+    padding: var(--gap-0);
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--gap-6);
+    -webkit-app-region: no-drag;
+  }
+
+  .browser-item {
+    border-radius: var(--radius-4);
+    padding: var(--gap-6) var(--gap-8);
+    font-size: var(--text-12);
+    user-select: none;
+    -webkit-user-drag: none;
+    cursor: grab;
+    background: var(--neutral-20);
+
+    &:global(.is-dragging) {
+      opacity: 0.7;
+      cursor: grabbing;
+    }
+  }
+</style>

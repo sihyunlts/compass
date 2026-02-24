@@ -1,0 +1,38 @@
+* {
+  box-sizing: border-box;
+
+  /* Hide scrollbars */
+  scrollbar-width: none;
+
+  /* Disable selection and tap highlight */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Hide default focus ring and re-enable for keyboard navigation mode */
+:focus-visible {
+  outline: none;
+}
+
+body[data-focus-nav='tab'] :focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 2px;
+}
+
+/* Remove default text margins */
+h1, h2, h3, h4, h5, h6, p, span {
+  margin: var(--gap-0);
+}
+
+html, body {
+  margin: var(--gap-0);
+  height: 100vh;
+  background: var(--neutral-00);
+  color: var(--neutral-90);
+  font-family: 'Avenir Next', 'Helvetica Neue', sans-serif;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}

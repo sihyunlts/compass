@@ -1,0 +1,84 @@
+/* Button: Base */
+button {
+  border: 0;
+  border-radius: var(--radius-6);
+  background: var(--neutral-20);
+  color: var(--neutral-90);
+  padding: var(--gap-6) var(--gap-8);
+  font-size: var(--text-13);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  white-space: nowrap;
+
+  &.primary {
+    background: var(--accent-500);
+    color: var(--accent-050);
+  }
+}
+
+/* Field Wrapper */
+.control-field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--gap-6);
+  min-width: 0;
+  min-height: 0;
+
+  input,
+  select {
+    width: 6.6rem;
+  }
+}
+
+.field-label {
+  color: var(--neutral-50);
+  font-size: var(--text-12);
+}
+
+/* Input/Select: Base */
+input,
+select {
+  border: 0;
+  background: var(--neutral-20);
+  color: var(--neutral-90);
+  border-radius: var(--radius-4);
+  padding: var(--gap-4) var(--gap-6);
+  max-width: 100%;
+  min-width: 0;
+}
+
+input {
+  &[type='checkbox'] {
+    accent-color: var(--accent-500);
+  }
+
+  &:not([type='checkbox']) {
+    height: 1.75rem;
+    box-sizing: border-box;
+  }
+
+  &[type='range'] {
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    width: 100%;
+    cursor: pointer;
+
+    &::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 0.28rem;
+      background: var(--neutral-30);
+      border-radius: var(--radius-2);
+    }
+
+    &::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 0.74rem;
+      width: 0.74rem;
+      border-radius: var(--radius-round);
+      background: var(--neutral-90);
+      margin-top: var(--gap-neg-4);
+      box-shadow: 0 0 0 1px var(--neutral-00);
+    }
+  }
+}

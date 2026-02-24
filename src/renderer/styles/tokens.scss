@@ -1,0 +1,49 @@
+:root {
+  /* Colors */
+  color-scheme: dark;
+  --neutral-00: #0d0e0f;
+  --neutral-10: #1a1c21;
+  --neutral-20: #2b2e37;
+  --neutral-30: #4a5160;
+  --neutral-50: #9ca4b5;
+  --neutral-90: #e6e9ef;
+  --accent-500: #2dd1ff;
+  --accent-050: #231100;
+  --effect-500: #f5d442;
+  --rgb-white: 255 255 255;
+  --rgb-led-default: 255 166 57;
+  --alpha-02: 0.02;
+  --alpha-04: 0.04;
+  --alpha-06: 0.06;
+
+  /* Font sizes */
+  --text-12: 0.75rem;
+  --text-13: 0.8125rem;
+  --text-14: 0.875rem;
+  --text-16: 1rem;
+  --text-18: 1.125rem;
+  --text-20: 1.25rem;
+
+  /* Radius */
+  --radius-2: 0.125rem;
+  --radius-4: 0.25rem;
+  --radius-6: 0.375rem;
+  --radius-8: 0.5rem;
+  --radius-12: 0.75rem;
+  --radius-percent-3: 3%;
+  --radius-round: 100rem;
+
+  /* Spacing */
+  --gap-0: 0;
+  --gap-2: 0.125rem;
+  --gap-4: 0.25rem;
+  --gap-6: 0.375rem;
+  --gap-8: 0.5rem;
+  --gap-10: 0.625rem;
+  --gap-12: 0.75rem;
+  --gap-14: 0.875rem;
+  --gap-16: 1rem;
+  --gap-32: 2rem;
+  --gap-48: 3rem;
+  --gap-neg-4: -0.25rem;
+}
