@@ -52,6 +52,13 @@ input {
     accent-color: var(--accent-500);
   }
 
+  &[type='number'] {
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+    }
+  }
+
   &:not([type='checkbox']) {
     height: 1.75rem;
     box-sizing: border-box;
