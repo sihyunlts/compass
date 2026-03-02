@@ -9,6 +9,7 @@ import {
   createCenterPickerSessionState,
   isCenterPickerActive,
   isCenterPickerPointer,
+  resetCenterPickerToMidpoint,
   resolveCenterPickerSurface,
   startCenterPickerSession,
   syncCenterPickerSelection,
@@ -531,6 +532,29 @@ export class DeviceRackController {
     this.selectSingleDevice(cardId);
   }
 
+  handleDoubleClick(event: MouseEvent): boolean {
+    if (event.button !== 0) {
+      return false;
+    }
+
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    const centerPickerSurface = resolveCenterPickerSurface(target);
+    if (!centerPickerSurface) {
+      return false;
+    }
+
+    this.blurActiveTextEditingElement();
+    this.closeContextMenu();
+    if (this.resetCenterPickerToMidpoint(centerPickerSurface)) {
+      this.commitChainChange();
+    }
+    return true;
+  }
+
   prepareSelectionOnPointerDown(target: PointerDownSelectionTarget, event: PointerEvent): void {
     if (event.button !== 0 || !event.isPrimary) {
       return;
@@ -770,6 +794,10 @@ export class DeviceRackController {
     clientY: number,
   ): boolean {
     return applyCenterPickerPosition(surface, clientX, clientY, this.getCenterPickerDeps());
+  }
+
+  private resetCenterPickerToMidpoint(surface: HTMLElement): boolean {
+    return resetCenterPickerToMidpoint(surface, this.getCenterPickerDeps());
   }
 
   private tryStartMaskTilePaint(event: PointerEvent, target: HTMLElement): boolean {

@@ -171,6 +171,39 @@ export const applyCenterPickerPosition = (
   return true;
 };
 
+/** Resets center coordinates to the midpoint of picker bounds. */
+export const resetCenterPickerToMidpoint = (
+  surface: HTMLElement,
+  deps: CenterPickerDeps,
+): boolean => {
+  const id = surface.dataset.id;
+  if (!id) {
+    return false;
+  }
+
+  const device = deps.findDeviceById(id);
+  if (!isCenterPickerDevice(device)) {
+    return false;
+  }
+
+  const { min, max, step } = resolvePickerBounds(surface);
+  const midpointRaw = min + ((max - min) / 2);
+  const midpoint = snapPickerCoordinate(midpointRaw, min, max, step);
+
+  if (
+    Math.abs(device.params.centerX - midpoint) < 0.0001
+    && Math.abs(device.params.centerY - midpoint) < 0.0001
+  ) {
+    return false;
+  }
+
+  device.params.centerX = midpoint;
+  device.params.centerY = midpoint;
+  updateCenterPickerSurface(surface, midpoint, midpoint);
+  syncCenterPickerSelection(id, deps);
+  return true;
+};
+
 /** Captures the pointer for center picking and resets session dirty state. */
 export const startCenterPickerSession = (
   state: CenterPickerSessionState,

@@ -574,6 +574,11 @@
   }
 
   function handleChainDoubleClick(event: MouseEvent) {
+    if (deviceRackController?.handleDoubleClick(event)) {
+      event.preventDefault();
+      return;
+    }
+
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
       return;
