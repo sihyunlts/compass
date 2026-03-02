@@ -84,8 +84,7 @@
     border: 1px solid var(--neutral-30);
     border-radius: var(--radius-4);
     cursor: crosshair;
-    
-    --picker-guide-color: var(--neutral-30);
+    --picker-guide-color: transparent;
     background:
       linear-gradient(
         to bottom,
@@ -112,6 +111,10 @@
         transparent var(--picker-grid-step, 10%)
       ),
       var(--neutral-10);
+
+    &:active {
+      --picker-guide-color: var(--neutral-30);
+    }
 
     &::after {
       content: '';
