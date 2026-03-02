@@ -176,7 +176,7 @@
           role="menuitem"
           onclick={handleGroupClick}
         >
-          Create Group
+          Group
         </button>
       {/if}
       <button
@@ -186,9 +186,7 @@
         role="menuitem"
         onclick={handleDeleteClick}
       >
-        {target.deviceIds.length > 1
-          ? `Delete Selected Devices (${target.deviceIds.length})`
-          : 'Delete Device'}
+        Delete
       </button>
     {:else}
       <button
@@ -207,7 +205,7 @@
         role="menuitem"
         onclick={handleDeleteClick}
       >
-        Delete Group ({target.memberDeviceIds.length})
+        Delete
       </button>
     {/if}
   {/if}
@@ -219,7 +217,7 @@
     left: 0;
     top: 0;
     z-index: 42;
-    min-width: 160px;
+    min-width: 120px;
     padding: var(--gap-4);
     border: 1px solid var(--neutral-30);
     border-radius: var(--radius-8);
@@ -232,6 +230,7 @@
     }
 
     &-item {
+      display: block;
       width: 100%;
       border-radius: var(--radius-4);
       background: transparent;
