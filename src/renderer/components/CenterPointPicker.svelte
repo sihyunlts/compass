@@ -22,26 +22,52 @@
   const resolvedCenterY = $derived(clamp(Math.round(centerY / STEP) * STEP, MIN, MAX));
   const xPercent = $derived((((resolvedCenterX - MIN) / RANGE) * 100).toFixed(3));
   const yPercent = $derived(((1 - (resolvedCenterY - MIN) / RANGE) * 100).toFixed(3));
+  const gridStepPercent = $derived((100 / RANGE).toFixed(3));
+  let surfaceHeight = $state(0);
 </script>
 
-<div class="center-point-control">
-  <span class="field-label">Center (0.5 Snap)</span>
-  <div class="center-picker" role="group" aria-label="Center point picker">
-    <div
-      class="center-picker-surface"
-      data-action="set-center-point"
-      data-id={deviceId}
-      data-min={MIN}
-      data-max={MAX}
-      data-step={STEP}
-      data-center-x={resolvedCenterX.toFixed(1)}
-      data-center-y={resolvedCenterY.toFixed(1)}
-      aria-label="Center point area"
-      style={`--picker-x:${xPercent}%;--picker-y:${yPercent}%;`}
-    ></div>
-    <span class="center-picker-readout">
-      X {resolvedCenterX.toFixed(1)} | Y {resolvedCenterY.toFixed(1)}
-    </span>
+<div class="center-point-control" role="group" aria-label="Center point picker">
+  <span class="field-label">Center</span>
+  <div
+    class="center-picker-surface"
+    bind:clientHeight={surfaceHeight}
+    data-action="set-center-point"
+    data-id={deviceId}
+    data-min={MIN}
+    data-max={MAX}
+    data-step={STEP}
+    data-center-x={resolvedCenterX.toFixed(1)}
+    data-center-y={resolvedCenterY.toFixed(1)}
+    aria-label="Center point area"
+    style={`width:${surfaceHeight}px;--picker-x:${xPercent}%;--picker-y:${yPercent}%;--picker-grid-step:${gridStepPercent}%;`}
+  ></div>
+  <div class="center-picker-inputs">
+    <div class="control-field">
+      <span class="field-label">X</span>
+      <input
+        type="number"
+        step={STEP}
+        min={MIN}
+        max={MAX}
+        value={resolvedCenterX}
+        data-action="set-center-picker-param"
+        data-id={deviceId}
+        data-param="centerX"
+      />
+    </div>
+    <div class="control-field">
+      <span class="field-label">Y</span>
+      <input
+        type="number"
+        step={STEP}
+        min={MIN}
+        max={MAX}
+        value={resolvedCenterY}
+        data-action="set-center-picker-param"
+        data-id={deviceId}
+        data-param="centerY"
+      />
+    </div>
   </div>
 </div>
 
@@ -50,75 +76,74 @@
     display: flex;
     flex-direction: column;
     gap: var(--gap-6);
-    min-height: 0;
-    height: 100%;
   }
 
-  .center-picker {
-    display: flex;
-    flex-direction: column;
+  .center-picker-surface {
+    position: relative;
     flex: 1;
-    gap: var(--gap-6);
-    min-height: 0;
-    height: 100%;
-    min-width: 0;
+    border: 1px solid var(--neutral-30);
+    border-radius: var(--radius-4);
+    cursor: crosshair;
+    
+    --picker-guide-color: var(--neutral-30);
+    background:
+      linear-gradient(
+        to bottom,
+        var(--picker-guide-color),
+        var(--picker-guide-color)
+      ) var(--picker-x, 50%) 0 / 1px 100% no-repeat,
+      linear-gradient(
+        to right,
+        var(--picker-guide-color),
+        var(--picker-guide-color)
+      ) 0 var(--picker-y, 50%) / 100% 1px no-repeat,
+      repeating-linear-gradient(
+        to right,
+        var(--neutral-20) 0,
+        var(--neutral-20) 1px,
+        transparent 1px,
+        transparent var(--picker-grid-step, 10%)
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        var(--neutral-20) 0,
+        var(--neutral-20) 1px,
+        transparent 1px,
+        transparent var(--picker-grid-step, 10%)
+      ),
+      var(--neutral-10);
 
-    &-surface {
-      position: relative;
-      height: 100%;
-      min-width: 0;
-      max-height: 100%;
-      max-width: 100%;
-      min-height: 0;
-      aspect-ratio: 1 / 1;
-      border: 1px solid var(--neutral-30);
-      border-radius: var(--radius-6);
-      cursor: crosshair;
-      background:
-        repeating-linear-gradient(
-          to right,
-          rgb(var(--rgb-white) / var(--alpha-02)) 0,
-          rgb(var(--rgb-white) / var(--alpha-02)) 1px,
-          transparent 1px,
-          transparent 10%
-        ),
-        repeating-linear-gradient(
-          to bottom,
-          rgb(var(--rgb-white) / var(--alpha-02)) 0,
-          rgb(var(--rgb-white) / var(--alpha-02)) 1px,
-          transparent 1px,
-          transparent 10%
-        ),
-        var(--neutral-10);
-
-      &::before {
-        content: '';
-        position: absolute;
-        left: var(--picker-x, 50%);
-        top: 0;
-        bottom: 0;
-        width: 1px;
-        background: rgb(var(--rgb-white) / var(--alpha-08));
-        transform: translateX(-50%);
-      }
-
-      &::after {
-        content: '';
-        position: absolute;
-        left: var(--picker-x, 50%);
-        top: var(--picker-y, 50%);
-        width: 0.48rem;
-        height: 0.48rem;
-        border-radius: var(--radius-round);
-        background: var(--accent-500);
-        box-shadow: 0 0 0 1px rgb(var(--rgb-black) / var(--alpha-15));
-        transform: translate(-50%, -50%);
-      }
+    &::after {
+      content: '';
+      position: absolute;
+      left: var(--picker-x, 50%);
+      top: var(--picker-y, 50%);
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: var(--radius-round);
+      background: var(--accent-500);
+      transform: translate(-50%, -50%);
     }
+  }
 
-    &-readout {
-      color: var(--neutral-50);
-      font-size: var(--text-12);
+  .center-picker-inputs {
+    display: flex;
+    gap: var(--gap-8);
+    margin-top: var(--gap-2);
+
+    .control-field {
+      flex: 1 1 0;
+      gap: var(--gap-4);
+      flex-direction: row;
+      align-items: center;
+      
+      input {
+        flex: 1 1 0;
+        width: auto;
+        height: var(--gap-20);
+        padding: 0 var(--gap-6);
+        font-size: var(--text-12);
+      }
     }
   }
 </style>

@@ -643,19 +643,12 @@
       gap: var(--gap-10);
       flex: 1;
       min-width: 0;
-
-      :global(.center-point-control) {
-        flex: 1;
-        min-width: 0;
-      }
     }
 
     .column-wrapper {
       display: flex;
       flex-direction: column;
-      flex: 0 0 7.4rem;
       gap: var(--gap-8);
-      width: 7.4rem;
     }
 
     &[data-device-kind='modulator'] {

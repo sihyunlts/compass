@@ -123,6 +123,30 @@ const handleSetSpiralParam = (): ChainControlHandler => (device, target) => {
   return true;
 };
 
+const handleSetCenterPickerParam = (): ChainControlHandler => (device, target) => {
+  if (device.kind !== 'waterdrop' && device.kind !== 'spiral') {
+    return false;
+  }
+
+  const input = requireInput(target);
+  if (!input) {
+    return false;
+  }
+
+  const rawParam = input.dataset.param;
+  if (rawParam !== 'centerX' && rawParam !== 'centerY') {
+    return false;
+  }
+
+  const value = parseFiniteNumber(input.value);
+  if (value === null) {
+    return false;
+  }
+
+  device.params[rawParam] = value;
+  return true;
+};
+
 const handleSetAngleParam = (): ChainControlHandler => (device, target) => {
   if (device.kind !== 'scanner' && device.kind !== 'mirror' && device.kind !== 'rotate') {
     return false;
@@ -428,6 +452,7 @@ export const createChainControlHandlers = (
   'set-waterdrop-param': handleSetWaterdropParam(),
   'set-scanner-param': handleSetScannerParam(),
   'set-spiral-param': handleSetSpiralParam(),
+  'set-center-picker-param': handleSetCenterPickerParam(),
   'set-angle-param': handleSetAngleParam(),
   'set-effect-symmetry-mode': handleSetSymmetryMode(),
   'set-effect-symmetry-axis': handleSetSymmetryAxis(),
