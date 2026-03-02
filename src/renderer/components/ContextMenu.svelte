@@ -39,8 +39,8 @@
     requiresClipboard?: boolean;
   };
   const CLIPBOARD_ACTIONS: readonly ClipboardActionMeta[] = [
-    { id: 'context-copy', kind: 'copy', label: 'Copy' },
     { id: 'context-cut', kind: 'cut', label: 'Cut' },
+    { id: 'context-copy', kind: 'copy', label: 'Copy' },
     { id: 'context-paste', kind: 'paste', label: 'Paste', requiresClipboard: true },
     { id: 'context-duplicate', kind: 'duplicate', label: 'Duplicate' },
   ];
@@ -176,7 +176,17 @@
         {action.label}
       </button>
     {/each}
+    <hr class="context-menu-separator" role="separator" />
     {#if target.kind === 'devices'}
+      <button
+        id="context-delete"
+        class="context-menu-item"
+        type="button"
+        role="menuitem"
+        onclick={handleDeleteClick}
+      >
+        Delete
+      </button>
       {#if target.canGroup}
         <button
           id="context-group"
@@ -188,6 +198,7 @@
           Group
         </button>
       {/if}
+    {:else}
       <button
         id="context-delete"
         class="context-menu-item"
@@ -197,7 +208,6 @@
       >
         Delete
       </button>
-    {:else}
       <button
         id="context-ungroup"
         class="context-menu-item"
@@ -206,15 +216,6 @@
         onclick={handleUngroupClick}
       >
         Ungroup
-      </button>
-      <button
-        id="context-delete"
-        class="context-menu-item"
-        type="button"
-        role="menuitem"
-        onclick={handleDeleteClick}
-      >
-        Delete
       </button>
     {/if}
   {/if}
@@ -250,6 +251,12 @@
       &:hover {
         background: var(--neutral-20);
       }
+    }
+
+    &-separator {
+      margin: var(--gap-4) var(--gap-6);
+      border: 0;
+      border-top: 1px solid var(--neutral-30);
     }
   }
 </style>
