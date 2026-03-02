@@ -53,9 +53,27 @@ input {
   }
 
   &[type='number'] {
+    cursor: n-resize;
+
     &::-webkit-inner-spin-button,
     &::-webkit-outer-spin-button {
       -webkit-appearance: none;
+    }
+
+    &:focus {
+      box-shadow: inset 0 0 0 1px var(--neutral-30);
+      outline: none;
+      caret-color: transparent;
+    }
+
+    &[data-drag-active='true'] {
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    &[data-keyboard-editing='true'] {
+      cursor: text;
+      caret-color: currentColor;
     }
   }
 

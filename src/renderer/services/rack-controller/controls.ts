@@ -7,6 +7,7 @@ import {
   type WaterdropParamKey,
 } from '../devices';
 import {
+  createDefaultDeviceNode,
   getModulationTargetParamDefinitions,
   isModulationTargetDeviceKind,
 } from '../../../shared/device-registry';
@@ -496,4 +497,67 @@ export const applyChainControlChange = (
 
   const handler = chainControlHandlers[action];
   return handler ? handler(device, control) : false;
+};
+
+const resolveResetParamKey = (action: string, input: HTMLInputElement): string | null => {
+  if (
+    action === 'set-waterdrop-param'
+    || action === 'set-scanner-param'
+    || action === 'set-spiral-param'
+    || action === 'set-center-picker-param'
+    || action === 'set-angle-param'
+  ) {
+    return input.dataset.param ?? null;
+  }
+
+  if (action === 'set-modulation-amount') {
+    return 'amount';
+  }
+
+  return null;
+};
+
+export const resetNumericControlToDefault = (
+  target: EventTarget | null,
+  findDeviceById: (id: string) => ChainDevice | null,
+  chainControlHandlers: Readonly<Record<string, ChainControlHandler>>,
+): boolean => {
+  if (!(target instanceof HTMLInputElement) || target.type !== 'number') {
+    return false;
+  }
+
+  const action = target.dataset.action;
+  const id = target.dataset.id;
+  if (!action || !id || !chainControlHandlers[action]) {
+    return false;
+  }
+
+  const paramKey = resolveResetParamKey(action, target);
+  if (!paramKey) {
+    return false;
+  }
+
+  const device = findDeviceById(id);
+  if (!device) {
+    return false;
+  }
+
+  const defaultDevice = createDefaultDeviceNode(device.kind, device.id, device.enabled);
+  if (!('params' in defaultDevice)) {
+    return false;
+  }
+
+  const defaultValue = (defaultDevice.params as Record<string, unknown>)[paramKey];
+  if (typeof defaultValue !== 'number' || !Number.isFinite(defaultValue)) {
+    return false;
+  }
+
+  const currentValue = Number(target.value);
+  if (Number.isFinite(currentValue) && Math.abs(currentValue - defaultValue) < 0.0001) {
+    return false;
+  }
+
+  target.value = String(defaultValue);
+  target.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
 };

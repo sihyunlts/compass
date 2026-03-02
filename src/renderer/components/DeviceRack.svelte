@@ -488,6 +488,14 @@
     deviceRackController?.handleControlInputOrChange(event);
   }
 
+  function handleChainFocusIn(event: FocusEvent) {
+    deviceRackController?.handleChainFocusIn(event);
+  }
+
+  function handleChainKeyDown(event: KeyboardEvent) {
+    deviceRackController?.handleChainKeyDown(event);
+  }
+
   function handleGroupEnabledChange(event: Event, groupId: string) {
     event.stopPropagation();
     const target = event.currentTarget;
@@ -662,6 +670,22 @@
     dragDropManager?.handlePointerCancel(event);
   }
 
+  function handleWindowBlur() {
+    deviceRackController?.handleWindowBlur();
+  }
+
+  function handleWindowMouseUp(event: MouseEvent) {
+    deviceRackController?.handleWindowMouseUp(event);
+  }
+
+  function handlePointerLockChange() {
+    deviceRackController?.handlePointerLockChange();
+  }
+
+  function handleLockedMouseMove(event: MouseEvent) {
+    deviceRackController?.handleLockedMouseMove(event);
+  }
+
   onMount(() => {
     if (!chainDevicesEl || !browserDragBadgeEl) return;
 
@@ -683,7 +707,10 @@
       onDragUpdate: (info) => applyDropIndicator(info),
     });
 
+    document.addEventListener('pointerlockchange', handlePointerLockChange);
+
     return () => {
+      document.removeEventListener('pointerlockchange', handlePointerLockChange);
       clearDropIndicator();
       dragDropManager = null;
       deviceRackController = null;
@@ -695,17 +722,25 @@
   onpointermove={handleWindowPointerMove}
   onpointerup={handleWindowPointerUp}
   onpointercancel={handleWindowPointerCancel}
+  onmouseup={handleWindowMouseUp}
+  onblur={handleWindowBlur}
+/>
+
+<svelte:document
+  onmousemove={handleLockedMouseMove}
 />
 
 <section class="device-rack">
+  <!-- Rack surface delegates composite pointer/keyboard interactions. -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
     bind:this={chainDevicesEl}
     id="chain-devices"
     class="chain-devices"
     oninput={handleChainControlInputOrChange}
     onchange={handleChainControlInputOrChange}
+    onfocusin={handleChainFocusIn}
+    onkeydown={handleChainKeyDown}
     onpointerdown={handleChainPointerDown}
     oncontextmenu={handleChainContextMenu}
     onclick={handleChainClick}

@@ -17,6 +17,7 @@ import {
 import {
   applyChainControlChange,
   createChainControlHandlers,
+  resetNumericControlToDefault,
 } from './rack-controller/controls';
 import {
   applyMaskTileFromPoint,
@@ -39,6 +40,22 @@ interface SelectionState {
   lastSelectedDeviceId: string | null;
   selectedGroupIds: Set<string>;
   lastSelectedGroupId: string | null;
+}
+
+interface NumberDragState {
+  pointerId: number | null;
+  inputEl: HTMLInputElement | null;
+  lastPointerX: number;
+  lastPointerY: number;
+  didMove: boolean;
+  dragRawValue: number;
+  step: number;
+  min: number | null;
+  max: number | null;
+  decimals: number;
+  sensitivity: number;
+  wrapMode: boolean;
+  isPointerLocked: boolean;
 }
 
 interface DeviceRackControllerOptions {
@@ -66,6 +83,22 @@ const createSelectionState = (): SelectionState => ({
   lastSelectedDeviceId: null,
   selectedGroupIds: new Set<string>(),
   lastSelectedGroupId: null,
+});
+
+const createNumberDragState = (): NumberDragState => ({
+  pointerId: null,
+  inputEl: null,
+  lastPointerX: 0,
+  lastPointerY: 0,
+  didMove: false,
+  dragRawValue: 0,
+  step: 1,
+  min: null,
+  max: null,
+  decimals: 0,
+  sensitivity: 1,
+  wrapMode: false,
+  isPointerLocked: false,
 });
 
 const getOrderedSelectedDeviceIds = (
@@ -206,6 +239,14 @@ const NON_TEXT_INPUT_TYPES = new Set([
   'reset',
 ]);
 
+const isRackNumericInput = (target: EventTarget | null): target is HTMLInputElement =>
+  target instanceof HTMLInputElement
+  && target.type === 'number'
+  && !!target.dataset.action
+  && !!target.dataset.id;
+
+const NUMERIC_RESET_DOUBLE_CLICK_WINDOW_MS = 400;
+
 const isTextEditingElement = (element: Element | null): boolean => {
   if (!element) {
     return false;
@@ -267,6 +308,14 @@ export class DeviceRackController {
   private readonly centerPickerState = createCenterPickerSessionState();
 
   private readonly maskTileState = createMaskTilePaintState();
+
+  private readonly numberDragState = createNumberDragState();
+
+  private overwriteOnTypeInput: HTMLInputElement | null = null;
+
+  private lastNumberClickInput: HTMLInputElement | null = null;
+
+  private lastNumberClickAt = 0;
 
   private readonly chainControlHandlers: ReturnType<typeof createChainControlHandlers>;
 
@@ -345,10 +394,45 @@ export class DeviceRackController {
     return true;
   }
 
+  handleChainFocusIn(event: FocusEvent): void {
+    const target = event.target;
+    if (!isRackNumericInput(target) || target.disabled || target.readOnly) {
+      return;
+    }
+    this.overwriteOnTypeInput = target;
+    delete target.dataset.keyboardEditing;
+  }
+
+  handleChainKeyDown(event: KeyboardEvent): void {
+    const target = event.target;
+    if (!isRackNumericInput(target)) {
+      return;
+    }
+    const isTypingKey = !(
+      event.defaultPrevented
+      || event.isComposing
+      || event.ctrlKey
+      || event.metaKey
+      || event.altKey
+      || event.key.length !== 1
+      || !/[0-9+\-eE.]/.test(event.key)
+    );
+    if (!isTypingKey) {
+      return;
+    }
+
+    target.dataset.keyboardEditing = 'true';
+    if (this.overwriteOnTypeInput === target) {
+      this.overwriteOnTypeInput = null;
+      target.value = '';
+    }
+  }
+
   handleChainPointerDown(event: PointerEvent): boolean {
     if (
       event.button !== 0
       || !event.isPrimary
+      || this.isNumberDragActive()
       || isCenterPickerActive(this.centerPickerState)
       || isMaskTilePaintActive(this.maskTileState)
     ) {
@@ -358,6 +442,11 @@ export class DeviceRackController {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
       return false;
+    }
+
+    if (this.tryStartNumberInputDrag(event, target)) {
+      this.closeContextMenu();
+      return true;
     }
 
     if (this.tryStartMaskTilePaint(event, target)) {
@@ -393,6 +482,14 @@ export class DeviceRackController {
       return true;
     }
 
+    if (this.isNumberDragPointer(event.pointerId)) {
+      if (this.numberDragState.isPointerLocked) {
+        return true;
+      }
+      this.applyNumberInputDrag(event.clientX, event.clientY);
+      return true;
+    }
+
     if (!isCenterPickerPointer(this.centerPickerState, event.pointerId) || !this.centerPickerState.surfaceEl) {
       return false;
     }
@@ -415,6 +512,10 @@ export class DeviceRackController {
       this.clearMaskTilePointerState(true);
       return true;
     }
+    if (this.isNumberDragPointer(event.pointerId)) {
+      this.finalizeNumberDragInteraction(event.timeStamp);
+      return true;
+    }
     if (!isCenterPickerPointer(this.centerPickerState, event.pointerId)) {
       return false;
     }
@@ -427,11 +528,47 @@ export class DeviceRackController {
       this.clearMaskTilePointerState(false);
       return true;
     }
+    if (this.isNumberDragPointer(event.pointerId)) {
+      this.clearNumberDragState();
+      this.clearNumberClickState();
+      return true;
+    }
     if (!isCenterPickerPointer(this.centerPickerState, event.pointerId)) {
       return false;
     }
     this.clearCenterPickerPointerState(false);
     return true;
+  }
+
+  handleWindowBlur(): void {
+    if (this.isNumberDragActive()) {
+      this.clearNumberDragState();
+    }
+    this.clearNumberClickState();
+  }
+
+  handleWindowMouseUp(event: MouseEvent): void {
+    if (this.isNumberDragActive()) {
+      this.finalizeNumberDragInteraction(event.timeStamp);
+    }
+  }
+
+  handlePointerLockChange(): void {
+    const input = this.numberDragState.inputEl;
+    const wasPointerLocked = this.numberDragState.isPointerLocked;
+    const isPointerLocked = !!input && document.pointerLockElement === input;
+    this.numberDragState.isPointerLocked = isPointerLocked;
+    if (wasPointerLocked && !isPointerLocked && this.isNumberDragActive()) {
+      this.clearNumberDragState();
+      this.clearNumberClickState();
+    }
+  }
+
+  handleLockedMouseMove(event: MouseEvent): void {
+    if (!this.isNumberDragActive() || !this.numberDragState.isPointerLocked) {
+      return;
+    }
+    this.applyNumberInputDragDelta(event.movementX, -event.movementY);
   }
 
   handleContextMenu(event: MouseEvent): void {
@@ -537,22 +674,7 @@ export class DeviceRackController {
       return false;
     }
 
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
-      return false;
-    }
-
-    const centerPickerSurface = resolveCenterPickerSurface(target);
-    if (!centerPickerSurface) {
-      return false;
-    }
-
-    this.blurActiveTextEditingElement();
-    this.closeContextMenu();
-    if (this.resetCenterPickerToMidpoint(centerPickerSurface)) {
-      this.commitChainChange();
-    }
-    return true;
+    return this.tryResetControlFromDoubleClick(event.target);
   }
 
   prepareSelectionOnPointerDown(target: PointerDownSelectionTarget, event: PointerEvent): void {
@@ -819,6 +941,250 @@ export class DeviceRackController {
     clearCenterPickerPointerState(this.centerPickerState, persist, () => {
       this.saveChain(this.getChainState());
     });
+  }
+
+  private isNumberDragActive(): boolean {
+    return this.numberDragState.pointerId !== null;
+  }
+
+  private isNumberDragPointer(pointerId: number): boolean {
+    return this.numberDragState.pointerId === pointerId;
+  }
+
+  private parseInputBound(rawValue: string): number | null {
+    if (rawValue.trim() === '') {
+      return null;
+    }
+    const parsed = Number(rawValue);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private resolveNumberStep(input: HTMLInputElement): number {
+    const parsedStep = Number(input.step);
+    return Number.isFinite(parsedStep) && parsedStep > 0 ? parsedStep : 1;
+  }
+
+  private resolveStepDecimals(input: HTMLInputElement): number {
+    const stepText = input.step;
+    if (!stepText || stepText === 'any') {
+      return 0;
+    }
+    const dotIndex = stepText.indexOf('.');
+    if (dotIndex < 0) {
+      return 0;
+    }
+    return Math.max(0, stepText.length - dotIndex - 1);
+  }
+
+  private formatDraggedValue(value: number, decimals: number): string {
+    return decimals > 0 ? value.toFixed(decimals) : String(Math.round(value));
+  }
+
+  private clampValue(value: number, min: number | null, max: number | null): number {
+    let next = value;
+    if (min !== null) {
+      next = Math.max(next, min);
+    }
+    if (max !== null) {
+      next = Math.min(next, max);
+    }
+    return next;
+  }
+
+  private requestNumberInputPointerLock(input: HTMLInputElement): void {
+    if (!('requestPointerLock' in input)) {
+      return;
+    }
+
+    try {
+      input.requestPointerLock();
+    } catch {
+      // Pointer lock is optional; drag still works without it.
+    }
+  }
+
+  private exitNumberInputPointerLock(input: HTMLInputElement | null): void {
+    if (!input || document.pointerLockElement !== input) {
+      return;
+    }
+    document.exitPointerLock();
+  }
+
+  private snapDraggedValue(rawValue: number, state: NumberDragState): number {
+    if (
+      state.wrapMode
+      && state.min !== null
+      && state.max !== null
+      && state.max > state.min
+    ) {
+      const range = state.max - state.min;
+      const stepped = Math.round((rawValue - state.min) / state.step) * state.step + state.min;
+      let wrapped = (stepped - state.min) % range;
+      if (wrapped < 0) {
+        wrapped += range;
+      }
+      return Number((state.min + wrapped).toFixed(state.decimals));
+    }
+
+    const base = state.min ?? 0;
+    const stepped = Math.round((rawValue - base) / state.step) * state.step + base;
+    const clamped = this.clampValue(stepped, state.min, state.max);
+    return Number(clamped.toFixed(state.decimals));
+  }
+
+  private tryStartNumberInputDrag(event: PointerEvent, target: HTMLElement): boolean {
+    const input = target.closest<HTMLInputElement>('input[type="number"][data-action][data-id]');
+    if (!input || input.disabled || input.readOnly) {
+      return false;
+    }
+
+    const min = this.parseInputBound(input.min);
+    const max = this.parseInputBound(input.max);
+    const step = this.resolveNumberStep(input);
+    const decimals = this.resolveStepDecimals(input);
+    const currentValue = Number(input.value);
+    const initialValue = Number.isFinite(currentValue) ? currentValue : (min ?? 0);
+    const hasFiniteRange = min !== null && max !== null && max > min;
+    const wrapMode = input.dataset.action === 'set-angle-param' && hasFiniteRange;
+    const sensitivity = hasFiniteRange ? Math.max((max - min) / 480, step) : step;
+
+    this.numberDragState.pointerId = event.pointerId;
+    this.numberDragState.inputEl = input;
+    this.numberDragState.lastPointerX = event.clientX;
+    this.numberDragState.lastPointerY = event.clientY;
+    this.numberDragState.didMove = false;
+    this.numberDragState.dragRawValue = initialValue;
+    this.numberDragState.step = step;
+    this.numberDragState.min = min;
+    this.numberDragState.max = max;
+    this.numberDragState.decimals = decimals;
+    this.numberDragState.sensitivity = sensitivity;
+    this.numberDragState.wrapMode = wrapMode;
+    this.numberDragState.isPointerLocked = false;
+    this.overwriteOnTypeInput = input;
+    delete input.dataset.keyboardEditing;
+
+    input.dataset.dragActive = 'true';
+    input.focus();
+    input.setPointerCapture(event.pointerId);
+    if (event.pointerType === 'mouse') {
+      this.requestNumberInputPointerLock(input);
+    }
+    return true;
+  }
+
+  private tryResetControlFromDoubleClick(target: EventTarget | null): boolean {
+    return this.tryResetNumericControl(target) || this.tryResetCenterPickerSurface(target);
+  }
+
+  private tryResetNumericControl(target: EventTarget | null): boolean {
+    if (!resetNumericControlToDefault(
+      target,
+      this.findDeviceById.bind(this),
+      this.chainControlHandlers,
+    )) {
+      return false;
+    }
+    this.closeContextMenu();
+    return true;
+  }
+
+  private tryResetCenterPickerSurface(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    const centerPickerSurface = resolveCenterPickerSurface(target);
+    if (!centerPickerSurface) {
+      return false;
+    }
+
+    this.blurActiveTextEditingElement();
+    this.closeContextMenu();
+    if (this.resetCenterPickerToMidpoint(centerPickerSurface)) {
+      this.commitChainChange();
+    }
+    return true;
+  }
+
+  private applyNumberInputDrag(clientX: number, clientY: number): void {
+    const input = this.numberDragState.inputEl;
+    if (!input) {
+      return;
+    }
+
+    const deltaY = this.numberDragState.lastPointerY - clientY;
+    const deltaX = clientX - this.numberDragState.lastPointerX;
+    this.numberDragState.lastPointerX = clientX;
+    this.numberDragState.lastPointerY = clientY;
+    this.applyNumberInputDragDelta(deltaX, deltaY);
+  }
+
+  private applyNumberInputDragDelta(deltaX: number, deltaY: number): void {
+    const input = this.numberDragState.inputEl;
+    if (!input) {
+      return;
+    }
+
+    if (deltaX !== 0 || deltaY !== 0) {
+      this.numberDragState.didMove = true;
+    }
+
+    this.numberDragState.dragRawValue += (deltaY + deltaX * 0.5) * this.numberDragState.sensitivity;
+
+    const nextValue = this.snapDraggedValue(this.numberDragState.dragRawValue, this.numberDragState);
+    const nextText = this.formatDraggedValue(nextValue, this.numberDragState.decimals);
+    if (input.value === nextText) {
+      return;
+    }
+
+    input.value = nextText;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  private finalizeNumberDragInteraction(at: number): void {
+    const { inputEl, didMove } = this.numberDragState;
+    this.clearNumberDragState();
+
+    if (!inputEl) {
+      this.clearNumberClickState();
+      return;
+    }
+
+    if (didMove) {
+      this.clearNumberClickState();
+      return;
+    }
+
+    const isDoubleClick = this.lastNumberClickInput === inputEl
+      && at - this.lastNumberClickAt <= NUMERIC_RESET_DOUBLE_CLICK_WINDOW_MS;
+    this.lastNumberClickInput = inputEl;
+    this.lastNumberClickAt = at;
+
+    if (!isDoubleClick) {
+      return;
+    }
+
+    this.clearNumberClickState();
+    this.tryResetNumericControl(inputEl);
+  }
+
+  private clearNumberClickState(): void {
+    this.lastNumberClickInput = null;
+    this.lastNumberClickAt = 0;
+  }
+
+  private clearNumberDragState(): void {
+    const { inputEl, pointerId } = this.numberDragState;
+    if (inputEl && pointerId !== null && inputEl.hasPointerCapture(pointerId)) {
+      inputEl.releasePointerCapture(pointerId);
+    }
+    this.exitNumberInputPointerLock(inputEl);
+    if (inputEl) {
+      delete inputEl.dataset.dragActive;
+    }
+
+    Object.assign(this.numberDragState, createNumberDragState());
   }
 
   private applyChainControlChange(target: EventTarget | null): boolean {
