@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { clamp } from '../../shared/math';
   import type { ContextMenuTarget } from '../state/context-menu';
 
@@ -23,10 +24,12 @@
   }>();
 
   let isOpen = $state(false);
+  let isPositioned = $state(false);
   let x = $state(0);
   let y = $state(0);
   let target = $state<ContextMenuTarget | null>(null);
   let menuEl = $state<HTMLElement | null>(null);
+  let openToken = 0;
   const canPasteForTarget = $derived.by(() => target !== null && clipboardAvailable);
   type ClipboardActionKind = 'copy' | 'cut' | 'paste' | 'duplicate';
   type ClipboardActionMeta = {
@@ -46,7 +49,7 @@
 
   const MARGIN_PX = 8;
 
-  export function open(clientX: number, clientY: number, nextTarget: ContextMenuTarget) {
+  export async function open(clientX: number, clientY: number, nextTarget: ContextMenuTarget) {
     if (
       (nextTarget.kind === 'devices' && nextTarget.deviceIds.length === 0)
       || (nextTarget.kind === 'group' && nextTarget.memberDeviceIds.length === 0)
@@ -66,23 +69,29 @@
         groupId: nextTarget.groupId,
         memberDeviceIds: [...nextTarget.memberDeviceIds],
       };
+    isPositioned = false;
     isOpen = true;
+    const token = ++openToken;
+    await tick();
 
-    setTimeout(() => {
-      if (!menuEl) return;
+    if (!menuEl || token !== openToken || !isOpen) {
+      return;
+    }
 
-      const menuWidth = menuEl.offsetWidth;
-      const menuHeight = menuEl.offsetHeight;
-      const maxX = Math.max(MARGIN_PX, window.innerWidth - menuWidth - MARGIN_PX);
-      const maxY = Math.max(MARGIN_PX, window.innerHeight - menuHeight - MARGIN_PX);
+    const menuWidth = menuEl.offsetWidth;
+    const menuHeight = menuEl.offsetHeight;
+    const maxX = Math.max(MARGIN_PX, window.innerWidth - menuWidth - MARGIN_PX);
+    const maxY = Math.max(MARGIN_PX, window.innerHeight - menuHeight - MARGIN_PX);
 
-      x = clamp(clientX, MARGIN_PX, maxX);
-      y = clamp(clientY, MARGIN_PX, maxY);
-    }, 0);
+    x = clamp(clientX, MARGIN_PX, maxX);
+    y = clamp(clientY, MARGIN_PX, maxY);
+    isPositioned = true;
   }
 
   export function close() {
+    openToken += 1;
     isOpen = false;
+    isPositioned = false;
     target = null;
   }
 
@@ -149,7 +158,7 @@
   bind:this={menuEl}
   id="context-menu"
   class="context-menu"
-  class:is-open={isOpen}
+  class:is-open={isOpen && isPositioned}
   role="menu"
   aria-hidden={!isOpen}
   hidden={!isOpen}
