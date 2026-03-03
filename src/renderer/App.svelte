@@ -1537,6 +1537,7 @@
               min="0"
               max={SCRUB_MAX}
               bind:value={uiState.previewScrubValue}
+              style={`--range-fill:${clamp((uiState.previewScrubValue / SCRUB_MAX) * 100, 0, 100)}%`}
               oninput={handlePreviewScrubInput}
             />
           </div>

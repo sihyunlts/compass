@@ -88,11 +88,20 @@ input {
     background: transparent;
     width: 100%;
     cursor: pointer;
+    --range-fill: 0%;
+    --range-fill-color: var(--accent-500);
+    --range-track-color: var(--neutral-30);
 
     &::-webkit-slider-runnable-track {
       width: 100%;
       height: 0.28rem;
-      background: var(--neutral-30);
+      background: linear-gradient(
+        to right,
+        var(--range-fill-color) 0,
+        var(--range-fill-color) var(--range-fill),
+        var(--range-track-color) var(--range-fill),
+        var(--range-track-color) 100%
+      );
       border-radius: var(--radius-2);
     }
 
@@ -104,6 +113,14 @@ input {
       background: var(--neutral-90);
       margin-top: var(--gap-neg-4);
       box-shadow: 0 0 0 1px var(--neutral-00);
+      opacity: 0;
+      transition: opacity 120ms ease;
+    }
+
+    &:hover::-webkit-slider-thumb,
+    &:active::-webkit-slider-thumb,
+    &:focus-visible::-webkit-slider-thumb {
+      opacity: 1;
     }
   }
 }
