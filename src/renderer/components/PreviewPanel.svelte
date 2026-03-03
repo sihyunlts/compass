@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { PreviewWindowState } from '../../shared/types';
+  import { clamp } from '../../shared/math';
   import PreviewSurface from './PreviewSurface.svelte';
+
+  const SCRUB_MAX = 1000;
 
   let {
     previewState,
@@ -10,6 +13,8 @@
     loopEnabled,
     onPlayClick,
     onLoopToggle,
+    scrubValue = $bindable(),
+    onScrubInput,
   } = $props<{
     previewState: PreviewWindowState | null;
     onGuideToggle: (nextEnabled: boolean) => void;
@@ -18,6 +23,8 @@
     loopEnabled: boolean;
     onPlayClick: () => void;
     onLoopToggle: () => void;
+    scrubValue: number;
+    onScrubInput: () => void;
   }>();
 
   const isGuideVisible = (): boolean => previewState?.isGuideEnabled !== false;
@@ -32,10 +39,21 @@
 </script>
 
 <section class="preview-panel">
-  <PreviewSurface
-    mode="rack"
-    previewState={previewState}
-  />
+  <div class="preview-panel-main">
+    <PreviewSurface
+      mode="rack"
+      previewState={previewState}
+    />
+    <input
+      id="preview-scrub"
+      type="range"
+      min="0"
+      max={SCRUB_MAX}
+      bind:value={scrubValue}
+      style={`--range-fill:${clamp((scrubValue / SCRUB_MAX) * 100, 0, 100)}%`}
+      oninput={onScrubInput}
+    />
+  </div>
   <div class="preview-panel-controls">
     <button
       id="preview-play"
@@ -74,21 +92,22 @@
 
 <style lang="scss">
   .preview-panel {
-    flex: 0 0 auto;
     display: flex;
-    align-items: start;
     gap: var(--gap-8);
-    height: 100%;
-    min-height: 0;
+
     border-left: 1px solid var(--neutral-20);
     padding: var(--gap-10);
+
+    &-main {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap-8);
+    }
 
     &-controls {
       display: flex;
       flex-direction: column;
-      align-items: stretch;
       gap: var(--gap-6);
-      flex: 0 0 auto;
     }
   }
 

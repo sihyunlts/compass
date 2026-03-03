@@ -37,7 +37,6 @@
 
     .workspace-actions,
     .header-length-select,
-    .preview-controls,
     button,
     input,
     select {
@@ -94,10 +93,4 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-}
-
-.preview-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-8);
 }

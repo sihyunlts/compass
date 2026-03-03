@@ -220,6 +220,7 @@
   let yCentersByCoord: number[] | null = null;
   let wasGuideEnabled = true;
   let lastRenderedModel: LaunchpadModel | null = null;
+  let surfaceHeight = $state(0);
 
   const resolveLedCellsByPitch = (): SvelteMap<number, HTMLElement> => {
     if (!stageEl) {
@@ -537,6 +538,8 @@
   class={`preview-launchpad mode-${mode}`}
   class:is-guide-enabled={isGuideVisible()}
   bind:this={stageEl}
+  bind:clientHeight={surfaceHeight}
+  style={surfaceHeight > 0 ? `width: ${surfaceHeight}px` : ''}
   role="img"
   aria-label="Launchpad LED preview"
 >
@@ -561,8 +564,7 @@
     border: 1px solid var(--neutral-20);
     border-radius: var(--radius-4);
     background: var(--neutral-00);
-    aspect-ratio: 1 / 1;
-    height: 100%;
+    flex: 1;
     display: grid;
     grid-template-columns: repeat(10, minmax(0, 1fr));
     grid-template-rows: repeat(10, minmax(0, 1fr));
@@ -586,10 +588,6 @@
       max-width: 100%;
       max-height: 100%;
       align-self: center;
-    }
-
-    &.mode-rack {
-      height: 100%;
     }
   }
 

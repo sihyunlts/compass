@@ -1518,17 +1518,7 @@
       <header class="workspace-head">
         <div class="workspace-head-left">
           <span id="preview-bpm-text" class="header-bpm-text">{toBpmText(uiState.previewBpm)}</span>
-          <div class="preview-controls">
-            <input
-              id="preview-scrub"
-              type="range"
-              min="0"
-              max={SCRUB_MAX}
-              bind:value={uiState.previewScrubValue}
-              style={`--range-fill:${clamp((uiState.previewScrubValue / SCRUB_MAX) * 100, 0, 100)}%`}
-              oninput={handlePreviewScrubInput}
-            />
-          </div>
+
           <span id="preview-meta" class="header-preview-meta">{uiState.previewMetaText}</span>
         </div>
 
@@ -1590,6 +1580,8 @@
             loopEnabled={uiState.isPreviewLoopEnabled}
             onPlayClick={handlePreviewPlayClick}
             onLoopToggle={handlePreviewLoopToggle}
+            bind:scrubValue={uiState.previewScrubValue}
+            onScrubInput={handlePreviewScrubInput}
           />
         {/if}
       </section>
