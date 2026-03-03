@@ -1519,18 +1519,6 @@
         <div class="workspace-head-left">
           <span id="preview-bpm-text" class="header-bpm-text">{toBpmText(uiState.previewBpm)}</span>
           <div class="preview-controls">
-            <button id="preview-play" type="button" onclick={handlePreviewPlayClick}>
-              {uiState.previewPlayLabel}
-            </button>
-            <button
-              id="preview-loop-toggle"
-              class:is-active={uiState.isPreviewLoopEnabled}
-              type="button"
-              aria-pressed={uiState.isPreviewLoopEnabled ? 'true' : 'false'}
-              onclick={handlePreviewLoopToggle}
-            >
-              {uiState.isPreviewLoopEnabled ? 'Loop On' : 'Loop Off'}
-            </button>
             <input
               id="preview-scrub"
               type="range"
@@ -1598,6 +1586,10 @@
             previewState={previewSurfaceState}
             onGuideToggle={handlePreviewGuideToggle}
             onPopout={handlePreviewPopout}
+            playLabel={uiState.previewPlayLabel}
+            loopEnabled={uiState.isPreviewLoopEnabled}
+            onPlayClick={handlePreviewPlayClick}
+            onLoopToggle={handlePreviewLoopToggle}
           />
         {/if}
       </section>
