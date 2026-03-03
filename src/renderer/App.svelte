@@ -22,7 +22,6 @@
     parseBeatsValue,
     toLengthPresetLabel,
   } from '../shared/beat-length';
-  import { cloneDeviceNode } from '../shared/device-registry';
   import {
     PREVIEW_FRAME_COUNT,
     toPreviewFrameBeat,
@@ -86,6 +85,7 @@
     createPlaybackScheduler,
     createPreviewWindowStatePusher,
   } from './services/playback';
+  import { cloneChainForIpc } from './services/clone-chain';
   import {
     createRackClipboard,
     prepareClipboardInsert,
@@ -765,20 +765,6 @@
   const writeBridgeInputs = (bridge: BridgeSettings): void => {
     uiState.autoCreateLengthLabel = resolveBridgeLengthLabel(bridge);
     uiState.previewLoopLengthBeats = bridge.autoCreateLengthBeats;
-  };
-
-  const cloneChainForIpc = (chain: GeneratorChain): GeneratorChain => {
-    const groupStateById: GeneratorChain['groupStateById'] = {};
-    for (const [groupId, state] of Object.entries(chain.groupStateById)) {
-      groupStateById[groupId] = {
-        enabled: state.enabled !== false,
-      };
-    }
-
-    return {
-      devices: chain.devices.map((device) => cloneDeviceNode(device)),
-      groupStateById,
-    };
   };
 
   const requestLiveTempoSync = async (): Promise<void> => {

@@ -1,5 +1,4 @@
 import { clamp } from '../../shared/math';
-import { cloneDeviceNode } from '../../shared/device-registry';
 import type {
   CompassApi,
   GeneratorChain,
@@ -7,6 +6,7 @@ import type {
   LaunchpadModel,
   PreviewWindowState,
 } from '../../shared/types';
+import { cloneChainForIpc } from './clone-chain';
 
 /**
  * Renderer playback boundary for timeline scheduling and preview-window state sync.
@@ -143,20 +143,6 @@ export interface PreviewWindowStatePusherOptions {
   resolveLedRgb: (velocity: number) => string;
   now?: () => number;
 }
-
-const cloneChainForIpc = (chain: GeneratorChain): GeneratorChain => {
-  const groupStateById: GeneratorChain['groupStateById'] = {};
-  for (const [groupId, state] of Object.entries(chain.groupStateById)) {
-    groupStateById[groupId] = {
-      enabled: state.enabled !== false,
-    };
-  }
-
-  return {
-    devices: chain.devices.map((device) => cloneDeviceNode(device)),
-    groupStateById,
-  };
-};
 
 class PreviewWindowStatePusher {
   private lastPushedMs = 0;
