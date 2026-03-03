@@ -2,9 +2,6 @@ import {
   SCANNER_PARAM_KEYS,
   SPIRAL_PARAM_KEYS,
   WATERDROP_PARAM_KEYS,
-  type ScannerParamKey,
-  type SpiralParamKey,
-  type WaterdropParamKey,
 } from '../devices';
 import {
   createDefaultDeviceNode,
@@ -18,6 +15,11 @@ import type { GeneratorChain } from '../../../shared/types';
 type ChainDevice = GeneratorChain['devices'][number];
 type ChainControlTarget = HTMLInputElement | HTMLSelectElement;
 type ChainControlHandler = (device: ChainDevice, target: ChainControlTarget) => boolean;
+type WaterdropDevice = Extract<ChainDevice, { kind: 'waterdrop' }>;
+type ScannerDevice = Extract<ChainDevice, { kind: 'scanner' }>;
+type SpiralDevice = Extract<ChainDevice, { kind: 'spiral' }>;
+type CenterPickerDevice = Extract<ChainDevice, { kind: 'waterdrop' | 'spiral' }>;
+type AngleDevice = Extract<ChainDevice, { kind: 'scanner' | 'mirror' | 'rotate' }>;
 
 interface ChainControlContext {
   findDeviceById: (id: string) => ChainDevice | null;
@@ -40,6 +42,65 @@ const parseFiniteNumber = (raw: string): number | null => {
   return Number.isFinite(value) ? value : null;
 };
 
+const readDatasetParam = <ParamKey extends string>(
+  input: HTMLInputElement,
+  allowedParamKeys: readonly ParamKey[],
+): ParamKey | null => {
+  const rawParam = input.dataset.param;
+  if (!rawParam || !allowedParamKeys.includes(rawParam as ParamKey)) {
+    return null;
+  }
+  return rawParam as ParamKey;
+};
+
+const createNumericParamSetter = <Device extends ChainDevice, ParamKey extends string>(
+  options: {
+    isKind: (device: ChainDevice) => device is Device;
+    readParam: (input: HTMLInputElement) => ParamKey | null;
+    assign: (device: Device, param: ParamKey, value: number) => void;
+  },
+): ChainControlHandler => (device, target) => {
+  if (!options.isKind(device)) {
+    return false;
+  }
+
+  const input = requireInput(target);
+  if (!input) {
+    return false;
+  }
+
+  const param = options.readParam(input);
+  if (!param) {
+    return false;
+  }
+
+  const value = parseFiniteNumber(input.value);
+  if (value === null) {
+    return false;
+  }
+
+  options.assign(device, param, value);
+  return true;
+};
+
+const isWaterdropDevice = (device: ChainDevice): device is WaterdropDevice =>
+  device.kind === 'waterdrop';
+
+const isScannerDevice = (device: ChainDevice): device is ScannerDevice =>
+  device.kind === 'scanner';
+
+const isSpiralDevice = (device: ChainDevice): device is SpiralDevice =>
+  device.kind === 'spiral';
+
+const isCenterPickerDevice = (device: ChainDevice): device is CenterPickerDevice =>
+  device.kind === 'waterdrop' || device.kind === 'spiral';
+
+const isAngleDevice = (device: ChainDevice): device is AngleDevice =>
+  device.kind === 'scanner' || device.kind === 'mirror' || device.kind === 'rotate';
+
+const CENTER_PICKER_PARAM_KEYS = ['centerX', 'centerY'] as const;
+const ANGLE_PARAM_KEYS = ['angleDeg'] as const;
+
 const handleSetDeviceEnabled = (): ChainControlHandler => (device, target) => {
   const input = requireInput(target);
   if (!input) {
@@ -49,127 +110,45 @@ const handleSetDeviceEnabled = (): ChainControlHandler => (device, target) => {
   return true;
 };
 
-const handleSetWaterdropParam = (): ChainControlHandler => (device, target) => {
-  if (device.kind !== 'waterdrop') {
-    return false;
-  }
+const handleSetWaterdropParam = (): ChainControlHandler => createNumericParamSetter({
+  isKind: isWaterdropDevice,
+  readParam: (input) => readDatasetParam(input, WATERDROP_PARAM_KEYS),
+  assign: (device, param, value) => {
+    device.params[param] = value;
+  },
+});
 
-  const input = requireInput(target);
-  if (!input) {
-    return false;
-  }
+const handleSetScannerParam = (): ChainControlHandler => createNumericParamSetter({
+  isKind: isScannerDevice,
+  readParam: (input) => readDatasetParam(input, SCANNER_PARAM_KEYS),
+  assign: (device, param, value) => {
+    device.params[param] = value;
+  },
+});
 
-  const rawParam = input.dataset.param;
-  if (!rawParam || !WATERDROP_PARAM_KEYS.includes(rawParam as WaterdropParamKey)) {
-    return false;
-  }
+const handleSetSpiralParam = (): ChainControlHandler => createNumericParamSetter({
+  isKind: isSpiralDevice,
+  readParam: (input) => readDatasetParam(input, SPIRAL_PARAM_KEYS),
+  assign: (device, param, value) => {
+    device.params[param] = value;
+  },
+});
 
-  const value = parseFiniteNumber(input.value);
-  if (value === null) {
-    return false;
-  }
+const handleSetCenterPickerParam = (): ChainControlHandler => createNumericParamSetter({
+  isKind: isCenterPickerDevice,
+  readParam: (input) => readDatasetParam(input, CENTER_PICKER_PARAM_KEYS),
+  assign: (device, param, value) => {
+    device.params[param] = value;
+  },
+});
 
-  const param = rawParam as WaterdropParamKey;
-  device.params[param] = value;
-  return true;
-};
-
-const handleSetScannerParam = (): ChainControlHandler => (device, target) => {
-  if (device.kind !== 'scanner') {
-    return false;
-  }
-
-  const input = requireInput(target);
-  if (!input) {
-    return false;
-  }
-
-  const rawParam = input.dataset.param;
-  if (!rawParam || !SCANNER_PARAM_KEYS.includes(rawParam as ScannerParamKey)) {
-    return false;
-  }
-
-  const value = parseFiniteNumber(input.value);
-  if (value === null) {
-    return false;
-  }
-
-  const param = rawParam as ScannerParamKey;
-  device.params[param] = value;
-  return true;
-};
-
-const handleSetSpiralParam = (): ChainControlHandler => (device, target) => {
-  if (device.kind !== 'spiral') {
-    return false;
-  }
-
-  const input = requireInput(target);
-  if (!input) {
-    return false;
-  }
-
-  const rawParam = input.dataset.param;
-  if (!rawParam || !SPIRAL_PARAM_KEYS.includes(rawParam as SpiralParamKey)) {
-    return false;
-  }
-
-  const value = parseFiniteNumber(input.value);
-  if (value === null) {
-    return false;
-  }
-
-  const param = rawParam as SpiralParamKey;
-  device.params[param] = value;
-  return true;
-};
-
-const handleSetCenterPickerParam = (): ChainControlHandler => (device, target) => {
-  if (device.kind !== 'waterdrop' && device.kind !== 'spiral') {
-    return false;
-  }
-
-  const input = requireInput(target);
-  if (!input) {
-    return false;
-  }
-
-  const rawParam = input.dataset.param;
-  if (rawParam !== 'centerX' && rawParam !== 'centerY') {
-    return false;
-  }
-
-  const value = parseFiniteNumber(input.value);
-  if (value === null) {
-    return false;
-  }
-
-  device.params[rawParam] = value;
-  return true;
-};
-
-const handleSetAngleParam = (): ChainControlHandler => (device, target) => {
-  if (device.kind !== 'scanner' && device.kind !== 'mirror' && device.kind !== 'rotate') {
-    return false;
-  }
-
-  const input = requireInput(target);
-  if (!input) {
-    return false;
-  }
-
-  if (input.dataset.param !== 'angleDeg') {
-    return false;
-  }
-
-  const value = parseFiniteNumber(input.value);
-  if (value === null) {
-    return false;
-  }
-
-  device.params.angleDeg = value;
-  return true;
-};
+const handleSetAngleParam = (): ChainControlHandler => createNumericParamSetter({
+  isKind: isAngleDevice,
+  readParam: (input) => readDatasetParam(input, ANGLE_PARAM_KEYS),
+  assign: (device, param, value) => {
+    device.params[param] = value;
+  },
+});
 
 const handleSetSymmetryMode = (): ChainControlHandler => (device, target) => {
   if (device.kind !== 'symmetry') {
