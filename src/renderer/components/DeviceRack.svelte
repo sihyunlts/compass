@@ -28,6 +28,7 @@
   import { onMount } from 'svelte';
   import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/types';
   import { normalizeOptionalId } from '../../shared/normalize-id';
+  import type { ChainMutationMeta } from '../state/chain-history';
   import type { ContextMenuTarget } from '../state/context-menu';
   import type { BrowserDeviceKind } from '../services/devices';
   import { DeviceRackController, type GroupSelectionContext } from '../services/rack-controller';
@@ -58,7 +59,7 @@
     modulationReadoutById?: Record<string, string>;
     isSidebarResizing: boolean;
     interactiveElementSelector: string;
-    onSaveChain: (chain: GeneratorChain) => void;
+    onSaveChain: (chain: GeneratorChain, meta: ChainMutationMeta) => void;
     onScheduleAutoPreview: (delayMs?: number) => void;
     onOpenContextMenu: (clientX: number, clientY: number, target: ContextMenuTarget) => void;
     onCloseContextMenu: () => void;

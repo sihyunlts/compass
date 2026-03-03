@@ -61,6 +61,10 @@
     removeDevicesById,
     withDevices,
   } from './state/chain';
+  import {
+    createChainHistory,
+    type ChainMutationMeta,
+  } from './state/chain-history';
   import type { ContextMenuTarget } from './state/context-menu';
   import {
     applyInsertDeviceByDropZone,
@@ -98,6 +102,7 @@
     1000 / PREVIEW_WINDOW_STATE_MAX_FPS,
   );
   const AUTO_PREVIEW_DEBOUNCE_MS = 120;
+  const HISTORY_MAX_ENTRIES = 100;
   const SEND_DONE_MS = 900;
   const DEFAULT_LED_RGB = '255 166 57';
   const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, select, textarea, option';
@@ -196,6 +201,84 @@
         memberDeviceIds: string[];
       };
 
+  const HISTORY_META = {
+    addDevice: { kind: 'add-device', label: 'Add device' },
+    insertDevice: { kind: 'insert-device', label: 'Insert device' },
+    moveDevices: { kind: 'move-devices', label: 'Move devices' },
+    deleteDevices: { kind: 'delete-devices', label: 'Delete devices' },
+    groupCreate: { kind: 'group-create', label: 'Create group' },
+    groupUngroup: { kind: 'group-ungroup', label: 'Ungroup devices' },
+    groupToggleEnabled: { kind: 'group-toggle-enabled', label: 'Toggle group enabled' },
+    clipboardCut: { kind: 'clipboard-cut', label: 'Cut selection' },
+    clipboardPaste: { kind: 'clipboard-paste', label: 'Paste selection' },
+    duplicate: { kind: 'duplicate', label: 'Duplicate selection' },
+  } as const satisfies Record<string, ChainMutationMeta>;
+
+  const chainHistory = createChainHistory(uiState.chainState, {
+    maxEntries: HISTORY_MAX_ENTRIES,
+  });
+  let canUndo = $state(chainHistory.canUndo());
+  let canRedo = $state(chainHistory.canRedo());
+  let undoActionLabel = $state(chainHistory.getUndoEntry()?.label ?? 'Undo');
+  let redoActionLabel = $state(chainHistory.getRedoEntry()?.label ?? 'Redo');
+
+  const syncHistoryUiState = (): void => {
+    canUndo = chainHistory.canUndo();
+    canRedo = chainHistory.canRedo();
+    undoActionLabel = chainHistory.getUndoEntry()?.label ?? 'Undo';
+    redoActionLabel = chainHistory.getRedoEntry()?.label ?? 'Redo';
+  };
+
+  const persistChainState = (): void => {
+    reconcileCurrentChainModulators();
+    pruneCollapsedDeviceIds();
+    saveChainSettings(uiState.chainState);
+    void syncRackAfterRender();
+  };
+
+  const onChainMutated = (meta: ChainMutationMeta): void => {
+    persistChainState();
+    chainHistory.push(uiState.chainState, meta);
+    syncHistoryUiState();
+  };
+
+  const restoreChainFromHistory = (chain: GeneratorChain): void => {
+    uiState.chainState = chain;
+    persistChainState();
+    chainHistory.replaceCurrent(uiState.chainState);
+    scheduleAutoPreview(0);
+  };
+
+  const handleUndo = (): boolean => {
+    const restored = chainHistory.undo();
+    syncHistoryUiState();
+    if (!restored) {
+      return false;
+    }
+    restoreChainFromHistory(restored);
+    return true;
+  };
+
+  const handleRedo = (): boolean => {
+    const restored = chainHistory.redo();
+    syncHistoryUiState();
+    if (!restored) {
+      return false;
+    }
+    restoreChainFromHistory(restored);
+    return true;
+  };
+
+  const handleUndoClick = (): void => {
+    contextMenuComponent?.close();
+    handleUndo();
+  };
+
+  const handleRedoClick = (): void => {
+    contextMenuComponent?.close();
+    handleRedo();
+  };
+
   const reconcileCurrentChainModulators = (): void => {
     const changed = reconcileGeneratorChainModulators(uiState.chainState);
     if (changed) {
@@ -232,13 +315,6 @@
     contextMenuComponent?.close();
   };
 
-  const onChainMutated = (): void => {
-    reconcileCurrentChainModulators();
-    pruneCollapsedDeviceIds();
-    saveChainSettings(uiState.chainState);
-    void syncRackAfterRender();
-  };
-
   pruneCollapsedDeviceIds();
 
   const scheduleAutoPreview = (delayMs = AUTO_PREVIEW_DEBOUNCE_MS): void => {
@@ -252,7 +328,10 @@
     }, delayMs);
   };
 
-  const deleteDevicesById = (deviceIds: readonly string[]): boolean => {
+  const deleteDevicesById = (
+    deviceIds: readonly string[],
+    meta: ChainMutationMeta = HISTORY_META.deleteDevices,
+  ): boolean => {
     deviceRackComponent?.applyNextSelectionAfterDelete(deviceIds);
 
     const nextChain = removeDevicesById(uiState.chainState, deviceIds);
@@ -261,7 +340,7 @@
     }
 
     uiState.chainState = nextChain;
-    onChainMutated();
+    onChainMutated(meta);
     scheduleAutoPreview(0);
     return true;
   };
@@ -282,6 +361,7 @@
   const setGroupIdForDevices = (
     deviceIds: readonly string[],
     groupId: string | null,
+    meta: ChainMutationMeta,
   ): boolean => {
     const idSet = new Set(deviceIds);
     if (idSet.size === 0) {
@@ -310,7 +390,7 @@
     }
 
     uiState.chainState = withDevices(uiState.chainState, nextDevices);
-    onChainMutated();
+    onChainMutated(meta);
     scheduleAutoPreview(0);
     return true;
   };
@@ -343,13 +423,19 @@
     return action(memberIds);
   };
 
-  const deleteGroup = (rawGroupId: string): boolean =>
-    withGroupMemberIds(rawGroupId, deleteDevicesById);
+  const deleteGroup = (
+    rawGroupId: string,
+    meta: ChainMutationMeta = HISTORY_META.deleteDevices,
+  ): boolean =>
+    withGroupMemberIds(rawGroupId, (memberIds) => deleteDevicesById(memberIds, meta));
 
-  const ungroupGroup = (rawGroupId: string): boolean => {
+  const ungroupGroup = (
+    rawGroupId: string,
+    meta: ChainMutationMeta = HISTORY_META.groupUngroup,
+  ): boolean => {
     return withGroupMemberIds(
       rawGroupId,
-      (memberIds) => setGroupIdForDevices(memberIds, null),
+      (memberIds) => setGroupIdForDevices(memberIds, null, meta),
     );
   };
 
@@ -496,8 +582,8 @@
     }
 
     return selection.kind === 'group'
-      ? deleteGroup(selection.groupId)
-      : deleteDevicesById(selection.deviceIds);
+      ? deleteGroup(selection.groupId, HISTORY_META.clipboardCut)
+      : deleteDevicesById(selection.deviceIds, HISTORY_META.clipboardCut);
   };
 
   const resolveGroupEndTargetId = (
@@ -646,9 +732,12 @@
     };
   };
 
-  const applyChainMutation = (nextChain: GeneratorChain): void => {
+  const applyChainMutation = (
+    nextChain: GeneratorChain,
+    meta: ChainMutationMeta,
+  ): void => {
     uiState.chainState = nextChain;
-    onChainMutated();
+    onChainMutated(meta);
     scheduleAutoPreview(0);
   };
 
@@ -688,6 +777,7 @@
   const pasteClipboard = (
     clipboardOverride?: RackClipboard | null,
     selectionOverride?: RackSelectionSnapshot | null,
+    mutationMeta: ChainMutationMeta = HISTORY_META.clipboardPaste,
   ): boolean => {
     const clipboard = clipboardOverride ?? rackClipboard;
     if (!clipboard) {
@@ -696,7 +786,7 @@
 
     const selection = resolveActionSelection(selectionOverride);
     const nextChain = buildChainWithClipboardPaste(uiState.chainState, clipboard, selection);
-    applyChainMutation(nextChain);
+    applyChainMutation(nextChain, mutationMeta);
     return true;
   };
 
@@ -712,7 +802,7 @@
     if (!copied) {
       return false;
     }
-    return pasteClipboard(copied, selection);
+    return pasteClipboard(copied, selection, HISTORY_META.duplicate);
   };
 
   const selectAllRackDevices = (): boolean => {
@@ -755,7 +845,7 @@
         },
       },
     };
-    onChainMutated();
+    onChainMutated(HISTORY_META.groupToggleEnabled);
     scheduleAutoPreview(0);
   };
 
@@ -1017,7 +1107,7 @@
           placement: 'after',
         },
       ),
-    ));
+    ), HISTORY_META.addDevice);
   };
 
   const handleBrowserPointerDown = (payload: {
@@ -1042,7 +1132,7 @@
       );
       const changed = nextDevices !== null;
       if (changed) {
-        applyChainMutation(withDevices(uiState.chainState, nextDevices));
+        applyChainMutation(withDevices(uiState.chainState, nextDevices), HISTORY_META.moveDevices);
       }
       return;
     }
@@ -1054,7 +1144,7 @@
         createDeviceNodeByKind(commit.sourceKind),
         commit.dropZone,
       ),
-    ));
+    ), HISTORY_META.insertDevice);
   };
 
   const handleSettingsSave = (): void => {
@@ -1075,7 +1165,12 @@
     scheduleAutoPreview(0);
   };
 
-  const handleChainSave = (chain: GeneratorChain): void => {
+  const handleChainSave = (
+    chain: GeneratorChain,
+    meta: ChainMutationMeta,
+  ): void => {
+    chainHistory.push(chain, meta);
+    syncHistoryUiState();
     saveChainSettings(chain);
   };
 
@@ -1258,19 +1353,21 @@
       return;
     }
     const groupId = getNextGroupId();
-    setGroupIdForDevices(targetIds, groupId);
+    setGroupIdForDevices(targetIds, groupId, HISTORY_META.groupCreate);
   };
 
   const handleContextMenuUngroupGroup = (groupId: string): void => {
     if (!groupId) {
       return;
     }
-    ungroupGroup(groupId);
+    ungroupGroup(groupId, HISTORY_META.groupUngroup);
   };
 
 
   onMount(() => {
     reconcileCurrentChainModulators();
+    chainHistory.replaceCurrent(uiState.chainState);
+    syncHistoryUiState();
     void syncRackAfterRender();
     playbackScheduler = createPlaybackScheduler({
       getLoopMs: () => getPreviewLoopMs(),
@@ -1354,6 +1451,26 @@
       const isModifierShortcut = (event.metaKey || event.ctrlKey) && !event.altKey;
       if (isModifierShortcut) {
         const key = event.key.toLowerCase();
+        const isUndoShortcut = key === 'z' && !event.shiftKey;
+        if (isUndoShortcut) {
+          if (handleUndo()) {
+            event.preventDefault();
+            contextMenuComponent?.close();
+          }
+          return;
+        }
+
+        const isRedoShortcut =
+          (key === 'z' && event.shiftKey)
+          || (key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey);
+        if (isRedoShortcut) {
+          if (handleRedo()) {
+            event.preventDefault();
+            contextMenuComponent?.close();
+          }
+          return;
+        }
+
         if (key === 'c') {
           if (copySelectionToClipboard()) {
             event.preventDefault();
@@ -1462,6 +1579,7 @@
       playbackScheduler?.teardown();
       playbackScheduler = null;
       previewWindowStatePusher.reset();
+      chainHistory.flushPendingMerge();
       if (autoPreviewTimer !== null) {
         window.clearTimeout(autoPreviewTimer);
       }
@@ -1537,6 +1655,26 @@
               {/each}
             </select>
           </div>
+          <button
+            id="undo-button"
+            type="button"
+            disabled={!canUndo}
+            title={canUndo ? `Undo: ${undoActionLabel}` : 'Nothing to undo'}
+            aria-label={canUndo ? `Undo: ${undoActionLabel}` : 'Undo unavailable'}
+            onclick={handleUndoClick}
+          >
+            Undo
+          </button>
+          <button
+            id="redo-button"
+            type="button"
+            disabled={!canRedo}
+            title={canRedo ? `Redo: ${redoActionLabel}` : 'Nothing to redo'}
+            aria-label={canRedo ? `Redo: ${redoActionLabel}` : 'Redo unavailable'}
+            onclick={handleRedoClick}
+          >
+            Redo
+          </button>
           <button id="settings-button" type="button" onclick={openSettings}>
             Settings
           </button>

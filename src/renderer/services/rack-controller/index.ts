@@ -2,6 +2,7 @@ import type { GeneratorChain } from '../../../shared/types';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
 import type { ContextMenuTarget } from '../../state/context-menu';
+import type { ChainMutationMeta } from '../../state/chain-history';
 import {
   applyCenterPickerPointerMove,
   applyCenterPickerPosition,
@@ -62,7 +63,7 @@ interface DeviceRackControllerOptions {
   chainDevices: HTMLElement;
   interactiveElementSelector: string;
   getChainState: () => GeneratorChain;
-  saveChain: (chain: GeneratorChain) => void;
+  saveChain: (chain: GeneratorChain, meta: ChainMutationMeta) => void;
   scheduleAutoPreview: (delayMs?: number) => void;
   openContextMenu: (clientX: number, clientY: number, target: ContextMenuTarget) => void;
   closeContextMenu: () => void;
@@ -289,7 +290,7 @@ export class DeviceRackController {
 
   private readonly getChainState: () => GeneratorChain;
 
-  private readonly saveChain: (chain: GeneratorChain) => void;
+  private readonly saveChain: (chain: GeneratorChain, meta: ChainMutationMeta) => void;
 
   private readonly scheduleAutoPreview: (delayMs?: number) => void;
 
@@ -390,7 +391,15 @@ export class DeviceRackController {
     if (id) {
       this.syncCenterPickerSelection(id);
     }
-    this.commitChainChange();
+    const mergeKey = this.resolveControlMergeKey(event.target);
+    this.commitChainChange(
+      {
+        kind: 'control-edit',
+        label: 'Edit parameter',
+        mergeKey,
+        finalize: event.type === 'change',
+      },
+    );
     return true;
   }
 
@@ -933,13 +942,21 @@ export class DeviceRackController {
 
   private clearMaskTilePointerState(persist: boolean): void {
     clearMaskTilePointerState(this.maskTileState, persist, () => {
-      this.saveChain(this.getChainState());
+      this.saveChain(this.getChainState(), {
+        kind: 'mask-tile-edit',
+        label: 'Paint mask tiles',
+        finalize: true,
+      });
     });
   }
 
   private clearCenterPickerPointerState(persist: boolean): void {
     clearCenterPickerPointerState(this.centerPickerState, persist, () => {
-      this.saveChain(this.getChainState());
+      this.saveChain(this.getChainState(), {
+        kind: 'center-picker-edit',
+        label: 'Edit center point',
+        finalize: true,
+      });
     });
   }
 
@@ -1102,7 +1119,11 @@ export class DeviceRackController {
     this.blurActiveTextEditingElement();
     this.closeContextMenu();
     if (this.resetCenterPickerToMidpoint(centerPickerSurface)) {
-      this.commitChainChange();
+      this.commitChainChange({
+        kind: 'center-picker-edit',
+        label: 'Edit center point',
+        finalize: true,
+      });
     }
     return true;
   }
@@ -1195,6 +1216,23 @@ export class DeviceRackController {
     );
   }
 
+  private resolveControlMergeKey(target: EventTarget | null): string | null {
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) {
+      return null;
+    }
+
+    const action = target.dataset.action?.trim();
+    const id = target.dataset.id?.trim();
+    if (!action || !id) {
+      return null;
+    }
+
+    const param = target.dataset.param?.trim();
+    return param
+      ? `control|${action}|${id}|${param}`
+      : `control|${action}|${id}`;
+  }
+
   private findDeviceById(id: string): ChainDevice | null {
     return this.getChainState().devices.find((item) => item.id === id) ?? null;
   }
@@ -1210,10 +1248,10 @@ export class DeviceRackController {
       .map((device) => device.id);
   }
 
-  private commitChainChange(delayMs?: number): void {
+  private commitChainChange(meta: ChainMutationMeta, delayMs?: number): void {
     const chain = this.getChainState();
     reconcileGeneratorChainModulators(chain);
-    this.saveChain(chain);
+    this.saveChain(chain, meta);
     this.scheduleAutoPreview(delayMs);
   }
 
