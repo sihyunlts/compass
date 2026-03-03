@@ -1,7 +1,7 @@
-import type { GeneratorChain } from '../../shared/types';
-import { normalizeOptionalId } from '../../shared/normalize-id';
-import { reconcileGeneratorChainModulators } from '../../core/modulation/routing';
-import type { ContextMenuTarget } from '../state/context-menu';
+import type { GeneratorChain } from '../../../shared/types';
+import { normalizeOptionalId } from '../../../shared/normalize-id';
+import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
+import type { ContextMenuTarget } from '../../state/context-menu';
 import {
   applyCenterPickerPointerMove,
   applyCenterPickerPosition,
@@ -13,12 +13,12 @@ import {
   resolveCenterPickerSurface,
   startCenterPickerSession,
   syncCenterPickerSelection,
-} from './rack-controller/center-picker';
+} from './center-picker';
 import {
   applyChainControlChange,
   createChainControlHandlers,
   resetNumericControlToDefault,
-} from './rack-controller/controls';
+} from './controls';
 import {
   applyMaskTileFromPoint,
   clearMaskTilePointerState,
@@ -26,7 +26,7 @@ import {
   isMaskTilePaintActive,
   isMaskTilePointer,
   tryStartMaskTilePaint,
-} from './rack-controller/mask-tiles';
+} from './mask-tiles';
 
 /**
  * Coordinates rack interactions in the main renderer.
