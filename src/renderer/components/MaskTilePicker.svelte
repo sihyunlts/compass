@@ -91,8 +91,6 @@
 
     &.is-selected {
       background: var(--accent-500);
-      border-color: rgb(var(--rgb-black) / var(--alpha-30));
-      box-shadow: inset 0 0 0 1px rgb(var(--rgb-black) / var(--alpha-25));
     }
   }
 </style>

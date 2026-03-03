@@ -288,7 +288,6 @@
         position: absolute;
         inset: 0;
         border-radius: var(--radius-round);
-        border: 2px solid var(--neutral-40);
       }
 
       &-knob {
@@ -297,7 +296,6 @@
         height: 0.5rem;
         border-radius: var(--radius-round);
         background: var(--accent-500);
-        box-shadow: 0 0 0 1px rgb(var(--rgb-black) / var(--alpha-15));
         transform: rotate(var(--angle-deg)) translateY(-0.75rem);
       }
 

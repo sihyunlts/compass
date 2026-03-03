@@ -75,7 +75,6 @@
   let deviceRackController = $state<DeviceRackController | null>(null);
   let dragDropManager = $state<DragDropManager | null>(null);
   let lastIndicatorKey: string | null = null;
-  let lastInsideGroupEl: HTMLElement | null = null;
 
   type RackDeviceItem = {
     kind: 'device';
@@ -219,7 +218,6 @@
   type IndicatorLayout = {
     key: string;
     leftInScrollSpace: number;
-    insideGroupEl: HTMLElement | null;
   };
 
   const getTopLevelItems = (): HTMLElement[] => {
@@ -246,10 +244,6 @@
   };
 
   const clearDropIndicator = (): void => {
-    if (lastInsideGroupEl) {
-      lastInsideGroupEl.classList.remove('is-drop-inside');
-    }
-    lastInsideGroupEl = null;
     lastIndicatorKey = null;
     if (dropIndicatorEl) {
       dropIndicatorEl.hidden = true;
@@ -331,7 +325,6 @@
     return {
       key: `outside|${insertionIndex}`,
       leftInScrollSpace,
-      insideGroupEl: null,
     };
   };
 
@@ -372,7 +365,6 @@
     return {
       key: `inside|${dropZone.groupId}|${insertionIndex}`,
       leftInScrollSpace,
-      insideGroupEl: groupEl,
     };
   };
 
@@ -398,14 +390,6 @@
     if (layout.key === lastIndicatorKey) {
       return;
     }
-
-    if (lastInsideGroupEl && lastInsideGroupEl !== layout.insideGroupEl) {
-      lastInsideGroupEl.classList.remove('is-drop-inside');
-    }
-    if (layout.insideGroupEl && layout.insideGroupEl !== lastInsideGroupEl) {
-      layout.insideGroupEl.classList.add('is-drop-inside');
-    }
-    lastInsideGroupEl = layout.insideGroupEl;
 
     dropIndicatorEl.style.left = `${layout.leftInScrollSpace}px`;
     dropIndicatorEl.hidden = false;
@@ -916,10 +900,6 @@
 
   .drop-indicator[hidden] {
     display: none;
-  }
-
-  :global(.device-group.is-rack.is-drop-inside) {
-    box-shadow: 0 0 0 1px rgb(var(--rgb-white) / var(--alpha-18));
   }
 
   .group-rail {
