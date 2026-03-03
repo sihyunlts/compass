@@ -4,10 +4,6 @@
   flex-direction: column;
   background: var(--neutral-00);
 
-  &[hidden] {
-    display: none;
-  }
-
   &-head {
     display: flex;
     align-items: center;
