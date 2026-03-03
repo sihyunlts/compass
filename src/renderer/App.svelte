@@ -4,7 +4,6 @@
    * Coordinates persisted state, rack interactions, preview/playback, and IPC updates.
    */
   import { onMount, tick } from 'svelte';
-  import { SvelteSet } from 'svelte/reactivity';
 
   import type {
     BridgeSettings,
@@ -1415,7 +1414,8 @@
 
       const selectedGroups = deviceRackComponent?.getSelectedGroupContexts() ?? [];
       const selectedDeviceIds = deviceRackComponent?.getOrderedSelectedDeviceIds() ?? [];
-      const deleteIdSet = new SvelteSet(selectedDeviceIds);
+      // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Ephemeral union set used only in this handler.
+      const deleteIdSet = new Set(selectedDeviceIds);
       for (const selectedGroup of selectedGroups) {
         for (const memberId of selectedGroup.memberDeviceIds) {
           deleteIdSet.add(memberId);
