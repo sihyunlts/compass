@@ -124,6 +124,8 @@ export class ChainHistory {
 
   private pendingMergeIndex: number | null = null;
 
+  private pendingMergeSnapshot: GeneratorChain | null = null;
+
   private pendingMergeTimer: number | null = null;
 
   constructor(initialChain: GeneratorChain, options: ChainHistoryOptions = {}) {
@@ -184,32 +186,25 @@ export class ChainHistory {
   }
 
   public push(chain: GeneratorChain, meta: ChainMutationMeta): boolean {
-    const snapshot = toSnapshot(chain);
-    const currentEntry = this.entries[this.cursor];
-    if (currentEntry.signature === snapshot.signature) {
-      if (meta.finalize) {
-        this.flushPendingMerge();
-      }
-      return false;
-    }
-
     const mergeKey = normalizeMergeKey(meta.mergeKey);
-    const canMerge = !!mergeKey
-      && !meta.finalize
+    const currentEntry = this.entries[this.cursor];
+    const isActiveMergeSession = !!mergeKey
       && this.pendingMergeKey === mergeKey
       && this.pendingMergeIndex === this.cursor
       && currentEntry.kind === meta.kind;
 
-    if (canMerge) {
-      currentEntry.chain = snapshot.chain;
-      currentEntry.signature = snapshot.signature;
-      currentEntry.timestampMs = Date.now();
-      currentEntry.label = meta.label;
-      this.armPendingMerge(mergeKey, meta.mergeIdleMs);
+    if (isActiveMergeSession) {
+      this.stagePendingMerge(chain, mergeKey, meta);
       return true;
     }
 
     this.flushPendingMerge();
+    const latestEntry = this.entries[this.cursor];
+    const snapshot = toSnapshot(chain);
+    if (latestEntry.signature === snapshot.signature) {
+      return false;
+    }
+
     if (this.cursor < this.entries.length - 1) {
       this.entries.splice(this.cursor + 1);
     }
@@ -226,12 +221,13 @@ export class ChainHistory {
     this.trimToCapacity();
 
     if (mergeKey && !meta.finalize) {
-      this.armPendingMerge(mergeKey, meta.mergeIdleMs);
+      this.stagePendingMerge(chain, mergeKey, meta);
     }
     return true;
   }
 
   public replaceCurrent(chain: GeneratorChain, label?: string): void {
+    this.flushPendingMerge();
     const snapshot = toSnapshot(chain);
     const current = this.entries[this.cursor];
     current.chain = snapshot.chain;
@@ -277,8 +273,10 @@ export class ChainHistory {
       window.clearTimeout(this.pendingMergeTimer);
       this.pendingMergeTimer = null;
     }
+    this.commitPendingMergeSnapshot();
     this.pendingMergeKey = null;
     this.pendingMergeIndex = null;
+    this.pendingMergeSnapshot = null;
   }
 
   private toPublicEntry(entry: ChainHistoryEntryInternal): ChainHistoryEntry {
@@ -297,14 +295,51 @@ export class ChainHistory {
     return `chain-history-${id}`;
   }
 
-  private armPendingMerge(mergeKey: string, mergeIdleMs: number | undefined): void {
+  private stagePendingMerge(
+    chain: GeneratorChain,
+    mergeKey: string,
+    meta: ChainMutationMeta,
+  ): void {
+    const entry = this.entries[this.cursor];
+    entry.timestampMs = Date.now();
+    entry.label = meta.label;
+
+    this.pendingMergeKey = mergeKey;
+    this.pendingMergeIndex = this.cursor;
+    this.pendingMergeSnapshot = cloneChainForIpc(chain);
+    if (meta.finalize) {
+      this.flushPendingMerge();
+      return;
+    }
+
+    this.armPendingMerge(meta.mergeIdleMs);
+  }
+
+  private commitPendingMergeSnapshot(): void {
+    if (this.pendingMergeIndex === null || !this.pendingMergeSnapshot) {
+      return;
+    }
+
+    const entry = this.entries[this.pendingMergeIndex];
+    if (!entry) {
+      return;
+    }
+
+    const signature = stableSerialize(this.pendingMergeSnapshot);
+    if (entry.signature === signature) {
+      return;
+    }
+    entry.chain = this.pendingMergeSnapshot;
+    entry.signature = signature;
+    entry.timestampMs = Date.now();
+  }
+
+  private armPendingMerge(mergeIdleMs: number | undefined): void {
     if (this.pendingMergeTimer !== null) {
       window.clearTimeout(this.pendingMergeTimer);
       this.pendingMergeTimer = null;
     }
 
-    this.pendingMergeKey = mergeKey;
-    this.pendingMergeIndex = this.cursor;
     const timeoutMs = Number.isFinite(mergeIdleMs) && (mergeIdleMs as number) > 0
       ? (mergeIdleMs as number)
       : this.defaultMergeIdleMs;
