@@ -220,6 +220,7 @@
   let yCentersByCoord: number[] | null = null;
   let wasGuideEnabled = true;
   let lastRenderedModel: LaunchpadModel | null = null;
+  let surfaceWidth = $state(0);
   let surfaceHeight = $state(0);
 
   const resolveLedCellsByPitch = (): SvelteMap<number, HTMLElement> => {
@@ -518,6 +519,14 @@
   });
 
   $effect(() => {
+    if (!isMounted || surfaceWidth <= 0 || surfaceHeight <= 0) {
+      return;
+    }
+
+    resizeSurfaceCanvases();
+  });
+
+  $effect(() => {
     if (!isMounted) {
       return;
     }
@@ -538,6 +547,7 @@
   class={`preview-launchpad mode-${mode}`}
   class:is-guide-enabled={isGuideVisible()}
   bind:this={stageEl}
+  bind:clientWidth={surfaceWidth}
   bind:clientHeight={surfaceHeight}
   style={surfaceHeight > 0 ? `width: ${surfaceHeight}px` : ''}
   role="img"
