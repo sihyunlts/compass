@@ -5,6 +5,12 @@
     RackDropZone,
   } from '../state/rack-drop';
 
+  export interface RackScrollMetrics {
+    scrollLeft: number;
+    scrollWidth: number;
+    clientWidth: number;
+  }
+
   /** Commit payload emitted when rack drag/insert interactions complete. */
   export type RackInteractionCommit =
     | {
@@ -26,6 +32,7 @@
    * Integrates rack selection, drop indicators, and group rendering state.
    */
   import { onMount } from 'svelte';
+  import { clamp } from '../../shared/math';
   import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/types';
   import { normalizeOptionalId } from '../../shared/normalize-id';
   import type { ChainMutationMeta } from '../state/chain-history';
@@ -49,6 +56,8 @@
     onCloseContextMenu,
     onGetBrowserDragBadgeLabel,
     onCommit,
+    onScrollMetricsChange = () => {},
+    onMiniMapContentRevisionChange = () => {},
     onToggleGroupEnabled = () => {},
     onToggleCollapse = () => {},
   } = $props<{
@@ -65,6 +74,8 @@
     onCloseContextMenu: () => void;
     onGetBrowserDragBadgeLabel: (kind: BrowserDeviceKind) => string;
     onCommit: (commit: RackInteractionCommit) => void;
+    onScrollMetricsChange?: (metrics: RackScrollMetrics) => void;
+    onMiniMapContentRevisionChange?: (revision: number) => void;
     onToggleGroupEnabled?: (groupId: string, nextEnabled: boolean) => void;
     onToggleCollapse: (id: string) => void;
   }>();
@@ -76,6 +87,11 @@
   let deviceRackController = $state<DeviceRackController | null>(null);
   let dragDropManager = $state<DragDropManager | null>(null);
   let lastIndicatorKey: string | null = null;
+  let resizeObserver: ResizeObserver | null = null;
+  let resizeSyncFrameId: number | null = null;
+  let lastScrollMetricsSignature: string | null = null;
+  let lastMiniMapLayoutSignature: string | null = null;
+  let miniMapContentRevision = 0;
 
   type RackDeviceItem = {
     kind: 'device';
@@ -214,6 +230,75 @@
     };
 
     return [leftRail, ...columns, rightRail];
+  };
+
+  const toScrollMetricsSignature = (metrics: RackScrollMetrics): string => (
+    `${metrics.scrollLeft.toFixed(2)}|${metrics.scrollWidth.toFixed(2)}|${metrics.clientWidth.toFixed(2)}`
+  );
+
+  const resolveScrollMetrics = (): RackScrollMetrics | null => {
+    if (!chainDevicesEl) {
+      return null;
+    }
+
+    const scrollWidth = Math.max(chainDevicesEl.scrollWidth, 0);
+    const clientWidth = Math.max(chainDevicesEl.clientWidth, 0);
+    const maxScrollLeft = Math.max(scrollWidth - clientWidth, 0);
+    const scrollLeft = clamp(chainDevicesEl.scrollLeft, 0, maxScrollLeft);
+
+    return {
+      scrollLeft,
+      scrollWidth,
+      clientWidth,
+    };
+  };
+
+  const emitScrollMetrics = (): RackScrollMetrics | null => {
+    const metrics = resolveScrollMetrics();
+    if (!metrics) {
+      return null;
+    }
+
+    const signature = toScrollMetricsSignature(metrics);
+    if (signature === lastScrollMetricsSignature) {
+      return metrics;
+    }
+
+    lastScrollMetricsSignature = signature;
+    onScrollMetricsChange(metrics);
+    return metrics;
+  };
+
+  const miniMapLayoutSignature = $derived.by(() => {
+    const rackOrderSignature = rackContentItems
+      .map((item) =>
+        item.kind === 'device'
+          ? `d:${item.device.id}`
+          : `g:${item.groupId}:${item.enabled ? '1' : '0'}:${item.devices.map((device) => device.id).join(',')}`)
+      .join('|');
+    const collapsedSignature = collapsedDeviceIds.join('|');
+    return `${rackOrderSignature}::collapsed:${collapsedSignature}`;
+  });
+
+  const emitMiniMapContentRevision = (layoutSignature: string): void => {
+    if (layoutSignature === lastMiniMapLayoutSignature) {
+      return;
+    }
+
+    lastMiniMapLayoutSignature = layoutSignature;
+    miniMapContentRevision += 1;
+    onMiniMapContentRevisionChange(miniMapContentRevision);
+  };
+
+  const queueScrollMetricsSync = (): void => {
+    if (resizeSyncFrameId !== null) {
+      return;
+    }
+
+    resizeSyncFrameId = window.requestAnimationFrame(() => {
+      resizeSyncFrameId = null;
+      emitScrollMetrics();
+    });
   };
 
   type IndicatorLayout = {
@@ -445,6 +530,21 @@
     );
   }
 
+  /** Applies horizontal scroll offset requested from external minimap controls. */
+  export function setScrollLeft(nextScrollLeft: number) {
+    if (!chainDevicesEl || !Number.isFinite(nextScrollLeft)) {
+      return;
+    }
+
+    const maxScrollLeft = Math.max(chainDevicesEl.scrollWidth - chainDevicesEl.clientWidth, 0);
+    const clamped = clamp(nextScrollLeft, 0, maxScrollLeft);
+    if (Math.abs(chainDevicesEl.scrollLeft - clamped) > 0.1) {
+      chainDevicesEl.scrollLeft = clamped;
+    }
+
+    emitScrollMetrics();
+  }
+
   /** Starts an insert drag from the browser panel into the rack. */
   export function handleBrowserPointerDown(
     sourceEvent: PointerEvent,
@@ -595,6 +695,10 @@
     onToggleCollapse(deviceId);
   }
 
+  function handleChainScroll() {
+    emitScrollMetrics();
+  }
+
   function handleDragStart(event: DragEvent) {
     event.preventDefault();
   }
@@ -692,14 +796,36 @@
       onDragUpdate: (info) => applyDropIndicator(info),
     });
 
+    resizeObserver = new ResizeObserver(() => {
+      queueScrollMetricsSync();
+    });
+    resizeObserver.observe(chainDevicesEl);
+    emitScrollMetrics();
+    emitMiniMapContentRevision(miniMapLayoutSignature);
+
     document.addEventListener('pointerlockchange', handlePointerLockChange);
 
     return () => {
       document.removeEventListener('pointerlockchange', handlePointerLockChange);
       clearDropIndicator();
+      if (resizeSyncFrameId !== null) {
+        window.cancelAnimationFrame(resizeSyncFrameId);
+        resizeSyncFrameId = null;
+      }
+      resizeObserver?.disconnect();
+      resizeObserver = null;
       dragDropManager = null;
       deviceRackController = null;
     };
+  });
+
+  $effect(() => {
+    if (!chainDevicesEl) {
+      return;
+    }
+
+    queueScrollMetricsSync();
+    emitMiniMapContentRevision(miniMapLayoutSignature);
   });
 </script>
 
@@ -730,6 +856,7 @@
     oncontextmenu={handleChainContextMenu}
     onclick={handleChainClick}
     ondblclick={handleChainDoubleClick}
+    onscroll={handleChainScroll}
     ondragstart={handleDragStart}
   >
     {#each rackContentItems as item (item.key)}

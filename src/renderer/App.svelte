@@ -75,7 +75,11 @@
   } from './state/rack-drop';
   import BrowserPanel from './components/BrowserPanel.svelte';
   import SidebarResizer from './components/SidebarResizer.svelte';
-  import DeviceRack, { type RackInteractionCommit } from './components/DeviceRack.svelte';
+  import DeviceRack, {
+    type RackInteractionCommit,
+    type RackScrollMetrics,
+  } from './components/DeviceRack.svelte';
+  import RackHeaderScrollbar from './components/RackHeaderScrollbar.svelte';
   import PreviewPanel from './components/PreviewPanel.svelte';
   import ContextMenu from './components/ContextMenu.svelte';
   import { generateRendererPreview } from './app/preview';
@@ -189,6 +193,12 @@
   let previewWindowVisibilityUnsubscribe: (() => void) | null = null;
   let previewGuideEnabledUnsubscribe: (() => void) | null = null;
   let rackClipboard: RackClipboard | null = $state(null);
+  let rackScrollMetrics: RackScrollMetrics = $state({
+    scrollLeft: 0,
+    scrollWidth: 1,
+    clientWidth: 1,
+  });
+  let rackMiniMapContentRevision = $state(0);
 
   type RackSelectionSnapshot =
     | {
@@ -1147,6 +1157,18 @@
     ), HISTORY_META.insertDevice);
   };
 
+  const handleRackScrollMetricsChange = (metrics: RackScrollMetrics): void => {
+    rackScrollMetrics = metrics;
+  };
+
+  const handleRackMiniMapContentRevisionChange = (revision: number): void => {
+    rackMiniMapContentRevision = revision;
+  };
+
+  const handleRackHeaderScrollRequest = (nextScrollLeft: number): void => {
+    deviceRackComponent?.setScrollLeft(nextScrollLeft);
+  };
+
   const handleSettingsSave = (): void => {
     const bridge = readBridge();
     writeBridgeInputs(bridge);
@@ -1635,6 +1657,13 @@
     <section class="workspace">
       <header class="workspace-head">
         <div class="workspace-head-left">
+          <RackHeaderScrollbar
+            metrics={rackScrollMetrics}
+            contentRevision={rackMiniMapContentRevision}
+            controlsId="chain-devices"
+            onScrollRequest={handleRackHeaderScrollRequest}
+          />
+
           <span id="preview-bpm-text" class="header-bpm-text">{toBpmText(uiState.previewBpm)}</span>
 
           <span id="preview-meta" class="header-preview-meta">{uiState.previewMetaText}</span>
@@ -1706,6 +1735,8 @@
           onCloseContextMenu={() => contextMenuComponent?.close()}
           onGetBrowserDragBadgeLabel={toBrowserDragBadgeLabel}
           onCommit={handleRackCommit}
+          onScrollMetricsChange={handleRackScrollMetricsChange}
+          onMiniMapContentRevisionChange={handleRackMiniMapContentRevisionChange}
           onToggleGroupEnabled={handleToggleGroupEnabled}
           onToggleCollapse={toggleCollapse}
         />
