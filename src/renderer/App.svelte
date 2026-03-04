@@ -7,7 +7,6 @@
 
   import type {
     BridgeSettings,
-    BridgeTarget,
     GenerateAndSendRequest,
     GeneratorChain,
     GeneratorDeviceNode,
@@ -108,6 +107,8 @@
   const AUTO_PREVIEW_DEBOUNCE_MS = 120;
   const HISTORY_MAX_ENTRIES = 100;
   const SEND_DONE_MS = 900;
+  const HEADER_INDICATOR_VISIBILITY_MS = 2000;
+  const HEADER_INDICATOR_FADE_OUT_MS = 1500;
   const DEFAULT_LED_RGB = '255 166 57';
   const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, select, textarea, option';
   const NON_TEXT_INPUT_TYPES = new Set([
@@ -193,6 +194,10 @@
   let previewWindowVisibilityUnsubscribe: (() => void) | null = null;
   let previewGuideEnabledUnsubscribe: (() => void) | null = null;
   let rackClipboard: RackClipboard | null = $state(null);
+  let headerIndicatorTimer: number | null = null;
+  let headerIndicatorFadeTimer: number | null = null;
+  let headerIndicatorDisplayText = $state('');
+  let isHeaderIndicatorVisible = $state(false);
   let rackScrollMetrics: RackScrollMetrics = $state({
     scrollLeft: 0,
     scrollWidth: 1,
@@ -238,6 +243,64 @@
     undoActionLabel = chainHistory.getUndoEntry()?.label ?? 'Undo';
     redoActionLabel = chainHistory.getRedoEntry()?.label ?? 'Redo';
   };
+
+  const clearHeaderIndicatorTimer = (): void => {
+    if (headerIndicatorTimer === null) {
+      return;
+    }
+    window.clearTimeout(headerIndicatorTimer);
+    headerIndicatorTimer = null;
+  };
+
+  const clearHeaderIndicatorFadeTimer = (): void => {
+    if (headerIndicatorFadeTimer === null) {
+      return;
+    }
+    window.clearTimeout(headerIndicatorFadeTimer);
+    headerIndicatorFadeTimer = null;
+  };
+
+  const setHeaderIndicatorText = (
+    text: string,
+    options: { autoClear?: boolean } = {},
+  ): void => {
+    uiState.headerIndicatorText = text;
+    clearHeaderIndicatorTimer();
+    if (options.autoClear === false) {
+      return;
+    }
+
+    headerIndicatorTimer = window.setTimeout(() => {
+      headerIndicatorTimer = null;
+      if (uiState.headerIndicatorText === text) {
+        uiState.headerIndicatorText = '';
+      }
+    }, HEADER_INDICATOR_VISIBILITY_MS);
+  };
+
+  $effect(() => {
+    const nextText = uiState.headerIndicatorText.trim();
+    clearHeaderIndicatorFadeTimer();
+
+    if (nextText) {
+      headerIndicatorDisplayText = nextText;
+      isHeaderIndicatorVisible = true;
+      return;
+    }
+
+    if (!headerIndicatorDisplayText) {
+      isHeaderIndicatorVisible = false;
+      return;
+    }
+
+    isHeaderIndicatorVisible = false;
+    headerIndicatorFadeTimer = window.setTimeout(() => {
+      headerIndicatorFadeTimer = null;
+      if (uiState.headerIndicatorText.trim() === '') {
+        headerIndicatorDisplayText = '';
+      }
+    }, HEADER_INDICATOR_FADE_OUT_MS);
+  });
 
   const persistChainState = (): void => {
     reconcileCurrentChainModulators();
@@ -1018,8 +1081,6 @@
 
   const startPlayback = (): void => {
     if (!previewData || previewData.noteCount === 0) {
-      uiState.previewMetaText =
-        'No preview notes available. Change parameters to generate a pattern first.';
       return;
     }
 
@@ -1032,7 +1093,6 @@
 
   const applyPreviewData = (
     preview: GeneratorPreview,
-    target: BridgeTarget | null,
     bridge: BridgeSettings | null,
     source: 'preview' | 'send',
     sourceChain: GeneratorChain,
@@ -1049,23 +1109,22 @@
       renderLedFrame();
     }
 
-    const modeLabel = source === 'send' ? 'Send complete' : 'Preview generated';
-    const targetLabel = target
-      ? ` | ${target.host}:${target.port}${target.path}`
-      : '';
-    uiState.previewMetaText = `${modeLabel} | Notes ${preview.noteCount}${targetLabel}`;
-
     if (preview.noteCount > 0) {
+      if (source === 'preview') {
+        setHeaderIndicatorText(`${preview.noteCount} notes generated`);
+      } else {
+        setHeaderIndicatorText('Send complete');
+      }
       startPlayback();
       return;
     }
 
+    clearHeaderIndicatorTimer();
+    uiState.headerIndicatorText = '';
     stopPlayback();
   };
 
   const runPreview = async (): Promise<void> => {
-    uiState.statusText = 'Updating preview...';
-
     try {
       const requestChain = cloneChainForIpc(uiState.chainState);
       const preview = generateRendererPreview(
@@ -1073,13 +1132,11 @@
         uiState.previewLoopLengthBeats,
         uiState.launchpadModel,
       );
-      applyPreviewData(preview, null, null, 'preview', requestChain);
-      uiState.statusText = 'Preview updated';
+      applyPreviewData(preview, null, 'preview', requestChain);
     } catch (error) {
       stopPlayback();
-      uiState.statusText = 'Preview update failed';
-      uiState.previewMetaText =
-        error instanceof Error ? error.message : 'Unknown preview error';
+      const errorText = error instanceof Error ? error.message : 'Unknown preview error';
+      setHeaderIndicatorText(`Preview update failed | ${errorText}`);
     }
   };
 
@@ -1174,7 +1231,6 @@
     writeBridgeInputs(bridge);
     saveBridgeSettings(bridge);
     saveLaunchpadModel(uiState.launchpadModel);
-    uiState.statusText = 'Settings saved';
     runBestEffort(requestLiveTempoSync());
     closeSettings();
   };
@@ -1183,7 +1239,6 @@
     const bridge = readBridge();
     uiState.previewLoopLengthBeats = bridge.autoCreateLengthBeats;
     saveBridgeSettings(bridge);
-    uiState.statusText = `Length changed (${uiState.autoCreateLengthLabel})`;
     scheduleAutoPreview(0);
   };
 
@@ -1211,11 +1266,8 @@
       };
       paletteController.applyUploadedPalette(payload);
       renderLedFrame();
-      uiState.statusText = 'Custom palette loaded';
     } catch (error) {
-      uiState.statusText = 'Palette load failed';
-      uiState.previewMetaText =
-        error instanceof Error ? error.message : 'Unknown palette error';
+      void error;
     } finally {
       if (input) {
         input.value = '';
@@ -1224,11 +1276,8 @@
   };
 
   const handlePaletteReset = (): void => {
-    const loaded = paletteController.resetToDefault();
+    paletteController.resetToDefault();
     renderLedFrame();
-    uiState.statusText = loaded
-      ? 'Default palette loaded'
-      : 'Default palette unavailable, using embedded colors';
   };
 
   const handleLaunchpadModelToggle = (nextEnabled: boolean): void => {
@@ -1238,7 +1287,6 @@
     }
     uiState.launchpadModel = nextModel;
     saveLaunchpadModel(nextModel);
-    uiState.statusText = `Launchpad model: ${nextModel.toUpperCase()}`;
     scheduleAutoPreview(0);
     renderLedFrame();
   };
@@ -1268,7 +1316,7 @@
       uiState.isPreviewPopoutOpen = true;
       renderLedFrame();
     } catch {
-      uiState.statusText = 'Failed to open preview popout';
+      setHeaderIndicatorText('Failed to open preview popout');
     }
   };
 
@@ -1292,7 +1340,7 @@
     clearSendDoneTimer();
     uiState.sendButtonDisabled = true;
     uiState.sendButtonLabel = 'Sending...';
-    uiState.statusText = 'Sending...';
+    setHeaderIndicatorText('Sending...', { autoClear: false });
 
     try {
       const bridge = readBridge();
@@ -1306,8 +1354,7 @@
         launchpadModel: uiState.launchpadModel,
       };
       const response = await bridgeClient.generateAndSend(request);
-      applyPreviewData(response.preview, response.target, response.bridge, 'send', requestChain);
-      uiState.statusText = 'Idle';
+      applyPreviewData(response.preview, response.bridge, 'send', requestChain);
       uiState.sendButtonDisabled = false;
       uiState.sendButtonLabel = 'Done!';
       sendDoneTimer = window.setTimeout(() => {
@@ -1316,9 +1363,8 @@
       }, SEND_DONE_MS);
     } catch (error) {
       stopPlayback();
-      uiState.statusText = 'Send failed';
-      uiState.previewMetaText =
-        error instanceof Error ? error.message : 'Unknown send error';
+      const errorText = error instanceof Error ? error.message : 'Unknown send error';
+      setHeaderIndicatorText(`Send failed | ${errorText}`);
       uiState.sendButtonDisabled = false;
       uiState.sendButtonLabel = 'Send';
     }
@@ -1412,7 +1458,7 @@
 
       uiState.previewBpm = nextBpm;
       savePreviewBpm(nextBpm);
-      uiState.statusText = `Live BPM sync (${nextBpm})`;
+      setHeaderIndicatorText('BPM synced');
     });
 
     previewWindowVisibilityUnsubscribe = bridgeClient.subscribePreviewWindowVisibility((isOpen) => {
@@ -1608,6 +1654,8 @@
       if (sendDoneTimer !== null) {
         window.clearTimeout(sendDoneTimer);
       }
+      clearHeaderIndicatorTimer();
+      clearHeaderIndicatorFadeTimer();
 
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('focusin', handleFocusIn);
@@ -1666,11 +1714,18 @@
 
           <span id="preview-bpm-text" class="header-bpm-text">{toBpmText(uiState.previewBpm)}</span>
 
-          <span id="preview-meta" class="header-preview-meta">{uiState.previewMetaText}</span>
+          <span
+            id="preview-meta"
+            class="header-preview-meta"
+            class:is-visible={isHeaderIndicatorVisible}
+            role="status"
+            aria-live="polite"
+          >
+            {headerIndicatorDisplayText}
+          </span>
         </div>
 
         <div class="workspace-actions">
-          <span id="status" aria-live="polite">{uiState.statusText}</span>
           <div class="header-length-select">
             <span class="field-label">Length</span>
             <select

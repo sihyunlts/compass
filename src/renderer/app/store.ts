@@ -14,8 +14,7 @@ import {
 export interface AppState {
   chainState: GeneratorChain;
   launchpadModel: LaunchpadModel;
-  statusText: string;
-  previewMetaText: string;
+  headerIndicatorText: string;
   paletteNameText: string;
   isSettingsOpen: boolean;
   previewBpm: number;
@@ -38,8 +37,7 @@ export const createInitialAppState = (): AppState => {
   return {
     chainState: loadChainSettings(),
     launchpadModel: loadLaunchpadModel(),
-    statusText: 'Idle',
-    previewMetaText: 'Preview updates automatically when the chain changes.',
+    headerIndicatorText: '',
     paletteNameText: 'Default palette: loading...',
     isSettingsOpen: false,
     previewBpm: loadPreviewBpm(),
