@@ -1155,10 +1155,6 @@
     uiState.isSettingsOpen = false;
   };
 
-  const handleSettingsFormSubmit = (event: SubmitEvent): void => {
-    event.preventDefault();
-  };
-
   const handleBrowserDeviceAdd = (kind: BrowserDeviceKind): void => {
     if (!isBrowserDeviceKind(kind)) {
       return;
@@ -1224,15 +1220,6 @@
 
   const handleRackHeaderScrollRequest = (nextScrollLeft: number): void => {
     deviceRackComponent?.setScrollLeft(nextScrollLeft);
-  };
-
-  const handleSettingsSave = (): void => {
-    const bridge = readBridge();
-    writeBridgeInputs(bridge);
-    saveBridgeSettings(bridge);
-    saveLaunchpadModel(uiState.launchpadModel);
-    runBestEffort(requestLiveTempoSync());
-    closeSettings();
   };
 
   const handleAutoCreateLengthChange = (): void => {
@@ -1827,7 +1814,7 @@
     </header>
 
     <div class="settings-screen-body">
-      <form id="settings-form" class="settings-form" onsubmit={handleSettingsFormSubmit}>
+      <div id="settings-form" class="settings-form">
         <div class="control-field">
           <label for="launchpad-model-mk2" class="field-label">Launchpad MK2 Mode</label>
           <input
@@ -1856,14 +1843,8 @@
             Reset to Default
           </button>
         </div>
-      </form>
+      </div>
     </div>
-
-    <footer class="settings-screen-actions">
-      <button id="settings-save" class="primary" type="button" onclick={handleSettingsSave}>
-        Save
-      </button>
-    </footer>
   </section>
 
   <ContextMenu

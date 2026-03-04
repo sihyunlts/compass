@@ -33,12 +33,6 @@
     overflow: auto;
   }
 
-  &-actions {
-    display: flex;
-    justify-content: flex-end;
-    padding: var(--gap-14) var(--gap-16) var(--gap-16);
-    border-top: 1px solid var(--neutral-20);
-  }
 }
 
 .settings-form {
