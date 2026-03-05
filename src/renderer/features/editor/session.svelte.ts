@@ -32,7 +32,7 @@ import {
   saveSidebarWidth,
   sanitizeBridgeSettings,
 } from '../../services/storage';
-import type { GroupSelectionContext } from '../../services/rack-controller';
+import type { GroupSelectionContext } from '../rack/selection.svelte';
 import {
   assignGroupIdToDevices,
   canCreateGroupFromSelection,

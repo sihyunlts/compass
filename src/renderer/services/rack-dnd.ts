@@ -296,11 +296,7 @@ export class DragDropManager {
 
   private markDragStarted(drag: ActiveDrag): void {
     drag.didMove = true;
-    if (drag.kind === 'chain') {
-      for (const id of drag.sourceIds) {
-        this.getCardElement(id)?.classList.add('is-dragging');
-      }
-    } else {
+    if (drag.kind === 'browser') {
       drag.itemEl.classList.add('is-dragging');
     }
     this.notifyDragUpdate();
@@ -332,11 +328,7 @@ export class DragDropManager {
   private clearDraggingState(drag: ActiveDrag): void {
     this.stopAutoScrollLoop();
 
-    if (drag.kind === 'chain') {
-      for (const id of drag.sourceIds) {
-        this.getCardElement(id)?.classList.remove('is-dragging');
-      }
-    } else {
+    if (drag.kind === 'browser') {
       drag.itemEl.classList.remove('is-dragging');
       this.browserDragBadge.classList.remove('is-visible');
       this.browserDragBadge.hidden = true;

@@ -55,6 +55,12 @@
     resolvePaletteRgb,
     isCollapsed = false,
     isDisabledByGroup = false,
+    isSelected = false,
+    isDragging = false,
+    onHeaderPointerDown,
+    onHeaderClick,
+    onHeaderContextMenu,
+    onHeaderDoubleClick,
   } = $props<{
     device: GeneratorDeviceNode;
     devices?: GeneratorDeviceNode[];
@@ -64,6 +70,12 @@
     resolvePaletteRgb: (velocity: number) => string;
     isCollapsed?: boolean;
     isDisabledByGroup?: boolean;
+    isSelected?: boolean;
+    isDragging?: boolean;
+    onHeaderPointerDown?: (event: PointerEvent) => void;
+    onHeaderClick?: (event: MouseEvent) => void;
+    onHeaderContextMenu?: (event: MouseEvent) => void;
+    onHeaderDoubleClick?: (event: MouseEvent) => void;
   }>();
   let selectedColorSlotIndex = $state(0);
   let colorPaletteFrameHeight = $state(0);
@@ -138,10 +150,20 @@
     class="device-card instrument"
     class:is-disabled={isDeviceDisabled}
     class:is-collapsed={isCollapsed}
+    class:is-selected={isSelected}
+    class:is-dragging={isDragging}
     data-device-id={device.id}
     data-device-kind="waterdrop"
   >
-    <header class="device-head">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <header
+      class="device-head"
+      onpointerdown={onHeaderPointerDown}
+      onclick={onHeaderClick}
+      oncontextmenu={onHeaderContextMenu}
+      ondblclick={onHeaderDoubleClick}
+    >
       <div class="device-head-left">
         <input
           class="round-checkbox device-toggle"
@@ -190,10 +212,20 @@
     class="device-card instrument"
     class:is-disabled={isDeviceDisabled}
     class:is-collapsed={isCollapsed}
+    class:is-selected={isSelected}
+    class:is-dragging={isDragging}
     data-device-id={device.id}
     data-device-kind="scanner"
   >
-    <header class="device-head">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <header
+      class="device-head"
+      onpointerdown={onHeaderPointerDown}
+      onclick={onHeaderClick}
+      oncontextmenu={onHeaderContextMenu}
+      ondblclick={onHeaderDoubleClick}
+    >
       <div class="device-head-left">
         <input
           class="round-checkbox device-toggle"
@@ -231,10 +263,20 @@
     class="device-card instrument"
     class:is-disabled={isDeviceDisabled}
     class:is-collapsed={isCollapsed}
+    class:is-selected={isSelected}
+    class:is-dragging={isDragging}
     data-device-id={device.id}
     data-device-kind="spiral"
   >
-    <header class="device-head">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <header
+      class="device-head"
+      onpointerdown={onHeaderPointerDown}
+      onclick={onHeaderClick}
+      oncontextmenu={onHeaderContextMenu}
+      ondblclick={onHeaderDoubleClick}
+    >
       <div class="device-head-left">
         <input
           class="round-checkbox device-toggle"
@@ -285,10 +327,20 @@
     class="device-card effect"
     class:is-disabled={isDeviceDisabled}
     class:is-collapsed={isCollapsed}
+    class:is-selected={isSelected}
+    class:is-dragging={isDragging}
     data-device-id={device.id}
     data-device-kind="modulator"
   >
-    <header class="device-head">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <header
+      class="device-head"
+      onpointerdown={onHeaderPointerDown}
+      onclick={onHeaderClick}
+      oncontextmenu={onHeaderContextMenu}
+      ondblclick={onHeaderDoubleClick}
+    >
       <div class="device-head-left">
         <input
           class="round-checkbox device-toggle"
@@ -368,10 +420,20 @@
     class="device-card effect"
     class:is-disabled={isDeviceDisabled}
     class:is-collapsed={isCollapsed}
+    class:is-selected={isSelected}
+    class:is-dragging={isDragging}
     data-device-id={device.id}
     data-device-kind="mirror"
   >
-    <header class="device-head">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <header
+      class="device-head"
+      onpointerdown={onHeaderPointerDown}
+      onclick={onHeaderClick}
+      oncontextmenu={onHeaderContextMenu}
+      ondblclick={onHeaderDoubleClick}
+    >
       <div class="device-head-left">
         <input
           class="round-checkbox device-toggle"
@@ -398,10 +460,20 @@
     class="device-card effect"
     class:is-disabled={isDeviceDisabled}
     class:is-collapsed={isCollapsed}
+    class:is-selected={isSelected}
+    class:is-dragging={isDragging}
     data-device-id={device.id}
     data-device-kind="symmetry"
   >
-    <header class="device-head">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <header
+      class="device-head"
+      onpointerdown={onHeaderPointerDown}
+      onclick={onHeaderClick}
+      oncontextmenu={onHeaderContextMenu}
+      ondblclick={onHeaderDoubleClick}
+    >
       <div class="device-head-left">
         <input
           class="round-checkbox device-toggle"
@@ -451,10 +523,20 @@
     class="device-card effect"
     class:is-disabled={isDeviceDisabled}
     class:is-collapsed={isCollapsed}
+    class:is-selected={isSelected}
+    class:is-dragging={isDragging}
     data-device-id={device.id}
     data-device-kind="mask"
   >
-    <header class="device-head">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <header
+      class="device-head"
+      onpointerdown={onHeaderPointerDown}
+      onclick={onHeaderClick}
+      oncontextmenu={onHeaderContextMenu}
+      ondblclick={onHeaderDoubleClick}
+    >
       <div class="device-head-left">
         <input
           class="round-checkbox device-toggle"
@@ -551,10 +633,20 @@
     class="device-card effect"
     class:is-disabled={isDeviceDisabled}
     class:is-collapsed={isCollapsed}
+    class:is-selected={isSelected}
+    class:is-dragging={isDragging}
     data-device-id={device.id}
     data-device-kind="color"
   >
-    <header class="device-head">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <header
+      class="device-head"
+      onpointerdown={onHeaderPointerDown}
+      onclick={onHeaderClick}
+      oncontextmenu={onHeaderContextMenu}
+      ondblclick={onHeaderDoubleClick}
+    >
       <div class="device-head-left">
         <input
           class="round-checkbox device-toggle"
@@ -667,10 +759,20 @@
     class="device-card effect"
     class:is-disabled={isDeviceDisabled}
     class:is-collapsed={isCollapsed}
+    class:is-selected={isSelected}
+    class:is-dragging={isDragging}
     data-device-id={device.id}
     data-device-kind="rotate"
   >
-    <header class="device-head">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <header
+      class="device-head"
+      onpointerdown={onHeaderPointerDown}
+      onclick={onHeaderClick}
+      oncontextmenu={onHeaderContextMenu}
+      ondblclick={onHeaderDoubleClick}
+    >
       <div class="device-head-left">
         <input
           class="round-checkbox device-toggle"
@@ -697,10 +799,20 @@
     class="device-card effect"
     class:is-disabled={isDeviceDisabled}
     class:is-collapsed={isCollapsed}
+    class:is-selected={isSelected}
+    class:is-dragging={isDragging}
     data-device-id={device.id}
     data-device-kind="reverse"
   >
-    <header class="device-head">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <header
+      class="device-head"
+      onpointerdown={onHeaderPointerDown}
+      onclick={onHeaderClick}
+      oncontextmenu={onHeaderContextMenu}
+      ondblclick={onHeaderDoubleClick}
+    >
       <div class="device-head-left">
         <input
           class="round-checkbox device-toggle"
@@ -731,7 +843,7 @@
     background: var(--neutral-10);
     transition: transform 130ms ease, opacity 130ms ease;
 
-    &:global(.is-selected) {
+    &.is-selected {
       .device-head {
         background-color: rgb(var(--rgb-white) / var(--alpha-04));
       }
@@ -769,7 +881,7 @@
       }
     }
 
-    &:global(.is-dragging) {
+    &.is-dragging {
       opacity: 0.86;
       z-index: 12;
       will-change: transform;

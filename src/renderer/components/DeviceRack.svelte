@@ -14,8 +14,14 @@
   import type { ChainMutationMeta } from '../state/chain-history';
   import type { ContextMenuTarget } from '../state/context-menu';
   import type { BrowserDeviceKind } from '../services/devices';
-  import { DeviceRackController, type GroupSelectionContext } from '../services/rack-controller';
-  import { DragDropManager, type ActiveDragInfo } from '../services/rack-dnd';
+  import { canCreateGroupFromSelection } from '../state/chain';
+  import { blurIfTextEditingElement } from '../features/rack/text-editing';
+  import {
+    createRackSelection,
+    type GroupSelectionContext,
+  } from '../features/rack/selection.svelte';
+  import { DragDropManager, type ActiveDragInfo } from '../features/rack/dnd';
+  import { DeviceRackController } from '../services/rack-controller';
   import DeviceCard from './DeviceCard.svelte';
 
   let {
@@ -64,8 +70,11 @@
   let dropIndicatorEl = $state<HTMLElement | null>(null);
   let browserDragBadgeEl = $state<HTMLElement | null>(null);
 
+  const rackSelection = createRackSelection();
   let deviceRackController = $state<DeviceRackController | null>(null);
   let dragDropManager = $state<DragDropManager | null>(null);
+  let activeDragInfo = $state<ActiveDragInfo | null>(null);
+  let suppressDeviceSelectionClick = false;
   let lastIndicatorKey: string | null = null;
   let resizeObserver: ResizeObserver | null = null;
   let resizeSyncFrameId: number | null = null;
@@ -135,6 +144,29 @@
 
   const getGroupMemberIds = (groupId: string): string[] =>
     groupMemberIdsByGroupId[groupId] ?? [];
+
+  const orderedDeviceIds = $derived.by(() =>
+    devices.map((device: GeneratorDeviceNode) => device.id));
+  const orderedGroupIds = $derived.by(() => {
+    const groupIds: string[] = [];
+
+    for (const device of devices) {
+      const groupId = normalizeOptionalId(device.groupId);
+      if (!groupId || groupIds.includes(groupId)) {
+        continue;
+      }
+
+      groupIds.push(groupId);
+    }
+
+    return groupIds;
+  });
+  const selectedDeviceIds = $derived.by(() => rackSelection.state.selectedDeviceIds);
+  const selectedGroupIds = $derived.by(() => rackSelection.state.selectedGroupIds);
+  const draggingDeviceIds = $derived.by(() =>
+    activeDragInfo?.kind === 'chain' && activeDragInfo.didMove
+      ? activeDragInfo.sourceIds
+      : []);
 
   const rackContentItems = $derived.by((): RackContentItem[] => {
     const items: RackContentItem[] = [];
@@ -462,44 +494,69 @@
     lastIndicatorKey = layout.key;
   };
 
-  /** Syncs selection visuals and transient UI state after Svelte re-render. */
+  const getOrderedSelectedDeviceIdsInRack = (): string[] =>
+    rackSelection.getOrderedSelectedDeviceIds(orderedDeviceIds);
+
+  const isAdditiveSelection = (event: { metaKey: boolean; ctrlKey: boolean }): boolean =>
+    event.metaKey || event.ctrlKey;
+
+  const blurActiveTextEditingElement = (): void => {
+    blurIfTextEditingElement(document.activeElement);
+  };
+
+  const selectDeviceForContextMenu = (deviceId: string): void => {
+    if (selectedDeviceIds.includes(deviceId)) {
+      return;
+    }
+
+    rackSelection.clear();
+    rackSelection.selectDeviceIds([deviceId], deviceId, orderedDeviceIds);
+  };
+
+  const selectGroupForContextMenu = (groupId: string): void => {
+    if (selectedGroupIds.includes(groupId)) {
+      return;
+    }
+
+    rackSelection.clear();
+    rackSelection.setSelectedGroupIds([groupId], orderedGroupIds);
+  };
+
+  /** Syncs selection state and transient UI state after Svelte re-render. */
   export function syncAfterRender() {
+    rackSelection.reconcileWithDevices(devices);
     deviceRackController?.syncAfterRender();
   }
 
   /** Applies fallback selection when currently selected devices are deleted. */
   export function applyNextSelectionAfterDelete(deletedIds: readonly string[]) {
-    deviceRackController?.applyNextSelectionAfterDelete(deletedIds);
+    rackSelection.applyNextSelectionAfterDelete(deletedIds, orderedDeviceIds);
   }
 
   /** Returns selected device IDs ordered by current rack layout. */
   export function getOrderedSelectedDeviceIds() {
-    return deviceRackController?.getOrderedSelectedDeviceIds() ?? [];
+    return getOrderedSelectedDeviceIdsInRack();
   }
 
   /** Selects all provided devices in rack order. */
   export function selectAllDevices(deviceIds: readonly string[]) {
-    if (!deviceRackController) {
-      return;
-    }
-
-    deviceRackController.clearSelection();
+    rackSelection.clear();
     if (deviceIds.length === 0) {
       return;
     }
 
     const anchorId = deviceIds[deviceIds.length - 1] ?? null;
-    deviceRackController.selectDeviceIds(deviceIds, anchorId);
+    rackSelection.selectDeviceIds(deviceIds, anchorId, orderedDeviceIds);
   }
 
   /** Returns selected group contexts in rack order. */
   export function getSelectedGroupContexts(): GroupSelectionContext[] {
-    return deviceRackController?.getSelectedGroupContexts() ?? [];
+    return rackSelection.getSelectedGroupContexts(devices);
   }
 
   /** Clears all current device and group selections. */
   export function clearSelection() {
-    deviceRackController?.clearSelection();
+    rackSelection.clear();
   }
 
   /** Reports whether rack pointer interactions are active. */
@@ -576,59 +633,90 @@
 
   function handleGroupToggleClick(event: MouseEvent) {
     event.stopPropagation();
+    if (suppressDeviceSelectionClick) {
+      suppressDeviceSelectionClick = false;
+    }
   }
 
-  // Resolves whether pointer-down should start reorder drag or remain in-place edit.
-  function handleChainPointerDown(event: PointerEvent) {
-    if (!deviceRackController || !dragDropManager) return;
+  function handleGroupRailPointerDown(event: PointerEvent, groupId: string) {
+    if (!dragDropManager) {
+      return;
+    }
 
-    if (deviceRackController.handleChainPointerDown(event)) {
+    event.stopPropagation();
+    if (event.button !== 0 || !event.isPrimary) {
+      return;
+    }
+
+    blurActiveTextEditingElement();
+    onCloseContextMenu();
+
+    if (isAdditiveSelection(event)) {
+      rackSelection.toggleSelectedGroupId(groupId, orderedGroupIds);
+    } else {
+      rackSelection.clear();
+      rackSelection.setSelectedGroupIds([groupId], orderedGroupIds);
+    }
+
+    const sourceIds = getGroupMemberIds(groupId);
+    if (sourceIds.length === 0) {
+      return;
+    }
+
+    const started = dragDropManager.startChainDrag(event, sourceIds, 'group');
+    if (started) {
+      clearDropIndicator();
       event.preventDefault();
+    }
+  }
+
+  function handleGroupRailClick(event: MouseEvent) {
+    event.stopPropagation();
+
+    if (suppressDeviceSelectionClick) {
+      suppressDeviceSelectionClick = false;
       return;
     }
 
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
-    if (target.closest(interactiveElementSelector)) return;
+    onCloseContextMenu();
+  }
 
-    const groupRail = target.closest<HTMLElement>('.group-rail');
-    if (groupRail) {
-      const groupEl = groupRail.closest<HTMLElement>('.device-group.is-rack[data-group-id]');
-      const groupId = normalizeOptionalId(groupEl?.dataset.groupId);
-      if (!groupId) {
-        return;
-      }
-
-      deviceRackController.prepareSelectionOnPointerDown({ kind: 'group', id: groupId }, event);
-
-      const sourceIds = getGroupMemberIds(groupId);
-      if (sourceIds.length === 0) {
-        return;
-      }
-
-      const started = dragDropManager.startChainDrag(event, sourceIds, 'group');
-      if (started) {
-        clearDropIndicator();
-        event.preventDefault();
-      }
+  function handleGroupRailContextMenu(event: MouseEvent, groupId: string) {
+    const memberDeviceIds = getGroupMemberIds(groupId);
+    if (memberDeviceIds.length === 0) {
       return;
     }
 
-    const handle = target.closest<HTMLElement>('.device-head');
-    if (!handle) return;
+    event.stopPropagation();
+    event.preventDefault();
+    selectGroupForContextMenu(groupId);
+    onOpenContextMenu(event.clientX, event.clientY, {
+      kind: 'group',
+      groupId,
+      memberDeviceIds,
+    });
+  }
 
-    const card = handle.closest<HTMLElement>('.device-card[data-device-id]');
-    if (!card) return;
+  function handleDeviceHeaderPointerDown(event: PointerEvent, deviceId: string) {
+    if (!dragDropManager) {
+      return;
+    }
 
-    const sourceId = card.dataset.deviceId;
-    if (!sourceId) return;
+    event.stopPropagation();
+    if (event.button !== 0 || !event.isPrimary) {
+      return;
+    }
 
-    deviceRackController.prepareSelectionOnPointerDown({ kind: 'device', id: sourceId }, event);
+    blurActiveTextEditingElement();
+    const additiveSelection = isAdditiveSelection(event);
+    if (!event.shiftKey && !additiveSelection && !selectedDeviceIds.includes(deviceId)) {
+      onCloseContextMenu();
+      rackSelection.selectSingleDevice(deviceId, orderedDeviceIds);
+    }
 
-    const orderedSelectedIds = deviceRackController.getOrderedSelectedDeviceIds();
-    const shouldDragSelection = orderedSelectedIds.includes(sourceId) && orderedSelectedIds.length > 1;
-    const sourceIds = shouldDragSelection ? orderedSelectedIds : [sourceId];
-
+    const orderedSelectedIds = getOrderedSelectedDeviceIdsInRack();
+    const shouldDragSelection = orderedSelectedIds.includes(deviceId) && orderedSelectedIds.length > 1;
+    const sourceIds = shouldDragSelection ? orderedSelectedIds : [deviceId];
     const started = dragDropManager.startChainDrag(event, sourceIds, 'devices');
     if (started) {
       clearDropIndicator();
@@ -636,19 +724,75 @@
     }
   }
 
-  // Opens context menu and aligns selection with the right-click target.
-  function handleChainContextMenu(event: MouseEvent) {
-    deviceRackController?.handleContextMenu(event);
+  function handleDeviceHeaderClick(event: MouseEvent, deviceId: string) {
+    event.stopPropagation();
+
+    if (suppressDeviceSelectionClick) {
+      suppressDeviceSelectionClick = false;
+      return;
+    }
+
+    onCloseContextMenu();
+    const additiveSelection = isAdditiveSelection(event);
+    if (event.shiftKey) {
+      rackSelection.applyRangeSelection(deviceId, additiveSelection, orderedDeviceIds);
+      return;
+    }
+
+    if (additiveSelection) {
+      rackSelection.toggleDeviceSelection(deviceId, orderedDeviceIds);
+      return;
+    }
+
+    rackSelection.selectSingleDevice(deviceId, orderedDeviceIds);
   }
 
-  // Applies single/multi-selection behavior based on modifier keys.
-  function handleChainClick(event: MouseEvent) {
-    deviceRackController?.handleClick(event);
+  function handleDeviceHeaderContextMenu(event: MouseEvent, deviceId: string) {
+    event.stopPropagation();
+    event.preventDefault();
+    selectDeviceForContextMenu(deviceId);
+
+    const deviceIds = getOrderedSelectedDeviceIdsInRack();
+    onOpenContextMenu(event.clientX, event.clientY, {
+      kind: 'devices',
+      deviceIds,
+      canGroup: canCreateGroupFromSelection(chainState.devices, deviceIds),
+    });
   }
 
-  function handleChainDoubleClick(event: MouseEvent) {
-    if (deviceRackController?.handleDoubleClick(event)) {
+  function handleDeviceHeaderDoubleClick(event: MouseEvent, deviceId: string) {
+    event.stopPropagation();
+    if (event.button !== 0) {
+      return;
+    }
+    onToggleCollapse(deviceId);
+  }
+
+  // Resolves whether pointer-down should start reorder drag or remain in-place edit.
+  function handleChainPointerDown(event: PointerEvent) {
+    if (deviceRackController?.handleChainPointerDown(event)) {
       event.preventDefault();
+    }
+  }
+
+  function handleChainContextMenu(event: MouseEvent) {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      onCloseContextMenu();
+      return;
+    }
+
+    if (target.closest(interactiveElementSelector)) {
+      onCloseContextMenu();
+      return;
+    }
+
+    onCloseContextMenu();
+  }
+
+  function handleChainClick(event: MouseEvent) {
+    if (suppressDeviceSelectionClick) {
+      suppressDeviceSelectionClick = false;
       return;
     }
 
@@ -657,22 +801,28 @@
       return;
     }
 
+    if (target.closest('.center-point-control')) {
+      return;
+    }
+
+    if (target.closest('.modulation-curve-control')) {
+      return;
+    }
+
     if (target.closest(interactiveElementSelector)) {
       return;
     }
 
-    const header = target.closest<HTMLElement>('.device-head');
-    if (!header) {
-      return;
+    if (!event.metaKey && !event.ctrlKey && !event.shiftKey) {
+      rackSelection.clear();
     }
+    onCloseContextMenu();
+  }
 
-    const card = header.closest<HTMLElement>('.device-card[data-device-id]');
-    const deviceId = card?.dataset.deviceId;
-    if (!deviceId) {
-      return;
+  function handleChainDoubleClick(event: MouseEvent) {
+    if (deviceRackController?.handleDoubleClick(event)) {
+      event.preventDefault();
     }
-
-    onToggleCollapse(deviceId);
   }
 
   function handleChainScroll() {
@@ -711,7 +861,7 @@
 
     if (pointerResult.kind === 'chain') {
       if (pointerResult.didMove) {
-        deviceRackController?.markSuppressSelectionClickOnce();
+        suppressDeviceSelectionClick = true;
       }
 
       if (pointerResult.shouldCommit && pointerResult.dropZone) {
@@ -760,11 +910,9 @@
 
     deviceRackController = new DeviceRackController({
       chainDevices: chainDevicesEl,
-      interactiveElementSelector,
       getChainState: () => chainState,
       saveChain: onSaveChain,
       scheduleAutoPreview: onScheduleAutoPreview,
-      openContextMenu: onOpenContextMenu,
       closeContextMenu: onCloseContextMenu,
     });
 
@@ -773,7 +921,10 @@
       browserDragBadge: browserDragBadgeEl,
       isBlocked: () => deviceRackController?.isCenterPickerActive() ?? false,
       closeContextMenu: onCloseContextMenu,
-      onDragUpdate: (info) => applyDropIndicator(info),
+      onDragUpdate: (info) => {
+        activeDragInfo = info;
+        applyDropIndicator(info);
+      },
     });
 
     resizeObserver = new ResizeObserver(() => {
@@ -794,9 +945,14 @@
       }
       resizeObserver?.disconnect();
       resizeObserver = null;
+      activeDragInfo = null;
       dragDropManager = null;
       deviceRackController = null;
     };
+  });
+
+  $effect(() => {
+    rackSelection.reconcileWithDevices(devices);
   });
 
   $effect(() => {
@@ -845,6 +1001,7 @@
           ? 'device-slot device-slot--solo'
           : 'device-group is-rack'}
         class:is-disabled={item.kind === 'group' && !item.enabled}
+        class:is-selected={item.kind === 'group' && selectedGroupIds.includes(item.groupId)}
         data-group-id={item.kind === 'group' ? item.groupId : undefined}
       >
         {#if item.kind === 'device'}
@@ -857,16 +1014,32 @@
             {resolvePaletteRgb}
             isCollapsed={collapsedSet.has(item.device.id)}
             isDisabledByGroup={false}
+            isSelected={selectedDeviceIds.includes(item.device.id)}
+            isDragging={draggingDeviceIds.includes(item.device.id)}
+            onHeaderPointerDown={(event) => handleDeviceHeaderPointerDown(event, item.device.id)}
+            onHeaderClick={(event) => handleDeviceHeaderClick(event, item.device.id)}
+            onHeaderContextMenu={(event) => handleDeviceHeaderContextMenu(event, item.device.id)}
+            onHeaderDoubleClick={(event) => handleDeviceHeaderDoubleClick(event, item.device.id)}
           />
         {:else if item.kind === 'group'}
           <div class="device-group-body">
             {#each buildGroupColumns(item) as col (col.key)}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
               <div
                 class={col.kind === 'device'
                   ? 'device-slot'
                   : col.kind === 'left-rail'
                       ? 'group-rail group-rail-left'
                       : 'group-rail group-rail-right'}
+                onpointerdown={col.kind === 'device'
+                  ? undefined
+                  : (event) => handleGroupRailPointerDown(event, col.groupId)}
+                onclick={col.kind === 'device'
+                  ? undefined
+                  : handleGroupRailClick}
+                oncontextmenu={col.kind === 'device'
+                  ? undefined
+                  : (event) => handleGroupRailContextMenu(event, col.groupId)}
               >
                 {#if col.kind === 'device'}
                   <DeviceCard
@@ -878,6 +1051,12 @@
                     {resolvePaletteRgb}
                     isCollapsed={collapsedSet.has(col.device.id)}
                     isDisabledByGroup={!item.enabled}
+                    isSelected={selectedDeviceIds.includes(col.device.id)}
+                    isDragging={draggingDeviceIds.includes(col.device.id)}
+                    onHeaderPointerDown={(event) => handleDeviceHeaderPointerDown(event, col.device.id)}
+                    onHeaderClick={(event) => handleDeviceHeaderClick(event, col.device.id)}
+                    onHeaderContextMenu={(event) => handleDeviceHeaderContextMenu(event, col.device.id)}
+                    onHeaderDoubleClick={(event) => handleDeviceHeaderDoubleClick(event, col.device.id)}
                   />
                 {:else if col.kind === 'left-rail'}
                   <input
@@ -946,12 +1125,11 @@
     border-radius: var(--radius-6);
   }
 
-  /* Group selection state class is toggled via classList in rack-controller. */
-  :global(.device-group.is-rack.is-selected) {
+  .device-group.is-rack.is-selected {
     border-color: var(--neutral-30);
   }
 
-  :global(.device-group.is-rack.is-selected .group-rail-left) {
+  .device-group.is-rack.is-selected .group-rail-left {
     background: var(--neutral-20);
   }
 
