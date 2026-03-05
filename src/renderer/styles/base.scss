@@ -1,6 +1,9 @@
 * {
   box-sizing: border-box;
 
+  /* Form elements do not inherit font-family by default */
+  font-family: inherit;
+
   /* Hide scrollbars */
   scrollbar-width: none;
 
