@@ -905,7 +905,7 @@
                   />
                 {:else if col.kind === 'left-rail'}
                   <input
-                    class="group-enabled-toggle"
+                    class="group-enabled-toggle round-checkbox"
                     type="checkbox"
                     checked={col.enabled}
                     aria-label={`${col.groupId} enabled`}
@@ -1074,7 +1074,6 @@
   .group-enabled-toggle {
     width: var(--gap-14);
     height: var(--gap-14);
-    margin: 0;
     flex: 0 0 auto;
   }
 

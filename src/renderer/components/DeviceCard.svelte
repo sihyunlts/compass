@@ -144,6 +144,7 @@
     <header class="device-head">
       <div class="device-head-left">
         <input
+          class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
           data-action="set-device-enabled"
@@ -195,6 +196,7 @@
     <header class="device-head">
       <div class="device-head-left">
         <input
+          class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
           data-action="set-device-enabled"
@@ -235,6 +237,7 @@
     <header class="device-head">
       <div class="device-head-left">
         <input
+          class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
           data-action="set-device-enabled"
@@ -288,6 +291,7 @@
     <header class="device-head">
       <div class="device-head-left">
         <input
+          class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
           data-action="set-device-enabled"
@@ -370,6 +374,7 @@
     <header class="device-head">
       <div class="device-head-left">
         <input
+          class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
           data-action="set-device-enabled"
@@ -399,6 +404,7 @@
     <header class="device-head">
       <div class="device-head-left">
         <input
+          class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
           data-action="set-device-enabled"
@@ -451,6 +457,7 @@
     <header class="device-head">
       <div class="device-head-left">
         <input
+          class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
           data-action="set-device-enabled"
@@ -550,6 +557,7 @@
     <header class="device-head">
       <div class="device-head-left">
         <input
+          class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
           data-action="set-device-enabled"
@@ -665,6 +673,7 @@
     <header class="device-head">
       <div class="device-head-left">
         <input
+          class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
           data-action="set-device-enabled"
@@ -694,6 +703,7 @@
     <header class="device-head">
       <div class="device-head-left">
         <input
+          class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
           data-action="set-device-enabled"
@@ -748,9 +758,8 @@
 
       &-left {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         gap: var(--gap-8);
-        min-width: 0;
       }
 
       .device-title {

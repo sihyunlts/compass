@@ -50,6 +50,20 @@ select {
 input {
   &[type='checkbox'] {
     accent-color: var(--accent-500);
+
+    &.round-checkbox {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 0.875rem;
+      height: 0.875rem;
+      border-radius: var(--radius-round);
+      background-color: var(--neutral-30);
+      margin: 0;
+
+      &:checked {
+        background-color: var(--accent-500);
+      }
+    }
   }
 
   &[type='number'] {
