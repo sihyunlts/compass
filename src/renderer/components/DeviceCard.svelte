@@ -736,7 +736,7 @@
     }
 
     .device-head {
-      padding: var(--gap-10) var(--gap-8) var(--gap-6);
+      padding: var(--gap-8) var(--gap-8) var(--gap-4);
       border-bottom: 1px solid var(--neutral-20);
       display: flex;
       align-items: flex-start;
@@ -755,7 +755,7 @@
 
       .device-title {
         margin: var(--gap-0);
-        font-size: var(--text-14);
+        font-size: var(--text-13);
         min-width: 0;
       }
     }
@@ -804,7 +804,6 @@
         display: inline-block;
         transform: rotate(-90deg);
         transform-origin: center;
-        font-size: var(--text-12);
         white-space: nowrap;
       }
     }
