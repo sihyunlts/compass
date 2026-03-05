@@ -18,11 +18,12 @@ export const DEVICE_KIND_LABELS = {
   symmetry: 'Symmetry',
   rotate: 'Rotate',
   reverse: 'Reverse',
+  color: 'Color',
 } as const satisfies Record<DeviceKind, string>;
 
 export const DEVICE_KIND_GROUPS = {
   generator: ['waterdrop', 'scanner', 'spiral'],
-  effect: ['modulator', 'mirror', 'symmetry', 'mask', 'rotate', 'reverse'],
+  effect: ['modulator', 'mirror', 'symmetry', 'mask', 'rotate', 'reverse', 'color'],
 } as const satisfies Record<DeviceGroup, readonly DeviceKind[]>;
 
 export const DEVICE_KINDS = Object.freeze(
@@ -66,7 +67,10 @@ export interface ModulationTargetParamDefinition {
   label: string;
 }
 
-export type ModulationTargetDeviceKind = Exclude<DeviceKind, 'reverse' | 'modulator' | 'symmetry' | 'mask'>;
+export type ModulationTargetDeviceKind = Exclude<
+  DeviceKind,
+  'reverse' | 'modulator' | 'symmetry' | 'mask' | 'color'
+>;
 
 const MODULATION_TARGET_PARAM_DEFINITIONS: Record<
   ModulationTargetDeviceKind,
@@ -158,6 +162,11 @@ const DEFAULT_SYMMETRY_PARAMS: DeviceNodeOfKind<'symmetry'>['params'] = {
 
 const DEFAULT_ROTATE_PARAMS: DeviceNodeOfKind<'rotate'>['params'] = {
   angleDeg: 90,
+};
+
+const DEFAULT_COLOR_PARAMS: DeviceNodeOfKind<'color'>['params'] = {
+  velocities: [3],
+  noteLengthPercent: 100,
 };
 
 const DEFAULT_MODULATION_PARAMS: CurveModulatorNode['params'] = {
@@ -256,6 +265,16 @@ const DEFAULT_DEVICE_FACTORIES = {
     enabled,
     groupId: null,
   }),
+  color: (id: string, enabled: boolean): DeviceNodeOfKind<'color'> => ({
+    id,
+    kind: 'color',
+    enabled,
+    groupId: null,
+    params: {
+      velocities: [...DEFAULT_COLOR_PARAMS.velocities],
+      noteLengthPercent: DEFAULT_COLOR_PARAMS.noteLengthPercent,
+    },
+  }),
 } as const satisfies DefaultDeviceFactoryMap;
 
 export const createDefaultDeviceNode = (
@@ -310,6 +329,19 @@ export const cloneDeviceNode = (
         sourceKind: device.params.sourceKind ?? 'tiles',
         sourceId: device.params.sourceId ?? null,
         sourceVisibility: device.params.sourceVisibility === 'show' ? 'show' : 'hide',
+      },
+    };
+  }
+
+  if (device.kind === 'color') {
+    return {
+      id: device.id,
+      kind: 'color',
+      enabled: device.enabled !== false,
+      groupId: device.groupId ?? null,
+      params: {
+        velocities: [...device.params.velocities],
+        noteLengthPercent: device.params.noteLengthPercent,
       },
     };
   }

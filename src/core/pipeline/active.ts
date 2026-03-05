@@ -51,15 +51,16 @@ export const resolveActiveByPitch = (
     const { x, y } = group;
 
     let maxVelocity = 0;
+    let maxVelocityOriginId: string | null = null;
     for (const polyline of polylines) {
       if (polyline.mask && !polyline.mask(x, y)) {
         continue;
       }
       const distanceSq = distanceToPolylineSquared({ x, y }, polyline);
       if (distanceSq <= thicknessSq) {
-        maxVelocity = Math.max(maxVelocity, polyline.velocity);
-        if (maxVelocity >= polyline.velocity) {
-          // keep scanning to honor masks, but velocity is constant
+        if (polyline.velocity > maxVelocity) {
+          maxVelocity = polyline.velocity;
+          maxVelocityOriginId = polyline.originId;
         }
       }
     }
@@ -74,6 +75,7 @@ export const resolveActiveByPitch = (
         active.set(button.output.number, {
           velocity: maxVelocity,
           channel: button.output.channel,
+          originId: maxVelocityOriginId ?? undefined,
         });
       }
     }

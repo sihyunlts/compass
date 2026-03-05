@@ -63,6 +63,7 @@ export interface ButtonIndex {
 export interface ActivePitchInfo {
   velocity: number;
   channel: number;
+  originId?: string;
 }
 
 export interface OpenNoteState {

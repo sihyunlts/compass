@@ -117,6 +117,16 @@ export interface RotateEffectNode extends GroupedDeviceNode {
   };
 }
 
+export interface ColorEffectNode extends GroupedDeviceNode {
+  id: string;
+  kind: 'color';
+  enabled: boolean;
+  params: {
+    velocities: number[];
+    noteLengthPercent: number;
+  };
+}
+
 export interface CurveNode {
   id: string;
   t: number;
@@ -150,7 +160,8 @@ export type GeneratorEffectNode =
   | MaskEffectNode
   | SymmetryEffectNode
   | ReverseEffectNode
-  | RotateEffectNode;
+  | RotateEffectNode
+  | ColorEffectNode;
 
 export type GeneratorDeviceNode =
   | GeneratorNode
@@ -228,6 +239,7 @@ export interface PreviewWindowState {
   launchpadModel?: LaunchpadModel;
   chain: GeneratorChain;
   currentBeat: number;
+  sourceTimelineEndBeat: number;
   loopLengthBeats: number;
   noteCount: number;
   uniquePitchCount: number;

@@ -17,21 +17,62 @@
   import CurveEditor from './CurveEditor.svelte';
   import MaskTilePicker from './MaskTilePicker.svelte';
 
+  const BLACK_RGB = '0 0 0';
+  const PALETTE_GRID_1 = Object.freeze(
+    Array.from({ length: 64 }, (_, i) => {
+      const row = Math.floor(i / 8);
+      const col = i % 8;
+      const flippedRow = 7 - row;
+      return (flippedRow * 8) + col;
+    })
+  );
+
+  const PALETTE_GRID_2 = Object.freeze(
+    Array.from({ length: 64 }, (_, i) => {
+      const row = Math.floor(i / 8);
+      const col = i % 8;
+      const flippedRow = 7 - row;
+      return 64 + (flippedRow * 8) + col;
+    })
+  );
+
   let {
     device,
     devices = [] as GeneratorDeviceNode[],
+    paletteRevision,
     currentBeat = 0,
     modulationReadoutById = {},
+    resolvePaletteRgb,
     isCollapsed = false,
     isDisabledByGroup = false,
   } = $props<{
     device: GeneratorDeviceNode;
     devices?: GeneratorDeviceNode[];
+    paletteRevision: number;
     currentBeat?: number;
     modulationReadoutById?: Record<string, string>;
+    resolvePaletteRgb: (velocity: number) => string;
     isCollapsed?: boolean;
     isDisabledByGroup?: boolean;
   }>();
+  let selectedColorSlotIndex = $state(0);
+  let colorPaletteFrameHeight = $state(0);
+
+  $effect(() => {
+    if (device.kind !== 'color') {
+      selectedColorSlotIndex = 0;
+      return;
+    }
+
+    const slotCount = Math.max(device.params.velocities.length, 1);
+    if (selectedColorSlotIndex >= slotCount) {
+      selectedColorSlotIndex = slotCount - 1;
+    }
+    if (selectedColorSlotIndex < 0) {
+      selectedColorSlotIndex = 0;
+    }
+  });
+
   const isDeviceDisabled = $derived.by(() => !device.enabled || isDisabledByGroup);
   const deviceLabel = $derived(getBrowserDeviceLabel(device.kind));
   const targetableDevices = $derived.by((): GeneratorDeviceNode[] =>
@@ -73,6 +114,13 @@
   const maskGeneratorOptions = $derived.by(() =>
     devices.filter((item: GeneratorDeviceNode) =>
       item.kind === 'waterdrop' || item.kind === 'scanner' || item.kind === 'spiral'));
+
+  const resolvePaletteSwatchRgb = (velocity: number, revision: number): string => {
+    void revision;
+    return resolvePaletteRgb(velocity);
+  };
+  const isPaletteSlotDisabled = (rgb: string): boolean => rgb.trim() === BLACK_RGB;
+  const colorPaletteGridSizePx = $derived.by(() => Math.max(0, colorPaletteFrameHeight));
 </script>
 
 {#if device.kind === 'waterdrop'}
@@ -481,6 +529,121 @@
       {/if}
     </div>
   </div>
+{:else if device.kind === 'color'}
+  <div
+    class="device-card effect"
+    class:is-disabled={isDeviceDisabled}
+    class:is-collapsed={isCollapsed}
+    data-device-id={device.id}
+    data-device-kind="color"
+  >
+    <header class="device-head">
+      <div class="device-head-left">
+        <input
+          type="checkbox"
+          checked={device.enabled}
+          data-action="set-device-enabled"
+          data-id={device.id}
+        />
+        <span class="device-title">{deviceLabel}</span>
+      </div>
+    </header>
+    <div class="device-controls">
+      <div class="column-wrapper">
+        <div
+          class="color-palette-container"
+          data-action="color-palette"
+          data-id={device.id}
+          data-slot-index={selectedColorSlotIndex}
+          style={`--color-palette-grid-size:${colorPaletteGridSizePx}px;`}
+        >
+          <div
+            class="color-palette-frame"
+            bind:clientHeight={colorPaletteFrameHeight}
+          >
+            <div
+              class="color-palette-grid"
+            >
+              {#each PALETTE_GRID_1 as paletteIndex (paletteIndex)}
+                {@const paletteRgb = resolvePaletteSwatchRgb(paletteIndex, paletteRevision)}
+                <button
+                  type="button"
+                  class="color-palette-cell"
+                  class:is-selected={device.params.velocities[selectedColorSlotIndex] === paletteIndex}
+                  data-action="color-palette-cell"
+                  data-palette-index={paletteIndex}
+                  disabled={isPaletteSlotDisabled(paletteRgb)}
+                  style={`background-color: rgb(${paletteRgb});`}
+                  aria-label={`Palette ${paletteIndex}`}
+                ></button>
+              {/each}
+            </div>
+          </div>
+
+          <div class="color-palette-frame">
+            <div
+              class="color-palette-grid"
+            >
+              {#each PALETTE_GRID_2 as paletteIndex (paletteIndex)}
+                {@const paletteRgb = resolvePaletteSwatchRgb(paletteIndex, paletteRevision)}
+                <button
+                  type="button"
+                  class="color-palette-cell"
+                  class:is-selected={device.params.velocities[selectedColorSlotIndex] === paletteIndex}
+                  data-action="color-palette-cell"
+                  data-palette-index={paletteIndex}
+                  disabled={isPaletteSlotDisabled(paletteRgb)}
+                  style={`background-color: rgb(${paletteRgb});`}
+                  aria-label={`Palette ${paletteIndex}`}
+                ></button>
+              {/each}
+            </div>
+          </div>
+        </div>
+
+        <div class="color-slot-row">
+          {#each device.params.velocities as slotVelocity, slotIndex (slotIndex)}
+            <button
+              type="button"
+              class="color-slot"
+              class:is-selected={selectedColorSlotIndex === slotIndex}
+              style={`background-color: rgb(${resolvePaletteSwatchRgb(slotVelocity, paletteRevision)});`}
+              onclick={() => {
+                selectedColorSlotIndex = slotIndex;
+              }}
+              aria-label={`Color slot ${slotIndex + 1}`}
+            ></button>
+          {/each}
+        </div>
+      </div>
+      <div class="column-wrapper">
+        <div class="control-field">
+          <span class="field-label">Note Length</span>
+          <input
+            type="number"
+            step="1"
+            min="1"
+            value={device.params.noteLengthPercent}
+            data-action="set-color-note-length-percent"
+            data-id={device.id}
+          />
+        </div>
+
+        <div class="control-field">
+          <span class="field-label">Slots</span>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={device.params.velocities.length}
+            data-action="set-color-slot-count"
+            data-id={device.id}
+            aria-label="Color slot count"
+          />
+        </div>
+      </div>
+    </div>
+  </div>
 {:else if device.kind === 'rotate'}
   <div
     class="device-card effect"
@@ -684,6 +847,52 @@
     &[data-device-kind='mask'] {
       .device-controls {
         flex-direction: column;
+      }
+    }
+
+    &[data-device-kind='color'] {
+      .color-slot-row {
+        display: flex;
+        gap: var(--gap-4);
+        margin-top: var(--gap-4);
+      }
+
+      .color-slot {
+        width: 1.25rem;
+        height: 1.25rem;
+        border: 1px solid var(--neutral-20);
+        border-radius: var(--radius-2);
+        padding: 0;
+
+        &.is-selected {
+          outline: 2px solid var(--accent-500);
+        }
+      }
+
+      .color-palette-container {
+        display: flex;
+        flex: 1 1 auto;
+        gap: var(--gap-8);
+        width: calc((var(--color-palette-grid-size, 0px) * 2) + var(--gap-12));
+      }
+
+      .color-palette-grid {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        grid-template-rows: repeat(8, minmax(0, 1fr));
+        gap: var(--gap-2);
+        inline-size: var(--color-palette-grid-size);
+        block-size: var(--color-palette-grid-size);
+      }
+
+      .color-palette-cell {
+        border: 1px solid var(--neutral-20);
+        border-radius: var(--radius-2);
+        padding: 0;
+
+        &.is-selected {
+          outline: 2px solid var(--accent-500);
+        }
       }
     }
 

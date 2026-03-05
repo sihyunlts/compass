@@ -158,13 +158,24 @@ function applyClipNotesEnvelope(envelope) {
     autoCreateLength = DEFAULT_AUTO_CREATE_LENGTH_BEATS;
   }
   autoCreateLength = Math.max(autoCreateLength, MIN_CLIP_LENGTH_BEATS);
+  var requiredClipLength = Math.max(
+    roundBeat(autoCreateLength * sourceLength),
+    MIN_CLIP_LENGTH_BEATS
+  );
 
-  var targetClip = resolveTargetMidiClip(applyMode, autoCreateLength);
+  var targetClip = resolveTargetMidiClip(applyMode, requiredClipLength);
   if (!targetClip) {
     return;
   }
 
-  var clipLength = readClipLengthBeats(targetClip, sourceLength);
+  if (applyMode === "replace") {
+    var existingLength = readClipLengthBeats(targetClip, requiredClipLength);
+    if (existingLength + 1e-6 < requiredClipLength) {
+      safeSetClipMarkers(targetClip, requiredClipLength);
+    }
+  }
+
+  var clipLength = readClipLengthBeats(targetClip, requiredClipLength);
   var scaledNotes = scaleNotesToClip(normalized.notes, sourceLength, clipLength);
 
   if (applyMode === "replace") {
@@ -292,7 +303,7 @@ function writeNotesToClip(clipApi, notes) {
   }
 }
 
-function resolveTargetMidiClip(applyMode, autoCreateLength) {
+function resolveTargetMidiClip(applyMode, requiredClipLength) {
   var view = getLiveSetViewApi();
   if (!view) {
     return null;
@@ -318,7 +329,7 @@ function resolveTargetMidiClip(applyMode, autoCreateLength) {
     }
   }
 
-  var created = createArrangementMidiClipOnSelectedTrack(autoCreateLength);
+  var created = createArrangementMidiClipOnSelectedTrack(requiredClipLength);
   if (created) {
     status("target", "created_arrangement_clip", created.id);
   }

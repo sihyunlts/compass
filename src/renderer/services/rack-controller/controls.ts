@@ -20,6 +20,10 @@ type ScannerDevice = Extract<ChainDevice, { kind: 'scanner' }>;
 type SpiralDevice = Extract<ChainDevice, { kind: 'spiral' }>;
 type CenterPickerDevice = Extract<ChainDevice, { kind: 'waterdrop' | 'spiral' }>;
 type AngleDevice = Extract<ChainDevice, { kind: 'scanner' | 'mirror' | 'rotate' }>;
+type ColorDevice = Extract<ChainDevice, { kind: 'color' }>;
+
+const DEFAULT_COLOR_SLOT_VELOCITY = 3;
+const MIN_COLOR_SLOT_COUNT = 1;
 
 interface ChainControlContext {
   findDeviceById: (id: string) => ChainDevice | null;
@@ -98,6 +102,9 @@ const isCenterPickerDevice = (device: ChainDevice): device is CenterPickerDevice
 const isAngleDevice = (device: ChainDevice): device is AngleDevice =>
   device.kind === 'scanner' || device.kind === 'mirror' || device.kind === 'rotate';
 
+const isColorDevice = (device: ChainDevice): device is ColorDevice =>
+  device.kind === 'color';
+
 const CENTER_PICKER_PARAM_KEYS = ['centerX', 'centerY'] as const;
 const ANGLE_PARAM_KEYS = ['angleDeg'] as const;
 
@@ -149,6 +156,57 @@ const handleSetAngleParam = (): ChainControlHandler => createNumericParamSetter(
     device.params[param] = value;
   },
 });
+
+const handleSetColorNoteLengthPercent = (): ChainControlHandler => (device, target) => {
+  if (!isColorDevice(device)) {
+    return false;
+  }
+
+  const input = requireInput(target);
+  if (!input) {
+    return false;
+  }
+
+  const value = parseFiniteNumber(input.value);
+  if (value === null) {
+    return false;
+  }
+
+  device.params.noteLengthPercent = Math.min(400, Math.max(1, value));
+  return true;
+};
+
+const handleSetColorSlotCount = (): ChainControlHandler => (device, target) => {
+  if (!isColorDevice(device)) {
+    return false;
+  }
+
+  const input = requireInput(target);
+  if (!input) {
+    return false;
+  }
+
+  const value = parseFiniteNumber(input.value);
+  if (value === null) {
+    return false;
+  }
+
+  const nextCount = Math.max(MIN_COLOR_SLOT_COUNT, Math.round(value));
+  const currentCount = device.params.velocities.length;
+  if (nextCount === currentCount) {
+    return false;
+  }
+
+  if (nextCount < currentCount) {
+    device.params.velocities.length = nextCount;
+    return true;
+  }
+
+  while (device.params.velocities.length < nextCount) {
+    device.params.velocities.push(DEFAULT_COLOR_SLOT_VELOCITY);
+  }
+  return true;
+};
 
 const handleSetSymmetryMode = (): ChainControlHandler => (device, target) => {
   if (device.kind !== 'symmetry') {
@@ -434,6 +492,8 @@ export const createChainControlHandlers = (
   'set-spiral-param': handleSetSpiralParam(),
   'set-center-picker-param': handleSetCenterPickerParam(),
   'set-angle-param': handleSetAngleParam(),
+  'set-color-note-length-percent': handleSetColorNoteLengthPercent(),
+  'set-color-slot-count': handleSetColorSlotCount(),
   'set-effect-symmetry-mode': handleSetSymmetryMode(),
   'set-effect-symmetry-axis': handleSetSymmetryAxis(),
   'set-effect-symmetry-anchor': handleSetSymmetryAnchor(),
@@ -491,6 +551,10 @@ const resolveResetParamKey = (action: string, input: HTMLInputElement): string |
 
   if (action === 'set-modulation-amount') {
     return 'amount';
+  }
+
+  if (action === 'set-color-note-length-percent') {
+    return 'noteLengthPercent';
   }
 
   return null;

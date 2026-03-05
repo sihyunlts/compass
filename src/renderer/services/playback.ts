@@ -15,6 +15,7 @@ import { cloneChainForIpc } from './clone-chain';
 /** Configures beat scheduling callbacks for renderer playback. */
 export interface PlaybackSchedulerOptions {
   getLoopMs: () => number;
+  getLoopEndBeat: () => number;
   isLoopEnabled: () => boolean;
   onFrame: (currentBeat: number) => void;
   onPlayStateChange: (isPlaying: boolean) => void;
@@ -40,7 +41,7 @@ class PlaybackScheduler {
   }
 
   public setCurrentBeat(nextBeat: number, emitFrame = true): void {
-    this.currentBeat = clamp(nextBeat, 0, 1);
+    this.currentBeat = clamp(nextBeat, 0, this.resolveLoopEndBeat());
     if (emitFrame) {
       this.options.onFrame(this.currentBeat);
     }
@@ -51,7 +52,8 @@ class PlaybackScheduler {
       return;
     }
 
-    if (this.currentBeat >= 1) {
+    const endBeat = this.resolveLoopEndBeat();
+    if (this.currentBeat >= endBeat) {
       this.currentBeat = 0;
       this.options.onFrame(this.currentBeat);
     }
@@ -90,11 +92,12 @@ class PlaybackScheduler {
     this.lastFrameTs = now;
     this.currentBeat += delta / this.options.getLoopMs();
 
-    if (this.currentBeat >= 1) {
+    const endBeat = this.resolveLoopEndBeat();
+    if (this.currentBeat >= endBeat) {
       if (this.options.isLoopEnabled()) {
-        this.currentBeat %= 1;
+        this.currentBeat %= endBeat;
       } else {
-        this.currentBeat = 1;
+        this.currentBeat = endBeat;
         this.options.onFrame(this.currentBeat);
         this.stop(false);
         return;
@@ -113,9 +116,14 @@ class PlaybackScheduler {
     this.isPlayingNow = next;
     this.options.onPlayStateChange(next);
   }
+
+  private resolveLoopEndBeat(): number {
+    const endBeat = this.options.getLoopEndBeat();
+    return Number.isFinite(endBeat) && endBeat > 0 ? endBeat : 1;
+  }
 }
 
-/** Creates a requestAnimationFrame scheduler that advances beat progress in `[0, 1]`. */
+/** Creates a requestAnimationFrame scheduler that advances beat progress in `[0, endBeat]`. */
 export const createPlaybackScheduler = (
   options: PlaybackSchedulerOptions,
 ): PlaybackScheduler => new PlaybackScheduler(options);
@@ -125,6 +133,7 @@ export interface PreviewWindowStateSnapshot {
   activeVelocityByPitch: ReadonlyMap<number, number>;
   previewRevision: number;
   currentBeat: number;
+  sourceTimelineEndBeat: number;
   loopLengthBeats: number;
   launchpadModel: LaunchpadModel;
   noteCount: number;
@@ -191,7 +200,8 @@ class PreviewWindowStatePusher {
       previewRevision: snapshot.previewRevision,
       chain: chainForIpc,
       launchpadModel: snapshot.launchpadModel,
-      currentBeat: clamp(snapshot.currentBeat, 0, 1),
+      currentBeat: snapshot.currentBeat,
+      sourceTimelineEndBeat: snapshot.sourceTimelineEndBeat,
       loopLengthBeats: Math.max(snapshot.loopLengthBeats, 0.25),
       noteCount: snapshot.noteCount,
       uniquePitchCount: snapshot.uniquePitchCount,

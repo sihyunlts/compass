@@ -46,8 +46,10 @@
     devices,
     chainState,
     collapsedDeviceIds = [] as string[],
+    paletteRevision,
     currentBeat = 0,
     modulationReadoutById = {},
+    resolvePaletteRgb,
     isSidebarResizing = false,
     interactiveElementSelector,
     onSaveChain,
@@ -64,8 +66,10 @@
     devices: GeneratorDeviceNode[];
     chainState: GeneratorChain;
     collapsedDeviceIds?: string[];
+    paletteRevision: number;
     currentBeat?: number;
     modulationReadoutById?: Record<string, string>;
+    resolvePaletteRgb: (velocity: number) => string;
     isSidebarResizing: boolean;
     interactiveElementSelector: string;
     onSaveChain: (chain: GeneratorChain, meta: ChainMutationMeta) => void;
@@ -871,8 +875,10 @@
           <DeviceCard
             device={item.device}
             {devices}
+            {paletteRevision}
             {currentBeat}
             {modulationReadoutById}
+            {resolvePaletteRgb}
             isCollapsed={collapsedSet.has(item.device.id)}
             isDisabledByGroup={false}
           />
@@ -890,8 +896,10 @@
                   <DeviceCard
                     device={col.device}
                     {devices}
+                    {paletteRevision}
                     {currentBeat}
                     {modulationReadoutById}
+                    {resolvePaletteRgb}
                     isCollapsed={collapsedSet.has(col.device.id)}
                     isDisabledByGroup={!item.enabled}
                   />

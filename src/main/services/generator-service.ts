@@ -21,22 +21,37 @@ import type {
 } from '../../shared/types';
 import { UdpLiveBridge } from '../bridge/udp-live-bridge';
 
-const SOURCE_TIMELINE_BEATS = 1;
-
 const DEFAULT_LAUNCHPAD_MODEL: LaunchpadModel = 'mk3';
 const SUPPORTED_LAUNCHPAD_MODELS: ReadonlyArray<LaunchpadModel> = ['mk3', 'mk2'];
 const LAUNCHPAD_LAYOUT: LaunchpadLayout = launchpadLayout;
 
+const resolveSourceLengthBeats = (
+  notes: ReadonlyArray<ClipNote>,
+): number => {
+  let maxEndBeat = 1;
+  for (const note of notes) {
+    const startBeat = Number.isFinite(note.startBeat) ? note.startBeat : 0;
+    const durationBeats = Number.isFinite(note.durationBeats) ? note.durationBeats : 0;
+    const endBeat = Math.max(0, startBeat + Math.max(durationBeats, 0));
+    if (endBeat > maxEndBeat) {
+      maxEndBeat = endBeat;
+    }
+  }
+
+  return Number.isFinite(maxEndBeat) && maxEndBeat >= 1 ? maxEndBeat : 1;
+};
+
 const toEnvelope = (
   bridge: BridgeSettings,
   notes: ReadonlyArray<ClipNote>,
+  sourceLengthBeats: number,
 ): LiveBridgeNotesEnvelope => ({
   event: 'clip_notes.replace',
   source: 'compass',
   layout: LAUNCHPAD_LAYOUT,
   path: LIVE_BRIDGE_TARGET.path,
   applyMode: 'replace',
-  targetLengthBeats: SOURCE_TIMELINE_BEATS,
+  targetLengthBeats: sourceLengthBeats,
   autoCreateLengthBeats: bridge.autoCreateLengthBeats,
   notes: notes.map((note) => ({
     pitch: note.pitch,
@@ -88,7 +103,8 @@ export class GeneratorService {
       bridgeSettings.autoCreateLengthBeats,
       request.launchpadModel,
     );
-    const envelope = toEnvelope(bridgeSettings, notes);
+    const sourceLengthBeats = resolveSourceLengthBeats(notes);
+    const envelope = toEnvelope(bridgeSettings, notes, sourceLengthBeats);
 
     await this.bridge.send(envelope, LIVE_BRIDGE_TARGET);
 

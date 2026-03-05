@@ -1,12 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import { clamp } from '../../shared/math';
   import type { PreviewWindowState } from '../../shared/types';
   import PreviewSurface from '../components/PreviewSurface.svelte';
 
   const toBeatText = (beat: number): string =>
-    clamp(Number.isFinite(beat) ? beat : 0, 0, 1).toFixed(3);
+    (Number.isFinite(beat) ? beat : 0).toFixed(3);
 
   let previewState: PreviewWindowState | null = $state(null);
 

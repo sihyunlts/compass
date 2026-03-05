@@ -648,6 +648,10 @@ export class DeviceRackController {
       return;
     }
 
+    if (this.tryHandleColorActionButtonClick(target)) {
+      return;
+    }
+
     if (target.closest(this.interactiveElementSelector)) {
       return;
     }
@@ -767,6 +771,52 @@ export class DeviceRackController {
       this.clearSelection();
     }
     this.closeContextMenu();
+  }
+
+  private tryHandleColorActionButtonClick(target: HTMLElement): boolean {
+    const actionButton = target.closest<HTMLButtonElement>('button[data-action]');
+    if (!actionButton) {
+      return false;
+    }
+
+    const action = actionButton.dataset.action;
+    if (action !== 'color-palette-cell') {
+      return false;
+    }
+
+    if (actionButton.disabled) {
+      return true;
+    }
+
+    const paletteIndexRaw = actionButton.dataset.paletteIndex?.trim();
+    const paletteIndex = paletteIndexRaw ? Number(paletteIndexRaw) : Number.NaN;
+    if (!Number.isInteger(paletteIndex) || paletteIndex < 0 || paletteIndex > 127) {
+      return true;
+    }
+
+    const paletteContainer = actionButton.closest<HTMLElement>('[data-action="color-palette"]');
+    const deviceId = paletteContainer?.dataset.id?.trim();
+    const slotIndexRaw = paletteContainer?.dataset.slotIndex?.trim();
+    const slotIndex = slotIndexRaw ? Number(slotIndexRaw) : Number.NaN;
+    if (!deviceId || !Number.isInteger(slotIndex) || slotIndex < 0) {
+      return true;
+    }
+
+    const device = this.findDeviceById(deviceId);
+    if (!device || device.kind !== 'color') {
+      return true;
+    }
+    if (slotIndex >= device.params.velocities.length) {
+      return true;
+    }
+
+    device.params.velocities[slotIndex] = paletteIndex;
+    this.commitChainChange({
+      kind: 'control-edit',
+      label: 'Set color slot',
+      finalize: true,
+    });
+    return true;
   }
 
   private blurActiveTextEditingElement(): void {

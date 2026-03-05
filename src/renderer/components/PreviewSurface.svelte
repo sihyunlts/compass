@@ -12,7 +12,7 @@
     resolveLaunchpadModel,
     type OverlayFrameStroke,
   } from '../../domain';
-  import { clamp, lerp } from '../../shared/math';
+  import { lerp } from '../../shared/math';
   import type { LaunchpadButton, LaunchpadModel, PreviewWindowState } from '../../shared/types';
   import {
     PREVIEW_FRAME_COUNT,
@@ -58,6 +58,13 @@
   for (let index = 0; index < PREVIEW_FRAME_COUNT; index += 1) {
     previewFrameBeats.push(toPreviewFrameBeat(index));
   }
+
+  const resolveSourceTimelineEndBeat = (
+    state: PreviewWindowState | null,
+  ): number => {
+    const endBeat = state?.sourceTimelineEndBeat;
+    return Number.isFinite(endBeat) && endBeat > 0 ? endBeat : 1;
+  };
 
   const activeLaunchpadModel = $derived.by<LaunchpadModel>(() =>
     resolveLaunchpadModel(previewState?.launchpadModel));
@@ -437,8 +444,11 @@
     overlayCacheModel = model;
   };
 
-  const applyOverlayFrameByBeat = (beat01: number): void => {
-    const nextFrameIndex = toPreviewFrameIndex(beat01);
+  const applyOverlayFrameByBeat = (
+    beat: number,
+    sourceTimelineEndBeat: number,
+  ): void => {
+    const nextFrameIndex = toPreviewFrameIndex(beat, sourceTimelineEndBeat);
     if (overlayFrameIndex === nextFrameIndex && wasGuideEnabled) {
       return;
     }
@@ -480,7 +490,10 @@
         rebuildOverlayFrameCache(nextState);
         overlayFrameIndex = -1;
       }
-      applyOverlayFrameByBeat(clamp(nextState.currentBeat, 0, 1));
+      applyOverlayFrameByBeat(
+        nextState.currentBeat,
+        resolveSourceTimelineEndBeat(nextState),
+      );
       wasGuideEnabled = true;
     }
 
