@@ -1,3 +1,4 @@
+import { doesDeviceToggleTimelineParity } from '../../devices/engine';
 import type {
   CurveNode,
   GeneratorChain,
@@ -46,7 +47,7 @@ const resolveReversedTimelineByDeviceId = (
     if (!deviceIndexById.has(device.id)) {
       deviceIndexById.set(device.id, index);
     }
-    if (device.kind === 'reverse' && isDeviceEffectivelyEnabled(chain, device)) {
+    if (doesDeviceToggleTimelineParity(device) && isDeviceEffectivelyEnabled(chain, device)) {
       reverseIndices.push(index);
     }
   }

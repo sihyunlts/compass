@@ -1,11 +1,9 @@
+import { buildGeneratorPolyline } from '../../devices/engine';
 import type { GeneratorChain, MaskEffectNode } from '../../shared/types';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import type { GeneratorLayer, Polyline } from '../core-types';
 import { applyTransformToPolyline } from '../geometry';
-import { buildScannerPolyline } from '../generators/scanner';
-import { buildSpiralPolyline } from '../generators/spiral';
-import { buildWaterdropPolyline } from '../generators/waterdrop';
 import { resolveActiveTilesFromPolylines } from './active';
 import { POLYLINE_STEP } from './constants';
 import {
@@ -47,49 +45,7 @@ const getOriginFitTime = (
 const buildPolylineForLayer = (
   layer: GeneratorLayer,
   t01: number,
-): Polyline | null => {
-  if (!Number.isFinite(t01)) {
-    return null;
-  }
-
-  const localT = layer.temporal.alpha * t01 + layer.temporal.beta;
-  if (!Number.isFinite(localT) || localT < 0 || localT > 1) {
-    return null;
-  }
-
-  if (layer.kind === 'waterdrop') {
-    return buildWaterdropPolyline(
-      layer.originId,
-      layer.params,
-      localT,
-      POLYLINE_STEP,
-      layer.velocity,
-    );
-  }
-
-  if (layer.kind === 'scanner') {
-    return buildScannerPolyline(
-      layer.originId,
-      layer.params,
-      localT,
-      POLYLINE_STEP,
-      layer.velocity,
-      layer.sourceBounds,
-    );
-  }
-
-  if (layer.kind === 'spiral') {
-    return buildSpiralPolyline(
-      layer.originId,
-      layer.params,
-      localT,
-      POLYLINE_STEP,
-      layer.velocity,
-    );
-  }
-
-  return null;
-};
+): Polyline | null => buildGeneratorPolyline(layer, t01, POLYLINE_STEP);
 
 const buildPolylinesAtTime = (
   layers: ReadonlyArray<GeneratorLayer>,
@@ -256,6 +212,10 @@ const buildGroupLayersAtTime = (
     groupChain,
     context.worldBounds,
     (effect, deviceIndex) => {
+      if (effect.kind !== 'mask') {
+        return null;
+      }
+
       const reverseAfter = reverseParityAfter[deviceIndex] === true;
       const timeKind: MaskTimeKind = reverseAfter ? 'reversed' : 'forward';
       return resolveMaskTilesForEffect(effect, context, timeKind);

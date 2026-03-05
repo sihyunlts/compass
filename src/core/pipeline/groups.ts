@@ -1,7 +1,12 @@
+import {
+  isGeneratorEngineNode,
+  isPipelineEffectNode,
+  resolveEffectMutedSource,
+  type PipelineEffectNode,
+} from '../../devices/engine';
 import type {
   GeneratorChain,
   GeneratorDeviceNode,
-  GeneratorEffectNode,
   GeneratorNode,
 } from '../../shared/types';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
@@ -14,17 +19,11 @@ import type {
 } from './types';
 
 export const isGeneratorNode = (device: GeneratorDeviceNode): device is GeneratorNode => (
-  device.kind === 'waterdrop'
-  || device.kind === 'scanner'
-  || device.kind === 'spiral'
+  isGeneratorEngineNode(device)
 );
 
-export const isEffectNode = (device: GeneratorDeviceNode): device is GeneratorEffectNode => (
-  device.kind === 'mirror'
-  || device.kind === 'mask'
-  || device.kind === 'symmetry'
-  || device.kind === 'rotate'
-  || device.kind === 'reverse'
+export const isEffectNode = (device: GeneratorDeviceNode): device is PipelineEffectNode => (
+  isPipelineEffectNode(device)
 );
 
 export const splitChainByGroup = (chain: GeneratorChain): GroupChain[] => {
@@ -66,28 +65,19 @@ export const resolveMutedSources = (
   const mutedGeneratorIds = new Set<string>();
 
   for (const device of chain.devices) {
-    if (device.kind !== 'mask' || !isDeviceEffectivelyEnabled(chain, device)) {
+    if (!isDeviceEffectivelyEnabled(chain, device)) {
       continue;
     }
 
-    if (device.params.sourceVisibility === 'show') {
+    const mutedSource = resolveEffectMutedSource(device);
+    if (!mutedSource) {
       continue;
     }
 
-    const sourceKind = device.params.sourceKind ?? 'tiles';
-    if (sourceKind !== 'group' && sourceKind !== 'generator') {
-      continue;
-    }
-
-    const sourceId = normalizeOptionalId(device.params.sourceId);
-    if (!sourceId) {
-      continue;
-    }
-
-    if (sourceKind === 'group') {
-      mutedGroupIds.add(sourceId);
+    if (mutedSource.kind === 'group') {
+      mutedGroupIds.add(mutedSource.sourceId);
     } else {
-      mutedGeneratorIds.add(sourceId);
+      mutedGeneratorIds.add(mutedSource.sourceId);
     }
   }
 
