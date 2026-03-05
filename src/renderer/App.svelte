@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
    * Main renderer composition root.
-   * Coordinates persisted state, rack interactions, preview/playback, and IPC updates.
+   * Delegates editor state/commands to EditorSession while keeping preview/playback orchestration local.
    */
   import { onMount, tick } from 'svelte';
 
@@ -9,17 +9,12 @@
     BridgeSettings,
     GenerateAndSendRequest,
     GeneratorChain,
-    GeneratorDeviceNode,
     GeneratorPreview,
-    LaunchpadModel,
     PaletteFilePayload,
     PreviewWindowState,
   } from '../shared/types';
-  import { normalizeOptionalId } from '../shared/normalize-id';
   import {
     AUTO_CREATE_LENGTH_OPTIONS,
-    parseBeatsValue,
-    toLengthPresetLabel,
   } from '../shared/beat-length';
   import {
     PREVIEW_FRAME_COUNT,
@@ -31,61 +26,23 @@
     compileModulationProgram,
     evaluateModulationProgramReadouts,
   } from '../core/modulation/compiled-program';
-  import {
-    reconcileGeneratorChainModulators,
-  } from '../core/modulation/routing';
   import { clamp } from '../shared/math';
   import {
-    createDeviceNodeByKind,
     getBrowserDeviceLabel,
-    isBrowserDeviceKind,
     type BrowserDeviceKind,
   } from './services/devices';
   import {
-    saveChainSettings,
-    saveBridgeSettings,
-    loadCollapsedDeviceIds,
-    saveCollapsedDeviceIds,
-    saveLaunchpadModel,
-    savePreviewBpm,
-    savePreviewGuideEnabled,
-    savePreviewLoopEnabled,
-    saveSidebarWidth,
-    sanitizeBridgeSettings,
     sanitizePreviewBpm,
     sanitizeSidebarWidth,
   } from './services/storage';
-  import {
-    reconcileGroupStateById,
-    removeDevicesById,
-    withDevices,
-  } from './state/chain';
-  import {
-    createChainHistory,
-    type ChainMutationMeta,
-  } from './state/chain-history';
-  import type { ContextMenuTarget } from './state/context-menu';
-  import {
-    applyInsertDeviceByDropZone,
-    applyInsertDevicesByDropZone,
-    applyMoveDevicesByDropZone,
-    coerceOutsideTargetIdToGroupBoundaryByDevices,
-    type RackDropZone,
-  } from './state/rack-drop';
   import BrowserPanel from './components/BrowserPanel.svelte';
   import SidebarResizer from './components/SidebarResizer.svelte';
-  import DeviceRack, {
-    type RackInteractionCommit,
-    type RackScrollMetrics,
-  } from './components/DeviceRack.svelte';
+  import DeviceRack from './components/DeviceRack.svelte';
+  import type { RackScrollMetrics } from './components/device-rack-types';
   import RackHeaderScrollbar from './components/RackHeaderScrollbar.svelte';
   import PreviewPanel from './components/PreviewPanel.svelte';
   import ContextMenu from './components/ContextMenu.svelte';
   import { generateRendererPreview } from './app/preview';
-  import {
-    createInitialAppState,
-    type AppState,
-  } from './app/store';
   import { createPaletteController } from './services/palette';
   import {
     collectActiveVelocityByPitch,
@@ -94,10 +51,15 @@
   } from './services/playback';
   import { cloneChainForIpc } from './services/clone-chain';
   import {
-    createRackClipboard,
-    prepareClipboardInsert,
-    type RackClipboard,
-  } from './services/rack-clipboard';
+    createEditorSession,
+    type EditorRackBinding,
+  } from './features/editor/session.svelte';
+  import {
+    selectClipboardAvailable,
+    selectHistoryControls,
+    selectPreviewBpmText,
+    selectPreviewPanelControls,
+  } from './features/editor/selectors';
 
   const SCRUB_MAX = 1000;
   const PREVIEW_WINDOW_STATE_MAX_FPS = 120;
@@ -119,9 +81,6 @@
     'submit',
     'reset',
   ]);
-
-  const toBpmText = (bpm: number): string =>
-    `BPM ${sanitizePreviewBpm(bpm).toFixed(2)}`;
 
   const resolveSourceTimelineEnd = (preview: GeneratorPreview | null): number => {
     if (!preview) {
@@ -164,36 +123,48 @@
 
   const toBrowserDragBadgeLabel = (kind: BrowserDeviceKind): string =>
     `+ ${getBrowserDeviceLabel(kind)}`;
-  const resolvePaletteRgb = (velocity: number): string =>
-    paletteController.getLedRgb(velocity, '0 0 0');
-
-  const readBridgeSettingsFromLabel = (lengthLabel: string): BridgeSettings =>
-    sanitizeBridgeSettings({
-      autoCreateLengthBeats: parseBeatsValue(lengthLabel),
-    });
-
-  const resolveBridgeLengthLabel = (bridge: BridgeSettings): string =>
-    toLengthPresetLabel(bridge.autoCreateLengthBeats, AUTO_CREATE_LENGTH_OPTIONS[0].label);
-
   const bridgeClient = window.compass;
-  const uiState: AppState = $state(createInitialAppState());
+  let deviceRackComponent: ReturnType<typeof DeviceRack> | null = $state(null);
+  let playbackScheduler: ReturnType<typeof createPlaybackScheduler> | null = null;
+  let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
+  let previewSurfaceState: PreviewWindowState | null = $state(null);
+
+  const closeContextMenu = (): void => {
+    contextMenuComponent?.close();
+  };
+
+  const syncRackAfterRender = async (): Promise<void> => {
+    await tick();
+    deviceRackComponent?.syncAfterRender();
+    closeContextMenu();
+  };
+
+  const editorSession = createEditorSession({
+    autoPreviewDebounceMs: AUTO_PREVIEW_DEBOUNCE_MS,
+    historyMaxEntries: HISTORY_MAX_ENTRIES,
+    onAutoPreview: () => runPreview(),
+    onSyncAfterRender: () => syncRackAfterRender(),
+  });
+  const uiState = editorSession.state;
+  const historyControls = $derived.by(() => selectHistoryControls(uiState));
+  const previewPanelControls = $derived.by(() => selectPreviewPanelControls(uiState));
+  const bpmText = $derived.by(() => selectPreviewBpmText(uiState.previewBpm));
+  const clipboardAvailable = $derived.by(() => selectClipboardAvailable(uiState));
+
   let paletteRevision = $state(0);
   const paletteController = createPaletteController({
     onPaletteNameChanged: (nameText) => {
-      uiState.paletteNameText = nameText;
+      editorSession.commands.setPaletteNameText(nameText);
       paletteRevision += 1;
     },
   });
+  const resolvePaletteRgb = (velocity: number): string =>
+    paletteController.getLedRgb(velocity, '0 0 0');
   const previewWindowStatePusher = createPreviewWindowStatePusher({
     bridgeClient,
     minIntervalMs: PREVIEW_WINDOW_STATE_MIN_INTERVAL_MS,
     resolveLedRgb: (velocity) => paletteController.getLedRgb(velocity, DEFAULT_LED_RGB),
   });
-
-  let deviceRackComponent: ReturnType<typeof DeviceRack> | null = $state(null);
-  let playbackScheduler: ReturnType<typeof createPlaybackScheduler> | null = null;
-  let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
-  let previewSurfaceState: PreviewWindowState | null = $state(null);
 
   let previewRevision = $state(0);
   let previewData: GeneratorPreview | null = $state(null);
@@ -210,13 +181,10 @@
   let modulationReadoutById: Record<string, string> = $state({});
   let currentBeat = $state(0);
   let isPlaying = $state(false);
-  let collapsedDeviceIds = $state(loadCollapsedDeviceIds());
-  let autoPreviewTimer: number | null = null;
   let sendDoneTimer: number | null = null;
   let liveTempoUnsubscribe: (() => void) | null = null;
   let previewWindowVisibilityUnsubscribe: (() => void) | null = null;
   let previewGuideEnabledUnsubscribe: (() => void) | null = null;
-  let rackClipboard: RackClipboard | null = $state(null);
   let headerIndicatorTimer: number | null = null;
   let headerIndicatorFadeTimer: number | null = null;
   let headerIndicatorDisplayText = $state('');
@@ -228,44 +196,35 @@
   });
   let rackMiniMapContentRevision = $state(0);
 
-  type RackSelectionSnapshot =
-    | {
-        kind: 'devices';
-        deviceIds: string[];
-      }
-    | {
-        kind: 'group';
-        groupId: string;
-        memberDeviceIds: string[];
-      };
+  const createRackBinding = (): EditorRackBinding | null => {
+    if (!deviceRackComponent) {
+      return null;
+    }
 
-  const HISTORY_META = {
-    addDevice: { kind: 'add-device', label: 'Add device' },
-    insertDevice: { kind: 'insert-device', label: 'Insert device' },
-    moveDevices: { kind: 'move-devices', label: 'Move devices' },
-    deleteDevices: { kind: 'delete-devices', label: 'Delete devices' },
-    groupCreate: { kind: 'group-create', label: 'Create group' },
-    groupUngroup: { kind: 'group-ungroup', label: 'Ungroup devices' },
-    groupToggleEnabled: { kind: 'group-toggle-enabled', label: 'Toggle group enabled' },
-    clipboardCut: { kind: 'clipboard-cut', label: 'Cut selection' },
-    clipboardPaste: { kind: 'clipboard-paste', label: 'Paste selection' },
-    duplicate: { kind: 'duplicate', label: 'Duplicate selection' },
-  } as const satisfies Record<string, ChainMutationMeta>;
-
-  const chainHistory = createChainHistory(uiState.chainState, {
-    maxEntries: HISTORY_MAX_ENTRIES,
-  });
-  let canUndo = $state(chainHistory.canUndo());
-  let canRedo = $state(chainHistory.canRedo());
-  let undoActionLabel = $state(chainHistory.getUndoEntry()?.label ?? 'Undo');
-  let redoActionLabel = $state(chainHistory.getRedoEntry()?.label ?? 'Redo');
-
-  const syncHistoryUiState = (): void => {
-    canUndo = chainHistory.canUndo();
-    canRedo = chainHistory.canRedo();
-    undoActionLabel = chainHistory.getUndoEntry()?.label ?? 'Undo';
-    redoActionLabel = chainHistory.getRedoEntry()?.label ?? 'Redo';
+    return {
+      getSelectedGroupContexts: () => deviceRackComponent?.getSelectedGroupContexts() ?? [],
+      getOrderedSelectedDeviceIds: () => deviceRackComponent?.getOrderedSelectedDeviceIds() ?? [],
+      selectAllDevices: (ids) => {
+        deviceRackComponent?.selectAllDevices(ids);
+      },
+      applyNextSelectionAfterDelete: (deviceIds) => {
+        deviceRackComponent?.applyNextSelectionAfterDelete(deviceIds);
+      },
+      clearSelection: () => {
+        deviceRackComponent?.clearSelection();
+      },
+      syncAfterRender: () => {
+        deviceRackComponent?.syncAfterRender();
+      },
+      handleBrowserPointerDown: (event, kind, itemEl) => {
+        deviceRackComponent?.handleBrowserPointerDown(event, kind, itemEl);
+      },
+    };
   };
+
+  $effect(() => {
+    editorSession.commands.attachRackBinding(createRackBinding());
+  });
 
   const clearHeaderIndicatorTimer = (): void => {
     if (headerIndicatorTimer === null) {
@@ -287,7 +246,7 @@
     text: string,
     options: { autoClear?: boolean } = {},
   ): void => {
-    uiState.headerIndicatorText = text;
+    editorSession.commands.setHeaderIndicatorText(text);
     clearHeaderIndicatorTimer();
     if (options.autoClear === false) {
       return;
@@ -296,7 +255,7 @@
     headerIndicatorTimer = window.setTimeout(() => {
       headerIndicatorTimer = null;
       if (uiState.headerIndicatorText === text) {
-        uiState.headerIndicatorText = '';
+        editorSession.commands.clearHeaderIndicatorText();
       }
     }, HEADER_INDICATOR_VISIBILITY_MS);
   };
@@ -325,633 +284,18 @@
     }, HEADER_INDICATOR_FADE_OUT_MS);
   });
 
-  const persistChainState = (): void => {
-    reconcileCurrentChainModulators();
-    pruneCollapsedDeviceIds();
-    saveChainSettings(uiState.chainState);
-    void syncRackAfterRender();
-  };
-
-  const onChainMutated = (meta: ChainMutationMeta): void => {
-    persistChainState();
-    chainHistory.push(uiState.chainState, meta);
-    syncHistoryUiState();
-  };
-
-  const restoreChainFromHistory = (chain: GeneratorChain): void => {
-    uiState.chainState = chain;
-    persistChainState();
-    chainHistory.replaceCurrent(uiState.chainState);
-    scheduleAutoPreview(0);
-  };
-
-  const handleUndo = (): boolean => {
-    const restored = chainHistory.undo();
-    syncHistoryUiState();
-    if (!restored) {
-      return false;
-    }
-    restoreChainFromHistory(restored);
-    return true;
-  };
-
-  const handleRedo = (): boolean => {
-    const restored = chainHistory.redo();
-    syncHistoryUiState();
-    if (!restored) {
-      return false;
-    }
-    restoreChainFromHistory(restored);
-    return true;
-  };
-
   const handleUndoClick = (): void => {
-    contextMenuComponent?.close();
-    handleUndo();
+    closeContextMenu();
+    editorSession.commands.undo();
   };
 
   const handleRedoClick = (): void => {
-    contextMenuComponent?.close();
-    handleRedo();
-  };
-
-  const reconcileCurrentChainModulators = (): void => {
-    const changed = reconcileGeneratorChainModulators(uiState.chainState);
-    if (changed) {
-      uiState.chainState = withDevices(
-        uiState.chainState,
-        [...uiState.chainState.devices],
-      );
-    }
-  };
-
-  const pruneCollapsedDeviceIds = (): void => {
-    const validIds = new Set(
-      uiState.chainState.devices.map((device: GeneratorDeviceNode) => device.id),
-    );
-    const next = collapsedDeviceIds.filter((id) => validIds.has(id));
-    if (next.length === collapsedDeviceIds.length) {
-      return;
-    }
-    collapsedDeviceIds = next;
-    saveCollapsedDeviceIds(next);
-  };
-
-  const toggleCollapse = (id: string): void => {
-    const next = collapsedDeviceIds.includes(id)
-      ? collapsedDeviceIds.filter((item) => item !== id)
-      : [...collapsedDeviceIds, id];
-    collapsedDeviceIds = next;
-    saveCollapsedDeviceIds(next);
-  };
-
-  const syncRackAfterRender = async (): Promise<void> => {
-    await tick();
-    deviceRackComponent?.syncAfterRender();
-    contextMenuComponent?.close();
-  };
-
-  pruneCollapsedDeviceIds();
-
-  const scheduleAutoPreview = (delayMs = AUTO_PREVIEW_DEBOUNCE_MS): void => {
-    if (autoPreviewTimer !== null) {
-      window.clearTimeout(autoPreviewTimer);
-    }
-
-    autoPreviewTimer = window.setTimeout(() => {
-      autoPreviewTimer = null;
-      void runPreview();
-    }, delayMs);
-  };
-
-  const deleteDevicesById = (
-    deviceIds: readonly string[],
-    meta: ChainMutationMeta = HISTORY_META.deleteDevices,
-  ): boolean => {
-    deviceRackComponent?.applyNextSelectionAfterDelete(deviceIds);
-
-    const nextChain = removeDevicesById(uiState.chainState, deviceIds);
-    if (!nextChain) {
-      return false;
-    }
-
-    uiState.chainState = nextChain;
-    onChainMutated(meta);
-    scheduleAutoPreview(0);
-    return true;
-  };
-
-  const getNextGroupId = (): string => {
-    const existing = new Set(
-      uiState.chainState.devices
-        .map((device) => normalizeOptionalId(device.groupId))
-        .filter((value): value is string => value !== null),
-    );
-    let index = 1;
-    while (existing.has(`group-${index}`)) {
-      index += 1;
-    }
-    return `group-${index}`;
-  };
-
-  const setGroupIdForDevices = (
-    deviceIds: readonly string[],
-    groupId: string | null,
-    meta: ChainMutationMeta,
-  ): boolean => {
-    const idSet = new Set(deviceIds);
-    if (idSet.size === 0) {
-      return false;
-    }
-
-    let didChange = false;
-    const nextDevices = uiState.chainState.devices.map((device) => {
-      if (!idSet.has(device.id)) {
-        return device;
-      }
-      const nextGroupId = groupId ?? null;
-      const currentGroupId = device.groupId ?? null;
-      if (currentGroupId === nextGroupId) {
-        return device;
-      }
-      didChange = true;
-      return {
-        ...device,
-        groupId: nextGroupId,
-      };
-    });
-
-    if (!didChange) {
-      return false;
-    }
-
-    uiState.chainState = withDevices(uiState.chainState, nextDevices);
-    onChainMutated(meta);
-    scheduleAutoPreview(0);
-    return true;
-  };
-
-  const canCreateGroupFromSelection = (deviceIds: readonly string[]): boolean =>
-    deviceIds.length > 0 && deviceIds.every((id) => {
-      const device = uiState.chainState.devices.find((item) => item.id === id);
-      return !normalizeOptionalId(device?.groupId ?? null);
-    });
-
-  const getGroupMemberIds = (rawGroupId: string): string[] => {
-    const groupId = normalizeOptionalId(rawGroupId);
-    if (!groupId) {
-      return [];
-    }
-
-    return uiState.chainState.devices
-      .filter((device) => normalizeOptionalId(device.groupId) === groupId)
-      .map((device) => device.id);
-  };
-
-  const withGroupMemberIds = (
-    rawGroupId: string,
-    action: (memberIds: string[]) => boolean,
-  ): boolean => {
-    const memberIds = getGroupMemberIds(rawGroupId);
-    if (memberIds.length === 0) {
-      return false;
-    }
-    return action(memberIds);
-  };
-
-  const deleteGroup = (
-    rawGroupId: string,
-    meta: ChainMutationMeta = HISTORY_META.deleteDevices,
-  ): boolean =>
-    withGroupMemberIds(rawGroupId, (memberIds) => deleteDevicesById(memberIds, meta));
-
-  const ungroupGroup = (
-    rawGroupId: string,
-    meta: ChainMutationMeta = HISTORY_META.groupUngroup,
-  ): boolean => {
-    return withGroupMemberIds(
-      rawGroupId,
-      (memberIds) => setGroupIdForDevices(memberIds, null, meta),
-    );
-  };
-
-  const toExistingOrderedDeviceIds = (deviceIds: readonly string[]): string[] => {
-    const idSet = new Set(deviceIds);
-    return uiState.chainState.devices
-      .filter((device) => idSet.has(device.id))
-      .map((device) => device.id);
-  };
-
-  const resolveDevicesByIds = (deviceIds: readonly string[]): GeneratorDeviceNode[] => {
-    if (deviceIds.length === 0) {
-      return [];
-    }
-
-    const byId = new Map(
-      uiState.chainState.devices.map((device): [string, GeneratorDeviceNode] => [device.id, device]),
-    );
-    const resolved: GeneratorDeviceNode[] = [];
-    for (const id of deviceIds) {
-      const device = byId.get(id);
-      if (device) {
-        resolved.push(device);
-      }
-    }
-    return resolved;
-  };
-
-  type SelectionLike =
-    | {
-        kind: 'devices';
-        deviceIds: readonly string[];
-      }
-    | {
-        kind: 'group';
-        groupId: string;
-        memberDeviceIds: readonly string[];
-      };
-
-  const toSelectionSnapshot = (source: SelectionLike): RackSelectionSnapshot | null => {
-    if (source.kind === 'group') {
-      const memberDeviceIds = toExistingOrderedDeviceIds(source.memberDeviceIds);
-      if (memberDeviceIds.length === 0) {
-        return null;
-      }
-      return {
-        kind: 'group',
-        groupId: source.groupId,
-        memberDeviceIds,
-      };
-    }
-
-    const deviceIds = toExistingOrderedDeviceIds(source.deviceIds);
-    if (deviceIds.length === 0) {
-      return null;
-    }
-    return {
-      kind: 'devices',
-      deviceIds,
-    };
-  };
-
-  const resolveCurrentSelectionSnapshot = (): RackSelectionSnapshot | null => {
-    const selectedGroups = deviceRackComponent?.getSelectedGroupContexts() ?? [];
-    const selectedGroup = selectedGroups[0] ?? null;
-    if (selectedGroup && selectedGroups.length === 1) {
-      return toSelectionSnapshot({
-        kind: 'group',
-        groupId: selectedGroup.groupId,
-        memberDeviceIds: selectedGroup.memberDeviceIds,
-      });
-    }
-
-    return toSelectionSnapshot({
-      kind: 'devices',
-      deviceIds: deviceRackComponent?.getOrderedSelectedDeviceIds() ?? [],
-    });
-  };
-
-  const resolveSelectionSnapshotFromContextTarget = (
-    target: ContextMenuTarget,
-  ): RackSelectionSnapshot | null =>
-    target.kind === 'group'
-      ? toSelectionSnapshot({
-          kind: 'group',
-          groupId: target.groupId,
-          memberDeviceIds: target.memberDeviceIds,
-        })
-      : toSelectionSnapshot({
-          kind: 'devices',
-          deviceIds: target.deviceIds,
-        });
-
-  const resolveActionSelection = (
-    selectionOverride?: RackSelectionSnapshot | null,
-  ): RackSelectionSnapshot | null => selectionOverride ?? resolveCurrentSelectionSnapshot();
-
-  const buildClipboardFromSelection = (
-    selection: RackSelectionSnapshot,
-  ): RackClipboard | null => {
-    const sourceIds = selection.kind === 'group'
-      ? selection.memberDeviceIds
-      : selection.deviceIds;
-    const sourceDevices = resolveDevicesByIds(sourceIds);
-
-    if (selection.kind === 'group') {
-      return createRackClipboard(sourceDevices, {
-        kind: 'group',
-        enabled: uiState.chainState.groupStateById[selection.groupId]?.enabled !== false,
-      });
-    }
-
-    return createRackClipboard(sourceDevices, { kind: 'devices' });
-  };
-
-  const copySelectionToClipboard = (
-    selectionOverride?: RackSelectionSnapshot | null,
-  ): RackClipboard | null => {
-    const selection = resolveActionSelection(selectionOverride);
-    if (!selection) {
-      return null;
-    }
-
-    const nextClipboard = buildClipboardFromSelection(selection);
-    if (!nextClipboard) {
-      return null;
-    }
-
-    rackClipboard = nextClipboard;
-    return nextClipboard;
-  };
-
-  const cutSelection = (
-    selectionOverride?: RackSelectionSnapshot | null,
-  ): boolean => {
-    const selection = resolveActionSelection(selectionOverride);
-    if (!selection) {
-      return false;
-    }
-
-    const copied = copySelectionToClipboard(selection);
-    if (!copied) {
-      return false;
-    }
-
-    return selection.kind === 'group'
-      ? deleteGroup(selection.groupId, HISTORY_META.clipboardCut)
-      : deleteDevicesById(selection.deviceIds, HISTORY_META.clipboardCut);
-  };
-
-  const resolveGroupEndTargetId = (
-    chain: GeneratorChain,
-    rawGroupId: string,
-  ): string | null => {
-    const groupId = normalizeOptionalId(rawGroupId);
-    if (!groupId) {
-      return null;
-    }
-
-    let lastDeviceId: string | null = null;
-    for (const device of chain.devices) {
-      if (normalizeOptionalId(device.groupId) === groupId) {
-        lastDeviceId = device.id;
-      }
-    }
-    return lastDeviceId;
-  };
-
-  const resolveCommonSelectedGroupId = (
-    chain: GeneratorChain,
-    deviceIds: readonly string[],
-  ): string | null => {
-    let commonGroupId: string | null | undefined = undefined;
-    const byId = new Map(
-      chain.devices.map((device): [string, GeneratorDeviceNode] => [device.id, device]),
-    );
-
-    for (const deviceId of deviceIds) {
-      const device = byId.get(deviceId);
-      if (!device) {
-        return null;
-      }
-
-      const groupId = normalizeOptionalId(device.groupId);
-      if (commonGroupId === undefined) {
-        commonGroupId = groupId;
-        continue;
-      }
-
-      if (commonGroupId !== groupId) {
-        return null;
-      }
-    }
-
-    return commonGroupId ?? null;
-  };
-
-  const resolvePasteDropZone = (
-    chain: GeneratorChain,
-    selection: RackSelectionSnapshot | null,
-    clipboardKind: RackClipboard['kind'],
-  ): RackDropZone => {
-    if (clipboardKind === 'group') {
-      if (selection?.kind === 'group') {
-        return {
-          kind: 'outside',
-          targetId: resolveGroupEndTargetId(chain, selection.groupId),
-          placement: 'after',
-        };
-      }
-
-      if (selection?.kind === 'devices') {
-        const selectedLastId = selection.deviceIds[selection.deviceIds.length - 1] ?? null;
-        return {
-          kind: 'outside',
-          targetId: coerceOutsideTargetIdToGroupBoundaryByDevices(
-            chain.devices,
-            selectedLastId,
-            'after',
-          ),
-          placement: 'after',
-        };
-      }
-
-      return {
-        kind: 'outside',
-        targetId: null,
-        placement: 'after',
-      };
-    }
-
-    if (selection?.kind === 'group') {
-      const groupTailId = resolveGroupEndTargetId(chain, selection.groupId);
-      if (groupTailId) {
-        return {
-          kind: 'inside-group',
-          groupId: selection.groupId,
-          targetId: groupTailId,
-          placement: 'after',
-        };
-      }
-    } else if (selection?.kind === 'devices') {
-      const selectedLastId = selection.deviceIds[selection.deviceIds.length - 1] ?? null;
-      if (selectedLastId) {
-        const commonGroupId = resolveCommonSelectedGroupId(chain, selection.deviceIds);
-        if (commonGroupId) {
-          return {
-            kind: 'inside-group',
-            groupId: commonGroupId,
-            targetId: selectedLastId,
-            placement: 'after',
-          };
-        }
-
-        return {
-          kind: 'outside',
-          targetId: coerceOutsideTargetIdToGroupBoundaryByDevices(
-            chain.devices,
-            selectedLastId,
-            'after',
-          ),
-          placement: 'after',
-        };
-      }
-    }
-
-    return {
-      kind: 'outside',
-      targetId: null,
-      placement: 'after',
-    };
-  };
-
-  const allocateDeviceId = (kind: GeneratorDeviceNode['kind']): string =>
-    createDeviceNodeByKind(kind).id;
-
-  const coercePasteDropZone = (
-    chain: GeneratorChain,
-    dropZone: RackDropZone,
-    clipboardKind: RackClipboard['kind'],
-  ): RackDropZone => {
-    if (clipboardKind !== 'group' || dropZone.kind === 'outside') {
-      return dropZone;
-    }
-
-    return {
-      kind: 'outside',
-      targetId: coerceOutsideTargetIdToGroupBoundaryByDevices(
-        chain.devices,
-        dropZone.targetId,
-        dropZone.placement,
-      ),
-      placement: dropZone.placement,
-    };
-  };
-
-  const applyChainMutation = (
-    nextChain: GeneratorChain,
-    meta: ChainMutationMeta,
-  ): void => {
-    uiState.chainState = nextChain;
-    onChainMutated(meta);
-    scheduleAutoPreview(0);
-  };
-
-  const buildChainWithClipboardPaste = (
-    chain: GeneratorChain,
-    clipboard: RackClipboard,
-    selection: RackSelectionSnapshot | null,
-  ): GeneratorChain => {
-    const rawDropZone = resolvePasteDropZone(chain, selection, clipboard.kind);
-    const dropZone = coercePasteDropZone(chain, rawDropZone, clipboard.kind);
-    const prepared = prepareClipboardInsert(clipboard, {
-      allocateDeviceId,
-      resolveNextGroupId: getNextGroupId,
-    });
-
-    const forcedGroupId = prepared.groupStatePatch
-      ? prepared.forcedGroupId
-      : dropZone.kind === 'inside-group'
-        ? dropZone.groupId
-        : null;
-    const nextDevices = applyInsertDevicesByDropZone(
-      chain.devices,
-      prepared.devices,
-      dropZone,
-      forcedGroupId,
-    );
-
-    const nextChain = withDevices(chain, nextDevices);
-    if (prepared.groupStatePatch) {
-      nextChain.groupStateById[prepared.groupStatePatch.groupId] = {
-        enabled: prepared.groupStatePatch.enabled,
-      };
-    }
-    return nextChain;
-  };
-
-  const pasteClipboard = (
-    clipboardOverride?: RackClipboard | null,
-    selectionOverride?: RackSelectionSnapshot | null,
-    mutationMeta: ChainMutationMeta = HISTORY_META.clipboardPaste,
-  ): boolean => {
-    const clipboard = clipboardOverride ?? rackClipboard;
-    if (!clipboard) {
-      return false;
-    }
-
-    const selection = resolveActionSelection(selectionOverride);
-    const nextChain = buildChainWithClipboardPaste(uiState.chainState, clipboard, selection);
-    applyChainMutation(nextChain, mutationMeta);
-    return true;
-  };
-
-  const duplicateSelection = (
-    selectionOverride?: RackSelectionSnapshot | null,
-  ): boolean => {
-    const selection = resolveActionSelection(selectionOverride);
-    if (!selection) {
-      return false;
-    }
-
-    const copied = copySelectionToClipboard(selection);
-    if (!copied) {
-      return false;
-    }
-    return pasteClipboard(copied, selection, HISTORY_META.duplicate);
-  };
-
-  const selectAllRackDevices = (): boolean => {
-    const ids = uiState.chainState.devices.map((device) => device.id);
-    deviceRackComponent?.selectAllDevices(ids);
-    return true;
-  };
-
-  const handleToggleGroupEnabled = (
-    rawGroupId: string,
-    nextEnabled: boolean,
-  ): void => {
-    const groupId = normalizeOptionalId(rawGroupId);
-    if (!groupId) {
-      return;
-    }
-
-    const hasGroup = uiState.chainState.devices.some(
-      (device) => normalizeOptionalId(device.groupId) === groupId,
-    );
-    if (!hasGroup) {
-      return;
-    }
-
-    const currentEnabled = uiState.chainState.groupStateById[groupId]?.enabled !== false;
-    if (currentEnabled === nextEnabled) {
-      return;
-    }
-
-    const reconciledById = reconcileGroupStateById(
-      uiState.chainState.groupStateById,
-      uiState.chainState.devices,
-    );
-    uiState.chainState = {
-      ...uiState.chainState,
-      groupStateById: {
-        ...reconciledById,
-        [groupId]: {
-          enabled: nextEnabled,
-        },
-      },
-    };
-    onChainMutated(HISTORY_META.groupToggleEnabled);
-    scheduleAutoPreview(0);
+    closeContextMenu();
+    editorSession.commands.redo();
   };
 
   const readBridge = (): BridgeSettings =>
-    readBridgeSettingsFromLabel(uiState.autoCreateLengthLabel);
-
-  const writeBridgeInputs = (bridge: BridgeSettings): void => {
-    uiState.autoCreateLengthLabel = resolveBridgeLengthLabel(bridge);
-    uiState.previewLoopLengthBeats = bridge.autoCreateLengthBeats;
-  };
+    editorSession.commands.readBridgeSettings();
 
   const requestLiveTempoSync = async (): Promise<void> => {
     await bridgeClient.requestLiveTempo();
@@ -1107,16 +451,6 @@
     });
   };
 
-  const applyPreviewGuideEnabled = (nextEnabled: boolean): void => {
-    if (uiState.isPreviewGuideEnabled === nextEnabled) {
-      return;
-    }
-
-    uiState.isPreviewGuideEnabled = nextEnabled;
-    savePreviewGuideEnabled(nextEnabled);
-    renderLedFrame();
-  };
-
   const stopPlayback = (): void => {
     playbackScheduler?.stop();
   };
@@ -1144,7 +478,9 @@
     sourceTimelineEnd = resolveSourceTimelineEnd(preview);
     previewSourceChain = sourceChain;
     previewLedFrameCache = buildLedFrameCache(preview, sourceTimelineEnd);
-    uiState.previewLoopLengthBeats = bridge?.autoCreateLengthBeats ?? readBridge().autoCreateLengthBeats;
+    editorSession.commands.setPreviewLoopLengthBeats(
+      bridge?.autoCreateLengthBeats ?? readBridge().autoCreateLengthBeats,
+    );
     if (playbackScheduler) {
       playbackScheduler.setCurrentBeat(0);
     } else {
@@ -1163,7 +499,7 @@
     }
 
     clearHeaderIndicatorTimer();
-    uiState.headerIndicatorText = '';
+    editorSession.commands.clearHeaderIndicatorText();
     stopPlayback();
   };
 
@@ -1190,69 +526,6 @@
     }
   };
 
-  const openSettings = (): void => {
-    uiState.isSettingsOpen = true;
-  };
-
-  const closeSettings = (): void => {
-    uiState.isSettingsOpen = false;
-  };
-
-  const handleBrowserDeviceAdd = (kind: BrowserDeviceKind): void => {
-    if (!isBrowserDeviceKind(kind)) {
-      return;
-    }
-    applyChainMutation(withDevices(
-      uiState.chainState,
-      applyInsertDeviceByDropZone(
-        uiState.chainState.devices,
-        createDeviceNodeByKind(kind),
-        {
-          kind: 'outside',
-          targetId: null,
-          placement: 'after',
-        },
-      ),
-    ), HISTORY_META.addDevice);
-  };
-
-  const handleBrowserPointerDown = (payload: {
-    kind: BrowserDeviceKind;
-    sourceEvent: PointerEvent;
-    itemEl: HTMLElement;
-  }): void => {
-    deviceRackComponent?.handleBrowserPointerDown(
-      payload.sourceEvent,
-      payload.kind,
-      payload.itemEl,
-    );
-  };
-
-  const handleRackCommit = (commit: RackInteractionCommit): void => {
-    if (commit.kind === 'move') {
-      const nextDevices = applyMoveDevicesByDropZone(
-        uiState.chainState.devices,
-        commit.sourceIds,
-        commit.dropZone,
-        commit.sourceKind,
-      );
-      const changed = nextDevices !== null;
-      if (changed) {
-        applyChainMutation(withDevices(uiState.chainState, nextDevices), HISTORY_META.moveDevices);
-      }
-      return;
-    }
-
-    applyChainMutation(withDevices(
-      uiState.chainState,
-      applyInsertDeviceByDropZone(
-        uiState.chainState.devices,
-        createDeviceNodeByKind(commit.sourceKind),
-        commit.dropZone,
-      ),
-    ), HISTORY_META.insertDevice);
-  };
-
   const handleRackScrollMetricsChange = (metrics: RackScrollMetrics): void => {
     rackScrollMetrics = metrics;
   };
@@ -1263,22 +536,6 @@
 
   const handleRackHeaderScrollRequest = (nextScrollLeft: number): void => {
     deviceRackComponent?.setScrollLeft(nextScrollLeft);
-  };
-
-  const handleAutoCreateLengthChange = (): void => {
-    const bridge = readBridge();
-    uiState.previewLoopLengthBeats = bridge.autoCreateLengthBeats;
-    saveBridgeSettings(bridge);
-    scheduleAutoPreview(0);
-  };
-
-  const handleChainSave = (
-    chain: GeneratorChain,
-    meta: ChainMutationMeta,
-  ): void => {
-    chainHistory.push(chain, meta);
-    syncHistoryUiState();
-    saveChainSettings(chain);
   };
 
   const handlePaletteFileChange = async (event: Event): Promise<void> => {
@@ -1311,14 +568,9 @@
   };
 
   const handleLaunchpadModelToggle = (nextEnabled: boolean): void => {
-    const nextModel: LaunchpadModel = nextEnabled ? 'mk2' : 'mk3';
-    if (uiState.launchpadModel === nextModel) {
-      return;
+    if (editorSession.commands.setLaunchpadModelEnabled(nextEnabled)) {
+      renderLedFrame();
     }
-    uiState.launchpadModel = nextModel;
-    saveLaunchpadModel(nextModel);
-    scheduleAutoPreview(0);
-    renderLedFrame();
   };
 
   const handlePreviewPlayClick = (): void => {
@@ -1331,19 +583,21 @@
   };
 
   const handlePreviewLoopToggle = (): void => {
-    uiState.isPreviewLoopEnabled = !uiState.isPreviewLoopEnabled;
-    savePreviewLoopEnabled(uiState.isPreviewLoopEnabled);
-    renderLedFrame();
+    if (editorSession.commands.togglePreviewLoopEnabled()) {
+      renderLedFrame();
+    }
   };
 
   const handlePreviewGuideToggle = (nextEnabled: boolean): void => {
-    applyPreviewGuideEnabled(nextEnabled);
+    if (editorSession.commands.setPreviewGuideEnabled(nextEnabled)) {
+      renderLedFrame();
+    }
   };
 
   const handlePreviewPopout = async (): Promise<void> => {
     try {
       await bridgeClient.openPreviewWindow();
-      uiState.isPreviewPopoutOpen = true;
+      editorSession.commands.setPreviewPopoutOpen(true);
       renderLedFrame();
     } catch {
       setHeaderIndicatorText('Failed to open preview popout');
@@ -1363,20 +617,14 @@
   };
 
   const handleSendClick = async (): Promise<void> => {
-    if (autoPreviewTimer !== null) {
-      window.clearTimeout(autoPreviewTimer);
-      autoPreviewTimer = null;
-    }
-
+    editorSession.commands.cancelAutoPreview();
     clearSendDoneTimer();
-    uiState.sendButtonDisabled = true;
-    uiState.sendButtonLabel = 'Sending...';
+    editorSession.commands.setSendButtonState('Sending...', true);
     setHeaderIndicatorText('Sending...', { autoClear: false });
 
     try {
       const bridge = readBridge();
-      writeBridgeInputs(bridge);
-      saveBridgeSettings(bridge);
+      editorSession.commands.applyBridgeSettings(bridge, { persist: true });
       const requestChain = cloneChainForIpc(uiState.chainState);
 
       const request: GenerateAndSendRequest = {
@@ -1386,88 +634,22 @@
       };
       const response = await bridgeClient.generateAndSend(request);
       applyPreviewData(response.preview, response.bridge, 'send', requestChain);
-      uiState.sendButtonDisabled = false;
-      uiState.sendButtonLabel = 'Done!';
+      editorSession.commands.setSendButtonState('Done!', false);
       sendDoneTimer = window.setTimeout(() => {
         sendDoneTimer = null;
-        uiState.sendButtonLabel = 'Send';
+        editorSession.commands.setSendButtonState('Send', false);
       }, SEND_DONE_MS);
     } catch (error) {
       stopPlayback();
       const errorText = error instanceof Error ? error.message : 'Unknown send error';
       setHeaderIndicatorText(`Send failed | ${errorText}`);
-      uiState.sendButtonDisabled = false;
-      uiState.sendButtonLabel = 'Send';
+      editorSession.commands.setSendButtonState('Send', false);
     }
-  };
-
-  const handleContextMenuDelete = (target: ContextMenuTarget): void => {
-    if (target.kind === 'group') {
-      deleteGroup(target.groupId);
-      return;
-    }
-
-    if (target.deviceIds.length === 0) {
-      return;
-    }
-    deleteDevicesById(target.deviceIds);
-  };
-
-  const withContextSelection = (
-    target: ContextMenuTarget,
-    action: (selection: RackSelectionSnapshot | null) => void,
-  ): void => {
-    action(resolveSelectionSnapshotFromContextTarget(target));
-  };
-
-  const runContextClipboardAction = (
-    target: ContextMenuTarget,
-    action: (selectionOverride?: RackSelectionSnapshot | null) => unknown,
-  ): void => {
-    withContextSelection(target, (selection) => {
-      action(selection);
-    });
-  };
-
-  const handleContextMenuCopy = (target: ContextMenuTarget): void => {
-    runContextClipboardAction(target, copySelectionToClipboard);
-  };
-
-  const handleContextMenuCut = (target: ContextMenuTarget): void => {
-    runContextClipboardAction(target, cutSelection);
-  };
-
-  const handleContextMenuPaste = (target: ContextMenuTarget): void => {
-    withContextSelection(target, (selection) => {
-      pasteClipboard(undefined, selection);
-    });
-  };
-
-  const handleContextMenuDuplicate = (target: ContextMenuTarget): void => {
-    runContextClipboardAction(target, duplicateSelection);
-  };
-
-  const handleContextMenuGroup = (targetIds: string[]): void => {
-    if (!canCreateGroupFromSelection(targetIds)) {
-      return;
-    }
-    const groupId = getNextGroupId();
-    setGroupIdForDevices(targetIds, groupId, HISTORY_META.groupCreate);
-  };
-
-  const handleContextMenuUngroupGroup = (groupId: string): void => {
-    if (!groupId) {
-      return;
-    }
-    ungroupGroup(groupId, HISTORY_META.groupUngroup);
   };
 
 
   onMount(() => {
-    reconcileCurrentChainModulators();
-    chainHistory.replaceCurrent(uiState.chainState);
-    syncHistoryUiState();
-    void syncRackAfterRender();
+    editorSession.commands.initialize();
     playbackScheduler = createPlaybackScheduler({
       getLoopMs: () => getPreviewLoopMs(),
       getLoopEndBeat: () => sourceTimelineEnd,
@@ -1478,39 +660,34 @@
       },
       onPlayStateChange: (nextIsPlaying) => {
         isPlaying = nextIsPlaying;
-        uiState.previewPlayLabel = nextIsPlaying ? 'Pause' : 'Play';
+        editorSession.commands.setPreviewPlaying(nextIsPlaying);
       },
     });
 
     liveTempoUnsubscribe = bridgeClient.subscribeLiveTempo((update) => {
-      const nextBpm = sanitizePreviewBpm(update.bpm);
-      if (Math.abs(nextBpm - uiState.previewBpm) < 0.0001) {
-        return;
+      if (editorSession.commands.syncPreviewBpm(update.bpm)) {
+        setHeaderIndicatorText('BPM synced');
       }
-
-      uiState.previewBpm = nextBpm;
-      savePreviewBpm(nextBpm);
-      setHeaderIndicatorText('BPM synced');
     });
 
     previewWindowVisibilityUnsubscribe = bridgeClient.subscribePreviewWindowVisibility((isOpen) => {
-      uiState.isPreviewPopoutOpen = isOpen;
+      editorSession.commands.setPreviewPopoutOpen(isOpen);
     });
 
     previewGuideEnabledUnsubscribe = bridgeClient.subscribePreviewGuideEnabledUpdate((enabled) => {
-      applyPreviewGuideEnabled(enabled === true);
+      handlePreviewGuideToggle(enabled === true);
     });
 
     runBestEffort(
       bridgeClient.requestPreviewWindowVisibility().then((isOpen) => {
-        uiState.isPreviewPopoutOpen = isOpen === true;
+        editorSession.commands.setPreviewPopoutOpen(isOpen === true);
       }),
     );
 
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
-        contextMenuComponent?.close();
-        closeSettings();
+        closeContextMenu();
+        editorSession.commands.closeSettings();
         return;
       }
 
@@ -1523,28 +700,18 @@
         (event.metaKey || event.ctrlKey)
         && event.key.toLowerCase() === 'g';
       if (isGroupShortcut) {
-        const selectedGroups = deviceRackComponent?.getSelectedGroupContexts() ?? [];
-        const targetIds = deviceRackComponent?.getOrderedSelectedDeviceIds() ?? [];
         if (event.shiftKey) {
-          if (selectedGroups.length === 0) {
-            return;
+          if (editorSession.commands.ungroupSelectedGroups()) {
+            event.preventDefault();
+            closeContextMenu();
           }
+          return;
+        }
 
+        if (editorSession.commands.groupSelection()) {
           event.preventDefault();
-          contextMenuComponent?.close();
-          for (const selectedGroup of selectedGroups) {
-            handleContextMenuUngroupGroup(selectedGroup.groupId);
-          }
-          return;
+          closeContextMenu();
         }
-
-        if (selectedGroups.length > 0 || !canCreateGroupFromSelection(targetIds)) {
-          return;
-        }
-
-        event.preventDefault();
-        contextMenuComponent?.close();
-        handleContextMenuGroup(targetIds);
         return;
       }
 
@@ -1553,9 +720,9 @@
         const key = event.key.toLowerCase();
         const isUndoShortcut = key === 'z' && !event.shiftKey;
         if (isUndoShortcut) {
-          if (handleUndo()) {
+          if (editorSession.commands.undo()) {
             event.preventDefault();
-            contextMenuComponent?.close();
+            closeContextMenu();
           }
           return;
         }
@@ -1564,49 +731,50 @@
           (key === 'z' && event.shiftKey)
           || (key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey);
         if (isRedoShortcut) {
-          if (handleRedo()) {
+          if (editorSession.commands.redo()) {
             event.preventDefault();
-            contextMenuComponent?.close();
+            closeContextMenu();
           }
           return;
         }
 
         if (key === 'c') {
-          if (copySelectionToClipboard()) {
+          if (editorSession.commands.copySelection()) {
             event.preventDefault();
-            contextMenuComponent?.close();
+            closeContextMenu();
           }
           return;
         }
 
         if (key === 'x') {
-          if (cutSelection()) {
+          if (editorSession.commands.cutSelection()) {
             event.preventDefault();
-            contextMenuComponent?.close();
+            closeContextMenu();
           }
           return;
         }
 
         if (key === 'v') {
-          if (pasteClipboard()) {
+          if (editorSession.commands.pasteClipboard()) {
             event.preventDefault();
-            contextMenuComponent?.close();
+            closeContextMenu();
           }
           return;
         }
 
         if (key === 'd') {
-          if (duplicateSelection()) {
+          if (editorSession.commands.duplicateSelection()) {
             event.preventDefault();
-            contextMenuComponent?.close();
+            closeContextMenu();
           }
           return;
         }
 
         if (key === 'a') {
-          event.preventDefault();
-          contextMenuComponent?.close();
-          selectAllRackDevices();
+          if (editorSession.commands.selectAllRackDevices()) {
+            event.preventDefault();
+            closeContextMenu();
+          }
           return;
         }
       }
@@ -1615,23 +783,10 @@
         return;
       }
 
-      const selectedGroups = deviceRackComponent?.getSelectedGroupContexts() ?? [];
-      const selectedDeviceIds = deviceRackComponent?.getOrderedSelectedDeviceIds() ?? [];
-      // eslint-disable-next-line svelte/prefer-svelte-reactivity -- Ephemeral union set used only in this handler.
-      const deleteIdSet = new Set(selectedDeviceIds);
-      for (const selectedGroup of selectedGroups) {
-        for (const memberId of selectedGroup.memberDeviceIds) {
-          deleteIdSet.add(memberId);
-        }
+      if (editorSession.commands.deleteSelection()) {
+        event.preventDefault();
+        closeContextMenu();
       }
-      const targetIds = toExistingOrderedDeviceIds([...deleteIdSet]);
-      if (targetIds.length === 0) {
-        return;
-      }
-
-      event.preventDefault();
-      contextMenuComponent?.close();
-      deleteDevicesById(targetIds);
     };
 
     const handleFocusIn = (event: FocusEvent): void => {
@@ -1639,7 +794,7 @@
       if (!isTextEditingElement(target)) {
         return;
       }
-      deviceRackComponent?.clearSelection();
+      editorSession.commands.clearSelection();
     };
 
     const handleWindowPointerDown = (event: PointerEvent): void => {
@@ -1653,7 +808,7 @@
         return;
       }
 
-      deviceRackComponent?.clearSelection();
+      editorSession.commands.clearSelection();
     };
 
     const handleBeforeUnload = (): void => {
@@ -1673,19 +828,14 @@
 
     paletteController.initialize();
     renderLedFrame();
-    scheduleAutoPreview(0);
+    editorSession.commands.scheduleAutoPreview(0);
 
     return () => {
       playbackScheduler?.teardown();
       playbackScheduler = null;
       previewWindowStatePusher.reset();
-      chainHistory.flushPendingMerge();
-      if (autoPreviewTimer !== null) {
-        window.clearTimeout(autoPreviewTimer);
-      }
-      if (sendDoneTimer !== null) {
-        window.clearTimeout(sendDoneTimer);
-      }
+      editorSession.commands.dispose();
+      clearSendDoneTimer();
       clearHeaderIndicatorTimer();
       clearHeaderIndicatorFadeTimer();
 
@@ -1722,8 +872,8 @@
 
 <section class="live-main" hidden={uiState.isSettingsOpen}>
     <BrowserPanel
-      onDeviceAdd={handleBrowserDeviceAdd}
-      onBrowserPointerDown={handleBrowserPointerDown}
+      onDeviceAdd={editorSession.commands.addBrowserDevice}
+      onBrowserPointerDown={editorSession.commands.handleBrowserPointerDown}
     />
 
     <SidebarResizer
@@ -1731,7 +881,7 @@
       bind:isResizing={uiState.isSidebarResizing}
       isBlocked={!!deviceRackComponent?.hasPointerInteraction()}
       sanitizeWidth={sanitizeSidebarWidth}
-      onSave={saveSidebarWidth}
+      onSave={editorSession.commands.persistSidebarWidth}
     />
 
     <section class="workspace">
@@ -1744,7 +894,7 @@
             onScrollRequest={handleRackHeaderScrollRequest}
           />
 
-          <span id="preview-bpm-text" class="header-bpm-text">{toBpmText(uiState.previewBpm)}</span>
+          <span id="preview-bpm-text" class="header-bpm-text">{bpmText}</span>
 
           <span
             id="preview-meta"
@@ -1764,7 +914,7 @@
               id="auto-create-length-select"
               name="autoCreateLength"
               bind:value={uiState.autoCreateLengthLabel}
-              onchange={handleAutoCreateLengthChange}
+              onchange={editorSession.commands.handleAutoCreateLengthChange}
             >
               {#each AUTO_CREATE_LENGTH_OPTIONS as option (option.label)}
                 <option value={option.label}>{option.label}</option>
@@ -1774,9 +924,9 @@
           <button
             id="undo-button"
             type="button"
-            disabled={!canUndo}
-            title={canUndo ? `Undo: ${undoActionLabel}` : 'Nothing to undo'}
-            aria-label={canUndo ? `Undo: ${undoActionLabel}` : 'Undo unavailable'}
+            disabled={!historyControls.canUndo}
+            title={historyControls.canUndo ? `Undo: ${historyControls.undoActionLabel}` : 'Nothing to undo'}
+            aria-label={historyControls.canUndo ? `Undo: ${historyControls.undoActionLabel}` : 'Undo unavailable'}
             onclick={handleUndoClick}
           >
             Undo
@@ -1784,14 +934,14 @@
           <button
             id="redo-button"
             type="button"
-            disabled={!canRedo}
-            title={canRedo ? `Redo: ${redoActionLabel}` : 'Nothing to redo'}
-            aria-label={canRedo ? `Redo: ${redoActionLabel}` : 'Redo unavailable'}
+            disabled={!historyControls.canRedo}
+            title={historyControls.canRedo ? `Redo: ${historyControls.redoActionLabel}` : 'Nothing to redo'}
+            aria-label={historyControls.canRedo ? `Redo: ${historyControls.redoActionLabel}` : 'Redo unavailable'}
             onclick={handleRedoClick}
           >
             Redo
           </button>
-          <button id="settings-button" type="button" onclick={openSettings}>
+          <button id="settings-button" type="button" onclick={editorSession.commands.openSettings}>
             Settings
           </button>
           <button
@@ -1811,31 +961,31 @@
           bind:this={deviceRackComponent}
           devices={uiState.chainState.devices}
           chainState={uiState.chainState}
-          collapsedDeviceIds={collapsedDeviceIds}
+          collapsedDeviceIds={uiState.collapsedDeviceIds}
           {paletteRevision}
           {currentBeat}
           {modulationReadoutById}
           {resolvePaletteRgb}
           isSidebarResizing={uiState.isSidebarResizing}
           interactiveElementSelector={INTERACTIVE_ELEMENT_SELECTOR}
-          onSaveChain={handleChainSave}
-          onScheduleAutoPreview={(delayMs) => scheduleAutoPreview(delayMs)}
+          onSaveChain={editorSession.commands.saveChain}
+          onScheduleAutoPreview={editorSession.commands.scheduleAutoPreview}
           onOpenContextMenu={(x, y, target) => contextMenuComponent?.open(x, y, target)}
-          onCloseContextMenu={() => contextMenuComponent?.close()}
+          onCloseContextMenu={closeContextMenu}
           onGetBrowserDragBadgeLabel={toBrowserDragBadgeLabel}
-          onCommit={handleRackCommit}
+          onCommit={editorSession.commands.handleRackCommit}
           onScrollMetricsChange={handleRackScrollMetricsChange}
           onMiniMapContentRevisionChange={handleRackMiniMapContentRevisionChange}
-          onToggleGroupEnabled={handleToggleGroupEnabled}
-          onToggleCollapse={toggleCollapse}
+          onToggleGroupEnabled={editorSession.commands.toggleGroupEnabled}
+          onToggleCollapse={editorSession.commands.toggleCollapse}
         />
         {#if !uiState.isPreviewPopoutOpen}
           <PreviewPanel
             previewState={previewSurfaceState}
             onGuideToggle={handlePreviewGuideToggle}
             onPopout={handlePreviewPopout}
-            playLabel={uiState.previewPlayLabel}
-            loopEnabled={uiState.isPreviewLoopEnabled}
+            playLabel={previewPanelControls.playLabel}
+            loopEnabled={previewPanelControls.loopEnabled}
             onPlayClick={handlePreviewPlayClick}
             onLoopToggle={handlePreviewLoopToggle}
             bind:scrubValue={uiState.previewScrubValue}
@@ -1855,7 +1005,7 @@
   >
     <header class="settings-screen-head">
       <h1 id="settings-title">Settings</h1>
-      <button id="settings-close" type="button" onclick={closeSettings}>
+      <button id="settings-close" type="button" onclick={editorSession.commands.closeSettings}>
         Close
       </button>
     </header>
@@ -1896,12 +1046,12 @@
 
   <ContextMenu
     bind:this={contextMenuComponent}
-    onCopy={handleContextMenuCopy}
-    onCut={handleContextMenuCut}
-    onPaste={handleContextMenuPaste}
-    onDuplicate={handleContextMenuDuplicate}
-    onDelete={handleContextMenuDelete}
-    onGroup={handleContextMenuGroup}
-    onUngroupGroup={handleContextMenuUngroupGroup}
-    clipboardAvailable={rackClipboard !== null}
+    onCopy={editorSession.commands.copyFromContextTarget}
+    onCut={editorSession.commands.cutFromContextTarget}
+    onPaste={editorSession.commands.pasteFromContextTarget}
+    onDuplicate={editorSession.commands.duplicateFromContextTarget}
+    onDelete={editorSession.commands.deleteFromContextTarget}
+    onGroup={editorSession.commands.groupDeviceIds}
+    onUngroupGroup={editorSession.commands.ungroupGroup}
+    clipboardAvailable={clipboardAvailable}
   />

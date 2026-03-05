@@ -1,31 +1,3 @@
-<script lang="ts" module>
-  import type { BrowserDeviceKind as CommitBrowserDeviceKind } from '../services/devices';
-  import type {
-    ChainDragSourceKind,
-    RackDropZone,
-  } from '../state/rack-drop';
-
-  export interface RackScrollMetrics {
-    scrollLeft: number;
-    scrollWidth: number;
-    clientWidth: number;
-  }
-
-  /** Commit payload emitted when rack drag/insert interactions complete. */
-  export type RackInteractionCommit =
-    | {
-        kind: 'move';
-        sourceKind: ChainDragSourceKind;
-        sourceIds: string[];
-        dropZone: RackDropZone;
-      }
-    | {
-        kind: 'insert';
-        sourceKind: CommitBrowserDeviceKind;
-        dropZone: RackDropZone;
-      };
-</script>
-
 <script lang="ts">
   /**
    * Renders the rack surface and translates pointer/drag interactions into commit events.
@@ -35,6 +7,10 @@
   import { clamp } from '../../shared/math';
   import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/types';
   import { normalizeOptionalId } from '../../shared/normalize-id';
+  import type {
+    RackInteractionCommit,
+    RackScrollMetrics,
+  } from './device-rack-types';
   import type { ChainMutationMeta } from '../state/chain-history';
   import type { ContextMenuTarget } from '../state/context-menu';
   import type { BrowserDeviceKind } from '../services/devices';
