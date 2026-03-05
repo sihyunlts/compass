@@ -12,7 +12,7 @@
     resolveLaunchpadModel,
     type OverlayFrameStroke,
   } from '../../domain';
-  import { lerp } from '../../shared/math';
+  import { clamp, lerp } from '../../shared/math';
   import type { LaunchpadButton, LaunchpadModel, PreviewWindowState } from '../../shared/types';
   import {
     PREVIEW_FRAME_COUNT,
@@ -31,6 +31,8 @@
   const OVERLAY_WORLD_BASE_PADDING = 4;
   const OVERLAY_WORLD_PADDING_STEP = 2;
   const OVERLAY_WORLD_MAX_PADDING = 14;
+  const PREVIEW_LED_GAMMA = 0.3;
+  const PREVIEW_LED_PAD_FLOOR = 50;
 
   interface OverlayWorldBounds {
     minX: number;
@@ -64,6 +66,48 @@
   ): number => {
     const endBeat = state?.sourceTimelineEndBeat;
     return Number.isFinite(endBeat) && endBeat > 0 ? endBeat : 1;
+  };
+
+  const parseRgbChannels = (rgb: string): [number, number, number] | null => {
+    const values = rgb
+      .trim()
+      .split(/\s+/)
+      .map((value) => Number(value));
+    if (values.length !== 3 || values.some((value) => !Number.isFinite(value))) {
+      return null;
+    }
+
+    return [
+      Math.round(clamp(values[0], 0, 255)),
+      Math.round(clamp(values[1], 0, 255)),
+      Math.round(clamp(values[2], 0, 255)),
+    ];
+  };
+
+  const applyPreviewLedGamma = (channel: number): number =>
+    Math.pow(clamp(channel, 0, 255) / 255, PREVIEW_LED_GAMMA) * 255;
+
+  /**
+   * Approximates the brighter pad surface color instead of the bare LED color.
+   * Keeps fully-off LEDs black so velocity 0 still reads as unlit.
+   */
+  const resolvePreviewLedRgb = (rgb: string): string => {
+    const channels = parseRgbChannels(rgb);
+    if (!channels) {
+      return rgb;
+    }
+
+    const [r, g, b] = channels;
+    if (r === 0 && g === 0 && b === 0) {
+      return '0 0 0';
+    }
+
+    const liftChannel = (channel: number): number => Math.round(Math.min(
+      255,
+      (PREVIEW_LED_PAD_FLOOR * (1 - (channel / 255))) + (applyPreviewLedGamma(channel) * 1.1),
+    ));
+
+    return `${liftChannel(r)} ${liftChannel(g)} ${liftChannel(b)}`;
   };
 
   const activeLaunchpadModel = $derived.by<LaunchpadModel>(() =>
@@ -503,7 +547,7 @@
         continue;
       }
       target.classList.add('is-lit');
-      target.style.setProperty('--led-rgb', cell.rgb);
+      target.style.setProperty('--led-rgb', resolvePreviewLedRgb(cell.rgb));
     }
   };
 
@@ -629,7 +673,7 @@
     transition: opacity 200ms ease;
 
     &.is-button {
-      background: var(--neutral-30);
+      background: var(--neutral-20);
 
       &.is-edge-button {
         position: relative;
