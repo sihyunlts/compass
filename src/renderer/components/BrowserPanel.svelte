@@ -107,6 +107,7 @@
 
 <style lang="scss">
   .browser-panel {
+    display: flex;
     flex: 0 0 var(--sidebar-width);
     padding: var(--gap-10);
     background: var(--neutral-10);
@@ -125,10 +126,10 @@
   }
 
   .browser-view {
+    flex: 1;
     margin-top: var(--gap-32);
     border-radius: var(--radius-4);
     overflow-y: auto;
-    flex: 1;
   }
 
   .browser-group {
