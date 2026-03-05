@@ -1,0 +1,23 @@
+<svelte:options runes={true} />
+
+<script lang="ts">
+  import type { GeneratorDeviceNode } from '../../shared/types';
+  import AnglePicker from '../../renderer/components/AnglePicker.svelte';
+  import type { RendererDeviceEditorPropsBase } from '../types';
+
+  type RotateDeviceEditorProps = RendererDeviceEditorPropsBase & {
+    device: Extract<GeneratorDeviceNode, { kind: 'rotate' }>;
+  };
+
+  let { device }: RotateDeviceEditorProps = $props();
+</script>
+
+<div class="device-controls">
+  <AnglePicker
+    label="Angle (0-360)"
+    value={device.params.angleDeg}
+    dataAction="set-angle-param"
+    dataId={device.id}
+    dataParam="angleDeg"
+  />
+</div>

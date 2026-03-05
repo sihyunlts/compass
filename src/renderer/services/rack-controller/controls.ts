@@ -3,10 +3,9 @@ import {
   SPIRAL_PARAM_KEYS,
   WATERDROP_PARAM_KEYS,
 } from '../devices';
+import { getRendererModulationTargetParamDefinitions } from '../../../devices/metadata';
 import {
   createDefaultDeviceNode,
-  getModulationTargetParamDefinitions,
-  isModulationTargetDeviceKind,
 } from '../../../shared/device-registry';
 import { sanitizeCurveDivisions, sanitizeCurveNodes } from '../../../core/modulation/curve';
 import { sanitizeModulationTarget } from '../../../core/modulation/routing';
@@ -368,12 +367,12 @@ const handleSetModulationTargetDevice = (
   }
 
   const targetDevice = context.findDeviceById(deviceId);
-  if (!targetDevice || !isModulationTargetDeviceKind(targetDevice.kind)) {
+  if (!targetDevice) {
     device.params.target = null;
     return true;
   }
 
-  const paramOptions = getModulationTargetParamDefinitions(targetDevice.kind);
+  const paramOptions = getRendererModulationTargetParamDefinitions(targetDevice.kind);
   if (paramOptions.length === 0) {
     device.params.target = null;
     return true;

@@ -5,44 +5,25 @@ import type {
 } from './types';
 
 export type DeviceKind = GeneratorDeviceNode['kind'];
-export type DeviceGroup = 'generator' | 'effect';
 type DeviceNodeOfKind<K extends DeviceKind> = Extract<GeneratorDeviceNode, { kind: K }>;
 
-export const DEVICE_KIND_LABELS = {
-  waterdrop: 'Waterdrop',
-  scanner: 'Scanner',
-  spiral: 'Spiral',
-  modulator: 'Modulator',
-  mirror: 'Mirror',
-  mask: 'Mask',
-  symmetry: 'Symmetry',
-  rotate: 'Rotate',
-  reverse: 'Reverse',
-  color: 'Color',
-} as const satisfies Record<DeviceKind, string>;
-
-export const DEVICE_KIND_GROUPS = {
-  generator: ['waterdrop', 'scanner', 'spiral'],
-  effect: ['modulator', 'mirror', 'symmetry', 'mask', 'rotate', 'reverse', 'color'],
-} as const satisfies Record<DeviceGroup, readonly DeviceKind[]>;
-
-export const DEVICE_KINDS = Object.freeze(
-  Object.keys(DEVICE_KIND_LABELS) as DeviceKind[],
-);
+export const DEVICE_KINDS = Object.freeze([
+  'waterdrop',
+  'scanner',
+  'spiral',
+  'modulator',
+  'mirror',
+  'mask',
+  'symmetry',
+  'rotate',
+  'reverse',
+  'color',
+]) as readonly DeviceKind[];
 
 const DEVICE_KIND_SET = new Set<DeviceKind>(DEVICE_KINDS);
-const GENERATOR_KIND_SET = new Set<DeviceKind>(
-  DEVICE_KIND_GROUPS.generator as readonly DeviceKind[],
-);
 
 export const isDeviceKind = (value: string | undefined): value is DeviceKind =>
   !!value && DEVICE_KIND_SET.has(value as DeviceKind);
-
-export const getDeviceLabel = (kind: DeviceKind): string =>
-  DEVICE_KIND_LABELS[kind];
-
-export const getDeviceGroup = (kind: DeviceKind): DeviceGroup =>
-  GENERATOR_KIND_SET.has(kind) ? 'generator' : 'effect';
 
 export const WATERDROP_PARAM_KEYS = [
   'centerX',
@@ -62,46 +43,24 @@ export type WaterdropParamKey = (typeof WATERDROP_PARAM_KEYS)[number];
 export type ScannerParamKey = (typeof SCANNER_PARAM_KEYS)[number];
 export type SpiralParamKey = (typeof SPIRAL_PARAM_KEYS)[number];
 
-export interface ModulationTargetParamDefinition {
-  key: string;
-  label: string;
-}
-
 export type ModulationTargetDeviceKind = Exclude<
   DeviceKind,
   'reverse' | 'modulator' | 'symmetry' | 'mask' | 'color'
 >;
 
-const MODULATION_TARGET_PARAM_DEFINITIONS: Record<
+const MODULATION_TARGET_PARAM_KEYS: Record<
   ModulationTargetDeviceKind,
-  readonly ModulationTargetParamDefinition[]
+  readonly string[]
 > = {
-  waterdrop: [
-    { key: 'centerX', label: 'Center X' },
-    { key: 'centerY', label: 'Center Y' },
-    { key: 'curvature', label: 'Curvature' },
-    { key: 'startRadius', label: 'Start Radius' },
-  ],
-  scanner: [
-    { key: 'angleDeg', label: 'Angle' },
-    { key: 'startOffset', label: 'Start Offset' },
-  ],
-  spiral: [
-    { key: 'centerX', label: 'Center X' },
-    { key: 'centerY', label: 'Center Y' },
-    { key: 'turns', label: 'Turns' },
-    { key: 'startRadius', label: 'Start Radius' },
-  ],
-  mirror: [
-    { key: 'angleDeg', label: 'Mirror Axis Angle' },
-  ],
-  rotate: [
-    { key: 'angleDeg', label: 'Angle' },
-  ],
+  waterdrop: ['centerX', 'centerY', 'curvature', 'startRadius'],
+  scanner: ['angleDeg', 'startOffset'],
+  spiral: ['centerX', 'centerY', 'turns', 'startRadius'],
+  mirror: ['angleDeg'],
+  rotate: ['angleDeg'],
 };
 
 const MODULATION_TARGET_KIND_SET = new Set<ModulationTargetDeviceKind>(
-  Object.keys(MODULATION_TARGET_PARAM_DEFINITIONS) as ModulationTargetDeviceKind[],
+  Object.keys(MODULATION_TARGET_PARAM_KEYS) as ModulationTargetDeviceKind[],
 );
 
 export const isModulationTargetDeviceKind = (
@@ -109,19 +68,12 @@ export const isModulationTargetDeviceKind = (
 ): kind is ModulationTargetDeviceKind =>
   MODULATION_TARGET_KIND_SET.has(kind as ModulationTargetDeviceKind);
 
-export const getModulationTargetParamDefinitions = (
-  kind: DeviceKind,
-): readonly ModulationTargetParamDefinition[] => (
-  isModulationTargetDeviceKind(kind)
-    ? MODULATION_TARGET_PARAM_DEFINITIONS[kind]
-    : []
-);
-
 export const isModulationTargetParamKey = (
   kind: DeviceKind,
   paramKey: string,
 ): boolean =>
-  getModulationTargetParamDefinitions(kind).some((item) => item.key === paramKey);
+  isModulationTargetDeviceKind(kind)
+    && MODULATION_TARGET_PARAM_KEYS[kind].includes(paramKey);
 
 const DEFAULT_WATERDROP_PARAMS: DeviceNodeOfKind<'waterdrop'>['params'] = {
   centerX: 4.5,

@@ -1,14 +1,14 @@
 import {
   createDefaultDeviceNode,
-  DEVICE_KIND_GROUPS,
-  DEVICE_KIND_LABELS,
-  DEVICE_KINDS,
-  getDeviceGroup,
-  getDeviceLabel,
-  isDeviceKind,
-  type DeviceGroup,
-  type DeviceKind,
 } from '../../shared/device-registry';
+import {
+  getRendererDeviceGroup,
+  getRendererDeviceLabel,
+  isRendererDeviceKind,
+  RENDERER_DEVICE_GROUPS,
+  RENDERER_DEVICE_KINDS,
+} from '../../devices/metadata';
+import type { RendererDeviceGroup, RendererDeviceKind } from '../../devices';
 import type { GeneratorDeviceNode } from '../../shared/types';
 
 export {
@@ -22,25 +22,21 @@ export type {
   WaterdropParamKey,
 } from '../../shared/device-registry';
 
-const BROWSER_DEVICE_LABELS = DEVICE_KIND_LABELS;
-export type BrowserDeviceKind = DeviceKind;
-export type BrowserDeviceGroup = DeviceGroup;
+export type BrowserDeviceKind = RendererDeviceKind;
+export type BrowserDeviceGroup = RendererDeviceGroup;
 
-const BROWSER_DEVICE_GROUPS = DEVICE_KIND_GROUPS;
-const BROWSER_DEVICE_KIND_SET = new Set<BrowserDeviceKind>(DEVICE_KINDS);
-
-export const BROWSER_GENERATORS = BROWSER_DEVICE_GROUPS.generator.map((kind) => ({
+export const BROWSER_GENERATORS = RENDERER_DEVICE_GROUPS.generator.map((kind) => ({
   kind,
-  label: BROWSER_DEVICE_LABELS[kind],
+  label: getRendererDeviceLabel(kind),
 }));
 
-export const BROWSER_EFFECTS = BROWSER_DEVICE_GROUPS.effect.map((kind) => ({
+export const BROWSER_EFFECTS = RENDERER_DEVICE_GROUPS.effect.map((kind) => ({
   kind,
-  label: BROWSER_DEVICE_LABELS[kind],
+  label: getRendererDeviceLabel(kind),
 }));
 
 export const getBrowserDeviceLabel = (kind: BrowserDeviceKind): string =>
-  getDeviceLabel(kind);
+  getRendererDeviceLabel(kind);
 
 let generatorIdSeed = 1;
 let effectIdSeed = 1;
@@ -63,7 +59,7 @@ const readSeedSuffix = (
 const createGeneratedDeviceNode = (
   kind: BrowserDeviceKind,
 ): GeneratorDeviceNode => {
-  const group = getDeviceGroup(kind);
+  const group = getRendererDeviceGroup(kind);
   const id = group === 'generator'
     ? `generator-${generatorIdSeed++}`
     : `effect-${effectIdSeed++}`;
@@ -100,8 +96,8 @@ export const isBrowserDeviceKind = (
   value: string | undefined,
 ): value is BrowserDeviceKind => (
   !!value
-  && isDeviceKind(value)
-  && BROWSER_DEVICE_KIND_SET.has(value as BrowserDeviceKind)
+  && isRendererDeviceKind(value)
+  && RENDERER_DEVICE_KINDS.includes(value as BrowserDeviceKind)
 );
 
 export const createDeviceNodeByKind = (
