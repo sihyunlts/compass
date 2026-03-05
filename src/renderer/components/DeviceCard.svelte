@@ -18,23 +18,33 @@
   import MaskTilePicker from './MaskTilePicker.svelte';
 
   const BLACK_RGB = '0 0 0';
-  const PALETTE_GRID_1 = Object.freeze(
-    Array.from({ length: 64 }, (_, i) => {
-      const row = Math.floor(i / 8);
-      const col = i % 8;
-      const flippedRow = 7 - row;
-      return (flippedRow * 8) + col;
-    })
-  );
+  const createPaletteGridOrder = (
+    start: number,
+    end: number,
+  ): ReadonlyArray<number> => {
+    const rowCount = 8;
+    const bandColumnCount = 4;
+    const bandSize = rowCount * bandColumnCount;
+    const gridColumnCount = 8;
+    const valueCount = end - start + 1;
+    const topDownOrdered = new Array<number>(valueCount);
 
-  const PALETTE_GRID_2 = Object.freeze(
-    Array.from({ length: 64 }, (_, i) => {
-      const row = Math.floor(i / 8);
-      const col = i % 8;
-      const flippedRow = 7 - row;
-      return 64 + (flippedRow * 8) + col;
-    })
-  );
+    for (let index = 0; index < valueCount; index += 1) {
+      const bandIndex = Math.floor(index / bandSize);
+      const indexWithinBand = index % bandSize;
+      const rowFromBottom = Math.floor(indexWithinBand / bandColumnCount);
+      const columnWithinBand = indexWithinBand % bandColumnCount;
+      const rowFromTop = (rowCount - 1) - rowFromBottom;
+      const column = (bandIndex * bandColumnCount) + columnWithinBand;
+      const visualIndex = (rowFromTop * gridColumnCount) + column;
+      topDownOrdered[visualIndex] = start + index;
+    }
+
+    return Object.freeze(topDownOrdered);
+  };
+
+  const PALETTE_GRID_1 = createPaletteGridOrder(0, 63);
+  const PALETTE_GRID_2 = createPaletteGridOrder(64, 127);
 
   let {
     device,
