@@ -2,8 +2,6 @@ import { clamp } from '../../shared/math';
 import type {
   CompassApi,
   GeneratorChain,
-  GeneratorPreview,
-  LaunchpadModel,
   PreviewWindowState,
 } from '../../shared/types';
 import { cloneChainForIpc } from './clone-chain';
@@ -128,28 +126,10 @@ export const createPlaybackScheduler = (
   options: PlaybackSchedulerOptions,
 ): PlaybackScheduler => new PlaybackScheduler(options);
 
-/** Snapshot payload used when pushing preview state to the popout window. */
-export interface PreviewWindowStateSnapshot {
-  activeVelocityByPitch: ReadonlyMap<number, number>;
-  previewRevision: number;
-  currentBeat: number;
-  sourceTimelineEndBeat: number;
-  loopLengthBeats: number;
-  launchpadModel: LaunchpadModel;
-  noteCount: number;
-  uniquePitchCount: number;
-  bpm: number;
-  isPlaying: boolean;
-  isLoopEnabled: boolean;
-  isGuideEnabled: boolean;
-  resolveChain: () => GeneratorChain;
-}
-
-/** Configures preview-window state push behavior and LED color mapping. */
+/** Configures preview-window state push behavior and chain cloning. */
 export interface PreviewWindowStatePusherOptions {
   bridgeClient: CompassApi;
   minIntervalMs: number;
-  resolveLedRgb: (velocity: number) => string;
   now?: () => number;
 }
 
@@ -160,11 +140,13 @@ class PreviewWindowStatePusher {
 
   private lastPreviewRevision: number | null = null;
 
+  private lastSourceChain: GeneratorChain | null = null;
+
   private lastClonedChain: GeneratorChain | null = null;
 
   public constructor(private readonly options: PreviewWindowStatePusherOptions) {}
 
-  public push(snapshot: PreviewWindowStateSnapshot): void {
+  public push(snapshot: PreviewWindowState): void {
     const nextMetaKey = [
       snapshot.previewRevision,
       snapshot.noteCount,
@@ -188,52 +170,30 @@ class PreviewWindowStatePusher {
     let chainForIpc = this.lastClonedChain;
     if (
       this.lastPreviewRevision !== snapshot.previewRevision
+      || this.lastSourceChain !== snapshot.chain
       || !chainForIpc
     ) {
-      chainForIpc = cloneChainForIpc(snapshot.resolveChain());
+      chainForIpc = cloneChainForIpc(snapshot.chain);
       this.lastPreviewRevision = snapshot.previewRevision;
+      this.lastSourceChain = snapshot.chain;
       this.lastClonedChain = chainForIpc;
     }
 
-    const nextState: PreviewWindowState = {
-      activeCells: this.toActiveCells(snapshot.activeVelocityByPitch),
-      previewRevision: snapshot.previewRevision,
-      chain: chainForIpc,
-      launchpadModel: snapshot.launchpadModel,
-      currentBeat: snapshot.currentBeat,
-      sourceTimelineEndBeat: snapshot.sourceTimelineEndBeat,
-      loopLengthBeats: Math.max(snapshot.loopLengthBeats, 0.25),
-      noteCount: snapshot.noteCount,
-      uniquePitchCount: snapshot.uniquePitchCount,
-      bpm: snapshot.bpm,
-      isPlaying: snapshot.isPlaying,
-      isLoopEnabled: snapshot.isLoopEnabled,
-      isGuideEnabled: snapshot.isGuideEnabled,
-    };
-
     this.lastPushedMs = now;
     this.lastMetaKey = nextMetaKey;
-    this.options.bridgeClient.pushPreviewWindowState(nextState);
+    this.options.bridgeClient.pushPreviewWindowState({
+      ...snapshot,
+      chain: chainForIpc,
+      loopLengthBeats: Math.max(snapshot.loopLengthBeats, 0.25),
+    });
   }
 
   public reset(): void {
     this.lastPushedMs = 0;
     this.lastMetaKey = '';
     this.lastPreviewRevision = null;
+    this.lastSourceChain = null;
     this.lastClonedChain = null;
-  }
-
-  private toActiveCells(
-    activeVelocityByPitch: ReadonlyMap<number, number>,
-  ): PreviewWindowState['activeCells'] {
-    const activeCells: PreviewWindowState['activeCells'] = [];
-    for (const [pitch, velocity] of activeVelocityByPitch.entries()) {
-      activeCells.push({
-        pitch,
-        rgb: this.options.resolveLedRgb(velocity),
-      });
-    }
-    return activeCells;
   }
 }
 
@@ -241,30 +201,3 @@ class PreviewWindowStatePusher {
 export const createPreviewWindowStatePusher = (
   options: PreviewWindowStatePusherOptions,
 ): PreviewWindowStatePusher => new PreviewWindowStatePusher(options);
-
-/** Returns the highest active velocity per pitch at the given beat. */
-export const collectActiveVelocityByPitch = (
-  preview: GeneratorPreview | null,
-  beat: number,
-): Map<number, number> => {
-  const active = new Map<number, number>();
-
-  if (!preview) {
-    return active;
-  }
-
-  for (const note of preview.notes) {
-    const start = note.startBeat;
-    const end = note.startBeat + note.durationBeats;
-    if (beat < start || beat >= end) {
-      continue;
-    }
-
-    const prev = active.get(note.pitch) ?? 0;
-    if (note.velocity > prev) {
-      active.set(note.pitch, note.velocity);
-    }
-  }
-
-  return active;
-};

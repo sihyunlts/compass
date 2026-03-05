@@ -68,6 +68,7 @@ const DEFAULT_HISTORY_MAX_ENTRIES = 100;
 
 export interface EditorSessionState {
   chainState: GeneratorChain;
+  chainRevision: number;
   launchpadModel: LaunchpadModel;
   headerIndicatorText: string;
   paletteNameText: string;
@@ -125,6 +126,7 @@ const createInitialEditorState = (): EditorSessionState => {
   const bridge = loadBridgeSettings();
   return {
     chainState: loadChainSettings(),
+    chainRevision: 1,
     launchpadModel: loadLaunchpadModel(),
     headerIndicatorText: '',
     paletteNameText: 'Default palette: loading...',
@@ -179,7 +181,9 @@ export class EditorSession {
 
   public readonly commands = {
     initialize: (): void => {
-      this.reconcileCurrentChainModulators();
+      if (this.reconcileCurrentChainModulators()) {
+        this.bumpChainRevision();
+      }
       this.history.replaceCurrent(this.state.chainState);
       this.syncHistoryState();
       this.requestSyncAfterRender();
@@ -214,9 +218,11 @@ export class EditorSession {
       saveCollapsedDeviceIds(next);
     },
     saveChain: (chain: GeneratorChain, meta: ChainMutationMeta): void => {
+      this.state.chainState = chain;
+      this.bumpChainRevision();
+      this.persistChainState();
       this.history.push(chain, meta);
       this.syncHistoryState();
-      saveChainSettings(chain);
     },
     addBrowserDevice: (kind: BrowserDeviceKind): void => {
       if (!isBrowserDeviceKind(kind)) {
@@ -423,15 +429,20 @@ export class EditorSession {
     });
   }
 
-  private reconcileCurrentChainModulators(): void {
+  private bumpChainRevision(): void {
+    this.state.chainRevision += 1;
+  }
+
+  private reconcileCurrentChainModulators(): boolean {
     const changed = reconcileGeneratorChainModulators(this.state.chainState);
     if (!changed) {
-      return;
+      return false;
     }
     this.state.chainState = withDevices(
       this.state.chainState,
       [...this.state.chainState.devices],
     );
+    return true;
   }
 
   private pruneCollapsedDeviceIds(): void {
@@ -453,6 +464,7 @@ export class EditorSession {
 
   private onChainMutated(meta: ChainMutationMeta): void {
     this.persistChainState();
+    this.bumpChainRevision();
     this.history.push(this.state.chainState, meta);
     this.syncHistoryState();
   }
@@ -469,6 +481,7 @@ export class EditorSession {
   private restoreChainFromHistory(chain: GeneratorChain): void {
     this.state.chainState = chain;
     this.persistChainState();
+    this.bumpChainRevision();
     this.history.replaceCurrent(this.state.chainState);
     this.syncHistoryState();
     this.scheduleAutoPreview(0);

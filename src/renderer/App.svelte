@@ -10,22 +10,12 @@
     GenerateAndSendRequest,
     GeneratorChain,
     GeneratorPreview,
+    LaunchpadModel,
     PaletteFilePayload,
-    PreviewWindowState,
   } from '../shared/types';
   import {
     AUTO_CREATE_LENGTH_OPTIONS,
   } from '../shared/beat-length';
-  import {
-    PREVIEW_FRAME_COUNT,
-    toPreviewFrameBeat,
-    toPreviewFrameIndex,
-  } from './services/preview-cache';
-  import {
-    type CompiledModulationProgram,
-    compileModulationProgram,
-    evaluateModulationProgramReadouts,
-  } from '../core/modulation/compiled-program';
   import { clamp } from '../shared/math';
   import {
     getBrowserDeviceLabel,
@@ -42,10 +32,8 @@
   import RackHeaderScrollbar from './components/RackHeaderScrollbar.svelte';
   import PreviewPanel from './components/PreviewPanel.svelte';
   import ContextMenu from './components/ContextMenu.svelte';
-  import { generateRendererPreview } from './app/preview';
   import { createPaletteController } from './services/palette';
   import {
-    collectActiveVelocityByPitch,
     createPlaybackScheduler,
     createPreviewWindowStatePusher,
   } from './services/playback';
@@ -60,6 +48,7 @@
     selectPreviewBpmText,
     selectPreviewPanelControls,
   } from './features/editor/selectors';
+  import { createPreviewSession } from './features/preview/session.svelte';
 
   const SCRUB_MAX = 1000;
   const PREVIEW_WINDOW_STATE_MAX_FPS = 120;
@@ -81,24 +70,6 @@
     'submit',
     'reset',
   ]);
-
-  const resolveSourceTimelineEnd = (preview: GeneratorPreview | null): number => {
-    if (!preview) {
-      return 1;
-    }
-
-    let maxEndBeat = 1;
-    for (const note of preview.notes) {
-      const startBeat = Number.isFinite(note.startBeat) ? note.startBeat : 0;
-      const durationBeats = Number.isFinite(note.durationBeats) ? note.durationBeats : 0;
-      const endBeat = Math.max(0, startBeat + Math.max(durationBeats, 0));
-      if (endBeat > maxEndBeat) {
-        maxEndBeat = endBeat;
-      }
-    }
-
-    return Number.isFinite(maxEndBeat) && maxEndBeat >= 1 ? maxEndBeat : 1;
-  };
 
   const isTextEditingElement = (element: Element | null): boolean => {
     if (!element) {
@@ -127,7 +98,6 @@
   let deviceRackComponent: ReturnType<typeof DeviceRack> | null = $state(null);
   let playbackScheduler: ReturnType<typeof createPlaybackScheduler> | null = null;
   let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
-  let previewSurfaceState: PreviewWindowState | null = $state(null);
 
   const closeContextMenu = (): void => {
     contextMenuComponent?.close();
@@ -145,7 +115,9 @@
     onAutoPreview: () => runPreview(),
     onSyncAfterRender: () => syncRackAfterRender(),
   });
+  const previewSession = createPreviewSession();
   const uiState = editorSession.state;
+  const previewState = previewSession.state;
   const historyControls = $derived.by(() => selectHistoryControls(uiState));
   const previewPanelControls = $derived.by(() => selectPreviewPanelControls(uiState));
   const bpmText = $derived.by(() => selectPreviewBpmText(uiState.previewBpm));
@@ -163,22 +135,8 @@
   const previewWindowStatePusher = createPreviewWindowStatePusher({
     bridgeClient,
     minIntervalMs: PREVIEW_WINDOW_STATE_MIN_INTERVAL_MS,
-    resolveLedRgb: (velocity) => paletteController.getLedRgb(velocity, DEFAULT_LED_RGB),
   });
 
-  let previewRevision = $state(0);
-  let previewData: GeneratorPreview | null = $state(null);
-  let sourceTimelineEnd = $state(1);
-  let previewSourceChain: GeneratorChain | null = null;
-  let previewLedFrameCache: ReadonlyArray<ReadonlyMap<number, number>> | null = $state(null);
-  let compiledProgramCache:
-    | {
-        chainRef: GeneratorChain;
-        program: CompiledModulationProgram;
-        modulatorIds: readonly string[];
-      }
-    | null = null;
-  let modulationReadoutById: Record<string, string> = $state({});
   let currentBeat = $state(0);
   let isPlaying = $state(false);
   let sendDoneTimer: number | null = null;
@@ -313,142 +271,27 @@
     return (60000 / bpm) * beats;
   };
 
-  const EMPTY_ACTIVE_VELOCITY_BY_PITCH = new Map<number, number>();
-  const EMPTY_MODULATION_READOUT_BY_ID: Readonly<Record<string, string>> = Object.freeze({});
-
-  const buildLedFrameCache = (
-    preview: GeneratorPreview,
-    timelineSpanBeats: number,
-  ): ReadonlyArray<ReadonlyMap<number, number>> => {
-    const frames: Array<ReadonlyMap<number, number>> = [];
-    for (let index = 0; index < PREVIEW_FRAME_COUNT; index += 1) {
-      frames.push(collectActiveVelocityByPitch(preview, toPreviewFrameBeat(index, timelineSpanBeats)));
-    }
-    return frames;
-  };
-
-  const resolveActiveVelocityByPitchAtBeat = (
-    beat: number,
-  ): ReadonlyMap<number, number> => {
-    if (!previewLedFrameCache || previewLedFrameCache.length === 0) {
-      return EMPTY_ACTIVE_VELOCITY_BY_PITCH;
-    }
-    const frameIndex = toPreviewFrameIndex(beat, sourceTimelineEnd);
-    return previewLedFrameCache[frameIndex] ?? EMPTY_ACTIVE_VELOCITY_BY_PITCH;
-  };
-
-  const toModulationReadoutMap = (
-    chain: GeneratorChain,
-    beat01: number,
-  ): {
-    readoutById: Readonly<Record<string, string>>;
-  } => {
-    if (!compiledProgramCache || compiledProgramCache.chainRef !== chain) {
-      const modulatorIds = chain.devices
-        .filter((device) => device.kind === 'modulator')
-        .map((device) => device.id);
-      compiledProgramCache = {
-        chainRef: chain,
-        program: compileModulationProgram(chain),
-        modulatorIds,
-      };
-    }
-
-    if (compiledProgramCache.modulatorIds.length === 0) {
-      return {
-        readoutById: EMPTY_MODULATION_READOUT_BY_ID,
-      };
-    }
-
-    const baseline: Record<string, string> = {};
-    for (const modulatorId of compiledProgramCache.modulatorIds) {
-      baseline[modulatorId] = 'No valid target';
-    }
-
-    const readouts = evaluateModulationProgramReadouts(
-      compiledProgramCache.program,
-      beat01,
-      uiState.previewLoopLengthBeats,
-      { wrap: uiState.isPreviewLoopEnabled },
-    );
-    for (const readout of readouts) {
-      baseline[readout.modulatorId] = [
-        `${readout.targetParamKey}`,
-        `Current ${readout.modulatedValue.toFixed(3)}`,
-        `Base ${readout.baseValue.toFixed(3)}`,
-      ].join(' | ');
-    }
-
-    return {
-      readoutById: baseline,
-    };
-  };
-
-  const toWrappedLoopBeat01 = (beat: number): number => {
-    const safeBeat = Number.isFinite(beat) ? beat : 0;
-    const wrapped = ((safeBeat % 1) + 1) % 1;
-    if (wrapped === 0 && safeBeat > 0) {
-      return 1;
-    }
-    return wrapped;
-  };
-
-  const renderLedFrame = (): void => {
-    const timelineEnd = Number.isFinite(sourceTimelineEnd) && sourceTimelineEnd > 0
-      ? sourceTimelineEnd
-      : resolveSourceTimelineEnd(previewData);
-    const beat = clamp(currentBeat, 0, timelineEnd);
-    const sourceChain = previewSourceChain ?? uiState.chainState;
-    const modulationBeat01 = uiState.isPreviewLoopEnabled
-      ? toWrappedLoopBeat01(beat)
-      : clamp(beat, 0, 1);
-    const modulationRuntime = toModulationReadoutMap(sourceChain, modulationBeat01);
-    const activeVelocityByPitch = resolveActiveVelocityByPitchAtBeat(beat);
-    modulationReadoutById = modulationRuntime.readoutById;
-    const activeCells: PreviewWindowState['activeCells'] = [];
-    for (const [pitch, velocity] of activeVelocityByPitch.entries()) {
-      activeCells.push({
-        pitch,
-        rgb: paletteController.getLedRgb(velocity, DEFAULT_LED_RGB),
-      });
-    }
-
-    previewSurfaceState = {
-      activeCells,
-      previewRevision,
+  const renderPreviewFrame = (): void => {
+    const nextPreviewWindowState = previewSession.commands.renderFrame({
+      fallbackChain: uiState.chainState,
+      fallbackKey: `chain:${uiState.chainRevision}`,
       launchpadModel: uiState.launchpadModel,
-      chain: sourceChain,
-      currentBeat: beat,
-      sourceTimelineEndBeat: timelineEnd,
+      currentBeat,
       loopLengthBeats: uiState.previewLoopLengthBeats,
-      noteCount: previewData?.noteCount ?? 0,
-      uniquePitchCount: previewData?.uniquePitchCount ?? 0,
       bpm: uiState.previewBpm,
       isPlaying,
       isLoopEnabled: uiState.isPreviewLoopEnabled,
       isGuideEnabled: uiState.isPreviewGuideEnabled,
-    };
+      resolveLedRgb: (velocity) => paletteController.getLedRgb(velocity, DEFAULT_LED_RGB),
+    });
 
-    const progress = beat / timelineEnd;
+    const progress = nextPreviewWindowState.currentBeat / nextPreviewWindowState.sourceTimelineEndBeat;
     const nextPreviewScrubValue = Math.round(clamp(progress, 0, 1) * SCRUB_MAX);
     if (uiState.previewScrubValue !== nextPreviewScrubValue) {
       uiState.previewScrubValue = nextPreviewScrubValue;
     }
-    previewWindowStatePusher.push({
-      activeVelocityByPitch,
-      previewRevision,
-      currentBeat: beat,
-      sourceTimelineEndBeat: timelineEnd,
-      loopLengthBeats: uiState.previewLoopLengthBeats,
-      launchpadModel: uiState.launchpadModel,
-      noteCount: previewData?.noteCount ?? 0,
-      uniquePitchCount: previewData?.uniquePitchCount ?? 0,
-      bpm: uiState.previewBpm,
-      isPlaying,
-      isLoopEnabled: uiState.isPreviewLoopEnabled,
-      isGuideEnabled: uiState.isPreviewGuideEnabled,
-      resolveChain: () => sourceChain,
-    });
+
+    previewWindowStatePusher.push(nextPreviewWindowState);
   };
 
   const stopPlayback = (): void => {
@@ -456,7 +299,7 @@
   };
 
   const startPlayback = (): void => {
-    if (!previewData || previewData.noteCount === 0) {
+    if (previewState.noteCount === 0) {
       return;
     }
 
@@ -472,20 +315,23 @@
     bridge: BridgeSettings | null,
     source: 'preview' | 'send',
     sourceChain: GeneratorChain,
+    sourceKey: string,
+    previewLaunchpadModel: LaunchpadModel,
   ): void => {
-    previewRevision += 1;
-    previewData = preview;
-    sourceTimelineEnd = resolveSourceTimelineEnd(preview);
-    previewSourceChain = sourceChain;
-    previewLedFrameCache = buildLedFrameCache(preview, sourceTimelineEnd);
-    editorSession.commands.setPreviewLoopLengthBeats(
-      bridge?.autoCreateLengthBeats ?? readBridge().autoCreateLengthBeats,
-    );
+    const nextLoopLengthBeats = bridge?.autoCreateLengthBeats ?? readBridge().autoCreateLengthBeats;
+    previewSession.commands.applyPreviewResult({
+      preview,
+      sourceChain,
+      sourceKey,
+      loopLengthBeats: nextLoopLengthBeats,
+      launchpadModel: previewLaunchpadModel,
+    });
+    editorSession.commands.setPreviewLoopLengthBeats(nextLoopLengthBeats);
     if (playbackScheduler) {
       playbackScheduler.setCurrentBeat(0);
     } else {
       currentBeat = 0;
-      renderLedFrame();
+      renderPreviewFrame();
     }
 
     if (preview.noteCount > 0) {
@@ -505,13 +351,23 @@
 
   const runPreview = async (): Promise<void> => {
     try {
+      const sourceKey = `chain:${uiState.chainRevision}`;
+      const requestLaunchpadModel = uiState.launchpadModel;
       const requestChain = cloneChainForIpc(uiState.chainState);
-      const preview = generateRendererPreview(
+      const preview = previewSession.commands.generateRendererPreview({
+        sourceChain: requestChain,
+        sourceKey,
+        loopLengthBeats: uiState.previewLoopLengthBeats,
+        launchpadModel: requestLaunchpadModel,
+      });
+      applyPreviewData(
+        preview,
+        null,
+        'preview',
         requestChain,
-        uiState.previewLoopLengthBeats,
-        uiState.launchpadModel,
+        sourceKey,
+        requestLaunchpadModel,
       );
-      applyPreviewData(preview, null, 'preview', requestChain);
     } catch (error) {
       stopPlayback();
       const errorText = error instanceof Error ? error.message : 'Unknown preview error';
@@ -552,7 +408,7 @@
         content,
       };
       paletteController.applyUploadedPalette(payload);
-      renderLedFrame();
+      renderPreviewFrame();
     } catch (error) {
       void error;
     } finally {
@@ -564,12 +420,12 @@
 
   const handlePaletteReset = (): void => {
     paletteController.resetToDefault();
-    renderLedFrame();
+    renderPreviewFrame();
   };
 
   const handleLaunchpadModelToggle = (nextEnabled: boolean): void => {
     if (editorSession.commands.setLaunchpadModelEnabled(nextEnabled)) {
-      renderLedFrame();
+      renderPreviewFrame();
     }
   };
 
@@ -584,13 +440,13 @@
 
   const handlePreviewLoopToggle = (): void => {
     if (editorSession.commands.togglePreviewLoopEnabled()) {
-      renderLedFrame();
+      renderPreviewFrame();
     }
   };
 
   const handlePreviewGuideToggle = (nextEnabled: boolean): void => {
     if (editorSession.commands.setPreviewGuideEnabled(nextEnabled)) {
-      renderLedFrame();
+      renderPreviewFrame();
     }
   };
 
@@ -598,7 +454,7 @@
     try {
       await bridgeClient.openPreviewWindow();
       editorSession.commands.setPreviewPopoutOpen(true);
-      renderLedFrame();
+      renderPreviewFrame();
     } catch {
       setHeaderIndicatorText('Failed to open preview popout');
     }
@@ -606,14 +462,14 @@
 
   const handlePreviewScrubInput = (): void => {
     const scrubProgress = clamp(Number(uiState.previewScrubValue) / SCRUB_MAX, 0, 1);
-    const nextBeat = scrubProgress * sourceTimelineEnd;
+    const nextBeat = scrubProgress * previewState.sourceTimelineEndBeat;
     if (playbackScheduler) {
       playbackScheduler.setCurrentBeat(nextBeat);
       return;
     }
 
     currentBeat = nextBeat;
-    renderLedFrame();
+    renderPreviewFrame();
   };
 
   const handleSendClick = async (): Promise<void> => {
@@ -625,15 +481,24 @@
     try {
       const bridge = readBridge();
       editorSession.commands.applyBridgeSettings(bridge, { persist: true });
+      const sourceKey = `chain:${uiState.chainRevision}`;
+      const requestLaunchpadModel = uiState.launchpadModel;
       const requestChain = cloneChainForIpc(uiState.chainState);
 
       const request: GenerateAndSendRequest = {
         chain: requestChain,
         bridge,
-        launchpadModel: uiState.launchpadModel,
+        launchpadModel: requestLaunchpadModel,
       };
       const response = await bridgeClient.generateAndSend(request);
-      applyPreviewData(response.preview, response.bridge, 'send', requestChain);
+      applyPreviewData(
+        response.preview,
+        response.bridge,
+        'send',
+        requestChain,
+        sourceKey,
+        requestLaunchpadModel,
+      );
       editorSession.commands.setSendButtonState('Done!', false);
       sendDoneTimer = window.setTimeout(() => {
         sendDoneTimer = null;
@@ -652,11 +517,11 @@
     editorSession.commands.initialize();
     playbackScheduler = createPlaybackScheduler({
       getLoopMs: () => getPreviewLoopMs(),
-      getLoopEndBeat: () => sourceTimelineEnd,
+      getLoopEndBeat: () => previewState.sourceTimelineEndBeat,
       isLoopEnabled: () => uiState.isPreviewLoopEnabled,
       onFrame: (nextBeat) => {
         currentBeat = nextBeat;
-        renderLedFrame();
+        renderPreviewFrame();
       },
       onPlayStateChange: (nextIsPlaying) => {
         isPlaying = nextIsPlaying;
@@ -827,7 +692,7 @@
     runBestEffort(requestLiveTempoSync());
 
     paletteController.initialize();
-    renderLedFrame();
+    renderPreviewFrame();
     editorSession.commands.scheduleAutoPreview(0);
 
     return () => {
@@ -964,7 +829,7 @@
           collapsedDeviceIds={uiState.collapsedDeviceIds}
           {paletteRevision}
           {currentBeat}
-          {modulationReadoutById}
+          modulationReadoutById={previewState.modulationReadoutById}
           {resolvePaletteRgb}
           isSidebarResizing={uiState.isSidebarResizing}
           interactiveElementSelector={INTERACTIVE_ELEMENT_SELECTOR}
@@ -981,7 +846,7 @@
         />
         {#if !uiState.isPreviewPopoutOpen}
           <PreviewPanel
-            previewState={previewSurfaceState}
+            surfaceModel={previewState.surfaceModel}
             onGuideToggle={handlePreviewGuideToggle}
             onPopout={handlePreviewPopout}
             playLabel={previewPanelControls.playLabel}

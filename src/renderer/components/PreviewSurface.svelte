@@ -1,276 +1,44 @@
 <script lang="ts">
   /**
    * Renders Launchpad preview cells and overlay strokes for rack and popout modes.
-   * Converts preview-window state into frame-based LED and vector display models.
+   * Consumes precomputed surface view models and only handles DOM/canvas drawing.
    */
   import { onMount } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
 
+  import { lerp } from '../../shared/math';
   import {
-    generateOverlayFrames,
-    getLaunchpadRuntimeMap,
-    resolveLaunchpadModel,
-    type OverlayFrameStroke,
-  } from '../../domain';
-  import { clamp, lerp } from '../../shared/math';
-  import type { LaunchpadButton, LaunchpadModel, PreviewWindowState } from '../../shared/types';
-  import {
-    PREVIEW_FRAME_COUNT,
-    toPreviewFrameBeat,
-    toPreviewFrameIndex,
-  } from '../services/preview-cache';
+    DEFAULT_OVERLAY_WORLD_BOUNDS,
+    createEmptyPreviewSurfaceViewModel,
+    type PreviewSurfaceViewModel,
+  } from '../features/preview/view-model';
 
   type PreviewSurfaceMode = 'rack' | 'popout';
 
   const PREVIEW_COLS = 10;
   const PREVIEW_ROWS = 10;
-  const OVERLAY_SAMPLE_STEP = 0.25;
   const BASE_STAGE_CSS_SIZE = 214;
-  const COMPOSITION_MIN = 0;
-  const COMPOSITION_MAX = 9;
-  const OVERLAY_WORLD_BASE_PADDING = 4;
-  const OVERLAY_WORLD_PADDING_STEP = 2;
-  const OVERLAY_WORLD_MAX_PADDING = 14;
-  const PREVIEW_LED_GAMMA = 0.3;
-  const PREVIEW_LED_PAD_FLOOR = 50;
-
-  interface OverlayWorldBounds {
-    minX: number;
-    maxX: number;
-    minY: number;
-    maxY: number;
-  }
-
-  interface PreviewCellModel {
-    key: string;
-    pitches: number[];
-    isEdgeButton: boolean;
-    isCornerPlaceholder: boolean;
-  }
 
   let {
-    previewState = null,
+    surfaceModel = createEmptyPreviewSurfaceViewModel(),
     mode = 'rack',
   } = $props<{
-    previewState: PreviewWindowState | null;
+    surfaceModel?: PreviewSurfaceViewModel;
     mode: PreviewSurfaceMode;
   }>();
-
-  const previewFrameBeats: number[] = [];
-  for (let index = 0; index < PREVIEW_FRAME_COUNT; index += 1) {
-    previewFrameBeats.push(toPreviewFrameBeat(index));
-  }
-
-  const resolveSourceTimelineEndBeat = (
-    state: PreviewWindowState | null,
-  ): number => {
-    const endBeat = state?.sourceTimelineEndBeat;
-    return Number.isFinite(endBeat) && endBeat > 0 ? endBeat : 1;
-  };
-
-  const parseRgbChannels = (rgb: string): [number, number, number] | null => {
-    const values = rgb
-      .trim()
-      .split(/\s+/)
-      .map((value) => Number(value));
-    if (values.length !== 3 || values.some((value) => !Number.isFinite(value))) {
-      return null;
-    }
-
-    return [
-      Math.round(clamp(values[0], 0, 255)),
-      Math.round(clamp(values[1], 0, 255)),
-      Math.round(clamp(values[2], 0, 255)),
-    ];
-  };
-
-  const applyPreviewLedGamma = (channel: number): number =>
-    Math.pow(clamp(channel, 0, 255) / 255, PREVIEW_LED_GAMMA) * 255;
-
-  /**
-   * Approximates the brighter pad surface color instead of the bare LED color.
-   * Keeps fully-off LEDs black so velocity 0 still reads as unlit.
-   */
-  const resolvePreviewLedRgb = (rgb: string): string => {
-    const channels = parseRgbChannels(rgb);
-    if (!channels) {
-      return rgb;
-    }
-
-    const [r, g, b] = channels;
-    if (r === 0 && g === 0 && b === 0) {
-      return '0 0 0';
-    }
-
-    const liftChannel = (channel: number): number => Math.round(Math.min(
-      255,
-      (PREVIEW_LED_PAD_FLOOR * (1 - (channel / 255))) + (applyPreviewLedGamma(channel) * 1.1),
-    ));
-
-    return `${liftChannel(r)} ${liftChannel(g)} ${liftChannel(b)}`;
-  };
-
-  const activeLaunchpadModel = $derived.by<LaunchpadModel>(() =>
-    resolveLaunchpadModel(previewState?.launchpadModel));
-  const launchpadButtons = $derived.by(() =>
-    getLaunchpadRuntimeMap(activeLaunchpadModel).buttons);
-
-  const cellKey = (row: number, col: number): string => `${row}:${col}`;
-
-  const buttonToPreviewCell = (
-    button: LaunchpadButton,
-  ): { row: number; col: number } | null => {
-    switch (button.zone) {
-      case 'grid':
-        return { row: 9 - button.y, col: button.x };
-      case 'left':
-        if (button.id === 'left-top') {
-          return { row: 0, col: 0 };
-        }
-        return { row: 9 - button.y, col: 0 };
-      case 'right':
-        return { row: 9 - button.y, col: 9 };
-      case 'top':
-        return { row: 0, col: button.x };
-      case 'bottom':
-        return { row: 9, col: button.x };
-      case 'logo':
-        return { row: 0, col: 9 };
-      default:
-        return null;
-    }
-  };
-
-  const isCornerPlaceholderCell = (
-    buttons: ReadonlyArray<LaunchpadButton>,
-  ): boolean => {
-    if (buttons.length !== 1) {
-      return false;
-    }
-    const button = buttons[0];
-    return button.id === 'bottom-corner-left'
-      || button.id === 'bottom-corner-right'
-      || button.id === 'left-top'
-      || button.id === 'logo';
-  };
-
-  const isEdgeButtonCell = (
-    buttons: ReadonlyArray<LaunchpadButton>,
-  ): boolean => buttons.some((button) =>
-    button.zone === 'left'
-    || button.zone === 'right'
-    || button.zone === 'top'
-    || button.zone === 'bottom'
-    || button.zone === 'logo');
-
-  const toNoteNumber = (button: LaunchpadButton): number | null =>
-    button.output.kind === 'note' ? button.output.number : null;
-
-  const buildPreviewCells = (
-    buttons: ReadonlyArray<LaunchpadButton>,
-  ): PreviewCellModel[] => {
-    const buttonsByCell = new SvelteMap<string, LaunchpadButton[]>();
-
-    for (const button of buttons) {
-      if (button.output.kind !== 'note') {
-        continue;
-      }
-
-      const cell = buttonToPreviewCell(button);
-      if (!cell) {
-        continue;
-      }
-
-      const key = cellKey(cell.row, cell.col);
-      const list = buttonsByCell.get(key);
-      if (list) {
-        list.push(button);
-      } else {
-        buttonsByCell.set(key, [button]);
-      }
-    }
-
-    const cells: PreviewCellModel[] = [];
-    for (let row = 0; row < PREVIEW_ROWS; row += 1) {
-      for (let col = 0; col < PREVIEW_COLS; col += 1) {
-        const key = cellKey(row, col);
-        const cellButtons = buttonsByCell.get(key) ?? [];
-        const pitches: number[] = [];
-        for (const button of cellButtons) {
-          const note = toNoteNumber(button);
-          if (note !== null) {
-            pitches.push(note);
-          }
-        }
-        cells.push({
-          key,
-          pitches,
-          isEdgeButton: isEdgeButtonCell(cellButtons),
-          isCornerPlaceholder: isCornerPlaceholderCell(cellButtons),
-        });
-      }
-    }
-
-    return cells;
-  };
-
-  const previewCells = $derived.by(() => buildPreviewCells(launchpadButtons));
-
-  const resolveOverlayWorldBounds = (padding: number): OverlayWorldBounds => ({
-    minX: COMPOSITION_MIN - padding,
-    maxX: COMPOSITION_MAX + padding,
-    minY: COMPOSITION_MIN - padding,
-    maxY: COMPOSITION_MAX + padding,
-  });
-
-  const touchesOverlayBoundary = (
-    strokes: ReadonlyArray<OverlayFrameStroke>,
-    bounds: OverlayWorldBounds,
-  ): boolean => {
-    if (strokes.length === 0) {
-      return false;
-    }
-
-    const edgeMargin = OVERLAY_SAMPLE_STEP * 1.1;
-    const minXEdge = bounds.minX + edgeMargin;
-    const maxXEdge = bounds.maxX - edgeMargin;
-    const minYEdge = bounds.minY + edgeMargin;
-    const maxYEdge = bounds.maxY - edgeMargin;
-
-    for (const stroke of strokes) {
-      for (const point of stroke.points) {
-        if (
-          point.x <= minXEdge
-          || point.x >= maxXEdge
-          || point.y <= minYEdge
-          || point.y >= maxYEdge
-        ) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  };
 
   let stageEl: HTMLElement | null = $state(null);
   let overlayCanvasEl: HTMLCanvasElement | null = $state(null);
   let isMounted = false;
   let ledCellsByPitch = new SvelteMap<number, HTMLElement>();
   let overlayContext: CanvasRenderingContext2D | null = null;
-  let overlayStrokes: OverlayFrameStroke[] = [];
-  let overlayFramesByIndex: OverlayFrameStroke[][] = [];
-  let overlayFrameIndex = -1;
-  let overlayCachePreviewRevision: number | null = null;
-  let overlayCacheModel: LaunchpadModel | null = null;
+  let overlayStrokes: Array<PreviewSurfaceViewModel['overlayStrokes'][number]> = [];
   let canvasWidth = 0;
   let canvasHeight = 0;
-  let overlayPadding = OVERLAY_WORLD_BASE_PADDING;
-  let overlayWorldBounds = resolveOverlayWorldBounds(overlayPadding);
+  let overlayWorldBounds = DEFAULT_OVERLAY_WORLD_BOUNDS;
   let xCentersByCoord: number[] | null = null;
   let yCentersByCoord: number[] | null = null;
-  let wasGuideEnabled = true;
-  let lastRenderedModel: LaunchpadModel | null = null;
+  let lastRenderedModel: PreviewSurfaceViewModel['launchpadModel'] | null = null;
   let surfaceWidth = $state(0);
   let surfaceHeight = $state(0);
 
@@ -281,9 +49,9 @@
 
     const cells = stageEl.querySelectorAll<HTMLElement>('.preview-button');
     const cellByPitch = new SvelteMap<number, HTMLElement>();
-    const count = Math.min(previewCells.length, cells.length);
+    const count = Math.min(surfaceModel.cells.length, cells.length);
     for (let index = 0; index < count; index += 1) {
-      const model = previewCells[index];
+      const model = surfaceModel.cells[index];
       const cellEl = cells[index];
       for (const pitch of model.pitches) {
         cellByPitch.set(pitch, cellEl);
@@ -434,124 +202,32 @@
     }
   };
 
-  const buildOverlayFrameCache = (
-    chain: PreviewWindowState['chain'],
-    bounds: OverlayWorldBounds,
-    launchpadModel: LaunchpadModel,
-  ): OverlayFrameStroke[][] => generateOverlayFrames({
-    chain,
-    beats01: previewFrameBeats,
-    sampleStep: OVERLAY_SAMPLE_STEP,
-    bounds,
-    launchpadModel,
-  });
-
-  const touchesOverlayFrameCacheBoundary = (
-    framesByIndex: ReadonlyArray<ReadonlyArray<OverlayFrameStroke>>,
-    bounds: OverlayWorldBounds,
-  ): boolean => {
-    for (const frameStrokes of framesByIndex) {
-      if (touchesOverlayBoundary(frameStrokes, bounds)) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  const rebuildOverlayFrameCache = (nextState: PreviewWindowState): void => {
-    const model = resolveLaunchpadModel(nextState.launchpadModel);
-    let nextPadding = OVERLAY_WORLD_BASE_PADDING;
-    let nextBounds = resolveOverlayWorldBounds(nextPadding);
-    let nextFramesByIndex = buildOverlayFrameCache(
-      nextState.chain,
-      nextBounds,
-      model,
-    );
-
-    while (
-      touchesOverlayFrameCacheBoundary(nextFramesByIndex, nextBounds)
-      && nextPadding < OVERLAY_WORLD_MAX_PADDING
-    ) {
-      nextPadding = Math.min(OVERLAY_WORLD_MAX_PADDING, nextPadding + OVERLAY_WORLD_PADDING_STEP);
-      nextBounds = resolveOverlayWorldBounds(nextPadding);
-      nextFramesByIndex = buildOverlayFrameCache(
-        nextState.chain,
-        nextBounds,
-        model,
-      );
-    }
-
-    overlayPadding = nextPadding;
-    overlayWorldBounds = nextBounds;
-    overlayFramesByIndex = nextFramesByIndex;
-    overlayCachePreviewRevision = nextState.previewRevision;
-    overlayCacheModel = model;
-  };
-
-  const applyOverlayFrameByBeat = (
-    beat: number,
-    sourceTimelineEndBeat: number,
-  ): void => {
-    const nextFrameIndex = toPreviewFrameIndex(beat, sourceTimelineEndBeat);
-    if (overlayFrameIndex === nextFrameIndex && wasGuideEnabled) {
-      return;
-    }
-    overlayFrameIndex = nextFrameIndex;
-    overlayStrokes = overlayFramesByIndex[nextFrameIndex] ?? [];
-    drawOverlay();
-  };
-
-  const applyState = (nextState: PreviewWindowState | null): void => {
+  const applySurfaceModel = (nextSurfaceModel: PreviewSurfaceViewModel): void => {
     for (const cell of ledCellsByPitch.values()) {
       cell.classList.remove('is-lit');
       cell.style.removeProperty('--led-rgb');
     }
 
-    if (!nextState) {
-      overlayFramesByIndex = [];
-      overlayFrameIndex = -1;
+    overlayWorldBounds = nextSurfaceModel.overlayWorldBounds;
+    if (!nextSurfaceModel.isGuideEnabled) {
       overlayStrokes = [];
-      overlayCachePreviewRevision = null;
-      overlayCacheModel = null;
-      wasGuideEnabled = false;
-      clearOverlay();
-      return;
-    }
-
-    const nextModel = resolveLaunchpadModel(nextState.launchpadModel);
-    const isGuideEnabled = nextState.isGuideEnabled !== false;
-    if (!isGuideEnabled) {
-      overlayStrokes = [];
-      overlayFrameIndex = -1;
-      wasGuideEnabled = false;
       clearOverlay();
     } else {
-      if (
-        nextState.previewRevision !== overlayCachePreviewRevision
-        || nextModel !== overlayCacheModel
-        || overlayFramesByIndex.length !== PREVIEW_FRAME_COUNT
-      ) {
-        rebuildOverlayFrameCache(nextState);
-        overlayFrameIndex = -1;
-      }
-      applyOverlayFrameByBeat(
-        nextState.currentBeat,
-        resolveSourceTimelineEndBeat(nextState),
-      );
-      wasGuideEnabled = true;
+      overlayStrokes = [...nextSurfaceModel.overlayStrokes];
+      drawOverlay();
     }
 
-    for (const cell of nextState.activeCells) {
+    for (const cell of nextSurfaceModel.activeCells) {
       const target = ledCellsByPitch.get(cell.pitch);
       if (!target) {
         continue;
       }
       target.classList.add('is-lit');
-      target.style.setProperty('--led-rgb', resolvePreviewLedRgb(cell.rgb));
+      target.style.setProperty('--led-rgb', cell.rgb);
     }
   };
 
-  const isGuideVisible = (): boolean => previewState?.isGuideEnabled !== false;
+  const isGuideVisible = (): boolean => surfaceModel.isGuideEnabled;
 
   onMount(() => {
     if (!stageEl || !overlayCanvasEl) {
@@ -565,7 +241,7 @@
     }
 
     resizeSurfaceCanvases();
-    applyState(previewState);
+    applySurfaceModel(surfaceModel);
     isMounted = true;
 
     return () => {
@@ -588,15 +264,13 @@
       return;
     }
 
-    if (lastRenderedModel !== activeLaunchpadModel) {
-      lastRenderedModel = activeLaunchpadModel;
+    if (lastRenderedModel !== surfaceModel.launchpadModel) {
+      lastRenderedModel = surfaceModel.launchpadModel;
       ledCellsByPitch = resolveLedCellsByPitch();
       resolveGridCenters();
-      overlayCachePreviewRevision = null;
-      overlayCacheModel = null;
     }
 
-    applyState(previewState);
+    applySurfaceModel(surfaceModel);
   });
 </script>
 
@@ -610,7 +284,7 @@
   role="img"
   aria-label="Launchpad LED preview"
 >
-  {#each previewCells as cell (cell.key)}
+  {#each surfaceModel.cells as cell (cell.key)}
     <div
       class="preview-button"
       class:is-button={cell.pitches.length > 0}

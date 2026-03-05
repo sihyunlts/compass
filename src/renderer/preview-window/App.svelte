@@ -2,11 +2,14 @@
   import { onMount } from 'svelte';
 
   import type { PreviewWindowState } from '../../shared/types';
+  import { createPreviewSession } from '../features/preview/session.svelte';
   import PreviewSurface from '../components/PreviewSurface.svelte';
 
   const toBeatText = (beat: number): string =>
     (Number.isFinite(beat) ? beat : 0).toFixed(3);
 
+  const previewSession = createPreviewSession();
+  const previewViewState = previewSession.state;
   let previewState: PreviewWindowState | null = $state(null);
 
   const statusText = $derived.by(() => {
@@ -47,10 +50,12 @@
   onMount(() => {
     const unsubscribe = window.compass.subscribePreviewWindowState((nextState) => {
       previewState = nextState;
+      previewSession.commands.applyWindowState(nextState);
     });
 
     void window.compass.requestPreviewWindowState().then((state) => {
       previewState = state;
+      previewSession.commands.applyWindowState(state);
     }).catch(() => {
       // If initial request fails, live state push still recovers the view.
     });
@@ -70,7 +75,7 @@
   <div class="preview-popout-stage">
     <PreviewSurface
       mode="popout"
-      previewState={previewState}
+      surfaceModel={previewViewState.surfaceModel}
     />
     <button
       class="preview-guide-toggle"

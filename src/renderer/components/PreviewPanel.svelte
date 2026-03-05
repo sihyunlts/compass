@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { PreviewWindowState } from '../../shared/types';
   import { clamp } from '../../shared/math';
+  import type { PreviewSurfaceViewModel } from '../features/preview/view-model';
   import PreviewSurface from './PreviewSurface.svelte';
 
   const SCRUB_MAX = 1000;
 
   let {
-    previewState,
+    surfaceModel,
     onGuideToggle,
     onPopout,
     playLabel,
@@ -16,7 +16,7 @@
     scrubValue = $bindable(),
     onScrubInput,
   } = $props<{
-    previewState: PreviewWindowState | null;
+    surfaceModel: PreviewSurfaceViewModel;
     onGuideToggle: (nextEnabled: boolean) => void;
     onPopout: () => void | Promise<void>;
     playLabel: string;
@@ -27,7 +27,7 @@
     onScrubInput: () => void;
   }>();
 
-  const isGuideVisible = (): boolean => previewState?.isGuideEnabled !== false;
+  const isGuideVisible = (): boolean => surfaceModel.isGuideEnabled;
 
   const handleGuideToggle = (): void => {
     onGuideToggle(!isGuideVisible());
@@ -42,7 +42,7 @@
   <div class="preview-panel-main">
     <PreviewSurface
       mode="rack"
-      previewState={previewState}
+      {surfaceModel}
     />
     <input
       id="preview-scrub"
