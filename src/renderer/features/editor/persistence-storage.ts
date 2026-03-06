@@ -6,6 +6,7 @@ import {
   sanitizeBridgeSettings,
 } from '../../../shared/validation/bridge-settings';
 import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
+import { normalizeColorDeviceParams } from '../../../devices/color/schema';
 import {
   createInitialChainDevices,
   syncDeviceNodeIdSeeds,
@@ -70,6 +71,16 @@ const createDefaultChain = (): GeneratorChain => ({
   groupStateById: {},
 });
 
+const reconcileColorDeviceParams = (chain: GeneratorChain): void => {
+  for (const device of chain.devices) {
+    if (device.kind !== 'color') {
+      continue;
+    }
+
+    device.params = normalizeColorDeviceParams(device.params);
+  }
+};
+
 const toBoolean = (value: unknown, fallback: boolean): boolean =>
   typeof value === 'boolean' ? value : fallback;
 
@@ -130,6 +141,7 @@ export const loadChainSettings = (): GeneratorChain => {
     return createDefaultChain();
   }
 
+  reconcileColorDeviceParams(chain);
   syncDeviceNodeIdSeeds(chain.devices);
   reconcileGeneratorChainModulators(chain);
   return chain;

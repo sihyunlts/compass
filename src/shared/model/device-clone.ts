@@ -92,6 +92,7 @@ export const cloneDeviceNode = (
       params: {
         velocities: [...device.params.velocities],
         noteLengthPercent: device.params.noteLengthPercent,
+        gapPercent: device.params.gapPercent,
       },
     };
   }

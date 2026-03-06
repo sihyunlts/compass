@@ -2,6 +2,7 @@ import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import type { ClipNote, GeneratorChain } from '../../shared/model';
 import { isGeneratorEngineNode } from '../engine';
+import { DEFAULT_COLOR_PARAMS, sanitizeColorGapPercent } from './schema';
 
 export interface ClipNoteWithOrigin extends ClipNote {
   originId?: string;
@@ -10,10 +11,11 @@ export interface ClipNoteWithOrigin extends ClipNote {
 interface ColorOriginConfig {
   velocities: number[];
   noteLengthPercent: number;
+  gapPercent: number;
 }
 
-const DEFAULT_COLOR_VELOCITY = 3;
-const DEFAULT_COLOR_NOTE_LENGTH_PERCENT = 100;
+const DEFAULT_COLOR_VELOCITY = DEFAULT_COLOR_PARAMS.velocities[0];
+const DEFAULT_COLOR_NOTE_LENGTH_PERCENT = DEFAULT_COLOR_PARAMS.noteLengthPercent;
 
 const sortNumbersAscending = (left: number, right: number): number => left - right;
 
@@ -64,6 +66,7 @@ const resolveColorConfigByOriginId = (
   for (const groupDevices of devicesByGroupId.values()) {
     let accumulatedVelocities: number[] = [];
     let accumulatedNoteLengthPercent: number | null = null;
+    let accumulatedGapPercent: number | null = null;
 
     for (let index = groupDevices.length - 1; index >= 0; index -= 1) {
       const device = groupDevices[index];
@@ -77,6 +80,7 @@ const resolveColorConfigByOriginId = (
         accumulatedNoteLengthPercent = sanitizeColorNoteLengthPercent(
           device.params.noteLengthPercent,
         );
+        accumulatedGapPercent = sanitizeColorGapPercent(device.params.gapPercent);
         continue;
       }
 
@@ -87,6 +91,7 @@ const resolveColorConfigByOriginId = (
       configByOriginId.set(device.id, {
         velocities: [...accumulatedVelocities],
         noteLengthPercent: accumulatedNoteLengthPercent,
+        gapPercent: accumulatedGapPercent ?? DEFAULT_COLOR_PARAMS.gapPercent,
       });
     }
   }
@@ -189,6 +194,7 @@ export const applyColorDevices = (
       colorized.push(toClipNote(note));
       continue;
     }
+    const gapDuration = referenceDuration * (colorConfig.gapPercent / 100);
 
     const velocities = colorConfig.velocities;
     if (velocities.length === 0) {
@@ -197,7 +203,7 @@ export const applyColorDevices = (
     }
 
     for (let segmentIndex = 0; segmentIndex < velocities.length; segmentIndex += 1) {
-      const segmentStart = note.startBeat + segmentIndex * segmentLength;
+      const segmentStart = note.startBeat + segmentIndex * (segmentLength + gapDuration);
       if (!Number.isFinite(segmentStart)) {
         break;
       }

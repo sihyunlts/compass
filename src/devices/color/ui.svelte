@@ -145,6 +145,19 @@
     </div>
 
     <div class="control-field">
+      <span class="field-label">Gap</span>
+      <input
+        type="number"
+        step="1"
+        min="0"
+        max="400"
+        value={device.params.gapPercent}
+        data-action="set-color-gap-percent"
+        data-id={device.id}
+      />
+    </div>
+
+    <div class="control-field">
       <span class="field-label">Slots</span>
       <input
         type="number"

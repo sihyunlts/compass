@@ -237,6 +237,11 @@ export class RackInteractionManager {
   }
 
   handleControlClick(event: MouseEvent): boolean {
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || !target.closest('button[data-action][data-id]')) {
+      return false;
+    }
+
     if (!this.applyChainControlChange(event.target)) {
       return false;
     }

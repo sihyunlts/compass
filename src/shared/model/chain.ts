@@ -106,6 +106,7 @@ export interface ColorEffectNode extends GroupedDeviceNode {
   params: {
     velocities: number[];
     noteLengthPercent: number;
+    gapPercent: number;
   };
 }
 

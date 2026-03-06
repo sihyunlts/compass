@@ -5,8 +5,9 @@ import {
   requireInput,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
+import { DEFAULT_COLOR_PARAMS, sanitizeColorGapPercent } from './schema';
 
-const DEFAULT_COLOR_SLOT_VELOCITY = 3;
+const DEFAULT_COLOR_SLOT_VELOCITY = DEFAULT_COLOR_PARAMS.velocities[0];
 const MIN_COLOR_SLOT_COUNT = 1;
 
 const resolveColorSlotIndex = (raw: string | undefined): number | null => {
@@ -32,6 +33,13 @@ export const colorDeviceControls = {
       resolveDefaultValue: (defaultDevice) =>
         defaultDevice.kind === 'color'
           ? defaultDevice.params.noteLengthPercent
+          : null,
+    },
+    'set-color-gap-percent': {
+      resolveMergeKey: createMergeKeyResolver('set-color-gap-percent'),
+      resolveDefaultValue: (defaultDevice) =>
+        defaultDevice.kind === 'color'
+          ? defaultDevice.params.gapPercent
           : null,
     },
     'set-color-slot-count': {
@@ -84,6 +92,24 @@ export const colorDeviceControls = {
       }
 
       device.params.noteLengthPercent = Math.min(400, Math.max(1, value));
+      return true;
+    },
+    'set-color-gap-percent': (device, target) => {
+      if (device.kind !== 'color') {
+        return false;
+      }
+
+      const input = requireInput(target);
+      if (!input) {
+        return false;
+      }
+
+      const value = parseFiniteNumber(input.value);
+      if (value === null) {
+        return false;
+      }
+
+      device.params.gapPercent = sanitizeColorGapPercent(value);
       return true;
     },
     'set-color-slot-count': (device, target) => {
