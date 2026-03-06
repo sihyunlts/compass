@@ -8,7 +8,7 @@ import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import {
   PREVIEW_FRAME_COUNT,
   toPreviewFrameBeat,
-} from '../../services/preview-cache';
+} from './frame-index';
 import {
   resolveOverlayWorldBounds,
   type OverlayWorldBounds,

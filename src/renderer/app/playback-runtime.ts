@@ -2,7 +2,7 @@ import { clamp } from '../../shared/math';
 import type { GeneratorChain } from '../../shared/model';
 import type { PreviewWindowState } from '../../shared/contracts/preview/window-state';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
-import { cloneChainForIpc } from './clone-chain';
+import { cloneChainForIpc } from '../services/clone-chain';
 
 /**
  * Renderer playback boundary for timeline scheduling and preview-window state sync.

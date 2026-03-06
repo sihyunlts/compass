@@ -9,7 +9,7 @@ import {
   createRackClipboard,
   prepareClipboardInsert,
   type RackClipboard,
-} from '../../services/rack-clipboard';
+} from './rack-clipboard';
 import {
   reconcileGroupStateById,
   resolveCommonGroupId,

@@ -9,7 +9,7 @@ import { cloneChainForIpc } from '../services/clone-chain';
 import {
   createPlaybackScheduler,
   createPreviewWindowStatePusher,
-} from '../services/playback';
+} from './playback-runtime';
 import { sanitizePreviewBpm } from '../services/storage';
 import type { HeaderIndicatorController } from './header-indicator.svelte';
 

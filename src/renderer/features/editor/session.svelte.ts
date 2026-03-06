@@ -4,7 +4,6 @@ import type { ContextMenuTarget } from '../../components/context-menu-types';
 import type { RackInteractionCommit } from '../../components/device-rack-types';
 import type { BrowserDeviceKind } from '../../services/devices';
 import { isBrowserDeviceKind } from '../../services/devices';
-import type { RackClipboard } from '../../services/rack-clipboard';
 import type { GroupSelectionContext } from '../rack/selection.svelte';
 import {
   applyBridgeSettings as applyEditorBridgeSettings,
@@ -59,6 +58,7 @@ import {
   reconcileCurrentChainModulators as reconcileEditorChainModulators,
   toggleCollapse,
 } from './persistence';
+import type { RackClipboard } from './rack-clipboard';
 import type { ChainMutationMeta } from './history-core';
 import type { RackSelectionSnapshot } from './selectors';
 

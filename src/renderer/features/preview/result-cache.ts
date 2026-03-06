@@ -10,7 +10,7 @@ import {
   PREVIEW_FRAME_COUNT,
   toPreviewFrameBeat,
   toPreviewFrameIndex,
-} from '../../services/preview-cache';
+} from './frame-index';
 import {
   collectActiveVelocityByPitch,
   EMPTY_ACTIVE_VELOCITY_BY_PITCH,

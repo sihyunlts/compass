@@ -1,4 +1,4 @@
-import { clamp } from '../../shared/math';
+import { clamp } from '../../../shared/math';
 
 const PREVIEW_FRAME_BUCKETS = 512;
 export const PREVIEW_FRAME_COUNT = PREVIEW_FRAME_BUCKETS + 1;
