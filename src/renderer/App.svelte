@@ -6,9 +6,9 @@
   import { onMount, tick } from 'svelte';
 
   import type { GeneratorChain, LaunchpadModel, PaletteFilePayload } from '../shared/model';
-import type { GeneratorPreview } from '../shared/contracts/preview';
-import type { GenerateAndSendRequest } from '../shared/contracts/ipc';
-import type { BridgeSettings } from '../shared/bridge';
+  import type { GeneratorPreview } from '../shared/contracts/preview/generator-preview';
+  import type { GenerateAndSendRequest } from '../shared/contracts/ipc/generator';
+  import type { BridgeSettings } from '../shared/bridge/types';
   import {
     AUTO_CREATE_LENGTH_OPTIONS,
   } from '../shared/beat-length';

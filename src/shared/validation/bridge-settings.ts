@@ -2,7 +2,7 @@ import {
   DEFAULT_AUTO_CREATE_LENGTH_BEATS,
   sanitizeAutoCreateLengthBeats,
 } from '../beat-length';
-import type { BridgeSettings } from '../bridge';
+import type { BridgeSettings } from '../bridge/types';
 
 export const DEFAULT_BRIDGE_SETTINGS: BridgeSettings = {
   autoCreateLengthBeats: DEFAULT_AUTO_CREATE_LENGTH_BEATS,

@@ -1,5 +1,5 @@
-import type { LiveTempoUpdate } from '../../bridge';
-import type { PreviewWindowState } from '../preview';
+import type { LiveTempoUpdate } from '../../bridge/types';
+import type { PreviewWindowState } from '../preview/window-state';
 import type {
   GenerateAndSendRequest,
   GenerateAndSendResponse,

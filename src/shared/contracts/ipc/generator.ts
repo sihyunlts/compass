@@ -1,6 +1,6 @@
-import type { BridgeSettings, BridgeTarget } from '../../bridge';
+import type { BridgeSettings, BridgeTarget } from '../../bridge/types';
 import type { GeneratorChain, LaunchpadModel } from '../../model';
-import type { GeneratorPreview } from '../preview';
+import type { GeneratorPreview } from '../preview/generator-preview';
 
 export interface GenerateAndSendRequest {
   chain: GeneratorChain;

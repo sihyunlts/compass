@@ -1,4 +1,4 @@
-import type { CompassApi } from './shared/contracts/ipc';
+import type { CompassApi } from './shared/contracts/ipc/api';
 
 declare global {
   interface Window {

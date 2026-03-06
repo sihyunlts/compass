@@ -13,7 +13,8 @@ import {
 } from '../../../core/modulation/compiled-program';
 import { clamp } from '../../../shared/math';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
-import type { GeneratorPreview, PreviewWindowState } from '../../../shared/contracts/preview';
+import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
+import type { PreviewWindowState } from '../../../shared/contracts/preview/window-state';
 import {
   PREVIEW_FRAME_COUNT,
   toPreviewFrameBeat,

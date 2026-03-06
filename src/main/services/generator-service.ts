@@ -6,11 +6,19 @@ import {
   generateNotes,
   generatePreviewStats,
 } from '../../domain';
-import { LIVE_BRIDGE_TARGET } from '../../shared/bridge';
+import { LIVE_BRIDGE_TARGET } from '../../shared/bridge/protocol';
 import { sanitizeBridgeSettings } from '../../shared/validation/bridge-settings';
 import type { ClipNote, GeneratorChain, LaunchpadModel } from '../../shared/model';
-import type { GenerateAndSendRequest, GenerateAndSendResponse, RequestLiveTempoResponse } from '../../shared/contracts/ipc';
-import type { BridgeSettings, LiveBridgeNotesEnvelope, LiveBridgeTempoRequestEnvelope } from '../../shared/bridge';
+import type {
+  GenerateAndSendRequest,
+  GenerateAndSendResponse,
+  RequestLiveTempoResponse,
+} from '../../shared/contracts/ipc/generator';
+import type {
+  BridgeSettings,
+  LiveBridgeNotesEnvelope,
+  LiveBridgeTempoRequestEnvelope,
+} from '../../shared/bridge/types';
 import { UdpLiveBridge } from '../bridge/udp-live-bridge';
 
 const DEFAULT_LAUNCHPAD_MODEL: LaunchpadModel = 'mk3';

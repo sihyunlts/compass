@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron';
 import path from 'node:path';
 
-import { IPC_CHANNELS } from '../shared/contracts/ipc';
+import { IPC_CHANNELS } from '../shared/contracts/ipc/channels';
 
 let mainWindowRef: BrowserWindow | null = null;
 let previewWindowRef: BrowserWindow | null = null;

@@ -5,7 +5,7 @@ import {
 } from '../../../domain';
 import { clamp } from '../../../shared/math';
 import type { LaunchpadButton, LaunchpadModel } from '../../../shared/model';
-import type { PreviewWindowState } from '../../../shared/contracts/preview';
+import type { PreviewWindowState } from '../../../shared/contracts/preview/window-state';
 import { toPreviewFrameIndex } from '../../services/preview-cache';
 
 const PREVIEW_COLS = 10;

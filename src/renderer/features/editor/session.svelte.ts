@@ -5,7 +5,7 @@ import {
 } from '../../../shared/beat-length';
 import { sanitizePreviewBpm } from '../../services/storage';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
-import type { BridgeSettings } from '../../../shared/bridge';
+import type { BridgeSettings } from '../../../shared/bridge/types';
 import type { RackInteractionCommit } from '../../components/device-rack-types';
 import type { BrowserDeviceKind } from '../../services/devices';
 import { isBrowserDeviceKind } from '../../services/devices';

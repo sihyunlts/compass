@@ -1,7 +1,11 @@
 import dgram from 'node:dgram';
 
-import { MAX_UDP_PACKET_BYTES } from '../../shared/bridge';
-import type { BridgeTarget, LiveBridgeEnvelope, LiveBridgeNotesEnvelope } from '../../shared/bridge';
+import { MAX_UDP_PACKET_BYTES } from '../../shared/bridge/protocol';
+import type {
+  BridgeTarget,
+  LiveBridgeEnvelope,
+  LiveBridgeNotesEnvelope,
+} from '../../shared/bridge/types';
 
 const OSC_ALIGNMENT = 4;
 

@@ -5,7 +5,7 @@ import { createMainWindow } from './main/app-window';
 import { LiveTempoListener } from './main/bridge/live-tempo-listener';
 import { registerIpcHandlers } from './main/ipc/handlers';
 import { GeneratorService } from './main/services/generator-service';
-import { IPC_CHANNELS } from './shared/contracts/ipc';
+import { IPC_CHANNELS } from './shared/contracts/ipc/channels';
 
 const generatorService = new GeneratorService();
 const liveTempoListener = new LiveTempoListener();

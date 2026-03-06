@@ -1,8 +1,8 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 
-import { IPC_CHANNELS } from '../../shared/contracts/ipc';
-import type { PreviewWindowState } from '../../shared/contracts/preview';
-import type { GenerateAndSendRequest } from '../../shared/contracts/ipc';
+import { IPC_CHANNELS } from '../../shared/contracts/ipc/channels';
+import type { PreviewWindowState } from '../../shared/contracts/preview/window-state';
+import type { GenerateAndSendRequest } from '../../shared/contracts/ipc/generator';
 import {
   getPreviewWindow,
   isPreviewWindowOpen,

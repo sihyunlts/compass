@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  import type { PreviewWindowState } from '../../shared/contracts/preview';
+  import type { PreviewWindowState } from '../../shared/contracts/preview/window-state';
   import { createPreviewSession } from '../features/preview/session.svelte';
   import PreviewSurface from '../components/PreviewSurface.svelte';
 
