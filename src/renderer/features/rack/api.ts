@@ -1,0 +1,69 @@
+import type { BrowserDeviceKind } from '../../services/devices';
+import type { GeneratorDeviceNode } from '../../../shared/model';
+import type { GroupSelectionContext } from './selection.svelte';
+import type { RackSelection } from './selection.svelte';
+
+export interface RackViewApi {
+  syncAfterRender(): void;
+  applyNextSelectionAfterDelete(deletedIds: readonly string[]): void;
+  getOrderedSelectedDeviceIds(): string[];
+  selectAllDevices(deviceIds: readonly string[]): void;
+  getSelectedGroupContexts(): GroupSelectionContext[];
+  clearSelection(): void;
+  hasPointerInteraction(): boolean;
+  setScrollLeft(nextScrollLeft: number): void;
+  handleBrowserPointerDown(
+    sourceEvent: PointerEvent,
+    kind: BrowserDeviceKind,
+    itemEl: HTMLElement,
+  ): boolean;
+}
+
+interface CreateRackViewApiOptions {
+  rackSelection: RackSelection;
+  getDevices: () => readonly GeneratorDeviceNode[];
+  getOrderedDeviceIds: () => readonly string[];
+  syncAfterRender: () => void;
+  hasPointerInteraction: () => boolean;
+  setScrollLeft: (nextScrollLeft: number) => void;
+  handleBrowserPointerDown: (
+    sourceEvent: PointerEvent,
+    kind: BrowserDeviceKind,
+    itemEl: HTMLElement,
+  ) => boolean;
+}
+
+export const createRackViewApi = (
+  options: CreateRackViewApiOptions,
+): RackViewApi => ({
+  syncAfterRender: options.syncAfterRender,
+  applyNextSelectionAfterDelete: (deletedIds) => {
+    options.rackSelection.applyNextSelectionAfterDelete(
+      deletedIds,
+      options.getOrderedDeviceIds(),
+    );
+  },
+  getOrderedSelectedDeviceIds: () =>
+    options.rackSelection.getOrderedSelectedDeviceIds(options.getOrderedDeviceIds()),
+  selectAllDevices: (deviceIds) => {
+    options.rackSelection.clear();
+    if (deviceIds.length === 0) {
+      return;
+    }
+
+    const anchorId = deviceIds[deviceIds.length - 1] ?? null;
+    options.rackSelection.selectDeviceIds(
+      deviceIds,
+      anchorId,
+      options.getOrderedDeviceIds(),
+    );
+  },
+  getSelectedGroupContexts: () =>
+    options.rackSelection.getSelectedGroupContexts(options.getDevices()),
+  clearSelection: () => {
+    options.rackSelection.clear();
+  },
+  hasPointerInteraction: options.hasPointerInteraction,
+  setScrollLeft: options.setScrollLeft,
+  handleBrowserPointerDown: options.handleBrowserPointerDown,
+});

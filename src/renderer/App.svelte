@@ -45,6 +45,7 @@ import type { BridgeSettings } from '../shared/bridge';
     selectPreviewPanelControls,
   } from './features/editor/selectors';
   import { createPreviewSession } from './features/preview/session.svelte';
+  import type { RackViewApi } from './features/rack/api';
 
   const SCRUB_MAX = 1000;
   const PREVIEW_WINDOW_STATE_MAX_FPS = 120;
@@ -92,7 +93,7 @@ import type { BridgeSettings } from '../shared/bridge';
     `+ ${getBrowserDeviceLabel(kind)}`;
   const bridgeClient = window.compass;
   let appVersionText = $state('');
-  let deviceRackComponent: ReturnType<typeof DeviceRack> | null = $state(null);
+  let rackViewApi: RackViewApi | null = $state(null);
   let playbackScheduler: ReturnType<typeof createPlaybackScheduler> | null = null;
   let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
 
@@ -102,7 +103,7 @@ import type { BridgeSettings } from '../shared/bridge';
 
   const syncRackAfterRender = async (): Promise<void> => {
     await tick();
-    deviceRackComponent?.syncAfterRender();
+    rackViewApi?.syncAfterRender();
     closeContextMenu();
   };
 
@@ -152,27 +153,27 @@ import type { BridgeSettings } from '../shared/bridge';
   let rackMiniMapContentRevision = $state(0);
 
   const createRackBinding = (): EditorRackBinding | null => {
-    if (!deviceRackComponent) {
+    if (!rackViewApi) {
       return null;
     }
 
     return {
-      getSelectedGroupContexts: () => deviceRackComponent?.getSelectedGroupContexts() ?? [],
-      getOrderedSelectedDeviceIds: () => deviceRackComponent?.getOrderedSelectedDeviceIds() ?? [],
+      getSelectedGroupContexts: () => rackViewApi?.getSelectedGroupContexts() ?? [],
+      getOrderedSelectedDeviceIds: () => rackViewApi?.getOrderedSelectedDeviceIds() ?? [],
       selectAllDevices: (ids) => {
-        deviceRackComponent?.selectAllDevices(ids);
+        rackViewApi?.selectAllDevices(ids);
       },
       applyNextSelectionAfterDelete: (deviceIds) => {
-        deviceRackComponent?.applyNextSelectionAfterDelete(deviceIds);
+        rackViewApi?.applyNextSelectionAfterDelete(deviceIds);
       },
       clearSelection: () => {
-        deviceRackComponent?.clearSelection();
+        rackViewApi?.clearSelection();
       },
       syncAfterRender: () => {
-        deviceRackComponent?.syncAfterRender();
+        rackViewApi?.syncAfterRender();
       },
       handleBrowserPointerDown: (event, kind, itemEl) => {
-        deviceRackComponent?.handleBrowserPointerDown(event, kind, itemEl);
+        rackViewApi?.handleBrowserPointerDown(event, kind, itemEl);
       },
     };
   };
@@ -388,7 +389,7 @@ import type { BridgeSettings } from '../shared/bridge';
   };
 
   const handleRackHeaderScrollRequest = (nextScrollLeft: number): void => {
-    deviceRackComponent?.setScrollLeft(nextScrollLeft);
+    rackViewApi?.setScrollLeft(nextScrollLeft);
   };
 
   const handlePaletteFileChange = async (event: Event): Promise<void> => {
@@ -747,7 +748,7 @@ import type { BridgeSettings } from '../shared/bridge';
     <SidebarResizer
       bind:width={uiState.sidebarWidthPx}
       bind:isResizing={uiState.isSidebarResizing}
-      isBlocked={!!deviceRackComponent?.hasPointerInteraction()}
+      isBlocked={rackViewApi?.hasPointerInteraction() ?? false}
       sanitizeWidth={sanitizeSidebarWidth}
       onSave={editorSession.commands.persistSidebarWidth}
     />
@@ -826,7 +827,6 @@ import type { BridgeSettings } from '../shared/bridge';
 
       <section class="workspace-rack">
         <DeviceRack
-          bind:this={deviceRackComponent}
           devices={uiState.chainState.devices}
           chainState={uiState.chainState}
           collapsedDeviceIds={uiState.collapsedDeviceIds}
@@ -846,6 +846,9 @@ import type { BridgeSettings } from '../shared/bridge';
           onMiniMapContentRevisionChange={handleRackMiniMapContentRevisionChange}
           onToggleGroupEnabled={editorSession.commands.toggleGroupEnabled}
           onToggleCollapse={editorSession.commands.toggleCollapse}
+          onRackApiReady={(api) => {
+            rackViewApi = api;
+          }}
         />
         {#if !uiState.isPreviewPopoutOpen}
           <PreviewPanel

@@ -2,8 +2,8 @@ import type { GeneratorChain } from '../../../shared/model';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
 import type { ChainMutationMeta } from '../../state/chain-history';
-import { blurIfTextEditingElement } from '../../features/rack/text-editing';
-import { NumericInputInteraction } from '../../features/rack/actions/numeric-input-drag';
+import { blurIfTextEditingElement } from './text-editing';
+import { NumericInputInteraction } from './actions/numeric-input-drag';
 import {
   applyCenterPickerPointerMove,
   applyCenterPickerPosition,
@@ -15,12 +15,13 @@ import {
   resolveCenterPickerSurface,
   startCenterPickerSession,
   syncCenterPickerSelection,
-} from '../../features/rack/actions/center-picker';
+} from './actions/center-picker';
 import {
   applyChainControlChange,
   createChainControlHandlers,
+  resolveChainControlMergeKey,
   resetNumericControlToDefault,
-} from './controls';
+} from './actions/controls';
 import {
   applyMaskTileFromPoint,
   clearMaskTilePointerState,
@@ -28,7 +29,7 @@ import {
   isMaskTilePaintActive,
   isMaskTilePointer,
   tryStartMaskTilePaint,
-} from '../../features/rack/actions/mask-paint';
+} from './actions/mask-paint';
 
 /**
  * Coordinates non-selection rack interactions in the main renderer.
@@ -37,7 +38,7 @@ import {
  */
 type ChainDevice = GeneratorChain['devices'][number];
 
-interface DeviceRackControllerOptions {
+interface RackInteractionManagerOptions {
   chainDevices: HTMLElement;
   getChainState: () => GeneratorChain;
   saveChain: (chain: GeneratorChain, meta: ChainMutationMeta) => void;
@@ -46,7 +47,7 @@ interface DeviceRackControllerOptions {
 }
 
 /** Manages pointer and input interactions that mutate device controls. */
-export class DeviceRackController {
+export class RackInteractionManager {
   private readonly chainDevices: HTMLElement;
 
   private readonly getChainState: () => GeneratorChain;
@@ -65,7 +66,7 @@ export class DeviceRackController {
 
   private readonly numericInputInteraction: NumericInputInteraction;
 
-  constructor(options: DeviceRackControllerOptions) {
+  constructor(options: RackInteractionManagerOptions) {
     this.chainDevices = options.chainDevices;
     this.getChainState = options.getChainState;
     this.saveChain = options.saveChain;
@@ -107,7 +108,7 @@ export class DeviceRackController {
       this.syncCenterPickerSelection(id);
     }
 
-    const mergeKey = this.resolveControlMergeKey(event.target);
+    const mergeKey = resolveChainControlMergeKey(event.target);
     this.commitChainChange(
       {
         kind: 'control-edit',
@@ -367,23 +368,6 @@ export class DeviceRackController {
       this.findDeviceById.bind(this),
       this.chainControlHandlers,
     );
-  }
-
-  private resolveControlMergeKey(target: EventTarget | null): string | null {
-    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) {
-      return null;
-    }
-
-    const action = target.dataset.action?.trim();
-    const id = target.dataset.id?.trim();
-    if (!action || !id) {
-      return null;
-    }
-
-    const param = target.dataset.param?.trim();
-    return param
-      ? `control|${action}|${id}|${param}`
-      : `control|${action}|${id}`;
   }
 
   private findDeviceById(id: string): ChainDevice | null {

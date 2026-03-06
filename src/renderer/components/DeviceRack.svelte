@@ -18,10 +18,10 @@
   import { blurIfTextEditingElement } from '../features/rack/text-editing';
   import {
     createRackSelection,
-    type GroupSelectionContext,
   } from '../features/rack/selection.svelte';
   import { DragDropManager, type ActiveDragInfo } from '../features/rack/dnd';
-  import { DeviceRackController } from '../services/rack-controller';
+  import { createRackViewApi, type RackViewApi } from '../features/rack/api';
+  import { RackInteractionManager } from '../features/rack/interaction-manager';
   import DeviceCard from './DeviceCard.svelte';
 
   let {
@@ -44,6 +44,7 @@
     onMiniMapContentRevisionChange = () => {},
     onToggleGroupEnabled = () => {},
     onToggleCollapse = () => {},
+    onRackApiReady = () => {},
   } = $props<{
     devices: GeneratorDeviceNode[];
     chainState: GeneratorChain;
@@ -64,6 +65,7 @@
     onMiniMapContentRevisionChange?: (revision: number) => void;
     onToggleGroupEnabled?: (groupId: string, nextEnabled: boolean) => void;
     onToggleCollapse: (id: string) => void;
+    onRackApiReady?: (api: RackViewApi | null) => void;
   }>();
 
   let chainDevicesEl = $state<HTMLElement | null>(null);
@@ -71,7 +73,7 @@
   let browserDragBadgeEl = $state<HTMLElement | null>(null);
 
   const rackSelection = createRackSelection();
-  let deviceRackController = $state<DeviceRackController | null>(null);
+  let rackInteractionManager = $state<RackInteractionManager | null>(null);
   let dragDropManager = $state<DragDropManager | null>(null);
   let activeDragInfo = $state<ActiveDragInfo | null>(null);
   let suppressDeviceSelectionClick = false;
@@ -523,52 +525,21 @@
   };
 
   /** Syncs selection state and transient UI state after Svelte re-render. */
-  export function syncAfterRender() {
+  function syncAfterRender() {
     rackSelection.reconcileWithDevices(devices);
-    deviceRackController?.syncAfterRender();
-  }
-
-  /** Applies fallback selection when currently selected devices are deleted. */
-  export function applyNextSelectionAfterDelete(deletedIds: readonly string[]) {
-    rackSelection.applyNextSelectionAfterDelete(deletedIds, orderedDeviceIds);
-  }
-
-  /** Returns selected device IDs ordered by current rack layout. */
-  export function getOrderedSelectedDeviceIds() {
-    return getOrderedSelectedDeviceIdsInRack();
-  }
-
-  /** Selects all provided devices in rack order. */
-  export function selectAllDevices(deviceIds: readonly string[]) {
-    rackSelection.clear();
-    if (deviceIds.length === 0) {
-      return;
-    }
-
-    const anchorId = deviceIds[deviceIds.length - 1] ?? null;
-    rackSelection.selectDeviceIds(deviceIds, anchorId, orderedDeviceIds);
-  }
-
-  /** Returns selected group contexts in rack order. */
-  export function getSelectedGroupContexts(): GroupSelectionContext[] {
-    return rackSelection.getSelectedGroupContexts(devices);
-  }
-
-  /** Clears all current device and group selections. */
-  export function clearSelection() {
-    rackSelection.clear();
+    rackInteractionManager?.syncAfterRender();
   }
 
   /** Reports whether rack pointer interactions are active. */
-  export function hasPointerInteraction() {
+  function hasPointerInteraction() {
     return (
-      dragDropManager?.hasActivePointer()
-      || deviceRackController?.isCenterPickerActive()
+      (dragDropManager?.hasActivePointer() ?? false)
+      || (rackInteractionManager?.isCenterPickerActive() ?? false)
     );
   }
 
   /** Applies horizontal scroll offset requested from external minimap controls. */
-  export function setScrollLeft(nextScrollLeft: number) {
+  function setScrollLeft(nextScrollLeft: number) {
     if (!chainDevicesEl || !Number.isFinite(nextScrollLeft)) {
       return;
     }
@@ -583,7 +554,7 @@
   }
 
   /** Starts an insert drag from the browser panel into the rack. */
-  export function handleBrowserPointerDown(
+  function handleBrowserPointerDown(
     sourceEvent: PointerEvent,
     kind: BrowserDeviceKind,
     itemEl: HTMLElement,
@@ -605,17 +576,27 @@
     return started;
   }
 
+  const rackViewApi: RackViewApi = createRackViewApi({
+    rackSelection,
+    getDevices: () => devices,
+    getOrderedDeviceIds: () => orderedDeviceIds,
+    syncAfterRender,
+    hasPointerInteraction,
+    setScrollLeft,
+    handleBrowserPointerDown,
+  });
+
   // Applies immediate chain mutations from in-card control edits.
   function handleChainControlInputOrChange(event: Event) {
-    deviceRackController?.handleControlInputOrChange(event);
+    rackInteractionManager?.handleControlInputOrChange(event);
   }
 
   function handleChainFocusIn(event: FocusEvent) {
-    deviceRackController?.handleChainFocusIn(event);
+    rackInteractionManager?.handleChainFocusIn(event);
   }
 
   function handleChainKeyDown(event: KeyboardEvent) {
-    deviceRackController?.handleChainKeyDown(event);
+    rackInteractionManager?.handleChainKeyDown(event);
   }
 
   function handleGroupEnabledChange(event: Event, groupId: string) {
@@ -770,7 +751,7 @@
 
   // Resolves whether pointer-down should start reorder drag or remain in-place edit.
   function handleChainPointerDown(event: PointerEvent) {
-    if (deviceRackController?.handleChainPointerDown(event)) {
+    if (rackInteractionManager?.handleChainPointerDown(event)) {
       event.preventDefault();
     }
   }
@@ -820,7 +801,7 @@
   }
 
   function handleChainDoubleClick(event: MouseEvent) {
-    if (deviceRackController?.handleDoubleClick(event)) {
+    if (rackInteractionManager?.handleDoubleClick(event)) {
       event.preventDefault();
     }
   }
@@ -837,7 +818,7 @@
   function handleWindowPointerMove(event: PointerEvent) {
     if (isSidebarResizing) return;
 
-    if (deviceRackController?.handleWindowPointerMove(event)) {
+    if (rackInteractionManager?.handleWindowPointerMove(event)) {
       event.preventDefault();
       return;
     }
@@ -850,7 +831,7 @@
 
   // Finalizes pointer-up results and commits move/insert mutations.
   function handleWindowPointerUp(event: PointerEvent) {
-    if (deviceRackController?.handleWindowPointerUp(event)) {
+    if (rackInteractionManager?.handleWindowPointerUp(event)) {
       return;
     }
 
@@ -883,32 +864,40 @@
 
   // Cancels active pointer interactions when the browser emits pointer-cancel.
   function handleWindowPointerCancel(event: PointerEvent) {
-    if (deviceRackController?.handleWindowPointerCancel(event)) {
+    if (rackInteractionManager?.handleWindowPointerCancel(event)) {
       return;
     }
     dragDropManager?.handlePointerCancel(event);
   }
 
   function handleWindowBlur() {
-    deviceRackController?.handleWindowBlur();
+    rackInteractionManager?.handleWindowBlur();
   }
 
   function handleWindowMouseUp(event: MouseEvent) {
-    deviceRackController?.handleWindowMouseUp(event);
+    rackInteractionManager?.handleWindowMouseUp(event);
   }
 
   function handlePointerLockChange() {
-    deviceRackController?.handlePointerLockChange();
+    rackInteractionManager?.handlePointerLockChange();
   }
 
   function handleLockedMouseMove(event: MouseEvent) {
-    deviceRackController?.handleLockedMouseMove(event);
+    rackInteractionManager?.handleLockedMouseMove(event);
   }
+
+  $effect(() => {
+    onRackApiReady(rackViewApi);
+
+    return () => {
+      onRackApiReady(null);
+    };
+  });
 
   onMount(() => {
     if (!chainDevicesEl || !browserDragBadgeEl) return;
 
-    deviceRackController = new DeviceRackController({
+    rackInteractionManager = new RackInteractionManager({
       chainDevices: chainDevicesEl,
       getChainState: () => chainState,
       saveChain: onSaveChain,
@@ -919,7 +908,7 @@
     dragDropManager = new DragDropManager({
       chainDevices: chainDevicesEl,
       browserDragBadge: browserDragBadgeEl,
-      isBlocked: () => deviceRackController?.isCenterPickerActive() ?? false,
+      isBlocked: () => rackInteractionManager?.isCenterPickerActive() ?? false,
       closeContextMenu: onCloseContextMenu,
       onDragUpdate: (info) => {
         activeDragInfo = info;
@@ -947,7 +936,7 @@
       resizeObserver = null;
       activeDragInfo = null;
       dragDropManager = null;
-      deviceRackController = null;
+      rackInteractionManager = null;
     };
   });
 

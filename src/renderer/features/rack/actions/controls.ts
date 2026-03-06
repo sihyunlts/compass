@@ -2,14 +2,14 @@ import {
   SCANNER_PARAM_KEYS,
   SPIRAL_PARAM_KEYS,
   WATERDROP_PARAM_KEYS,
-} from '../devices';
-import { getRendererModulationTargetParamDefinitions } from '../../../devices/metadata';
+} from '../../../services/devices';
+import { getRendererModulationTargetParamDefinitions } from '../../../../devices/metadata';
 import {
   createDefaultDeviceNode,
-} from '../../../shared/device-registry';
-import { sanitizeCurveDivisions, sanitizeCurveNodes } from '../../../core/modulation/curve';
-import { sanitizeModulationTarget } from '../../../core/modulation/routing';
-import type { GeneratorChain } from '../../../shared/model';
+} from '../../../../shared/device-registry';
+import { sanitizeCurveDivisions, sanitizeCurveNodes } from '../../../../core/modulation/curve';
+import { sanitizeModulationTarget } from '../../../../core/modulation/routing';
+import type { GeneratorChain } from '../../../../shared/model';
 
 type ChainDevice = GeneratorChain['devices'][number];
 type ChainControlTarget = HTMLInputElement | HTMLSelectElement;
@@ -34,6 +34,11 @@ interface ModulationHandlerContext {
   findDeviceById: (id: string) => ChainDevice | null;
 }
 
+interface ChainControlDescriptor {
+  resolveMergeKey: (control: ChainControlTarget) => string | null;
+  resolveDefaultParamKey?: (input: HTMLInputElement) => string | null;
+}
+
 const requireInput = (target: ChainControlTarget): HTMLInputElement | null =>
   target instanceof HTMLInputElement ? target : null;
 
@@ -55,6 +60,29 @@ const readDatasetParam = <ParamKey extends string>(
   }
   return rawParam as ParamKey;
 };
+
+const resolveControlDeviceId = (control: ChainControlTarget): string | null => {
+  const id = control.dataset.id?.trim();
+  return id ? id : null;
+};
+
+const createMergeKeyResolver = (
+  action: string,
+  resolveParamKey?: (control: ChainControlTarget) => string | null,
+) => (control: ChainControlTarget): string | null => {
+  const id = resolveControlDeviceId(control);
+  if (!id) {
+    return null;
+  }
+
+  const paramKey = resolveParamKey?.(control);
+  return paramKey
+    ? `control|${action}|${id}|${paramKey}`
+    : `control|${action}|${id}`;
+};
+
+const resolveNumericDatasetParam = (control: ChainControlTarget): string | null =>
+  control instanceof HTMLInputElement ? control.dataset.param ?? null : null;
 
 const createNumericParamSetter = <Device extends ChainDevice, ParamKey extends string>(
   options: {
@@ -482,6 +510,76 @@ const createModulationControlHandlers = (
   'set-modulation-curve-nodes': handleSetModulationCurveNodes(),
 });
 
+const CHAIN_CONTROL_DESCRIPTORS: Record<string, ChainControlDescriptor> = {
+  'set-device-enabled': {
+    resolveMergeKey: createMergeKeyResolver('set-device-enabled'),
+  },
+  'set-waterdrop-param': {
+    resolveMergeKey: createMergeKeyResolver('set-waterdrop-param', resolveNumericDatasetParam),
+    resolveDefaultParamKey: (input) => input.dataset.param ?? null,
+  },
+  'set-scanner-param': {
+    resolveMergeKey: createMergeKeyResolver('set-scanner-param', resolveNumericDatasetParam),
+    resolveDefaultParamKey: (input) => input.dataset.param ?? null,
+  },
+  'set-spiral-param': {
+    resolveMergeKey: createMergeKeyResolver('set-spiral-param', resolveNumericDatasetParam),
+    resolveDefaultParamKey: (input) => input.dataset.param ?? null,
+  },
+  'set-center-picker-param': {
+    resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericDatasetParam),
+    resolveDefaultParamKey: (input) => input.dataset.param ?? null,
+  },
+  'set-angle-param': {
+    resolveMergeKey: createMergeKeyResolver('set-angle-param', resolveNumericDatasetParam),
+    resolveDefaultParamKey: (input) => input.dataset.param ?? null,
+  },
+  'set-color-note-length-percent': {
+    resolveMergeKey: createMergeKeyResolver('set-color-note-length-percent'),
+    resolveDefaultParamKey: () => 'noteLengthPercent',
+  },
+  'set-color-slot-count': {
+    resolveMergeKey: createMergeKeyResolver('set-color-slot-count'),
+  },
+  'set-effect-symmetry-mode': {
+    resolveMergeKey: createMergeKeyResolver('set-effect-symmetry-mode'),
+  },
+  'set-effect-symmetry-axis': {
+    resolveMergeKey: createMergeKeyResolver('set-effect-symmetry-axis'),
+  },
+  'set-effect-symmetry-anchor': {
+    resolveMergeKey: createMergeKeyResolver('set-effect-symmetry-anchor'),
+  },
+  'set-mask-mode': {
+    resolveMergeKey: createMergeKeyResolver('set-mask-mode'),
+  },
+  'set-mask-source-visibility': {
+    resolveMergeKey: createMergeKeyResolver('set-mask-source-visibility'),
+  },
+  'set-mask-source-kind': {
+    resolveMergeKey: createMergeKeyResolver('set-mask-source-kind'),
+  },
+  'set-mask-source-id': {
+    resolveMergeKey: createMergeKeyResolver('set-mask-source-id'),
+  },
+  'set-modulation-target-device': {
+    resolveMergeKey: createMergeKeyResolver('set-modulation-target-device'),
+  },
+  'set-modulation-target-param': {
+    resolveMergeKey: createMergeKeyResolver('set-modulation-target-param'),
+  },
+  'set-modulation-amount': {
+    resolveMergeKey: createMergeKeyResolver('set-modulation-amount'),
+    resolveDefaultParamKey: () => 'amount',
+  },
+  'set-modulation-divisions': {
+    resolveMergeKey: createMergeKeyResolver('set-modulation-divisions'),
+  },
+  'set-modulation-curve-nodes': {
+    resolveMergeKey: createMergeKeyResolver('set-modulation-curve-nodes'),
+  },
+};
+
 export const createChainControlHandlers = (
   context: ChainControlContext,
 ): Record<string, ChainControlHandler> => ({
@@ -512,6 +610,16 @@ const getControlTarget = (target: EventTarget | null): ChainControlTarget | null
   return null;
 };
 
+const resolveControlDescriptor = (
+  control: ChainControlTarget,
+): ChainControlDescriptor | null => {
+  const action = control.dataset.action;
+  if (!action) {
+    return null;
+  }
+  return CHAIN_CONTROL_DESCRIPTORS[action] ?? null;
+};
+
 export const applyChainControlChange = (
   target: EventTarget | null,
   findDeviceById: (id: string) => ChainDevice | null,
@@ -537,26 +645,16 @@ export const applyChainControlChange = (
   return handler ? handler(device, control) : false;
 };
 
-const resolveResetParamKey = (action: string, input: HTMLInputElement): string | null => {
-  if (
-    action === 'set-waterdrop-param'
-    || action === 'set-scanner-param'
-    || action === 'set-spiral-param'
-    || action === 'set-center-picker-param'
-    || action === 'set-angle-param'
-  ) {
-    return input.dataset.param ?? null;
+export const resolveChainControlMergeKey = (
+  target: EventTarget | null,
+): string | null => {
+  const control = getControlTarget(target);
+  if (!control) {
+    return null;
   }
 
-  if (action === 'set-modulation-amount') {
-    return 'amount';
-  }
-
-  if (action === 'set-color-note-length-percent') {
-    return 'noteLengthPercent';
-  }
-
-  return null;
+  const descriptor = resolveControlDescriptor(control);
+  return descriptor?.resolveMergeKey(control) ?? null;
 };
 
 export const resetNumericControlToDefault = (
@@ -570,11 +668,12 @@ export const resetNumericControlToDefault = (
 
   const action = target.dataset.action;
   const id = target.dataset.id;
-  if (!action || !id || !chainControlHandlers[action]) {
+  const descriptor = resolveControlDescriptor(target);
+  if (!action || !id || !descriptor || !chainControlHandlers[action]) {
     return false;
   }
 
-  const paramKey = resolveResetParamKey(action, target);
+  const paramKey = descriptor.resolveDefaultParamKey?.(target) ?? null;
   if (!paramKey) {
     return false;
   }
