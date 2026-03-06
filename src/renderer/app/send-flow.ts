@@ -1,6 +1,6 @@
+import { cloneChainForIpc } from '../../shared/model';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { EditorSession } from '../features/editor/session.svelte';
-import { cloneChainForIpc } from '../services/clone-chain';
 import type { HeaderIndicatorController } from './header-indicator.svelte';
 import type { PlaybackSessionController } from './playback-session.svelte';
 

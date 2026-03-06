@@ -1,5 +1,4 @@
-import type { GeneratorChain } from '../../../shared/model';
-import { cloneChainForIpc } from '../../services/clone-chain';
+import { cloneChainForIpc, type GeneratorChain } from '../../../shared/model';
 
 const DEFAULT_MAX_ENTRIES = 100;
 const DEFAULT_MERGE_IDLE_MS = 500;

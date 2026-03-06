@@ -11,7 +11,7 @@
   } from '../devices';
   import type { PaletteFilePayload } from '../shared/model';
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
-  import { sanitizeSidebarWidth } from './services/storage';
+  import { sanitizeSidebarWidth } from './features/editor/persistence-storage';
   import BrowserPanel from './components/BrowserPanel.svelte';
   import SidebarResizer from './components/SidebarResizer.svelte';
   import DeviceRack from './components/DeviceRack.svelte';
@@ -19,7 +19,7 @@
   import RackHeaderScrollbar from './components/RackHeaderScrollbar.svelte';
   import PreviewPanel from './components/PreviewPanel.svelte';
   import ContextMenu from './components/ContextMenu.svelte';
-  import { createPaletteController } from './services/palette';
+  import { createPaletteController } from './app/palette-controller';
   import { mountBridgeSubscriptions } from './app/bridge-subscriptions';
   import { createHeaderIndicator } from './app/header-indicator.svelte';
   import { mountKeyboardShortcuts } from './app/keyboard-shortcuts';

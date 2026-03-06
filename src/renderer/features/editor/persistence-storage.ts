@@ -1,21 +1,17 @@
-import type { GeneratorChain, LaunchpadModel, PaletteFilePayload } from '../../shared/model';
-import type { BridgeSettings } from '../../shared/bridge/types';
-import { clamp } from '../../shared/math';
+import type { BridgeSettings } from '../../../shared/bridge/types';
+import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
+import { clamp } from '../../../shared/math';
 import {
   DEFAULT_BRIDGE_SETTINGS,
   sanitizeBridgeSettings,
-} from '../../shared/validation/bridge-settings';
-import { reconcileGeneratorChainModulators } from '../../core/modulation/routing';
+} from '../../../shared/validation/bridge-settings';
+import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
 import {
   createInitialChainDevices,
   syncDeviceNodeIdSeeds,
-} from '../features/editor/device-node-factory';
+} from './device-node-factory';
 
-/**
- * Renderer persistence boundary for app state stored in localStorage.
- * All loaders sanitize persisted data and fall back to safe defaults.
- */
-export { sanitizeBridgeSettings };
+/** Editor persistence boundary for renderer localStorage-backed state. */
 
 const STATE_KEY = 'compass.state.v1';
 const DEFAULT_PREVIEW_BPM = 120;
@@ -39,10 +35,6 @@ interface PersistedState {
     collapsedDeviceIds?: string[];
     launchpadModel?: LaunchpadModel;
   };
-  palette?: {
-    name?: string;
-    content?: string;
-  } | null;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -238,42 +230,5 @@ export const saveLaunchpadModel = (model: LaunchpadModel): void => {
       ...previous.ui,
       launchpadModel: toLaunchpadModel(model),
     },
-  }));
-};
-
-/** Loads imported palette data only when persisted content is non-empty text. */
-export const loadCustomPalette = (): PaletteFilePayload | null => {
-  const palette = readPersistedState().palette;
-  if (!palette || !isRecord(palette)) {
-    return null;
-  }
-
-  const content = typeof palette.content === 'string' ? palette.content : '';
-  if (!content.trim()) {
-    return null;
-  }
-
-  const name = typeof palette.name === 'string' && palette.name.trim()
-    ? palette.name
-    : 'custom-palette';
-  return { name, content };
-};
-
-/** Persists imported palette payload for reuse across renderer reloads. */
-export const saveCustomPalette = (payload: PaletteFilePayload): void => {
-  writePersistedState((previous) => ({
-    ...previous,
-    palette: {
-      name: payload.name,
-      content: payload.content,
-    },
-  }));
-};
-
-/** Removes persisted custom palette data so default palette is used on next load. */
-export const clearCustomPalette = (): void => {
-  writePersistedState((previous) => ({
-    ...previous,
-    palette: null,
   }));
 };

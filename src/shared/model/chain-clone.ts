@@ -1,4 +1,5 @@
-import { cloneDeviceNode, type GeneratorChain } from '../../shared/model';
+import type { GeneratorChain } from './chain';
+import { cloneDeviceNode } from './device-clone';
 
 /** Clones a chain into an IPC-safe payload with normalized group enabled flags. */
 export const cloneChainForIpc = (chain: GeneratorChain): GeneratorChain => {

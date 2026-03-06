@@ -2,15 +2,18 @@ import type { BridgeSettings } from '../../shared/bridge/types';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { GeneratorPreview } from '../../shared/contracts/preview/generator-preview';
 import { clamp } from '../../shared/math';
-import type { GeneratorChain, LaunchpadModel } from '../../shared/model';
+import {
+  cloneChainForIpc,
+  type GeneratorChain,
+  type LaunchpadModel,
+} from '../../shared/model';
 import type { EditorSession } from '../features/editor/session.svelte';
 import type { PreviewSession } from '../features/preview/session.svelte';
-import { cloneChainForIpc } from '../services/clone-chain';
 import {
   createPlaybackScheduler,
   createPreviewWindowStatePusher,
 } from './playback-runtime';
-import { sanitizePreviewBpm } from '../services/storage';
+import { sanitizePreviewBpm } from '../features/editor/persistence-storage';
 import type { HeaderIndicatorController } from './header-indicator.svelte';
 
 export interface PlaybackSessionState {

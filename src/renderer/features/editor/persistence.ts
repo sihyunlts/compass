@@ -11,7 +11,7 @@ import {
   saveChainSettings,
   saveCollapsedDeviceIds,
   saveSidebarWidth,
-} from '../../services/storage';
+} from './persistence-storage';
 import { withDevices } from './chain-ops';
 import {
   resolveBridgeLengthLabel,

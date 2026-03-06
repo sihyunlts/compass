@@ -5,6 +5,7 @@ import {
 } from '../../../shared/beat-length';
 import type { BridgeSettings } from '../../../shared/bridge/types';
 import type { LaunchpadModel } from '../../../shared/model';
+import { sanitizeBridgeSettings } from '../../../shared/validation/bridge-settings';
 import {
   sanitizePreviewBpm,
   saveBridgeSettings,
@@ -12,8 +13,7 @@ import {
   savePreviewBpm,
   savePreviewGuideEnabled,
   savePreviewLoopEnabled,
-  sanitizeBridgeSettings,
-} from '../../services/storage';
+} from './persistence-storage';
 import type { EditorSessionState } from './session.svelte';
 
 export const readBridgeSettingsFromLabel = (lengthLabel: string): BridgeSettings =>

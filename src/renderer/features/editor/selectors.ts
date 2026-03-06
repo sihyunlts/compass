@@ -1,8 +1,8 @@
-import { sanitizePreviewBpm } from '../../services/storage';
 import type { ContextMenuTarget } from '../../components/context-menu-types';
 import type { GroupSelectionContext } from '../rack/selection.svelte';
 import type { GeneratorChain } from '../../../shared/model';
 import { resolveExistingOrderedDeviceIds } from './chain-ops';
+import { sanitizePreviewBpm } from './persistence-storage';
 
 export type RackSelectionSnapshot =
   | {
