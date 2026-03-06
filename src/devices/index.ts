@@ -1,27 +1,31 @@
-import ColorDeviceUi from './color/ui.svelte';
-import {
-  createRendererDeviceNode,
-  getRendererDeviceGroup,
-  getRendererDeviceLabel,
-  getRendererNumericParamKeys,
-  getRendererDeviceSchema,
-  getRendererModulationTargetParamDefinitions,
-  isRendererDeviceKind,
-  RENDERER_DEVICE_GROUPS,
-  RENDERER_DEVICE_KINDS,
-} from './metadata';
-import MaskDeviceUi from './mask/ui.svelte';
-import MirrorDeviceUi from './mirror/ui.svelte';
-import ModulatorDeviceUi from './modulator/ui.svelte';
-import ReverseDeviceUi from './reverse/ui.svelte';
-import RotateDeviceUi from './rotate/ui.svelte';
-import ScannerDeviceUi from './scanner/ui.svelte';
-import SpiralDeviceUi from './spiral/ui.svelte';
-import SymmetryDeviceUi from './symmetry/ui.svelte';
+import { colorDeviceDefinition } from './color/index';
+import { maskDeviceDefinition } from './mask/index';
+import { mirrorDeviceDefinition } from './mirror/index';
+import { modulatorDeviceDefinition } from './modulator/index';
+import { reverseDeviceDefinition } from './reverse/index';
+import { rotateDeviceDefinition } from './rotate/index';
+import { scannerDeviceDefinition } from './scanner/index';
+import { spiralDeviceDefinition } from './spiral/index';
+import { symmetryDeviceDefinition } from './symmetry/index';
+import type { RendererKindControlDefinition } from './control-types';
 import type {
+  RendererDeviceDefinition,
   RendererDeviceKind,
 } from './types';
-import WaterdropDeviceUi from './waterdrop/ui.svelte';
+import { waterdropDeviceDefinition } from './waterdrop/index';
+
+export const rendererDeviceDefinitions = {
+  waterdrop: waterdropDeviceDefinition,
+  scanner: scannerDeviceDefinition,
+  spiral: spiralDeviceDefinition,
+  modulator: modulatorDeviceDefinition,
+  mirror: mirrorDeviceDefinition,
+  symmetry: symmetryDeviceDefinition,
+  mask: maskDeviceDefinition,
+  rotate: rotateDeviceDefinition,
+  reverse: reverseDeviceDefinition,
+  color: colorDeviceDefinition,
+} as const satisfies Record<RendererDeviceKind, RendererDeviceDefinition>;
 
 export type {
   RendererDeviceDefinition,
@@ -32,60 +36,25 @@ export type {
   RendererModulationParamDefinition,
 } from './types';
 
-export const rendererDeviceDefinitions = {
-  waterdrop: {
-    ...getRendererDeviceSchema('waterdrop'),
-    editor: WaterdropDeviceUi,
-  },
-  scanner: {
-    ...getRendererDeviceSchema('scanner'),
-    editor: ScannerDeviceUi,
-  },
-  spiral: {
-    ...getRendererDeviceSchema('spiral'),
-    editor: SpiralDeviceUi,
-  },
-  modulator: {
-    ...getRendererDeviceSchema('modulator'),
-    editor: ModulatorDeviceUi,
-  },
-  mirror: {
-    ...getRendererDeviceSchema('mirror'),
-    editor: MirrorDeviceUi,
-  },
-  symmetry: {
-    ...getRendererDeviceSchema('symmetry'),
-    editor: SymmetryDeviceUi,
-  },
-  mask: {
-    ...getRendererDeviceSchema('mask'),
-    editor: MaskDeviceUi,
-  },
-  rotate: {
-    ...getRendererDeviceSchema('rotate'),
-    editor: RotateDeviceUi,
-  },
-  reverse: {
-    ...getRendererDeviceSchema('reverse'),
-    editor: ReverseDeviceUi,
-  },
-  color: {
-    ...getRendererDeviceSchema('color'),
-    editor: ColorDeviceUi,
-  },
-} as const;
+export {
+  createRendererDeviceNode,
+  getRendererDeviceGroup,
+  getRendererDeviceLabel,
+  getRendererDeviceSchema,
+  getRendererModulationTargetParamDefinitions,
+  getRendererNumericParamKeys,
+  isRendererDeviceKind,
+  RENDERER_DEVICE_GROUPS,
+  RENDERER_DEVICE_KINDS,
+} from './metadata';
 
 export const getRendererDeviceDefinition = <K extends RendererDeviceKind>(
   kind: K,
 ): (typeof rendererDeviceDefinitions)[K] => rendererDeviceDefinitions[kind];
 
-export {
-  createRendererDeviceNode,
-  getRendererDeviceGroup,
-  getRendererDeviceLabel,
-  getRendererNumericParamKeys,
-  getRendererModulationTargetParamDefinitions,
-  isRendererDeviceKind,
-  RENDERER_DEVICE_GROUPS,
-  RENDERER_DEVICE_KINDS,
+export const getRendererDeviceControlDefinition = <K extends RendererDeviceKind>(
+  kind: K,
+): RendererKindControlDefinition | null => {
+  const definition = rendererDeviceDefinitions[kind];
+  return 'controls' in definition ? definition.controls ?? null : null;
 };

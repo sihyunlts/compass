@@ -1,22 +1,149 @@
-import { createRendererDeviceNode } from '../../../../devices';
-import { createDeviceControlHandlers, DEVICE_CONTROL_DESCRIPTORS } from './device-handlers';
-import { createMaskControlHandlers, MASK_CONTROL_DESCRIPTORS } from './mask-handlers';
 import {
-  createModulationControlHandlers,
-  MODULATION_CONTROL_DESCRIPTORS,
-} from './modulation-handlers';
-import type { ChainControlContext, ChainControlDescriptor, ChainControlHandler } from './shared';
-import { getControlTarget } from './shared';
+  createRendererDeviceNode,
+  getRendererDeviceControlDefinition,
+  getRendererModulationTargetParamDefinitions,
+  RENDERER_DEVICE_KINDS,
+} from '../../../../devices';
+import {
+  createMergeKeyResolver,
+  getControlTarget,
+  requireInput,
+} from '../../../../devices/control-helpers';
+import type {
+  RendererControlContext,
+  RendererControlDescriptor,
+  RendererControlHandler,
+} from '../../../../devices/control-types';
+import type { GeneratorDeviceNode } from '../../../../shared/model';
 
-const CHAIN_CONTROL_DESCRIPTORS: Record<string, ChainControlDescriptor> = {
-  ...DEVICE_CONTROL_DESCRIPTORS,
-  ...MASK_CONTROL_DESCRIPTORS,
-  ...MODULATION_CONTROL_DESCRIPTORS,
+type ChainControlHandler = RendererControlHandler;
+
+type ChainControlContext = Pick<
+  RendererControlContext,
+  'findDeviceById' | 'getMaskSourceGroupIds' | 'getMaskSourceGeneratorIds'
+>;
+
+const GENERIC_CONTROL_DESCRIPTORS: Readonly<Record<string, RendererControlDescriptor>> = {
+  'set-device-enabled': {
+    resolveMergeKey: createMergeKeyResolver('set-device-enabled'),
+  },
+};
+
+const createGenericHandlers = (): Readonly<Record<string, ChainControlHandler>> => ({
+  'set-device-enabled': (device, target) => {
+    const input = requireInput(target);
+    if (!input) {
+      return false;
+    }
+    device.enabled = input.checked;
+    return true;
+  },
+});
+
+const composeDescriptor = (
+  descriptors: readonly RendererControlDescriptor[],
+): RendererControlDescriptor => ({
+  resolveMergeKey: descriptors[0].resolveMergeKey,
+  resolveDefaultValue: descriptors.some((descriptor) => descriptor.resolveDefaultValue)
+    ? (defaultDevice, input) => {
+        for (const descriptor of descriptors) {
+          const value = descriptor.resolveDefaultValue?.(defaultDevice, input);
+          if (value !== null && value !== undefined) {
+            return value;
+          }
+        }
+        return null;
+      }
+    : undefined,
+});
+
+const createDescriptorMap = (): Record<string, RendererControlDescriptor> => {
+  const descriptorsByAction = new Map<string, RendererControlDescriptor[]>();
+
+  for (const [action, descriptor] of Object.entries(GENERIC_CONTROL_DESCRIPTORS)) {
+    descriptorsByAction.set(action, [descriptor]);
+  }
+
+  for (const kind of RENDERER_DEVICE_KINDS) {
+    const controls = getRendererDeviceControlDefinition(kind);
+    if (!controls?.descriptors) {
+      continue;
+    }
+
+    for (const [action, descriptor] of Object.entries(controls.descriptors)) {
+      const existing = descriptorsByAction.get(action);
+      if (existing) {
+        existing.push(descriptor);
+        continue;
+      }
+      descriptorsByAction.set(action, [descriptor]);
+    }
+  }
+
+  return Object.fromEntries(
+    [...descriptorsByAction.entries()].map(([action, descriptors]) => [
+      action,
+      composeDescriptor(descriptors),
+    ]),
+  );
+};
+
+const CHAIN_CONTROL_DESCRIPTORS = createDescriptorMap();
+
+const composeHandler = (
+  handlers: readonly ChainControlHandler[],
+): ChainControlHandler => (device, target) => {
+  for (const handler of handlers) {
+    if (handler(device, target)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const createFullControlContext = (
+  context: ChainControlContext,
+): RendererControlContext => ({
+  ...context,
+  getModulationTargetParamDefinitions: getRendererModulationTargetParamDefinitions,
+});
+
+export const createChainControlHandlers = (
+  context: ChainControlContext,
+): Record<string, ChainControlHandler> => {
+  const handlersByAction = new Map<string, ChainControlHandler[]>();
+  const appendHandlers = (handlers: Readonly<Record<string, ChainControlHandler>>): void => {
+    for (const [action, handler] of Object.entries(handlers)) {
+      const existing = handlersByAction.get(action);
+      if (existing) {
+        existing.push(handler);
+        continue;
+      }
+      handlersByAction.set(action, [handler]);
+    }
+  };
+
+  appendHandlers(createGenericHandlers());
+
+  const fullContext = createFullControlContext(context);
+  for (const kind of RENDERER_DEVICE_KINDS) {
+    const handlers = getRendererDeviceControlDefinition(kind)?.createHandlers?.(fullContext);
+    if (handlers) {
+      appendHandlers(handlers);
+    }
+  }
+
+  return Object.fromEntries(
+    [...handlersByAction.entries()].map(([action, handlers]) => [
+      action,
+      composeHandler(handlers),
+    ]),
+  );
 };
 
 const resolveControlDescriptor = (
   control: ReturnType<typeof getControlTarget>,
-): ChainControlDescriptor | null => {
+): RendererControlDescriptor | null => {
   if (!control) {
     return null;
   }
@@ -28,19 +155,9 @@ const resolveControlDescriptor = (
   return CHAIN_CONTROL_DESCRIPTORS[action] ?? null;
 };
 
-export const createChainControlHandlers = (
-  context: ChainControlContext,
-): Record<string, ChainControlHandler> => ({
-  ...createDeviceControlHandlers(),
-  ...createMaskControlHandlers(context),
-  ...createModulationControlHandlers({
-    findDeviceById: context.findDeviceById,
-  }),
-});
-
 export const applyChainControlChange = (
   target: EventTarget | null,
-  findDeviceById: (id: string) => Parameters<ChainControlHandler>[0] | null,
+  findDeviceById: (id: string) => GeneratorDeviceNode | null,
   chainControlHandlers: Readonly<Record<string, ChainControlHandler>>,
 ): boolean => {
   const control = getControlTarget(target);
@@ -73,7 +190,7 @@ export const resolveChainControlMergeKey = (
 
 export const resetNumericControlToDefault = (
   target: EventTarget | null,
-  findDeviceById: (id: string) => Parameters<ChainControlHandler>[0] | null,
+  findDeviceById: (id: string) => GeneratorDeviceNode | null,
   chainControlHandlers: Readonly<Record<string, ChainControlHandler>>,
 ): boolean => {
   if (!(target instanceof HTMLInputElement) || target.type !== 'number') {

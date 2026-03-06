@@ -14,11 +14,13 @@ const DEFAULT_MODULATOR_PARAMS: CurveModulatorNode['params'] = {
   },
 };
 
+export const MODULATOR_NUMERIC_PARAM_KEYS = ['amount'] as const;
+
 export const modulatorDeviceSchema = {
   kind: 'modulator',
   label: 'Modulator',
   group: 'effect',
-  numericParamKeys: ['amount'],
+  numericParamKeys: MODULATOR_NUMERIC_PARAM_KEYS,
   createDefaultNode: (id, enabled): CurveModulatorNode => ({
     id,
     kind: 'modulator',

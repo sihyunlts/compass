@@ -8,17 +8,20 @@ const DEFAULT_SPIRAL_PARAMS: SpiralGeneratorNode['params'] = {
   startRadius: 0,
 };
 
+export const SPIRAL_MODULATION_TARGET_PARAMS = [
+  { key: 'centerX', label: 'Center X' },
+  { key: 'centerY', label: 'Center Y' },
+  { key: 'turns', label: 'Turns' },
+  { key: 'startRadius', label: 'Start Radius' },
+] as const;
+export const SPIRAL_NUMERIC_PARAM_KEYS = ['centerX', 'centerY', 'turns', 'startRadius'] as const;
+
 export const spiralDeviceSchema = {
   kind: 'spiral',
   label: 'Spiral',
   group: 'generator',
-  modulationTargetParams: [
-    { key: 'centerX', label: 'Center X' },
-    { key: 'centerY', label: 'Center Y' },
-    { key: 'turns', label: 'Turns' },
-    { key: 'startRadius', label: 'Start Radius' },
-  ],
-  numericParamKeys: ['centerX', 'centerY', 'turns', 'startRadius'],
+  modulationTargetParams: SPIRAL_MODULATION_TARGET_PARAMS,
+  numericParamKeys: SPIRAL_NUMERIC_PARAM_KEYS,
   createDefaultNode: (id, enabled): SpiralGeneratorNode => ({
     id,
     kind: 'spiral',

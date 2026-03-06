@@ -6,11 +6,13 @@ const DEFAULT_COLOR_PARAMS: ColorEffectNode['params'] = {
   noteLengthPercent: 100,
 };
 
+export const COLOR_NUMERIC_PARAM_KEYS = ['noteLengthPercent'] as const;
+
 export const colorDeviceSchema = {
   kind: 'color',
   label: 'Color',
   group: 'effect',
-  numericParamKeys: ['noteLengthPercent'],
+  numericParamKeys: COLOR_NUMERIC_PARAM_KEYS,
   createDefaultNode: (id, enabled): ColorEffectNode => ({
     id,
     kind: 'color',

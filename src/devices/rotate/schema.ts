@@ -5,14 +5,17 @@ const DEFAULT_ROTATE_PARAMS: RotateEffectNode['params'] = {
   angleDeg: 90,
 };
 
+export const ROTATE_MODULATION_TARGET_PARAMS = [
+  { key: 'angleDeg', label: 'Angle' },
+] as const;
+export const ROTATE_NUMERIC_PARAM_KEYS = ['angleDeg'] as const;
+
 export const rotateDeviceSchema = {
   kind: 'rotate',
   label: 'Rotate',
   group: 'effect',
-  modulationTargetParams: [
-    { key: 'angleDeg', label: 'Angle' },
-  ],
-  numericParamKeys: ['angleDeg'],
+  modulationTargetParams: ROTATE_MODULATION_TARGET_PARAMS,
+  numericParamKeys: ROTATE_NUMERIC_PARAM_KEYS,
   createDefaultNode: (id, enabled): RotateEffectNode => ({
     id,
     kind: 'rotate',

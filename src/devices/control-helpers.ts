@@ -1,32 +1,10 @@
-import { getRendererNumericParamKeys } from '../../../../devices';
-import type { GeneratorChain } from '../../../../shared/model';
+import type { GeneratorDeviceNode } from '../shared/model';
+import type { RendererControlHandler, RendererControlTarget } from './control-types';
 
-export type ChainDevice = GeneratorChain['devices'][number];
-export type ChainControlTarget = HTMLInputElement | HTMLSelectElement;
-export type ChainControlHandler = (device: ChainDevice, target: ChainControlTarget) => boolean;
-
-export interface ChainControlContext {
-  findDeviceById: (id: string) => ChainDevice | null;
-  getMaskSourceGroupIds: () => string[];
-  getMaskSourceGeneratorIds: () => string[];
-}
-
-export interface ModulationHandlerContext {
-  findDeviceById: (id: string) => ChainDevice | null;
-}
-
-export interface ChainControlDescriptor {
-  resolveMergeKey: (control: ChainControlTarget) => string | null;
-  resolveDefaultValue?: (
-    defaultDevice: ChainDevice,
-    input: HTMLInputElement,
-  ) => number | null;
-}
-
-export const requireInput = (target: ChainControlTarget): HTMLInputElement | null =>
+export const requireInput = (target: RendererControlTarget): HTMLInputElement | null =>
   target instanceof HTMLInputElement ? target : null;
 
-export const requireSelect = (target: ChainControlTarget): HTMLSelectElement | null =>
+export const requireSelect = (target: RendererControlTarget): HTMLSelectElement | null =>
   target instanceof HTMLSelectElement ? target : null;
 
 export const parseFiniteNumber = (raw: string): number | null => {
@@ -45,15 +23,15 @@ export const readDatasetParam = <ParamKey extends string>(
   return rawParam as ParamKey;
 };
 
-const resolveControlDeviceId = (control: ChainControlTarget): string | null => {
+const resolveControlDeviceId = (control: RendererControlTarget): string | null => {
   const id = control.dataset.id?.trim();
   return id ? id : null;
 };
 
 export const createMergeKeyResolver = (
   action: string,
-  resolveParamKey?: (control: ChainControlTarget) => string | null,
-) => (control: ChainControlTarget): string | null => {
+  resolveParamKey?: (control: RendererControlTarget) => string | null,
+) => (control: RendererControlTarget): string | null => {
   const id = resolveControlDeviceId(control);
   if (!id) {
     return null;
@@ -65,16 +43,13 @@ export const createMergeKeyResolver = (
     : `control|${action}|${id}`;
 };
 
-export const resolveNumericDatasetParam = (control: ChainControlTarget): string | null =>
+export const resolveNumericDatasetParam = (
+  control: RendererControlTarget,
+): string | null =>
   control instanceof HTMLInputElement ? control.dataset.param ?? null : null;
 
-export const readRendererNumericParam = (
-  kind: ChainDevice['kind'],
-  input: HTMLInputElement,
-): string | null => readDatasetParam(input, getRendererNumericParamKeys(kind));
-
 const readNumericValueFromDeviceParams = (
-  device: ChainDevice,
+  device: GeneratorDeviceNode,
   paramKey: string,
 ): number | null => {
   if (!('params' in device)) {
@@ -88,7 +63,7 @@ const readNumericValueFromDeviceParams = (
 export const createDefaultNumericValueResolver = (
   resolveParamKey: (input: HTMLInputElement) => string | null,
 ) => (
-  defaultDevice: ChainDevice,
+  defaultDevice: GeneratorDeviceNode,
   input: HTMLInputElement,
 ): number | null => {
   const paramKey = resolveParamKey(input);
@@ -99,13 +74,16 @@ export const createDefaultNumericValueResolver = (
   return readNumericValueFromDeviceParams(defaultDevice, paramKey);
 };
 
-export const createNumericParamSetter = <Device extends ChainDevice, ParamKey extends string>(
+export const createNumericParamSetter = <
+  Device extends GeneratorDeviceNode,
+  ParamKey extends string,
+>(
   options: {
-    isKind: (device: ChainDevice) => device is Device;
+    isKind: (device: GeneratorDeviceNode) => device is Device;
     readParam: (input: HTMLInputElement) => ParamKey | null;
     assign: (device: Device, param: ParamKey, value: number) => void;
   },
-): ChainControlHandler => (device, target) => {
+): RendererControlHandler => (device, target) => {
   if (!options.isKind(device)) {
     return false;
   }
@@ -129,7 +107,7 @@ export const createNumericParamSetter = <Device extends ChainDevice, ParamKey ex
   return true;
 };
 
-export const getControlTarget = (target: EventTarget | null): ChainControlTarget | null => {
+export const getControlTarget = (target: EventTarget | null): RendererControlTarget | null => {
   if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) {
     return target;
   }

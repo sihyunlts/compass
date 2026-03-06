@@ -5,7 +5,7 @@ import {
   isRendererDeviceKind,
   RENDERER_DEVICE_GROUPS,
   RENDERER_DEVICE_KINDS,
-} from '../../devices/metadata';
+} from '../../devices';
 import type { RendererDeviceGroup, RendererDeviceKind } from '../../devices';
 import type { GeneratorDeviceNode } from '../../shared/model';
 

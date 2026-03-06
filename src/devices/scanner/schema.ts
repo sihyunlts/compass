@@ -6,15 +6,18 @@ const DEFAULT_SCANNER_PARAMS: ScannerGeneratorNode['params'] = {
   startOffset: 0,
 };
 
+export const SCANNER_MODULATION_TARGET_PARAMS = [
+  { key: 'angleDeg', label: 'Angle' },
+  { key: 'startOffset', label: 'Start Offset' },
+] as const;
+export const SCANNER_NUMERIC_PARAM_KEYS = ['angleDeg', 'startOffset'] as const;
+
 export const scannerDeviceSchema = {
   kind: 'scanner',
   label: 'Scanner',
   group: 'generator',
-  modulationTargetParams: [
-    { key: 'angleDeg', label: 'Angle' },
-    { key: 'startOffset', label: 'Start Offset' },
-  ],
-  numericParamKeys: ['angleDeg', 'startOffset'],
+  modulationTargetParams: SCANNER_MODULATION_TARGET_PARAMS,
+  numericParamKeys: SCANNER_NUMERIC_PARAM_KEYS,
   createDefaultNode: (id, enabled): ScannerGeneratorNode => ({
     id,
     kind: 'scanner',

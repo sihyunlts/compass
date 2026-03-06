@@ -1,6 +1,7 @@
 import type { Component } from 'svelte';
 
 import type { GeneratorDeviceNode } from '../shared/model';
+import type { RendererKindControlDefinition } from './control-types';
 
 export type RendererDeviceKind = GeneratorDeviceNode['kind'];
 export type RendererDeviceGroup = 'generator' | 'effect';
@@ -44,4 +45,5 @@ export interface RendererDeviceSchema<K extends RendererDeviceKind = RendererDev
 export interface RendererDeviceDefinition<K extends RendererDeviceKind = RendererDeviceKind>
   extends RendererDeviceSchema<K> {
   editor: Component<RendererDeviceEditorProps<K>>;
+  controls?: RendererKindControlDefinition;
 }
