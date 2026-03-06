@@ -10,8 +10,8 @@ import { symmetryDeviceSchema } from './symmetry/schema';
 import type {
   RendererDeviceGroup,
   RendererDeviceKind,
-  RendererDeviceSchema,
   RendererDeviceNodeOfKind,
+  RendererDeviceSchema,
   RendererModulationParamDefinition,
 } from './types';
 import { waterdropDeviceSchema } from './waterdrop/schema';

@@ -6,7 +6,7 @@
   import {
     getRendererDeviceLabel,
     getRendererModulationTargetParamDefinitions,
-  } from '../metadata';
+  } from '../schema-registry';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   type ModulatorDeviceEditorProps = RendererDeviceEditorPropsBase & {

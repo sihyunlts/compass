@@ -46,7 +46,7 @@ export {
   isRendererDeviceKind,
   RENDERER_DEVICE_GROUPS,
   RENDERER_DEVICE_KINDS,
-} from './metadata';
+} from './schema-registry';
 
 export const getRendererDeviceDefinition = <K extends RendererDeviceKind>(
   kind: K,

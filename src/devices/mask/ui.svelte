@@ -4,7 +4,7 @@
   import type { GeneratorDeviceNode } from '../../shared/model';
   import { normalizeOptionalId } from '../../shared/normalize-id';
   import MaskTilePicker from '../../renderer/components/MaskTilePicker.svelte';
-  import { getRendererDeviceLabel } from '../metadata';
+  import { getRendererDeviceLabel } from '../schema-registry';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   type MaskDeviceEditorProps = RendererDeviceEditorPropsBase & {

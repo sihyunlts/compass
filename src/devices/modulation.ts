@@ -2,7 +2,7 @@ import type { GeneratorDeviceNode } from '../shared/model';
 import {
   getRendererModulationTargetParamDefinitions,
   RENDERER_DEVICE_KINDS,
-} from './metadata';
+} from './schema-registry';
 
 type DeviceKind = GeneratorDeviceNode['kind'];
 type DeviceNodeOfKind<K extends DeviceKind> = Extract<GeneratorDeviceNode, { kind: K }>;
