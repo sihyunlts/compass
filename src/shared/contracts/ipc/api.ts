@@ -10,6 +10,7 @@ export interface CompassApi {
   generateAndSend: (
     request: GenerateAndSendRequest,
   ) => Promise<GenerateAndSendResponse>;
+  requestAppVersion: () => Promise<string>;
   requestLiveTempo: () => Promise<RequestLiveTempoResponse>;
   openPreviewWindow: () => Promise<void>;
   pushPreviewWindowState: (state: PreviewWindowState) => void;
@@ -28,4 +29,5 @@ export interface CompassApi {
   subscribeLiveTempo: (
     listener: (update: LiveTempoUpdate) => void,
   ) => () => void;
+  openExternal: (url: string) => Promise<void>;
 }

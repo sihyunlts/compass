@@ -149,11 +149,11 @@ class PaletteController {
       if (persistCustom) {
         saveCustomPalette(payload);
       }
-      this.options.onPaletteNameChanged(`Custom palette: ${payload.name} (${colors.size} colors)`);
+      this.options.onPaletteNameChanged(`Custom palette: ${payload.name}`);
       return;
     }
 
-    this.options.onPaletteNameChanged(`Default palette: ${payload.name} (${colors.size} colors)`);
+    this.options.onPaletteNameChanged(`Default palette: ${payload.name}`);
   }
 
   private applyEmbeddedFallback(): void {

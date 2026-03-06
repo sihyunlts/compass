@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 
 import { IPC_CHANNELS } from '../../shared/contracts/ipc';
 import type { PreviewWindowState } from '../../shared/contracts/preview';
@@ -18,6 +18,11 @@ export const registerIpcHandlers = (generatorService: GeneratorService): void =>
     IPC_CHANNELS.generateAndSend,
     (_event, request: GenerateAndSendRequest) =>
       generatorService.generateAndSend(request),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.requestAppVersion,
+    () => app.getVersion(),
   );
 
   ipcMain.handle(
@@ -82,4 +87,8 @@ export const registerIpcHandlers = (generatorService: GeneratorService): void =>
       previewWindow.webContents.send(IPC_CHANNELS.previewWindowStateUpdate, state);
     },
   );
+
+  ipcMain.handle(IPC_CHANNELS.openExternal, (_event, url: string) => {
+    void shell.openExternal(url);
+  });
 };

@@ -91,6 +91,7 @@ import type { BridgeSettings } from '../shared/bridge';
   const toBrowserDragBadgeLabel = (kind: BrowserDeviceKind): string =>
     `+ ${getBrowserDeviceLabel(kind)}`;
   const bridgeClient = window.compass;
+  let appVersionText = $state('');
   let deviceRackComponent: ReturnType<typeof DeviceRack> | null = $state(null);
   let playbackScheduler: ReturnType<typeof createPlaybackScheduler> | null = null;
   let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
@@ -540,6 +541,12 @@ import type { BridgeSettings } from '../shared/bridge';
     });
 
     runBestEffort(
+      bridgeClient.requestAppVersion().then((version) => {
+        appVersionText = version;
+      }),
+    );
+
+    runBestEffort(
       bridgeClient.requestPreviewWindowVisibility().then((isOpen) => {
         editorSession.commands.setPreviewPopoutOpen(isOpen === true);
       }),
@@ -861,46 +868,83 @@ import type { BridgeSettings } from '../shared/bridge';
     id="settings-screen"
     class="settings-screen"
     aria-hidden={uiState.isSettingsOpen ? 'false' : 'true'}
-    aria-labelledby="settings-title"
     hidden={!uiState.isSettingsOpen}
   >
     <header class="settings-screen-head">
-      <h1 id="settings-title">Settings</h1>
       <button id="settings-close" type="button" onclick={editorSession.commands.closeSettings}>
         Close
       </button>
     </header>
 
     <div class="settings-screen-body">
-      <div id="settings-form" class="settings-form">
-        <div class="control-field">
-          <label for="launchpad-model-mk2" class="field-label">Launchpad MK2 Mode</label>
-          <input
-            id="launchpad-model-mk2"
-            type="checkbox"
-            checked={uiState.launchpadModel === 'mk2'}
-            onchange={(event) => {
-              const target = event.currentTarget as HTMLInputElement;
-              handleLaunchpadModelToggle(target.checked);
-            }}
-          />
-        </div>
-        <div class="control-field">
-          <span class="field-label">Palette File</span>
-          <input
-            id="palette-file-input"
-            type="file"
-            accept=".txt,.csv,.palette,text/plain"
-            onchange={handlePaletteFileChange}
-          />
-        </div>
+      <div class="settings-container">
+        <!-- Settings -->
+        <section class="settings-section">
+          <h2 class="settings-section-title">Settings</h2>
+          <div class="settings-card">
+            <div class="settings-row">
+              <div class="info">
+                <span class="label">Pro MK2 Mode</span>
+                <span class="description">Enable mapping for Launchpad Pro MK2</span>
+              </div>
+              <input
+                id="launchpad-model-mk2"
+                type="checkbox"
+                checked={uiState.launchpadModel === 'mk2'}
+                onchange={(event) => {
+                  const target = event.currentTarget as HTMLInputElement;
+                  handleLaunchpadModelToggle(target.checked);
+                }}
+              />
+            </div>
+             <div class="settings-row">
+              <div class="info">
+                <span class="label">Color Palette</span>
+                <span class="description">{uiState.paletteNameText || 'Default palette'}</span>
+              </div>
+              
+              <div class="settings-actions">
+                <button id="palette-reset" type="button" onclick={handlePaletteReset}>
+                  Reset to Default
+                </button>
+                <div class="file-input-wrapper">
+                  <div class="file-button">Upload File</div>
+                  <input
+                    id="palette-file-input"
+                    type="file"
+                    onchange={handlePaletteFileChange}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
-        <div class="settings-palette-row">
-          <span id="palette-name">{uiState.paletteNameText}</span>
-          <button id="palette-reset" type="button" onclick={handlePaletteReset}>
-            Reset to Default
-          </button>
-        </div>
+        <!-- About -->
+        <section class="settings-section">
+          <h2 class="settings-section-title">About</h2>
+          <div class="settings-card">
+            <div class="settings-row">
+              <div class="info">
+                <span class="label">Version</span>
+                <span class="description">{appVersionText ? `v${appVersionText}` : 'Loading...'}</span>
+              </div>
+            </div>
+            <div class="settings-row">
+              <div class="info">
+                <span class="label">sihyunlights</span>
+                <span class="description">https://sihyunlights.com</span>
+              </div>
+              <button
+                type="button"
+                title="Visit website"
+                onclick={() => bridgeClient.openExternal('https://sihyunlights.com')}
+              >
+                Visit
+              </button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   </section>

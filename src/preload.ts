@@ -65,6 +65,8 @@ ipcRenderer.on(
 const api: CompassApi = {
   generateAndSend: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.generateAndSend, request),
+  requestAppVersion: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.requestAppVersion),
   requestLiveTempo: () =>
     ipcRenderer.invoke(IPC_CHANNELS.requestLiveTempo),
   openPreviewWindow: () =>
@@ -86,6 +88,8 @@ const api: CompassApi = {
     previewGuideEnabledListeners.subscribe(listener),
   subscribeLiveTempo: (listener) =>
     liveTempoListeners.subscribe(listener),
+  openExternal: (url) =>
+    ipcRenderer.invoke(IPC_CHANNELS.openExternal, url),
 };
 
 contextBridge.exposeInMainWorld('compass', api);

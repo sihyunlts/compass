@@ -1,5 +1,6 @@
 export const IPC_CHANNELS = {
   generateAndSend: 'bridge:generate-and-send',
+  requestAppVersion: 'bridge:request-app-version',
   requestLiveTempo: 'bridge:request-live-tempo',
   liveTempoUpdate: 'live:tempo-update',
   openPreviewWindow: 'preview:open-window',
@@ -10,4 +11,5 @@ export const IPC_CHANNELS = {
   previewWindowVisibilityUpdate: 'preview:window-visibility-update',
   requestPreviewGuideEnabledUpdate: 'preview:request-guide-enabled-update',
   previewGuideEnabledUpdate: 'preview:guide-enabled-update',
+  openExternal: 'bridge:open-external',
 } as const;
