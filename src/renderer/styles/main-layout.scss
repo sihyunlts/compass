@@ -23,7 +23,7 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--gap-8) var(--gap-10);
-    border-bottom: 1px solid rgb(var(--rgb-white) / var(--alpha-06));
+    border-bottom: 1px solid var(--neutral-20);
     -webkit-app-region: drag;
 
     .workspace-actions,
