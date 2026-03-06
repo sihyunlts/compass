@@ -1,26 +1,17 @@
 <script lang="ts">
   /**
    * Main renderer composition root.
-   * Delegates editor state/commands to EditorSession while keeping preview/playback orchestration local.
+   * Delegates non-visual orchestration to renderer/app modules and keeps UI wiring here.
    */
   import { onMount, tick } from 'svelte';
 
-  import type { GeneratorChain, LaunchpadModel, PaletteFilePayload } from '../shared/model';
-  import type { GeneratorPreview } from '../shared/contracts/preview/generator-preview';
-  import type { GenerateAndSendRequest } from '../shared/contracts/ipc/generator';
-  import type { BridgeSettings } from '../shared/bridge/types';
-  import {
-    AUTO_CREATE_LENGTH_OPTIONS,
-  } from '../shared/beat-length';
-  import { clamp } from '../shared/math';
+  import type { PaletteFilePayload } from '../shared/model';
+  import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
   import {
     getBrowserDeviceLabel,
     type BrowserDeviceKind,
   } from './services/devices';
-  import {
-    sanitizePreviewBpm,
-    sanitizeSidebarWidth,
-  } from './services/storage';
+  import { sanitizeSidebarWidth } from './services/storage';
   import BrowserPanel from './components/BrowserPanel.svelte';
   import SidebarResizer from './components/SidebarResizer.svelte';
   import DeviceRack from './components/DeviceRack.svelte';
@@ -29,11 +20,11 @@
   import PreviewPanel from './components/PreviewPanel.svelte';
   import ContextMenu from './components/ContextMenu.svelte';
   import { createPaletteController } from './services/palette';
-  import {
-    createPlaybackScheduler,
-    createPreviewWindowStatePusher,
-  } from './services/playback';
-  import { cloneChainForIpc } from './services/clone-chain';
+  import { mountBridgeSubscriptions } from './app/bridge-subscriptions';
+  import { createHeaderIndicator } from './app/header-indicator.svelte';
+  import { mountKeyboardShortcuts } from './app/keyboard-shortcuts';
+  import { createPlaybackSession } from './app/playback-session.svelte';
+  import { createSendFlow } from './app/send-flow';
   import {
     createEditorSession,
     type EditorRackBinding,
@@ -47,54 +38,16 @@
   import { createPreviewSession } from './features/preview/session.svelte';
   import type { RackViewApi } from './features/rack/api';
 
-  const SCRUB_MAX = 1000;
-  const PREVIEW_WINDOW_STATE_MAX_FPS = 120;
-  const PREVIEW_WINDOW_STATE_MIN_INTERVAL_MS = Math.round(
-    1000 / PREVIEW_WINDOW_STATE_MAX_FPS,
-  );
   const AUTO_PREVIEW_DEBOUNCE_MS = 120;
   const HISTORY_MAX_ENTRIES = 100;
-  const SEND_DONE_MS = 900;
-  const HEADER_INDICATOR_VISIBILITY_MS = 2000;
-  const HEADER_INDICATOR_FADE_OUT_MS = 1500;
   const DEFAULT_LED_RGB = '255 166 57';
   const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, select, textarea, option';
-  const NON_TEXT_INPUT_TYPES = new Set([
-    'checkbox',
-    'radio',
-    'range',
-    'button',
-    'submit',
-    'reset',
-  ]);
-
-  const isTextEditingElement = (element: Element | null): boolean => {
-    if (!element) {
-      return false;
-    }
-
-    if (
-      element instanceof HTMLTextAreaElement
-      || element instanceof HTMLSelectElement
-      || (element instanceof HTMLElement && element.isContentEditable)
-    ) {
-      return true;
-    }
-
-    if (element instanceof HTMLInputElement) {
-      const type = element.type.toLowerCase();
-      return !NON_TEXT_INPUT_TYPES.has(type);
-    }
-
-    return false;
-  };
 
   const toBrowserDragBadgeLabel = (kind: BrowserDeviceKind): string =>
     `+ ${getBrowserDeviceLabel(kind)}`;
   const bridgeClient = window.compass;
   let appVersionText = $state('');
   let rackViewApi: RackViewApi | null = $state(null);
-  let playbackScheduler: ReturnType<typeof createPlaybackScheduler> | null = null;
   let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
 
   const closeContextMenu = (): void => {
@@ -110,7 +63,7 @@
   const editorSession = createEditorSession({
     autoPreviewDebounceMs: AUTO_PREVIEW_DEBOUNCE_MS,
     historyMaxEntries: HISTORY_MAX_ENTRIES,
-    onAutoPreview: () => runPreview(),
+    onAutoPreview: () => playbackSession.runPreview(),
     onSyncAfterRender: () => syncRackAfterRender(),
   });
   const previewSession = createPreviewSession();
@@ -130,21 +83,29 @@
   });
   const resolvePaletteRgb = (velocity: number): string =>
     paletteController.getLedRgb(velocity, '0 0 0');
-  const previewWindowStatePusher = createPreviewWindowStatePusher({
+  const headerIndicator = createHeaderIndicator({
+    getText: () => uiState.headerIndicatorText,
+    setText: (text) => {
+      editorSession.commands.setHeaderIndicatorText(text);
+    },
+    clearText: () => {
+      editorSession.commands.clearHeaderIndicatorText();
+    },
+  });
+  const playbackSession = createPlaybackSession({
     bridgeClient,
-    minIntervalMs: PREVIEW_WINDOW_STATE_MIN_INTERVAL_MS,
+    editorSession,
+    previewSession,
+    headerIndicator,
+    resolveLedRgb: (velocity) => paletteController.getLedRgb(velocity, DEFAULT_LED_RGB),
+  });
+  const sendFlow = createSendFlow({
+    bridgeClient,
+    editorSession,
+    headerIndicator,
+    playbackSession,
   });
 
-  let currentBeat = $state(0);
-  let isPlaying = $state(false);
-  let sendDoneTimer: number | null = null;
-  let liveTempoUnsubscribe: (() => void) | null = null;
-  let previewWindowVisibilityUnsubscribe: (() => void) | null = null;
-  let previewGuideEnabledUnsubscribe: (() => void) | null = null;
-  let headerIndicatorTimer: number | null = null;
-  let headerIndicatorFadeTimer: number | null = null;
-  let headerIndicatorDisplayText = $state('');
-  let isHeaderIndicatorVisible = $state(false);
   let rackScrollMetrics: RackScrollMetrics = $state({
     scrollLeft: 0,
     scrollWidth: 1,
@@ -182,62 +143,9 @@
     editorSession.commands.attachRackBinding(createRackBinding());
   });
 
-  const clearHeaderIndicatorTimer = (): void => {
-    if (headerIndicatorTimer === null) {
-      return;
-    }
-    window.clearTimeout(headerIndicatorTimer);
-    headerIndicatorTimer = null;
-  };
-
-  const clearHeaderIndicatorFadeTimer = (): void => {
-    if (headerIndicatorFadeTimer === null) {
-      return;
-    }
-    window.clearTimeout(headerIndicatorFadeTimer);
-    headerIndicatorFadeTimer = null;
-  };
-
-  const setHeaderIndicatorText = (
-    text: string,
-    options: { autoClear?: boolean } = {},
-  ): void => {
-    editorSession.commands.setHeaderIndicatorText(text);
-    clearHeaderIndicatorTimer();
-    if (options.autoClear === false) {
-      return;
-    }
-
-    headerIndicatorTimer = window.setTimeout(() => {
-      headerIndicatorTimer = null;
-      if (uiState.headerIndicatorText === text) {
-        editorSession.commands.clearHeaderIndicatorText();
-      }
-    }, HEADER_INDICATOR_VISIBILITY_MS);
-  };
-
   $effect(() => {
-    const nextText = uiState.headerIndicatorText.trim();
-    clearHeaderIndicatorFadeTimer();
-
-    if (nextText) {
-      headerIndicatorDisplayText = nextText;
-      isHeaderIndicatorVisible = true;
-      return;
-    }
-
-    if (!headerIndicatorDisplayText) {
-      isHeaderIndicatorVisible = false;
-      return;
-    }
-
-    isHeaderIndicatorVisible = false;
-    headerIndicatorFadeTimer = window.setTimeout(() => {
-      headerIndicatorFadeTimer = null;
-      if (uiState.headerIndicatorText.trim() === '') {
-        headerIndicatorDisplayText = '';
-      }
-    }, HEADER_INDICATOR_FADE_OUT_MS);
+    void uiState.headerIndicatorText;
+    headerIndicator.syncFromSource();
   });
 
   const handleUndoClick = (): void => {
@@ -248,136 +156,6 @@
   const handleRedoClick = (): void => {
     closeContextMenu();
     editorSession.commands.redo();
-  };
-
-  const readBridge = (): BridgeSettings =>
-    editorSession.commands.readBridgeSettings();
-
-  const requestLiveTempoSync = async (): Promise<void> => {
-    await bridgeClient.requestLiveTempo();
-  };
-
-  const runBestEffort = (task: Promise<unknown>): void => {
-    void task.catch(() => {
-      // Non-critical sync failures should not break the main flow.
-    });
-  };
-
-  const getPreviewLoopMs = (): number => {
-    const bpm = sanitizePreviewBpm(uiState.previewBpm);
-    const beats = Math.max(uiState.previewLoopLengthBeats, 0.25);
-    return (60000 / bpm) * beats;
-  };
-
-  const renderPreviewFrame = (): void => {
-    const nextPreviewWindowState = previewSession.commands.renderFrame({
-      fallbackChain: uiState.chainState,
-      fallbackKey: `chain:${uiState.chainRevision}`,
-      launchpadModel: uiState.launchpadModel,
-      currentBeat,
-      loopLengthBeats: uiState.previewLoopLengthBeats,
-      bpm: uiState.previewBpm,
-      isPlaying,
-      isLoopEnabled: uiState.isPreviewLoopEnabled,
-      isGuideEnabled: uiState.isPreviewGuideEnabled,
-      resolveLedRgb: (velocity) => paletteController.getLedRgb(velocity, DEFAULT_LED_RGB),
-    });
-
-    const progress = nextPreviewWindowState.currentBeat / nextPreviewWindowState.sourceTimelineEndBeat;
-    const nextPreviewScrubValue = Math.round(clamp(progress, 0, 1) * SCRUB_MAX);
-    if (uiState.previewScrubValue !== nextPreviewScrubValue) {
-      uiState.previewScrubValue = nextPreviewScrubValue;
-    }
-
-    previewWindowStatePusher.push(nextPreviewWindowState);
-  };
-
-  const stopPlayback = (): void => {
-    playbackScheduler?.stop();
-  };
-
-  const startPlayback = (): void => {
-    if (previewState.noteCount === 0) {
-      return;
-    }
-
-    if (!playbackScheduler || playbackScheduler.isPlaying()) {
-      return;
-    }
-
-    playbackScheduler.start();
-  };
-
-  const applyPreviewData = (
-    preview: GeneratorPreview,
-    bridge: BridgeSettings | null,
-    source: 'preview' | 'send',
-    sourceChain: GeneratorChain,
-    sourceKey: string,
-    previewLaunchpadModel: LaunchpadModel,
-  ): void => {
-    const nextLoopLengthBeats = bridge?.autoCreateLengthBeats ?? readBridge().autoCreateLengthBeats;
-    previewSession.commands.applyPreviewResult({
-      preview,
-      sourceChain,
-      sourceKey,
-      loopLengthBeats: nextLoopLengthBeats,
-      launchpadModel: previewLaunchpadModel,
-    });
-    editorSession.commands.setPreviewLoopLengthBeats(nextLoopLengthBeats);
-    if (playbackScheduler) {
-      playbackScheduler.setCurrentBeat(0);
-    } else {
-      currentBeat = 0;
-      renderPreviewFrame();
-    }
-
-    if (preview.noteCount > 0) {
-      if (source === 'preview') {
-        setHeaderIndicatorText(`${preview.noteCount} notes generated`);
-      } else {
-        setHeaderIndicatorText('Send complete');
-      }
-      startPlayback();
-      return;
-    }
-
-    clearHeaderIndicatorTimer();
-    editorSession.commands.clearHeaderIndicatorText();
-    stopPlayback();
-  };
-
-  const runPreview = async (): Promise<void> => {
-    try {
-      const sourceKey = `chain:${uiState.chainRevision}`;
-      const requestLaunchpadModel = uiState.launchpadModel;
-      const requestChain = cloneChainForIpc(uiState.chainState);
-      const preview = previewSession.commands.generateRendererPreview({
-        sourceChain: requestChain,
-        sourceKey,
-        loopLengthBeats: uiState.previewLoopLengthBeats,
-        launchpadModel: requestLaunchpadModel,
-      });
-      applyPreviewData(
-        preview,
-        null,
-        'preview',
-        requestChain,
-        sourceKey,
-        requestLaunchpadModel,
-      );
-    } catch (error) {
-      stopPlayback();
-      const errorText = error instanceof Error ? error.message : 'Unknown preview error';
-      setHeaderIndicatorText(`Preview update failed | ${errorText}`);
-    }
-  };
-
-  const clearSendDoneTimer = (): void => {
-    if (sendDoneTimer !== null) {
-      window.clearTimeout(sendDoneTimer);
-      sendDoneTimer = null;
-    }
   };
 
   const handleRackScrollMetricsChange = (metrics: RackScrollMetrics): void => {
@@ -406,7 +184,7 @@
         content,
       };
       paletteController.applyUploadedPalette(payload);
-      renderPreviewFrame();
+      playbackSession.renderPreviewFrame();
     } catch (error) {
       void error;
     } finally {
@@ -418,313 +196,42 @@
 
   const handlePaletteReset = (): void => {
     paletteController.resetToDefault();
-    renderPreviewFrame();
+    playbackSession.renderPreviewFrame();
   };
 
   const handleLaunchpadModelToggle = (nextEnabled: boolean): void => {
     if (editorSession.commands.setLaunchpadModelEnabled(nextEnabled)) {
-      renderPreviewFrame();
+      playbackSession.renderPreviewFrame();
     }
   };
-
-  const handlePreviewPlayClick = (): void => {
-    if (isPlaying) {
-      stopPlayback();
-      return;
-    }
-
-    startPlayback();
-  };
-
-  const handlePreviewLoopToggle = (): void => {
-    if (editorSession.commands.togglePreviewLoopEnabled()) {
-      renderPreviewFrame();
-    }
-  };
-
-  const handlePreviewGuideToggle = (nextEnabled: boolean): void => {
-    if (editorSession.commands.setPreviewGuideEnabled(nextEnabled)) {
-      renderPreviewFrame();
-    }
-  };
-
-  const handlePreviewPopout = async (): Promise<void> => {
-    try {
-      await bridgeClient.openPreviewWindow();
-      editorSession.commands.setPreviewPopoutOpen(true);
-      renderPreviewFrame();
-    } catch {
-      setHeaderIndicatorText('Failed to open preview popout');
-    }
-  };
-
-  const handlePreviewScrubInput = (): void => {
-    const scrubProgress = clamp(Number(uiState.previewScrubValue) / SCRUB_MAX, 0, 1);
-    const nextBeat = scrubProgress * previewState.sourceTimelineEndBeat;
-    if (playbackScheduler) {
-      playbackScheduler.setCurrentBeat(nextBeat);
-      return;
-    }
-
-    currentBeat = nextBeat;
-    renderPreviewFrame();
-  };
-
-  const handleSendClick = async (): Promise<void> => {
-    editorSession.commands.cancelAutoPreview();
-    clearSendDoneTimer();
-    editorSession.commands.setSendButtonState('Sending...', true);
-    setHeaderIndicatorText('Sending...', { autoClear: false });
-
-    try {
-      const bridge = readBridge();
-      editorSession.commands.applyBridgeSettings(bridge, { persist: true });
-      const sourceKey = `chain:${uiState.chainRevision}`;
-      const requestLaunchpadModel = uiState.launchpadModel;
-      const requestChain = cloneChainForIpc(uiState.chainState);
-
-      const request: GenerateAndSendRequest = {
-        chain: requestChain,
-        bridge,
-        launchpadModel: requestLaunchpadModel,
-      };
-      const response = await bridgeClient.generateAndSend(request);
-      applyPreviewData(
-        response.preview,
-        response.bridge,
-        'send',
-        requestChain,
-        sourceKey,
-        requestLaunchpadModel,
-      );
-      editorSession.commands.setSendButtonState('Done!', false);
-      sendDoneTimer = window.setTimeout(() => {
-        sendDoneTimer = null;
-        editorSession.commands.setSendButtonState('Send', false);
-      }, SEND_DONE_MS);
-    } catch (error) {
-      stopPlayback();
-      const errorText = error instanceof Error ? error.message : 'Unknown send error';
-      setHeaderIndicatorText(`Send failed | ${errorText}`);
-      editorSession.commands.setSendButtonState('Send', false);
-    }
-  };
-
 
   onMount(() => {
     editorSession.commands.initialize();
-    playbackScheduler = createPlaybackScheduler({
-      getLoopMs: () => getPreviewLoopMs(),
-      getLoopEndBeat: () => previewState.sourceTimelineEndBeat,
-      isLoopEnabled: () => uiState.isPreviewLoopEnabled,
-      onFrame: (nextBeat) => {
-        currentBeat = nextBeat;
-        renderPreviewFrame();
-      },
-      onPlayStateChange: (nextIsPlaying) => {
-        isPlaying = nextIsPlaying;
-        editorSession.commands.setPreviewPlaying(nextIsPlaying);
-      },
-    });
-
-    liveTempoUnsubscribe = bridgeClient.subscribeLiveTempo((update) => {
-      if (editorSession.commands.syncPreviewBpm(update.bpm)) {
-        setHeaderIndicatorText('BPM synced');
-      }
-    });
-
-    previewWindowVisibilityUnsubscribe = bridgeClient.subscribePreviewWindowVisibility((isOpen) => {
-      editorSession.commands.setPreviewPopoutOpen(isOpen);
-    });
-
-    previewGuideEnabledUnsubscribe = bridgeClient.subscribePreviewGuideEnabledUpdate((enabled) => {
-      handlePreviewGuideToggle(enabled === true);
-    });
-
-    runBestEffort(
-      bridgeClient.requestAppVersion().then((version) => {
+    playbackSession.initialize();
+    const disposeBridgeSubscriptions = mountBridgeSubscriptions({
+      bridgeClient,
+      playbackSession,
+      onVersionResolved: (version) => {
         appVersionText = version;
-      }),
-    );
-
-    runBestEffort(
-      bridgeClient.requestPreviewWindowVisibility().then((isOpen) => {
-        editorSession.commands.setPreviewPopoutOpen(isOpen === true);
-      }),
-    );
-
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        closeContextMenu();
-        editorSession.commands.closeSettings();
-        return;
-      }
-
-      const target = event.target instanceof Element ? event.target : null;
-      if (isTextEditingElement(target)) {
-        return;
-      }
-
-      const isGroupShortcut =
-        (event.metaKey || event.ctrlKey)
-        && event.key.toLowerCase() === 'g';
-      if (isGroupShortcut) {
-        if (event.shiftKey) {
-          if (editorSession.commands.ungroupSelectedGroups()) {
-            event.preventDefault();
-            closeContextMenu();
-          }
-          return;
-        }
-
-        if (editorSession.commands.groupSelection()) {
-          event.preventDefault();
-          closeContextMenu();
-        }
-        return;
-      }
-
-      const isModifierShortcut = (event.metaKey || event.ctrlKey) && !event.altKey;
-      if (isModifierShortcut) {
-        const key = event.key.toLowerCase();
-        const isUndoShortcut = key === 'z' && !event.shiftKey;
-        if (isUndoShortcut) {
-          if (editorSession.commands.undo()) {
-            event.preventDefault();
-            closeContextMenu();
-          }
-          return;
-        }
-
-        const isRedoShortcut =
-          (key === 'z' && event.shiftKey)
-          || (key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey);
-        if (isRedoShortcut) {
-          if (editorSession.commands.redo()) {
-            event.preventDefault();
-            closeContextMenu();
-          }
-          return;
-        }
-
-        if (key === 'c') {
-          if (editorSession.commands.copySelection()) {
-            event.preventDefault();
-            closeContextMenu();
-          }
-          return;
-        }
-
-        if (key === 'x') {
-          if (editorSession.commands.cutSelection()) {
-            event.preventDefault();
-            closeContextMenu();
-          }
-          return;
-        }
-
-        if (key === 'v') {
-          if (editorSession.commands.pasteClipboard()) {
-            event.preventDefault();
-            closeContextMenu();
-          }
-          return;
-        }
-
-        if (key === 'd') {
-          if (editorSession.commands.duplicateSelection()) {
-            event.preventDefault();
-            closeContextMenu();
-          }
-          return;
-        }
-
-        if (key === 'a') {
-          if (editorSession.commands.selectAllRackDevices()) {
-            event.preventDefault();
-            closeContextMenu();
-          }
-          return;
-        }
-      }
-
-      if (event.key !== 'Delete' && event.key !== 'Backspace') {
-        return;
-      }
-
-      if (editorSession.commands.deleteSelection()) {
-        event.preventDefault();
-        closeContextMenu();
-      }
-    };
-
-    const handleFocusIn = (event: FocusEvent): void => {
-      const target = event.target instanceof Element ? event.target : null;
-      if (!isTextEditingElement(target)) {
-        return;
-      }
-      editorSession.commands.clearSelection();
-    };
-
-    const handleWindowPointerDown = (event: PointerEvent): void => {
-      const target = event.target instanceof Element ? event.target : null;
-      if (!target) {
-        return;
-      }
-
-      const rackEl = document.getElementById('chain-devices');
-      if (rackEl && rackEl.contains(target)) {
-        return;
-      }
-
-      editorSession.commands.clearSelection();
-    };
-
-    const handleBeforeUnload = (): void => {
-      if (liveTempoUnsubscribe) {
-        liveTempoUnsubscribe();
-        liveTempoUnsubscribe = null;
-      }
-    };
-
-
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('focusin', handleFocusIn);
-    window.addEventListener('pointerdown', handleWindowPointerDown);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    runBestEffort(requestLiveTempoSync());
+      },
+    });
+    const disposeKeyboardShortcuts = mountKeyboardShortcuts({
+      editorSession,
+      closeContextMenu,
+      onBeforeUnload: disposeBridgeSubscriptions,
+    });
 
     paletteController.initialize();
-    renderPreviewFrame();
+    playbackSession.renderPreviewFrame();
     editorSession.commands.scheduleAutoPreview(0);
 
     return () => {
-      playbackScheduler?.teardown();
-      playbackScheduler = null;
-      previewWindowStatePusher.reset();
+      disposeKeyboardShortcuts();
+      disposeBridgeSubscriptions();
+      sendFlow.dispose();
+      playbackSession.dispose();
+      headerIndicator.dispose();
       editorSession.commands.dispose();
-      clearSendDoneTimer();
-      clearHeaderIndicatorTimer();
-      clearHeaderIndicatorFadeTimer();
-
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('focusin', handleFocusIn);
-      window.removeEventListener('pointerdown', handleWindowPointerDown);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-
-      if (liveTempoUnsubscribe) {
-        liveTempoUnsubscribe();
-        liveTempoUnsubscribe = null;
-      }
-      if (previewWindowVisibilityUnsubscribe) {
-        previewWindowVisibilityUnsubscribe();
-        previewWindowVisibilityUnsubscribe = null;
-      }
-      if (previewGuideEnabledUnsubscribe) {
-        previewGuideEnabledUnsubscribe();
-        previewGuideEnabledUnsubscribe = null;
-      }
     };
   });
 
@@ -768,11 +275,11 @@
           <span
             id="preview-meta"
             class="header-preview-meta"
-            class:is-visible={isHeaderIndicatorVisible}
+            class:is-visible={headerIndicator.state.isVisible}
             role="status"
             aria-live="polite"
           >
-            {headerIndicatorDisplayText}
+            {headerIndicator.state.displayText}
           </span>
         </div>
 
@@ -818,7 +325,7 @@
             class="primary"
             type="button"
             disabled={uiState.sendButtonDisabled}
-            onclick={handleSendClick}
+            onclick={() => sendFlow.send()}
           >
             {uiState.sendButtonLabel}
           </button>
@@ -831,7 +338,7 @@
           chainState={uiState.chainState}
           collapsedDeviceIds={uiState.collapsedDeviceIds}
           {paletteRevision}
-          {currentBeat}
+          currentBeat={playbackSession.state.currentBeat}
           modulationReadoutById={previewState.modulationReadoutById}
           {resolvePaletteRgb}
           isSidebarResizing={uiState.isSidebarResizing}
@@ -853,14 +360,14 @@
         {#if !uiState.isPreviewPopoutOpen}
           <PreviewPanel
             surfaceModel={previewState.surfaceModel}
-            onGuideToggle={handlePreviewGuideToggle}
-            onPopout={handlePreviewPopout}
+            onGuideToggle={(enabled) => playbackSession.setPreviewGuideEnabled(enabled)}
+            onPopout={() => playbackSession.openPreviewPopout()}
             playLabel={previewPanelControls.playLabel}
             loopEnabled={previewPanelControls.loopEnabled}
-            onPlayClick={handlePreviewPlayClick}
-            onLoopToggle={handlePreviewLoopToggle}
+            onPlayClick={() => playbackSession.togglePlayback()}
+            onLoopToggle={() => playbackSession.togglePreviewLoop()}
             bind:scrubValue={uiState.previewScrubValue}
-            onScrubInput={handlePreviewScrubInput}
+            onScrubInput={() => playbackSession.scrubPreview(uiState.previewScrubValue)}
           />
         {/if}
       </section>
