@@ -8,7 +8,7 @@ import type { CompassApi } from '../../shared/contracts/ipc/api';
  * Keeps frame timing and IPC payload shaping centralized for the main app view.
  */
 /** Configures beat scheduling callbacks for renderer playback. */
-export interface PlaybackSchedulerOptions {
+interface PlaybackSchedulerOptions {
   getLoopMs: () => number;
   getLoopEndBeat: () => number;
   isLoopEnabled: () => boolean;
@@ -124,7 +124,7 @@ export const createPlaybackScheduler = (
 ): PlaybackScheduler => new PlaybackScheduler(options);
 
 /** Configures preview-window state push behavior and chain cloning. */
-export interface PreviewWindowStatePusherOptions {
+interface PreviewWindowStatePusherOptions {
   bridgeClient: CompassApi;
   minIntervalMs: number;
   now?: () => number;

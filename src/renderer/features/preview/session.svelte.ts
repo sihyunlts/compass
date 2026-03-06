@@ -46,7 +46,7 @@ interface PreviewFrameInput {
   resolveLedRgb: (velocity: number) => string;
 }
 
-export interface PreviewSessionState {
+interface PreviewSessionState {
   previewWindowState: PreviewWindowState | null;
   surfaceModel: PreviewSurfaceViewModel;
   modulationReadoutById: Record<string, string>;

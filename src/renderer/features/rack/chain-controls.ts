@@ -3,18 +3,18 @@ import {
   getRendererDeviceControlDefinition,
   getRendererModulationTargetParamDefinitions,
   RENDERER_DEVICE_KINDS,
-} from '../../../../devices';
+} from '../../../devices';
 import {
   createMergeKeyResolver,
   getControlTarget,
   requireInput,
-} from '../../../../devices/control-helpers';
+} from '../../../devices/control-helpers';
 import type {
   RendererControlContext,
   RendererControlDescriptor,
   RendererControlHandler,
-} from '../../../../devices/control-types';
-import type { GeneratorDeviceNode } from '../../../../shared/model';
+} from '../../../devices/control-types';
+import type { GeneratorDeviceNode } from '../../../shared/model';
 
 type ChainControlHandler = RendererControlHandler;
 

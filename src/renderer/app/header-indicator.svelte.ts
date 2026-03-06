@@ -13,7 +13,7 @@ interface HeaderIndicatorShowOptions {
   autoClear?: boolean;
 }
 
-export interface HeaderIndicatorState {
+interface HeaderIndicatorState {
   displayText: string;
   isVisible: boolean;
 }

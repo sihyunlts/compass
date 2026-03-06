@@ -14,7 +14,7 @@ interface SendFlowOptions {
 
 const DEFAULT_SEND_DONE_MS = 900;
 
-export class SendFlowController {
+class SendFlowController {
   private sendDoneTimer: number | null = null;
 
   public constructor(private readonly options: SendFlowOptions) {}

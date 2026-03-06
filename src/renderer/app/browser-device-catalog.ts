@@ -4,7 +4,7 @@ import {
 } from '../../devices';
 import type { RendererDeviceKind } from '../../devices';
 
-export interface BrowserDeviceCatalogItem {
+interface BrowserDeviceCatalogItem {
   kind: RendererDeviceKind;
   label: string;
 }

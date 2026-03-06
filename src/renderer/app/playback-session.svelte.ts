@@ -16,12 +16,12 @@ import {
 import { sanitizePreviewBpm } from '../features/editor/persistence-storage';
 import type { HeaderIndicatorController } from './header-indicator.svelte';
 
-export interface PlaybackSessionState {
+interface PlaybackSessionState {
   currentBeat: number;
   isPlaying: boolean;
 }
 
-export interface ApplyPreviewResultInput {
+interface ApplyPreviewResultInput {
   preview: GeneratorPreview;
   bridge: BridgeSettings | null;
   source: 'preview' | 'send';

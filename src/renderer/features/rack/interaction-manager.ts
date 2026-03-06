@@ -11,7 +11,7 @@ import {
   createChainControlHandlers,
   resolveChainControlMergeKey,
   resetNumericControlToDefault,
-} from './controls';
+} from './chain-controls';
 
 /**
  * Coordinates non-selection rack interactions in the main renderer.

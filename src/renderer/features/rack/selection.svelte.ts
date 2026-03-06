@@ -58,7 +58,7 @@ const dedupeIds = (ids: Iterable<string>): string[] => {
   return nextIds;
 };
 
-export interface RackSelectionState {
+interface RackSelectionState {
   selectedDeviceIds: string[];
   lastSelectedDeviceId: string | null;
   selectedGroupIds: string[];

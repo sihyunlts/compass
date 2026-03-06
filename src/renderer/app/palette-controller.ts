@@ -146,7 +146,7 @@ const getDefaultPalette = (): PaletteFilePayload => ({
   content: DEFAULT_PALETTE_CONTENT,
 });
 
-export interface PaletteControllerOptions {
+interface PaletteControllerOptions {
   onPaletteNameChanged: (nameText: string) => void;
 }
 

@@ -10,7 +10,7 @@ import {
 
 type EditorHistoryOptions = Parameters<typeof createChainHistory>[1];
 
-export interface EditorHistoryEntryMeta {
+interface EditorHistoryEntryMeta {
   id: string;
   revision: number;
   label: string;
@@ -22,7 +22,7 @@ export interface EditorHistoryListEntry extends EditorHistoryEntryMeta {
   isCurrent: boolean;
 }
 
-export interface EditorHistorySnapshotEntry extends EditorHistoryEntryMeta {
+interface EditorHistorySnapshotEntry extends EditorHistoryEntryMeta {
   chain: GeneratorChain;
 }
 
