@@ -4,7 +4,10 @@ import type { GeneratorDeviceNode } from '../shared/model';
 
 export type RendererDeviceKind = GeneratorDeviceNode['kind'];
 export type RendererDeviceGroup = 'generator' | 'effect';
-type DeviceOfKind<K extends RendererDeviceKind> = Extract<GeneratorDeviceNode, { kind: K }>;
+export type RendererDeviceNodeOfKind<K extends RendererDeviceKind> = Extract<
+  GeneratorDeviceNode,
+  { kind: K }
+>;
 
 export interface RendererDeviceEditorPropsBase {
   devices?: GeneratorDeviceNode[];
@@ -16,7 +19,7 @@ export interface RendererDeviceEditorPropsBase {
 
 export type RendererDeviceEditorProps<K extends RendererDeviceKind = RendererDeviceKind> =
   RendererDeviceEditorPropsBase & {
-    device: DeviceOfKind<K>;
+    device: RendererDeviceNodeOfKind<K>;
   };
 
 export interface RendererModulationParamDefinition {
@@ -24,11 +27,18 @@ export interface RendererModulationParamDefinition {
   label: string;
 }
 
+export type RendererDeviceNodeFactory<K extends RendererDeviceKind = RendererDeviceKind> = (
+  id: string,
+  enabled: boolean,
+) => RendererDeviceNodeOfKind<K>;
+
 export interface RendererDeviceSchema<K extends RendererDeviceKind = RendererDeviceKind> {
   kind: K;
   label: string;
   group: RendererDeviceGroup;
   modulationTargetParams?: readonly RendererModulationParamDefinition[];
+  numericParamKeys?: readonly string[];
+  createDefaultNode: RendererDeviceNodeFactory<K>;
 }
 
 export interface RendererDeviceDefinition<K extends RendererDeviceKind = RendererDeviceKind>

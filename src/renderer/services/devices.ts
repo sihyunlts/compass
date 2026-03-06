@@ -1,7 +1,5 @@
 import {
-  createDefaultDeviceNode,
-} from '../../shared/device-registry';
-import {
+  createRendererDeviceNode,
   getRendererDeviceGroup,
   getRendererDeviceLabel,
   isRendererDeviceKind,
@@ -10,17 +8,6 @@ import {
 } from '../../devices/metadata';
 import type { RendererDeviceGroup, RendererDeviceKind } from '../../devices';
 import type { GeneratorDeviceNode } from '../../shared/model';
-
-export {
-  SCANNER_PARAM_KEYS,
-  SPIRAL_PARAM_KEYS,
-  WATERDROP_PARAM_KEYS,
-} from '../../shared/device-registry';
-export type {
-  ScannerParamKey,
-  SpiralParamKey,
-  WaterdropParamKey,
-} from '../../shared/device-registry';
 
 export type BrowserDeviceKind = RendererDeviceKind;
 export type BrowserDeviceGroup = RendererDeviceGroup;
@@ -63,7 +50,7 @@ const createGeneratedDeviceNode = (
   const id = group === 'generator'
     ? `generator-${generatorIdSeed++}`
     : `effect-${effectIdSeed++}`;
-  return createDefaultDeviceNode(kind, id);
+  return createRendererDeviceNode(kind, id);
 };
 
 export const createInitialChainDevices = (): GeneratorDeviceNode[] => [

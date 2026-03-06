@@ -11,6 +11,7 @@ import type {
   RendererDeviceGroup,
   RendererDeviceKind,
   RendererDeviceSchema,
+  RendererDeviceNodeOfKind,
   RendererModulationParamDefinition,
 } from './types';
 import { waterdropDeviceSchema } from './waterdrop/schema';
@@ -51,9 +52,9 @@ export const isRendererDeviceKind = (
   !!value && RENDERER_DEVICE_KIND_SET.has(value as RendererDeviceKind)
 );
 
-export const getRendererDeviceSchema = (
-  kind: RendererDeviceKind,
-): RendererDeviceSchema => rendererDeviceSchemas[kind];
+export const getRendererDeviceSchema = <K extends RendererDeviceKind>(
+  kind: K,
+): RendererDeviceSchema<K> => rendererDeviceSchemas[kind] as RendererDeviceSchema<K>;
 
 export const getRendererDeviceLabel = (kind: RendererDeviceKind): string =>
   rendererDeviceSchemas[kind].label;
@@ -65,3 +66,14 @@ export const getRendererModulationTargetParamDefinitions = (
   kind: RendererDeviceKind,
 ): readonly RendererModulationParamDefinition[] =>
   getRendererDeviceSchema(kind).modulationTargetParams ?? [];
+
+export const createRendererDeviceNode = <K extends RendererDeviceKind>(
+  kind: K,
+  id: string,
+  enabled = true,
+): RendererDeviceNodeOfKind<K> =>
+  getRendererDeviceSchema(kind).createDefaultNode(id, enabled);
+
+export const getRendererNumericParamKeys = (
+  kind: RendererDeviceKind,
+): readonly string[] => getRendererDeviceSchema(kind).numericParamKeys ?? [];

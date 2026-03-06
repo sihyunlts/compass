@@ -1,7 +1,9 @@
 import ColorDeviceUi from './color/ui.svelte';
 import {
+  createRendererDeviceNode,
   getRendererDeviceGroup,
   getRendererDeviceLabel,
+  getRendererNumericParamKeys,
   getRendererDeviceSchema,
   getRendererModulationTargetParamDefinitions,
   isRendererDeviceKind,
@@ -17,7 +19,6 @@ import ScannerDeviceUi from './scanner/ui.svelte';
 import SpiralDeviceUi from './spiral/ui.svelte';
 import SymmetryDeviceUi from './symmetry/ui.svelte';
 import type {
-  RendererDeviceDefinition,
   RendererDeviceKind,
 } from './types';
 import WaterdropDeviceUi from './waterdrop/ui.svelte';
@@ -72,15 +73,17 @@ export const rendererDeviceDefinitions = {
     ...getRendererDeviceSchema('color'),
     editor: ColorDeviceUi,
   },
-} as const satisfies Record<RendererDeviceKind, RendererDeviceDefinition>;
+} as const;
 
-export const getRendererDeviceDefinition = (
-  kind: RendererDeviceKind,
-): RendererDeviceDefinition => rendererDeviceDefinitions[kind];
+export const getRendererDeviceDefinition = <K extends RendererDeviceKind>(
+  kind: K,
+): (typeof rendererDeviceDefinitions)[K] => rendererDeviceDefinitions[kind];
 
 export {
+  createRendererDeviceNode,
   getRendererDeviceGroup,
   getRendererDeviceLabel,
+  getRendererNumericParamKeys,
   getRendererModulationTargetParamDefinitions,
   isRendererDeviceKind,
   RENDERER_DEVICE_GROUPS,

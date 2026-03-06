@@ -1,12 +1,8 @@
 import {
-  SCANNER_PARAM_KEYS,
-  SPIRAL_PARAM_KEYS,
-  WATERDROP_PARAM_KEYS,
-} from '../../../services/devices';
-import { getRendererModulationTargetParamDefinitions } from '../../../../devices/metadata';
-import {
-  createDefaultDeviceNode,
-} from '../../../../shared/device-registry';
+  createRendererDeviceNode,
+  getRendererModulationTargetParamDefinitions,
+  getRendererNumericParamKeys,
+} from '../../../../devices';
 import { sanitizeCurveDivisions, sanitizeCurveNodes } from '../../../../core/modulation/curve';
 import { sanitizeModulationTarget } from '../../../../core/modulation/routing';
 import type { GeneratorChain } from '../../../../shared/model';
@@ -36,7 +32,10 @@ interface ModulationHandlerContext {
 
 interface ChainControlDescriptor {
   resolveMergeKey: (control: ChainControlTarget) => string | null;
-  resolveDefaultParamKey?: (input: HTMLInputElement) => string | null;
+  resolveDefaultValue?: (
+    defaultDevice: ChainDevice,
+    input: HTMLInputElement,
+  ) => number | null;
 }
 
 const requireInput = (target: ChainControlTarget): HTMLInputElement | null =>
@@ -83,6 +82,37 @@ const createMergeKeyResolver = (
 
 const resolveNumericDatasetParam = (control: ChainControlTarget): string | null =>
   control instanceof HTMLInputElement ? control.dataset.param ?? null : null;
+
+const readRendererNumericParam = (
+  kind: ChainDevice['kind'],
+  input: HTMLInputElement,
+): string | null => readDatasetParam(input, getRendererNumericParamKeys(kind));
+
+const readNumericValueFromDeviceParams = (
+  device: ChainDevice,
+  paramKey: string,
+): number | null => {
+  if (!('params' in device)) {
+    return null;
+  }
+
+  const value = (device.params as Record<string, unknown>)[paramKey];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+};
+
+const createDefaultNumericValueResolver = (
+  resolveParamKey: (input: HTMLInputElement) => string | null,
+) => (
+  defaultDevice: ChainDevice,
+  input: HTMLInputElement,
+): number | null => {
+  const paramKey = resolveParamKey(input);
+  if (!paramKey) {
+    return null;
+  }
+
+  return readNumericValueFromDeviceParams(defaultDevice, paramKey);
+};
 
 const createNumericParamSetter = <Device extends ChainDevice, ParamKey extends string>(
   options: {
@@ -146,25 +176,25 @@ const handleSetDeviceEnabled = (): ChainControlHandler => (device, target) => {
 
 const handleSetWaterdropParam = (): ChainControlHandler => createNumericParamSetter({
   isKind: isWaterdropDevice,
-  readParam: (input) => readDatasetParam(input, WATERDROP_PARAM_KEYS),
+  readParam: (input) => readRendererNumericParam('waterdrop', input),
   assign: (device, param, value) => {
-    device.params[param] = value;
+    (device.params as unknown as Record<string, number>)[param] = value;
   },
 });
 
 const handleSetScannerParam = (): ChainControlHandler => createNumericParamSetter({
   isKind: isScannerDevice,
-  readParam: (input) => readDatasetParam(input, SCANNER_PARAM_KEYS),
+  readParam: (input) => readRendererNumericParam('scanner', input),
   assign: (device, param, value) => {
-    device.params[param] = value;
+    (device.params as unknown as Record<string, number>)[param] = value;
   },
 });
 
 const handleSetSpiralParam = (): ChainControlHandler => createNumericParamSetter({
   isKind: isSpiralDevice,
-  readParam: (input) => readDatasetParam(input, SPIRAL_PARAM_KEYS),
+  readParam: (input) => readRendererNumericParam('spiral', input),
   assign: (device, param, value) => {
-    device.params[param] = value;
+    (device.params as unknown as Record<string, number>)[param] = value;
   },
 });
 
@@ -516,30 +546,47 @@ const CHAIN_CONTROL_DESCRIPTORS: Record<string, ChainControlDescriptor> = {
   },
   'set-waterdrop-param': {
     resolveMergeKey: createMergeKeyResolver('set-waterdrop-param', resolveNumericDatasetParam),
-    resolveDefaultParamKey: (input) => input.dataset.param ?? null,
+    resolveDefaultValue: createDefaultNumericValueResolver(
+      (input) => readRendererNumericParam('waterdrop', input),
+    ),
   },
   'set-scanner-param': {
     resolveMergeKey: createMergeKeyResolver('set-scanner-param', resolveNumericDatasetParam),
-    resolveDefaultParamKey: (input) => input.dataset.param ?? null,
+    resolveDefaultValue: createDefaultNumericValueResolver(
+      (input) => readRendererNumericParam('scanner', input),
+    ),
   },
   'set-spiral-param': {
     resolveMergeKey: createMergeKeyResolver('set-spiral-param', resolveNumericDatasetParam),
-    resolveDefaultParamKey: (input) => input.dataset.param ?? null,
+    resolveDefaultValue: createDefaultNumericValueResolver(
+      (input) => readRendererNumericParam('spiral', input),
+    ),
   },
   'set-center-picker-param': {
     resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericDatasetParam),
-    resolveDefaultParamKey: (input) => input.dataset.param ?? null,
+    resolveDefaultValue: createDefaultNumericValueResolver(
+      (input) => readDatasetParam(input, CENTER_PICKER_PARAM_KEYS),
+    ),
   },
   'set-angle-param': {
     resolveMergeKey: createMergeKeyResolver('set-angle-param', resolveNumericDatasetParam),
-    resolveDefaultParamKey: (input) => input.dataset.param ?? null,
+    resolveDefaultValue: createDefaultNumericValueResolver(
+      (input) => readDatasetParam(input, ANGLE_PARAM_KEYS),
+    ),
   },
   'set-color-note-length-percent': {
     resolveMergeKey: createMergeKeyResolver('set-color-note-length-percent'),
-    resolveDefaultParamKey: () => 'noteLengthPercent',
+    resolveDefaultValue: (defaultDevice) =>
+      defaultDevice.kind === 'color'
+        ? defaultDevice.params.noteLengthPercent
+        : null,
   },
   'set-color-slot-count': {
     resolveMergeKey: createMergeKeyResolver('set-color-slot-count'),
+    resolveDefaultValue: (defaultDevice) =>
+      defaultDevice.kind === 'color'
+        ? defaultDevice.params.velocities.length
+        : null,
   },
   'set-effect-symmetry-mode': {
     resolveMergeKey: createMergeKeyResolver('set-effect-symmetry-mode'),
@@ -570,7 +617,10 @@ const CHAIN_CONTROL_DESCRIPTORS: Record<string, ChainControlDescriptor> = {
   },
   'set-modulation-amount': {
     resolveMergeKey: createMergeKeyResolver('set-modulation-amount'),
-    resolveDefaultParamKey: () => 'amount',
+    resolveDefaultValue: (defaultDevice) =>
+      defaultDevice.kind === 'modulator'
+        ? defaultDevice.params.amount
+        : null,
   },
   'set-modulation-divisions': {
     resolveMergeKey: createMergeKeyResolver('set-modulation-divisions'),
@@ -673,23 +723,18 @@ export const resetNumericControlToDefault = (
     return false;
   }
 
-  const paramKey = descriptor.resolveDefaultParamKey?.(target) ?? null;
-  if (!paramKey) {
-    return false;
-  }
-
   const device = findDeviceById(id);
   if (!device) {
     return false;
   }
 
-  const defaultDevice = createDefaultDeviceNode(device.kind, device.id, device.enabled);
-  if (!('params' in defaultDevice)) {
-    return false;
-  }
-
-  const defaultValue = (defaultDevice.params as Record<string, unknown>)[paramKey];
-  if (typeof defaultValue !== 'number' || !Number.isFinite(defaultValue)) {
+  const defaultDevice = createRendererDeviceNode(
+    device.kind,
+    device.id,
+    device.enabled !== false,
+  );
+  const defaultValue = descriptor.resolveDefaultValue?.(defaultDevice, target) ?? null;
+  if (defaultValue === null) {
     return false;
   }
 

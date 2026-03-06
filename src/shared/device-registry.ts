@@ -1,5 +1,4 @@
 import type {
-  CurveModulatorNode,
   GeneratorDeviceNode,
   ModulationCurve,
 } from './model';
@@ -24,24 +23,6 @@ const DEVICE_KIND_SET = new Set<DeviceKind>(DEVICE_KINDS);
 
 export const isDeviceKind = (value: string | undefined): value is DeviceKind =>
   !!value && DEVICE_KIND_SET.has(value as DeviceKind);
-
-export const WATERDROP_PARAM_KEYS = [
-  'centerX',
-  'centerY',
-  'curvature',
-  'startRadius',
-] as const;
-export const SCANNER_PARAM_KEYS = ['angleDeg', 'startOffset'] as const;
-export const SPIRAL_PARAM_KEYS = [
-  'centerX',
-  'centerY',
-  'turns',
-  'startRadius',
-] as const;
-
-export type WaterdropParamKey = (typeof WATERDROP_PARAM_KEYS)[number];
-export type ScannerParamKey = (typeof SCANNER_PARAM_KEYS)[number];
-export type SpiralParamKey = (typeof SPIRAL_PARAM_KEYS)[number];
 
 export type ModulationTargetDeviceKind = Exclude<
   DeviceKind,
@@ -75,172 +56,45 @@ export const isModulationTargetParamKey = (
   isModulationTargetDeviceKind(kind)
     && MODULATION_TARGET_PARAM_KEYS[kind].includes(paramKey);
 
-const DEFAULT_WATERDROP_PARAMS: DeviceNodeOfKind<'waterdrop'>['params'] = {
-  centerX: 4.5,
-  centerY: 4.5,
-  curvature: 2,
-  startRadius: 0,
-};
-
-const DEFAULT_SCANNER_PARAMS: DeviceNodeOfKind<'scanner'>['params'] = {
-  angleDeg: 0,
-  startOffset: 0,
-};
-
-const DEFAULT_SPIRAL_PARAMS: DeviceNodeOfKind<'spiral'>['params'] = {
-  centerX: 4.5,
-  centerY: 4.5,
-  turns: 2,
-  startRadius: 0,
-};
-
-const DEFAULT_MIRROR_PARAMS: DeviceNodeOfKind<'mirror'>['params'] = {
-  angleDeg: 90,
-};
-
-const DEFAULT_MASK_PARAMS: DeviceNodeOfKind<'mask'>['params'] = {
-  mode: 'include',
-  tiles: [],
-  sourceKind: 'tiles',
-  sourceId: null,
-  sourceVisibility: 'hide',
-};
-
-const DEFAULT_SYMMETRY_PARAMS: DeviceNodeOfKind<'symmetry'>['params'] = {
-  mode: 'mirror-half',
-  axis: 'horizontal',
-  sourceAnchor: 'bl',
-};
-
-const DEFAULT_ROTATE_PARAMS: DeviceNodeOfKind<'rotate'>['params'] = {
-  angleDeg: 90,
-};
-
-const DEFAULT_COLOR_PARAMS: DeviceNodeOfKind<'color'>['params'] = {
-  velocities: [3],
-  noteLengthPercent: 100,
-};
-
-const DEFAULT_MODULATION_PARAMS: CurveModulatorNode['params'] = {
-  amount: 1,
-  target: null,
-  curve: {
-    domain: 'loop01',
-    divisions: 16,
-    nodes: [
-      { id: 'curve-node-start', t: 0, v: 0 },
-      { id: 'curve-node-end', t: 1, v: 0 },
-    ],
-  },
-};
-
 const cloneCurve = (curve: ModulationCurve): ModulationCurve => ({
   domain: curve.domain,
   divisions: curve.divisions,
   nodes: curve.nodes.map((node) => ({ ...node })),
 });
 
-type DefaultDeviceFactoryMap = {
-  [K in DeviceKind]: (id: string, enabled: boolean) => DeviceNodeOfKind<K>;
-};
-
-const DEFAULT_DEVICE_FACTORIES = {
-  waterdrop: (id: string, enabled: boolean): DeviceNodeOfKind<'waterdrop'> => ({
-    id,
-    kind: 'waterdrop',
-    enabled,
-    groupId: null,
-    params: { ...DEFAULT_WATERDROP_PARAMS },
-  }),
-  scanner: (id: string, enabled: boolean): DeviceNodeOfKind<'scanner'> => ({
-    id,
-    kind: 'scanner',
-    enabled,
-    groupId: null,
-    params: { ...DEFAULT_SCANNER_PARAMS },
-  }),
-  spiral: (id: string, enabled: boolean): DeviceNodeOfKind<'spiral'> => ({
-    id,
-    kind: 'spiral',
-    enabled,
-    groupId: null,
-    params: { ...DEFAULT_SPIRAL_PARAMS },
-  }),
-  modulator: (id: string, enabled: boolean): DeviceNodeOfKind<'modulator'> => ({
-    id,
-    kind: 'modulator',
-    enabled,
-    groupId: null,
-    params: {
-      amount: DEFAULT_MODULATION_PARAMS.amount,
-      target: DEFAULT_MODULATION_PARAMS.target,
-      curve: cloneCurve(DEFAULT_MODULATION_PARAMS.curve),
-    },
-  }),
-  mirror: (id: string, enabled: boolean): DeviceNodeOfKind<'mirror'> => ({
-    id,
-    kind: 'mirror',
-    enabled,
-    groupId: null,
-    params: { ...DEFAULT_MIRROR_PARAMS },
-  }),
-  mask: (id: string, enabled: boolean): DeviceNodeOfKind<'mask'> => ({
-    id,
-    kind: 'mask',
-    enabled,
-    groupId: null,
-    params: {
-      mode: DEFAULT_MASK_PARAMS.mode,
-      tiles: [...DEFAULT_MASK_PARAMS.tiles],
-      sourceKind: DEFAULT_MASK_PARAMS.sourceKind,
-      sourceId: DEFAULT_MASK_PARAMS.sourceId,
-      sourceVisibility: DEFAULT_MASK_PARAMS.sourceVisibility,
-    },
-  }),
-  symmetry: (id: string, enabled: boolean): DeviceNodeOfKind<'symmetry'> => ({
-    id,
-    kind: 'symmetry',
-    enabled,
-    groupId: null,
-    params: { ...DEFAULT_SYMMETRY_PARAMS },
-  }),
-  rotate: (id: string, enabled: boolean): DeviceNodeOfKind<'rotate'> => ({
-    id,
-    kind: 'rotate',
-    enabled,
-    groupId: null,
-    params: { ...DEFAULT_ROTATE_PARAMS },
-  }),
-  reverse: (id: string, enabled: boolean): DeviceNodeOfKind<'reverse'> => ({
-    id,
-    kind: 'reverse',
-    enabled,
-    groupId: null,
-  }),
-  color: (id: string, enabled: boolean): DeviceNodeOfKind<'color'> => ({
-    id,
-    kind: 'color',
-    enabled,
-    groupId: null,
-    params: {
-      velocities: [...DEFAULT_COLOR_PARAMS.velocities],
-      noteLengthPercent: DEFAULT_COLOR_PARAMS.noteLengthPercent,
-    },
-  }),
-} as const satisfies DefaultDeviceFactoryMap;
-
-export const createDefaultDeviceNode = (
-  kind: DeviceKind,
-  id: string,
-  enabled = true,
-): GeneratorDeviceNode => {
-  const isEnabled = enabled !== false;
-  return DEFAULT_DEVICE_FACTORIES[kind](id, isEnabled);
-};
-
 export const cloneDeviceNode = (
   device: GeneratorDeviceNode,
 ): GeneratorDeviceNode => {
+  if (device.kind === 'waterdrop') {
+    return {
+      id: device.id,
+      kind: 'waterdrop',
+      enabled: device.enabled !== false,
+      groupId: device.groupId ?? null,
+      params: { ...device.params },
+    };
+  }
+
+  if (device.kind === 'scanner') {
+    return {
+      id: device.id,
+      kind: 'scanner',
+      enabled: device.enabled !== false,
+      groupId: device.groupId ?? null,
+      params: { ...device.params },
+    };
+  }
+
+  if (device.kind === 'spiral') {
+    return {
+      id: device.id,
+      kind: 'spiral',
+      enabled: device.enabled !== false,
+      groupId: device.groupId ?? null,
+      params: { ...device.params },
+    };
+  }
+
   if (device.kind === 'reverse') {
     return {
       id: device.id,
@@ -298,16 +152,33 @@ export const cloneDeviceNode = (
     };
   }
 
-  const cloned = createDefaultDeviceNode(
-    device.kind,
-    device.id,
-    device.enabled !== false,
-  );
-  cloned.groupId = device.groupId ?? null;
-  if ('params' in cloned) {
-    cloned.params = { ...device.params };
+  if (device.kind === 'mirror') {
+    return {
+      id: device.id,
+      kind: 'mirror',
+      enabled: device.enabled !== false,
+      groupId: device.groupId ?? null,
+      params: { ...device.params },
+    };
   }
-  return cloned;
+
+  if (device.kind === 'symmetry') {
+    return {
+      id: device.id,
+      kind: 'symmetry',
+      enabled: device.enabled !== false,
+      groupId: device.groupId ?? null,
+      params: { ...device.params },
+    };
+  }
+
+  return {
+    id: device.id,
+    kind: 'rotate',
+    enabled: device.enabled !== false,
+    groupId: device.groupId ?? null,
+    params: { ...device.params },
+  };
 };
 
 type NumericParamAccessor = {
