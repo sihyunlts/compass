@@ -1,15 +1,13 @@
-#app {
-  &.is-settings-open .live-main {
-    display: none;
-  }
-}
-
 .live-main {
   display: flex;
   flex: 1;
   position: relative;
   min-height: 0;
   height: 100%;
+
+  &[hidden] {
+    display: none;
+  }
 }
 
 .workspace {

@@ -93,7 +93,6 @@ input {
 
   &:not([type='checkbox']) {
     height: 1.75rem;
-    box-sizing: border-box;
   }
 
   &[type='range'] {

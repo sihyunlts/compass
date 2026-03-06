@@ -240,7 +240,6 @@
     const appEl = document.getElementById('app');
     if (!appEl) return;
 
-    appEl.classList.toggle('is-settings-open', uiState.isSettingsOpen);
     appEl.classList.toggle('is-sidebar-resizing', uiState.isSidebarResizing);
     appEl.style.setProperty('--sidebar-width', `${uiState.sidebarWidthPx}px`);
   });
