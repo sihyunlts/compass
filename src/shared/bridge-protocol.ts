@@ -1,5 +1,0 @@
-export {
-  LIVE_BRIDGE_TARGET,
-  LIVE_TEMPO_ENDPOINT,
-  MAX_UDP_PACKET_BYTES,
-} from './bridge';
