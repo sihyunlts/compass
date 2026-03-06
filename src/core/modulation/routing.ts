@@ -46,7 +46,7 @@ const sanitizeCurveModulatorNode = (
 ): CurveModulatorNode => ({
   id: node.id,
   kind: 'modulator',
-  enabled: node.enabled !== false,
+  enabled: node.enabled,
   params: {
     amount: sanitizeAmount(node.params.amount),
     target: sanitizeModulationTarget(node.params.target),

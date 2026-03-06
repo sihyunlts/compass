@@ -13,13 +13,13 @@ const isGroupEnabled = (
     return true;
   }
 
-  return (chain.groupStateById ?? {})[normalizedGroupId]?.enabled !== false;
+  return chain.groupStateById[normalizedGroupId]?.enabled !== false;
 };
 
 export const isDeviceEffectivelyEnabled = (
   chain: GeneratorChain,
   device: GeneratorDeviceNode,
 ): boolean => (
-  device.enabled === true
+  device.enabled
   && isGroupEnabled(chain, device.groupId)
 );

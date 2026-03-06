@@ -167,7 +167,7 @@ const resolveMaskTilesForEffect = (
   context: GroupEvaluationContext,
   timeKind: MaskTimeKind,
 ): Iterable<number> => {
-  const sourceKind = effect.params.sourceKind ?? 'tiles';
+  const sourceKind = effect.params.sourceKind;
   if (sourceKind === 'group') {
     const sourceId = normalizeOptionalId(effect.params.sourceId);
     if (!sourceId) {
@@ -184,7 +184,7 @@ const resolveMaskTilesForEffect = (
     return resolveActiveTilesForGenerator(sourceId, context, timeKind);
   }
 
-  return effect.params.tiles ?? [];
+  return effect.params.tiles;
 };
 
 const buildGroupLayersAtTime = (

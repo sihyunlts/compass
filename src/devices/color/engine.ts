@@ -72,7 +72,7 @@ const resolveColorConfigByOriginId = (
       }
 
       if (isColorDevice(device)) {
-        const velocities = sanitizeColorVelocities(device.params.velocities ?? []);
+        const velocities = sanitizeColorVelocities(device.params.velocities);
         accumulatedVelocities = [...velocities, ...accumulatedVelocities];
         accumulatedNoteLengthPercent = sanitizeColorNoteLengthPercent(
           device.params.noteLengthPercent,
@@ -86,7 +86,7 @@ const resolveColorConfigByOriginId = (
 
       configByOriginId.set(device.id, {
         velocities: [...accumulatedVelocities],
-        noteLengthPercent: accumulatedNoteLengthPercent ?? DEFAULT_COLOR_NOTE_LENGTH_PERCENT,
+        noteLengthPercent: accumulatedNoteLengthPercent,
       });
     }
   }

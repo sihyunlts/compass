@@ -97,8 +97,7 @@ const withSymmetryQuadMirror = (
   worldBounds: Bounds,
 ): GeneratorLayer[] => {
   const next: GeneratorLayer[] = [];
-  const sourceQuadrant = SYMMETRY_QUADRANTS.find((q) => q.id === effect.params.sourceAnchor)
-    ?? SYMMETRY_QUADRANTS[0];
+  const sourceQuadrant = SYMMETRY_QUADRANTS.find((q) => q.id === effect.params.sourceAnchor)!;
 
   for (const layer of layers) {
     for (const tile of tiles) {
@@ -148,7 +147,7 @@ const withSymmetryQuadPinwheel = (
   worldBounds: Bounds,
 ): GeneratorLayer[] => {
   const next: GeneratorLayer[] = [];
-  const sourceIndex = Math.max(0, SYMMETRY_QUADRANTS.findIndex((q) => q.id === effect.params.sourceAnchor));
+  const sourceIndex = SYMMETRY_QUADRANTS.findIndex((q) => q.id === effect.params.sourceAnchor);
 
   for (const layer of layers) {
     for (const tile of tiles) {

@@ -29,12 +29,10 @@ import {
 import {
   createEditorHistory,
   type EditorHistory,
-  type EditorHistoryListEntry,
 } from './editor-history';
 import {
   applyChainMutation as applyEditorChainMutation,
   checkoutHistory as checkoutEditorHistory,
-  getCurrentHistoryEntry,
   initializeHistoryBridge,
   redoHistory,
   saveChainWithHistory,
@@ -222,9 +220,6 @@ export class EditorSession {
     },
     undo: (): boolean => this.undo(),
     redo: (): boolean => this.redo(),
-    listHistory: (): EditorHistoryListEntry[] => this.history.list(),
-    getCurrentHistoryEntry: (): EditorHistoryListEntry | null =>
-      getCurrentHistoryEntry(this.history),
     checkoutHistory: (target: string | number): boolean => this.checkoutHistory(target),
     copySelection: (): boolean => this.copySelectionToClipboard() !== null,
     cutSelection: (): boolean => this.cutSelection(),

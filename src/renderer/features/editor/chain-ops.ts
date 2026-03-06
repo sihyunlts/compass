@@ -79,7 +79,7 @@ export const assignGroupIdToDevices = (
   }
 
   let didChange = false;
-  const nextGroupId = groupId ?? null;
+  const nextGroupId = groupId;
   const nextDevices = chainState.devices.map((device) => {
     if (!targetIds.has(device.id)) {
       return device;

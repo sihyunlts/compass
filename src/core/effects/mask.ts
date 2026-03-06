@@ -50,8 +50,8 @@ export const applyMaskEffect = (
   effect: MaskEffectNode,
   tilesOverride?: Iterable<number> | null,
 ): GeneratorLayer[] => {
-  const tiles = tilesOverride ?? effect.params.tiles ?? [];
-  const mode = effect.params.mode === 'exclude' ? 'exclude' : 'include';
+  const tiles = tilesOverride ?? effect.params.tiles;
+  const mode = effect.params.mode;
   const mask = createMaskFromTiles(tiles, mode);
 
   return layers.map((layer) => applyMaskToLayer(layer, mask));

@@ -12,7 +12,7 @@ export const maskEngineHandler = {
       return null;
     }
 
-    const sourceKind = effect.params.sourceKind ?? 'tiles';
+    const sourceKind = effect.params.sourceKind;
     if (sourceKind !== 'group' && sourceKind !== 'generator') {
       return null;
     }

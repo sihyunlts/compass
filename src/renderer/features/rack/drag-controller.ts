@@ -786,7 +786,7 @@ export class RackDragController {
       return null;
     }
 
-    return pointerElement.closest<HTMLElement>('.device-group.is-rack') ?? null;
+    return pointerElement.closest<HTMLElement>('.device-group.is-rack');
   }
 
   private isPointInsideRectWithMargin(

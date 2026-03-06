@@ -1,6 +1,6 @@
 import type { GeneratorChain } from '../../../shared/model';
 import type { ChainMutationMeta } from './history-core';
-import type { EditorHistory, EditorHistoryListEntry } from './editor-history';
+import type { EditorHistory } from './editor-history';
 import type { EditorSessionState } from './session.svelte';
 
 export const syncHistoryState = (
@@ -141,8 +141,3 @@ export const checkoutHistory = (
   restoreChainFromHistory(state, history, restored, options);
   return true;
 };
-
-export const getCurrentHistoryEntry = (
-  history: EditorHistory,
-): EditorHistoryListEntry | null =>
-  history.list().find((entry) => entry.isCurrent) ?? null;

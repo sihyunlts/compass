@@ -13,7 +13,7 @@ export const cloneDeviceNode = (
     return {
       id: device.id,
       kind: 'waterdrop',
-      enabled: device.enabled !== false,
+      enabled: device.enabled,
       groupId: device.groupId ?? null,
       params: { ...device.params },
     };
@@ -23,7 +23,7 @@ export const cloneDeviceNode = (
     return {
       id: device.id,
       kind: 'scanner',
-      enabled: device.enabled !== false,
+      enabled: device.enabled,
       groupId: device.groupId ?? null,
       params: { ...device.params },
     };
@@ -33,7 +33,7 @@ export const cloneDeviceNode = (
     return {
       id: device.id,
       kind: 'spiral',
-      enabled: device.enabled !== false,
+      enabled: device.enabled,
       groupId: device.groupId ?? null,
       params: { ...device.params },
     };
@@ -43,7 +43,7 @@ export const cloneDeviceNode = (
     return {
       id: device.id,
       kind: 'reverse',
-      enabled: device.enabled !== false,
+      enabled: device.enabled,
       groupId: device.groupId ?? null,
     };
   }
@@ -52,7 +52,7 @@ export const cloneDeviceNode = (
     return {
       id: device.id,
       kind: 'modulator',
-      enabled: device.enabled !== false,
+      enabled: device.enabled,
       groupId: device.groupId ?? null,
       params: {
         amount: device.params.amount,
@@ -71,14 +71,14 @@ export const cloneDeviceNode = (
     return {
       id: device.id,
       kind: 'mask',
-      enabled: device.enabled !== false,
+      enabled: device.enabled,
       groupId: device.groupId ?? null,
       params: {
         mode: device.params.mode,
         tiles: [...device.params.tiles],
-        sourceKind: device.params.sourceKind ?? 'tiles',
+        sourceKind: device.params.sourceKind,
         sourceId: device.params.sourceId ?? null,
-        sourceVisibility: device.params.sourceVisibility === 'show' ? 'show' : 'hide',
+        sourceVisibility: device.params.sourceVisibility,
       },
     };
   }
@@ -87,7 +87,7 @@ export const cloneDeviceNode = (
     return {
       id: device.id,
       kind: 'color',
-      enabled: device.enabled !== false,
+      enabled: device.enabled,
       groupId: device.groupId ?? null,
       params: {
         velocities: [...device.params.velocities],
@@ -100,7 +100,7 @@ export const cloneDeviceNode = (
     return {
       id: device.id,
       kind: 'mirror',
-      enabled: device.enabled !== false,
+      enabled: device.enabled,
       groupId: device.groupId ?? null,
       params: { ...device.params },
     };
@@ -110,7 +110,7 @@ export const cloneDeviceNode = (
     return {
       id: device.id,
       kind: 'symmetry',
-      enabled: device.enabled !== false,
+      enabled: device.enabled,
       groupId: device.groupId ?? null,
       params: { ...device.params },
     };
@@ -119,7 +119,7 @@ export const cloneDeviceNode = (
   return {
     id: device.id,
     kind: 'rotate',
-    enabled: device.enabled !== false,
+    enabled: device.enabled,
     groupId: device.groupId ?? null,
     params: { ...device.params },
   };
