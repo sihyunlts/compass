@@ -14,6 +14,10 @@ interface ColorOriginConfig {
   gapPercent: number;
 }
 
+interface ColorProgram {
+  notes: ClipNote[];
+}
+
 const DEFAULT_COLOR_VELOCITY = DEFAULT_COLOR_PARAMS.velocities[0];
 const DEFAULT_COLOR_NOTE_LENGTH_PERCENT = DEFAULT_COLOR_PARAMS.noteLengthPercent;
 
@@ -147,7 +151,195 @@ const resolveMedianDurationByOriginId = (
   return medianDurationByOriginId;
 };
 
-export const applyColorDevices = (
+const groupNotesByOriginId = (
+  notes: ReadonlyArray<ClipNoteWithOrigin>,
+): Map<string, ClipNoteWithOrigin[]> => {
+  const notesByOriginId = new Map<string, ClipNoteWithOrigin[]>();
+
+  for (const note of notes) {
+    if (!note.originId) {
+      continue;
+    }
+
+    const originNotes = notesByOriginId.get(note.originId);
+    if (originNotes) {
+      originNotes.push(note);
+      continue;
+    }
+
+    notesByOriginId.set(note.originId, [note]);
+  }
+
+  return notesByOriginId;
+};
+
+const buildNominalColorProgram = (
+  originNotes: ReadonlyArray<ClipNoteWithOrigin>,
+  colorConfig: ColorOriginConfig,
+  referenceDuration: number,
+  minimumNoteDuration: number,
+): ClipNote[] => {
+  const segmentLength = Math.max(
+    referenceDuration * (colorConfig.noteLengthPercent / 100),
+    minimumNoteDuration,
+  );
+  const gapDuration = referenceDuration * (colorConfig.gapPercent / 100);
+  if (
+    !Number.isFinite(segmentLength)
+    || segmentLength <= 0
+    || !Number.isFinite(gapDuration)
+    || gapDuration < 0
+  ) {
+    return [];
+  }
+
+  const programNotes: ClipNote[] = [];
+  for (const note of originNotes) {
+    if (!Number.isFinite(note.startBeat)) {
+      continue;
+    }
+
+    for (let segmentIndex = 0; segmentIndex < colorConfig.velocities.length; segmentIndex += 1) {
+      const startBeat = note.startBeat + (segmentIndex * (segmentLength + gapDuration));
+      if (!Number.isFinite(startBeat)) {
+        break;
+      }
+
+      programNotes.push({
+        pitch: note.pitch,
+        channel: note.channel,
+        startBeat,
+        durationBeats: segmentLength,
+        velocity: colorConfig.velocities[segmentIndex],
+      });
+    }
+  }
+
+  return programNotes.sort((left, right) =>
+    left.startBeat - right.startBeat
+    || left.pitch - right.pitch
+    || left.channel - right.channel);
+};
+
+const fitColorProgramToOriginSpan = (
+  sourceNotes: ReadonlyArray<ClipNoteWithOrigin>,
+  programNotes: ReadonlyArray<ClipNote>,
+): ClipNote[] => {
+  if (sourceNotes.length === 0 || programNotes.length === 0) {
+    return [];
+  }
+
+  let sourceStart = Number.POSITIVE_INFINITY;
+  let sourceEnd = Number.NEGATIVE_INFINITY;
+  for (const note of sourceNotes) {
+    if (!Number.isFinite(note.startBeat) || !Number.isFinite(note.durationBeats)) {
+      continue;
+    }
+
+    sourceStart = Math.min(sourceStart, note.startBeat);
+    sourceEnd = Math.max(sourceEnd, note.startBeat + Math.max(note.durationBeats, 0));
+  }
+
+  if (!Number.isFinite(sourceStart) || !Number.isFinite(sourceEnd) || sourceEnd <= sourceStart) {
+    return [];
+  }
+
+  let nominalStart = Number.POSITIVE_INFINITY;
+  let nominalEnd = Number.NEGATIVE_INFINITY;
+  for (const note of programNotes) {
+    nominalStart = Math.min(nominalStart, note.startBeat);
+    nominalEnd = Math.max(nominalEnd, note.startBeat + Math.max(note.durationBeats, 0));
+  }
+
+  if (!Number.isFinite(nominalStart) || !Number.isFinite(nominalEnd) || nominalEnd <= nominalStart) {
+    return [];
+  }
+
+  const sourceSpan = sourceEnd - sourceStart;
+  const nominalSpan = nominalEnd - nominalStart;
+  const scale = nominalSpan > sourceSpan
+    ? sourceSpan / nominalSpan
+    : 1;
+
+  const fitted: ClipNote[] = [];
+  for (const note of programNotes) {
+    const startBeat = sourceStart + ((note.startBeat - nominalStart) * scale);
+    const scaledDurationBeats = note.durationBeats * scale;
+    const clippedStart = Math.max(sourceStart, startBeat);
+    const clippedEnd = Math.min(sourceEnd, startBeat + scaledDurationBeats);
+    if (
+      !Number.isFinite(clippedStart)
+      || !Number.isFinite(clippedEnd)
+      || clippedEnd <= clippedStart
+    ) {
+      continue;
+    }
+
+    fitted.push({
+      pitch: note.pitch,
+      channel: note.channel,
+      startBeat: clippedStart,
+      durationBeats: clippedEnd - clippedStart,
+      velocity: note.velocity,
+    });
+  }
+
+  return fitted;
+};
+
+const buildColorProgramByOriginId = (
+  chain: GeneratorChain,
+  notes: ReadonlyArray<ClipNoteWithOrigin>,
+  minimumNoteDuration: number,
+): Map<string, ColorProgram> => {
+  if (notes.length === 0) {
+    return new Map();
+  }
+
+  const colorConfigByOriginId = resolveColorConfigByOriginId(chain);
+  if (colorConfigByOriginId.size === 0) {
+    return new Map();
+  }
+
+  const medianDurationByOriginId = resolveMedianDurationByOriginId(notes);
+  if (medianDurationByOriginId.size === 0) {
+    return new Map();
+  }
+
+  const notesByOriginId = groupNotesByOriginId(notes);
+  const colorProgramByOriginId = new Map<string, ColorProgram>();
+
+  for (const [originId, originNotes] of notesByOriginId.entries()) {
+    const colorConfig = colorConfigByOriginId.get(originId);
+    const referenceDuration = medianDurationByOriginId.get(originId);
+    if (!colorConfig || referenceDuration === undefined) {
+      continue;
+    }
+
+    const nominalProgram = buildNominalColorProgram(
+      originNotes,
+      colorConfig,
+      referenceDuration,
+      minimumNoteDuration,
+    );
+    if (nominalProgram.length === 0) {
+      continue;
+    }
+
+    const fittedProgram = fitColorProgramToOriginSpan(originNotes, nominalProgram);
+    if (fittedProgram.length === 0) {
+      continue;
+    }
+
+    colorProgramByOriginId.set(originId, {
+      notes: fittedProgram,
+    });
+  }
+
+  return colorProgramByOriginId;
+};
+
+export const applyColorPrograms = (
   chain: GeneratorChain,
   notes: ReadonlyArray<ClipNoteWithOrigin>,
   minimumNoteDuration: number,
@@ -156,17 +348,17 @@ export const applyColorDevices = (
     return [];
   }
 
-  const colorConfigByOriginId = resolveColorConfigByOriginId(chain);
-  if (colorConfigByOriginId.size === 0) {
-    return notes.map((note) => toClipNote(note));
-  }
-
-  const medianDurationByOriginId = resolveMedianDurationByOriginId(notes);
-  if (medianDurationByOriginId.size === 0) {
+  const colorProgramByOriginId = buildColorProgramByOriginId(
+    chain,
+    notes,
+    minimumNoteDuration,
+  );
+  if (colorProgramByOriginId.size === 0) {
     return notes.map((note) => toClipNote(note));
   }
 
   const colorized: ClipNote[] = [];
+  const emittedOriginIds = new Set<string>();
 
   for (const note of notes) {
     if (!note.originId) {
@@ -174,48 +366,18 @@ export const applyColorDevices = (
       continue;
     }
 
-    const colorConfig = colorConfigByOriginId.get(note.originId);
-    if (!colorConfig) {
+    const colorProgram = colorProgramByOriginId.get(note.originId);
+    if (!colorProgram) {
       colorized.push(toClipNote(note));
       continue;
     }
 
-    const referenceDuration = medianDurationByOriginId.get(note.originId);
-    if (referenceDuration === undefined) {
-      colorized.push(toClipNote(note));
+    if (emittedOriginIds.has(note.originId)) {
       continue;
     }
 
-    const segmentLength = Math.max(
-      referenceDuration * (colorConfig.noteLengthPercent / 100),
-      minimumNoteDuration,
-    );
-    if (!Number.isFinite(note.startBeat) || !Number.isFinite(segmentLength) || segmentLength <= 0) {
-      colorized.push(toClipNote(note));
-      continue;
-    }
-    const gapDuration = referenceDuration * (colorConfig.gapPercent / 100);
-
-    const velocities = colorConfig.velocities;
-    if (velocities.length === 0) {
-      colorized.push(toClipNote(note));
-      continue;
-    }
-
-    for (let segmentIndex = 0; segmentIndex < velocities.length; segmentIndex += 1) {
-      const segmentStart = note.startBeat + segmentIndex * (segmentLength + gapDuration);
-      if (!Number.isFinite(segmentStart)) {
-        break;
-      }
-
-      colorized.push({
-        pitch: note.pitch,
-        channel: note.channel,
-        startBeat: segmentStart,
-        durationBeats: segmentLength,
-        velocity: velocities[segmentIndex],
-      });
-    }
+    colorized.push(...colorProgram.notes);
+    emittedOriginIds.add(note.originId);
   }
 
   return colorized;

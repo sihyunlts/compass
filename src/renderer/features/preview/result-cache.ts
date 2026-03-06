@@ -3,6 +3,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import {
   generateNotes,
   generatePreviewStats,
+  NORMALIZED_SOURCE_TIMELINE_END_BEAT,
 } from '../../../domain';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
@@ -14,7 +15,6 @@ import {
 import {
   collectActiveVelocityByPitch,
   EMPTY_ACTIVE_VELOCITY_BY_PITCH,
-  resolveSourceTimelineEnd,
 } from './utils';
 
 export interface PreviewResultCacheEntry {
@@ -51,12 +51,14 @@ class PreviewResultCache {
       input.loopLengthBeats,
       input.launchpadModel,
     );
-    const sourceTimelineEndBeat = resolveSourceTimelineEnd(preview);
     const entry: PreviewResultCacheEntry = {
       key,
       preview,
-      sourceTimelineEndBeat,
-      ledFramesByIndex: this.buildLedFrameCache(preview, sourceTimelineEndBeat),
+      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+      ledFramesByIndex: this.buildLedFrameCache(
+        preview,
+        NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+      ),
     };
     this.resultsByKey.set(key, entry);
     return entry;

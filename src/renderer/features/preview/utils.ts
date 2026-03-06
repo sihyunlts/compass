@@ -5,26 +5,6 @@ import type { PreviewWindowState } from '../../../shared/contracts/preview/windo
 
 export const EMPTY_ACTIVE_VELOCITY_BY_PITCH = new SvelteMap<number, number>();
 
-export const resolveSourceTimelineEnd = (
-  preview: GeneratorPreview | null,
-): number => {
-  if (!preview) {
-    return 1;
-  }
-
-  let maxEndBeat = 1;
-  for (const note of preview.notes) {
-    const startBeat = Number.isFinite(note.startBeat) ? note.startBeat : 0;
-    const durationBeats = Number.isFinite(note.durationBeats) ? note.durationBeats : 0;
-    const endBeat = Math.max(0, startBeat + Math.max(durationBeats, 0));
-    if (endBeat > maxEndBeat) {
-      maxEndBeat = endBeat;
-    }
-  }
-
-  return Number.isFinite(maxEndBeat) && maxEndBeat >= 1 ? maxEndBeat : 1;
-};
-
 export const collectActiveVelocityByPitch = (
   preview: GeneratorPreview | null,
   beat: number,

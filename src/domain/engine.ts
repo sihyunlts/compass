@@ -15,7 +15,7 @@ import {
 } from '../core/pipeline/engine';
 import type { OriginWindow } from '../core/pipeline/types';
 import {
-  applyColorDevices,
+  applyColorPrograms,
   type ClipNoteWithOrigin,
 } from '../devices/color/engine';
 import { getLaunchpadRuntimeMap } from './launchpad-model';
@@ -53,6 +53,8 @@ interface OpenNoteState {
   channel: number;
   originId?: string;
 }
+
+export const NORMALIZED_SOURCE_TIMELINE_END_BEAT = 1;
 
 const sortClipNotes = <T extends ClipNote>(notes: T[]): void => {
   notes.sort((left, right) =>
@@ -217,11 +219,11 @@ export const generateNotes = ({
   }
 
   for (const [pitch, open] of openByPitch.entries()) {
-    closeOpenNote(notes, pitch, open, 1);
+    closeOpenNote(notes, pitch, open, NORMALIZED_SOURCE_TIMELINE_END_BEAT);
   }
 
   sortClipNotes(notes);
-  const colorizedNotes = applyColorDevices(chain, notes, MIN_NOTE_DURATION);
+  const colorizedNotes = applyColorPrograms(chain, notes, MIN_NOTE_DURATION);
   sortClipNotes(colorizedNotes);
   return colorizedNotes;
 };
