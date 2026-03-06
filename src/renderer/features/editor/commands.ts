@@ -17,15 +17,15 @@ import {
   resolveNextGroupId,
   resolveTailDeviceIdByGroup,
   withDevices,
-} from '../../state/chain';
-import type { ChainMutationMeta } from '../../state/chain-history';
+} from './chain-ops';
 import {
   applyInsertDeviceByDropZone,
   applyInsertDevicesByDropZone,
   applyMoveDevicesByDropZone,
   coerceOutsideTargetIdToGroupBoundaryByDevices,
   type RackDropZone,
-} from '../../state/rack-drop';
+} from '../rack/drop-ops';
+import type { ChainMutationMeta } from './history-core';
 import type { RackSelectionSnapshot } from './selectors';
 
 export const EDITOR_HISTORY_META = {

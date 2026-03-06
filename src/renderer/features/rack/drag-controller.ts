@@ -5,7 +5,7 @@ import type {
   ChainDragSourceKind,
   DropPlacement,
   RackDropZone,
-} from '../../state/rack-drop';
+} from './drop-ops';
 
 /** Drag end result: dropZone may be null; shouldCommit gates reorder/insert persistence. */
 export type DragDropPointerUpResult =

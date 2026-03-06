@@ -1,7 +1,7 @@
 import type { GeneratorChain } from '../../../shared/model';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
-import type { ChainMutationMeta } from '../../state/chain-history';
+import type { ChainMutationMeta } from '../editor/history-core';
 import { blurIfTextEditingElement } from './text-editing';
 import { CenterPickerController } from './center-picker-controller';
 import { MaskTilePaintController } from './mask-paint-controller';

@@ -1,5 +1,5 @@
-import { normalizeOptionalId } from '../../shared/normalize-id';
-import type { GeneratorDeviceNode } from '../../shared/model';
+import { normalizeOptionalId } from '../../../shared/normalize-id';
+import type { GeneratorDeviceNode } from '../../../shared/model';
 
 export type DropPlacement = 'before' | 'after';
 

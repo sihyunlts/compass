@@ -1,6 +1,6 @@
 import type { RackClipboard } from '../../services/rack-clipboard';
-import type { ChainMutationMeta } from '../../state/chain-history';
-import type { ContextMenuTarget } from '../../state/context-menu';
+import type { ContextMenuTarget } from '../../components/context-menu-types';
+import type { ChainMutationMeta } from './history-core';
 import {
   EDITOR_HISTORY_META,
   buildChainWithClipboardPaste,

@@ -6,14 +6,14 @@
   import { onMount } from 'svelte';
   import { clamp } from '../../shared/math';
   import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/model';
+  import type { ContextMenuTarget } from './context-menu-types';
   import type {
     RackInteractionCommit,
     RackScrollMetrics,
   } from './device-rack-types';
-  import type { ChainMutationMeta } from '../state/chain-history';
-  import type { ContextMenuTarget } from '../state/context-menu';
   import type { BrowserDeviceKind } from '../services/devices';
-  import { canCreateGroupFromSelection } from '../state/chain';
+  import { canCreateGroupFromSelection } from '../features/editor/chain-ops';
+  import type { ChainMutationMeta } from '../features/editor/history-core';
   import { blurIfTextEditingElement } from '../features/rack/text-editing';
   import {
     createRackSelection,

@@ -1,11 +1,11 @@
-import type { ChainMutationMeta } from '../../state/chain-history';
+import type { ChainMutationMeta } from './history-core';
 import {
   assignGroupIdToDevices,
   canCreateGroupFromSelection,
   removeDevicesById,
   resolveGroupMemberIds,
   resolveNextGroupId,
-} from '../../state/chain';
+} from './chain-ops';
 import {
   applyGroupEnabledChange,
   EDITOR_HISTORY_META,

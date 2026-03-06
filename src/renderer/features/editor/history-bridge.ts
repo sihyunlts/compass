@@ -1,5 +1,5 @@
 import type { GeneratorChain } from '../../../shared/model';
-import type { ChainMutationMeta } from '../../state/chain-history';
+import type { ChainMutationMeta } from './history-core';
 import type { EditorHistory, EditorHistoryListEntry } from './editor-history';
 import type { EditorSessionState } from './session.svelte';
 

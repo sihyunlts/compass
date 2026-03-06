@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { clamp } from '../../shared/math';
-  import type { ContextMenuTarget } from '../state/context-menu';
+  import type { ContextMenuTarget } from './context-menu-types';
 
   let {
     onCopy,

@@ -2,7 +2,7 @@ import type { BrowserDeviceKind } from '../services/devices';
 import type {
   ChainDragSourceKind,
   RackDropZone,
-} from '../state/rack-drop';
+} from '../features/rack/drop-ops';
 
 export interface RackScrollMetrics {
   scrollLeft: number;

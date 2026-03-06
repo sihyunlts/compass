@@ -1,12 +1,11 @@
 import type { BridgeSettings } from '../../../shared/bridge/types';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
+import type { ContextMenuTarget } from '../../components/context-menu-types';
 import type { RackInteractionCommit } from '../../components/device-rack-types';
 import type { BrowserDeviceKind } from '../../services/devices';
 import { isBrowserDeviceKind } from '../../services/devices';
 import type { RackClipboard } from '../../services/rack-clipboard';
 import type { GroupSelectionContext } from '../rack/selection.svelte';
-import type { ChainMutationMeta } from '../../state/chain-history';
-import type { ContextMenuTarget } from '../../state/context-menu';
 import {
   applyBridgeSettings as applyEditorBridgeSettings,
   handleAutoCreateLengthChange,
@@ -60,6 +59,7 @@ import {
   reconcileCurrentChainModulators as reconcileEditorChainModulators,
   toggleCollapse,
 } from './persistence';
+import type { ChainMutationMeta } from './history-core';
 import type { RackSelectionSnapshot } from './selectors';
 
 const DEFAULT_AUTO_PREVIEW_DEBOUNCE_MS = 120;

@@ -6,7 +6,7 @@ import {
   type ChainHistoryKind,
   type ChainHistoryListItem,
   type ChainMutationMeta,
-} from '../../state/chain-history';
+} from './history-core';
 
 type EditorHistoryOptions = Parameters<typeof createChainHistory>[1];
 

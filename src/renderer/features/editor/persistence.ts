@@ -12,7 +12,7 @@ import {
   saveCollapsedDeviceIds,
   saveSidebarWidth,
 } from '../../services/storage';
-import { withDevices } from '../../state/chain';
+import { withDevices } from './chain-ops';
 import {
   resolveBridgeLengthLabel,
 } from './bridge-settings';
