@@ -70,9 +70,6 @@
   <div class="column-wrapper">
     <div
       class="color-palette-container"
-      data-action="color-palette"
-      data-id={device.id}
-      data-slot-index={selectedColorSlotIndex}
       style={`--color-palette-grid-size:${colorPaletteGridSizePx}px;`}
     >
       <div
@@ -86,8 +83,6 @@
               type="button"
               class="color-palette-cell"
               class:is-selected={device.params.velocities[selectedColorSlotIndex] === paletteIndex}
-              data-action="color-palette-cell"
-              data-palette-index={paletteIndex}
               disabled={isPaletteSlotDisabled(paletteRgb)}
               style={`background-color: rgb(${paletteRgb});`}
               aria-label={`Palette ${paletteIndex}`}
@@ -104,8 +99,6 @@
               type="button"
               class="color-palette-cell"
               class:is-selected={device.params.velocities[selectedColorSlotIndex] === paletteIndex}
-              data-action="color-palette-cell"
-              data-palette-index={paletteIndex}
               disabled={isPaletteSlotDisabled(paletteRgb)}
               style={`background-color: rgb(${paletteRgb});`}
               aria-label={`Palette ${paletteIndex}`}

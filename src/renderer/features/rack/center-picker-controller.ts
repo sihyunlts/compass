@@ -72,17 +72,8 @@ const updateCenterPickerSurface = (
   const xPercent = ((centerX - min) / range) * 100;
   const yPercent = (1 - (centerY - min) / range) * 100;
 
-  surface.dataset.centerX = centerX.toFixed(1);
-  surface.dataset.centerY = centerY.toFixed(1);
   surface.style.setProperty('--picker-x', `${xPercent.toFixed(3)}%`);
   surface.style.setProperty('--picker-y', `${yPercent.toFixed(3)}%`);
-
-  const readout = surface
-    .closest('.center-picker')
-    ?.querySelector<HTMLElement>('.center-picker-readout');
-  if (readout) {
-    readout.textContent = `X ${centerX.toFixed(1)} | Y ${centerY.toFixed(1)}`;
-  }
 };
 
 const resolvePickerPoint = (

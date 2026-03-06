@@ -39,8 +39,6 @@
     data-min={MIN}
     data-max={MAX}
     data-step={STEP}
-    data-center-x={resolvedCenterX.toFixed(1)}
-    data-center-y={resolvedCenterY.toFixed(1)}
     data-center-x-state={isCenterX ? 'center' : 'off-center'}
     data-center-y-state={isCenterY ? 'center' : 'off-center'}
     aria-label="Center point area"
