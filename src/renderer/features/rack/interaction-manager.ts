@@ -3,33 +3,15 @@ import { normalizeOptionalId } from '../../../shared/normalize-id';
 import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
 import type { ChainMutationMeta } from '../../state/chain-history';
 import { blurIfTextEditingElement } from './text-editing';
+import { CenterPickerController } from './center-picker-controller';
+import { MaskTilePaintController } from './mask-paint-controller';
 import { NumericInputInteraction } from './actions/numeric-input-drag';
-import {
-  applyCenterPickerPointerMove,
-  applyCenterPickerPosition,
-  clearCenterPickerPointerState,
-  createCenterPickerSessionState,
-  isCenterPickerActive,
-  isCenterPickerPointer,
-  resetCenterPickerToMidpoint,
-  resolveCenterPickerSurface,
-  startCenterPickerSession,
-  syncCenterPickerSelection,
-} from './actions/center-picker';
 import {
   applyChainControlChange,
   createChainControlHandlers,
   resolveChainControlMergeKey,
   resetNumericControlToDefault,
-} from './actions/controls';
-import {
-  applyMaskTileFromPoint,
-  clearMaskTilePointerState,
-  createMaskTilePaintState,
-  isMaskTilePaintActive,
-  isMaskTilePointer,
-  tryStartMaskTilePaint,
-} from './actions/mask-paint';
+} from './controls';
 
 /**
  * Coordinates non-selection rack interactions in the main renderer.
@@ -58,9 +40,9 @@ export class RackInteractionManager {
 
   private readonly closeContextMenu: () => void;
 
-  private readonly centerPickerState = createCenterPickerSessionState();
+  private readonly centerPicker: CenterPickerController;
 
-  private readonly maskTileState = createMaskTilePaintState();
+  private readonly maskTilePaint: MaskTilePaintController;
 
   private readonly chainControlHandlers: ReturnType<typeof createChainControlHandlers>;
 
@@ -77,19 +59,53 @@ export class RackInteractionManager {
       getMaskSourceGroupIds: this.getMaskSourceGroupIds.bind(this),
       getMaskSourceGeneratorIds: this.getMaskSourceGeneratorIds.bind(this),
     });
+    this.centerPicker = new CenterPickerController({
+      findDeviceById: this.findDeviceById.bind(this),
+      getCardElement: this.getCardElement.bind(this),
+      blurActiveTextEditingElement: this.blurActiveTextEditingElement.bind(this),
+      closeContextMenu: this.closeContextMenu,
+      scheduleAutoPreview: this.scheduleAutoPreview,
+      persistChange: () => {
+        this.saveChain(this.getChainState(), {
+          kind: 'center-picker-edit',
+          label: 'Edit center point',
+          finalize: true,
+        });
+      },
+      commitReset: () => {
+        this.commitChainChange({
+          kind: 'center-picker-edit',
+          label: 'Edit center point',
+          finalize: true,
+        });
+      },
+    });
+    this.maskTilePaint = new MaskTilePaintController({
+      findDeviceById: this.findDeviceById.bind(this),
+      blurActiveTextEditingElement: this.blurActiveTextEditingElement.bind(this),
+      closeContextMenu: this.closeContextMenu,
+      scheduleAutoPreview: this.scheduleAutoPreview,
+      commitChange: () => {
+        this.saveChain(this.getChainState(), {
+          kind: 'mask-tile-edit',
+          label: 'Paint mask tiles',
+          finalize: true,
+        });
+      },
+    });
     this.numericInputInteraction = new NumericInputInteraction({
       onResetInput: this.tryResetNumericControl.bind(this),
     });
   }
 
   isCenterPickerActive(): boolean {
-    return isCenterPickerActive(this.centerPickerState);
+    return this.centerPicker.isActive();
   }
 
   syncAfterRender(): void {
     const chain = this.getChainState();
     for (const device of chain.devices) {
-      this.syncCenterPickerSelection(device.id);
+      this.centerPicker.syncSelection(device.id);
     }
   }
 
@@ -105,7 +121,7 @@ export class RackInteractionManager {
         ? event.target.dataset.id
         : undefined;
     if (id) {
-      this.syncCenterPickerSelection(id);
+      this.centerPicker.syncSelection(id);
     }
 
     const mergeKey = resolveChainControlMergeKey(event.target);
@@ -133,8 +149,8 @@ export class RackInteractionManager {
       event.button !== 0
       || !event.isPrimary
       || this.numericInputInteraction.isActive()
-      || isCenterPickerActive(this.centerPickerState)
-      || isMaskTilePaintActive(this.maskTileState)
+      || this.centerPicker.isActive()
+      || this.maskTilePaint.isActive()
     ) {
       return false;
     }
@@ -149,36 +165,15 @@ export class RackInteractionManager {
       return true;
     }
 
-    if (this.tryStartMaskTilePaint(event, target)) {
+    if (this.maskTilePaint.handlePointerDown(event, target)) {
       return true;
     }
 
-    const centerPickerSurface = resolveCenterPickerSurface(target);
-    if (!centerPickerSurface) {
-      return false;
-    }
-
-    this.blurActiveTextEditingElement();
-    this.closeContextMenu();
-    startCenterPickerSession(this.centerPickerState, event.pointerId, centerPickerSurface);
-    if (this.applyCenterPickerPosition(centerPickerSurface, event.clientX, event.clientY)) {
-      this.centerPickerState.didChange = true;
-      this.scheduleAutoPreview();
-    }
-    return true;
+    return this.centerPicker.handlePointerDown(event, target);
   }
 
   handleWindowPointerMove(event: PointerEvent): boolean {
-    if (isMaskTilePointer(this.maskTileState, event.pointerId) && this.maskTileState.gridEl) {
-      if (applyMaskTileFromPoint(
-        this.maskTileState,
-        event.clientX,
-        event.clientY,
-        this.findDeviceById.bind(this),
-      )) {
-        this.maskTileState.didChange = true;
-        this.scheduleAutoPreview();
-      }
+    if (this.maskTilePaint.handlePointerMove(event)) {
       return true;
     }
 
@@ -187,26 +182,11 @@ export class RackInteractionManager {
       return true;
     }
 
-    if (!isCenterPickerPointer(this.centerPickerState, event.pointerId) || !this.centerPickerState.surfaceEl) {
-      return false;
-    }
-
-    if (applyCenterPickerPointerMove(
-      this.centerPickerState,
-      event.pointerId,
-      event.clientX,
-      event.clientY,
-      this.getCenterPickerDeps(),
-    )) {
-      this.centerPickerState.didChange = true;
-      this.scheduleAutoPreview();
-    }
-    return true;
+    return this.centerPicker.handlePointerMove(event);
   }
 
   handleWindowPointerUp(event: PointerEvent): boolean {
-    if (isMaskTilePointer(this.maskTileState, event.pointerId)) {
-      this.clearMaskTilePointerState(true);
+    if (this.maskTilePaint.handlePointerUp(event)) {
       return true;
     }
 
@@ -215,17 +195,11 @@ export class RackInteractionManager {
       return true;
     }
 
-    if (!isCenterPickerPointer(this.centerPickerState, event.pointerId)) {
-      return false;
-    }
-
-    this.clearCenterPickerPointerState(true);
-    return true;
+    return this.centerPicker.handlePointerUp(event);
   }
 
   handleWindowPointerCancel(event: PointerEvent): boolean {
-    if (isMaskTilePointer(this.maskTileState, event.pointerId)) {
-      this.clearMaskTilePointerState(false);
+    if (this.maskTilePaint.handlePointerCancel(event)) {
       return true;
     }
 
@@ -234,12 +208,7 @@ export class RackInteractionManager {
       return true;
     }
 
-    if (!isCenterPickerPointer(this.centerPickerState, event.pointerId)) {
-      return false;
-    }
-
-    this.clearCenterPickerPointerState(false);
-    return true;
+    return this.centerPicker.handlePointerCancel(event);
   }
 
   handleWindowBlur(): void {
@@ -263,68 +232,12 @@ export class RackInteractionManager {
       return false;
     }
 
-    return this.tryResetControlFromDoubleClick(event.target);
+    return this.numericInputInteraction.tryResetFromDoubleClick(event.target)
+      || this.centerPicker.tryResetFromDoubleClick(event.target);
   }
 
   private blurActiveTextEditingElement(): void {
     blurIfTextEditingElement(document.activeElement);
-  }
-
-  private getCenterPickerDeps() {
-    return {
-      findDeviceById: this.findDeviceById.bind(this),
-      getCardElement: this.getCardElement.bind(this),
-    };
-  }
-
-  private syncCenterPickerSelection(deviceId: string): void {
-    syncCenterPickerSelection(deviceId, this.getCenterPickerDeps());
-  }
-
-  private applyCenterPickerPosition(
-    surface: HTMLElement,
-    clientX: number,
-    clientY: number,
-  ): boolean {
-    return applyCenterPickerPosition(surface, clientX, clientY, this.getCenterPickerDeps());
-  }
-
-  private resetCenterPickerToMidpoint(surface: HTMLElement): boolean {
-    return resetCenterPickerToMidpoint(surface, this.getCenterPickerDeps());
-  }
-
-  private tryStartMaskTilePaint(event: PointerEvent, target: HTMLElement): boolean {
-    return tryStartMaskTilePaint(this.maskTileState, event, target, {
-      findDeviceById: this.findDeviceById.bind(this),
-      blurActiveTextEditingElement: this.blurActiveTextEditingElement.bind(this),
-      closeContextMenu: this.closeContextMenu,
-      scheduleAutoPreview: this.scheduleAutoPreview,
-    });
-  }
-
-  private clearMaskTilePointerState(persist: boolean): void {
-    clearMaskTilePointerState(this.maskTileState, persist, () => {
-      this.saveChain(this.getChainState(), {
-        kind: 'mask-tile-edit',
-        label: 'Paint mask tiles',
-        finalize: true,
-      });
-    });
-  }
-
-  private clearCenterPickerPointerState(persist: boolean): void {
-    clearCenterPickerPointerState(this.centerPickerState, persist, () => {
-      this.saveChain(this.getChainState(), {
-        kind: 'center-picker-edit',
-        label: 'Edit center point',
-        finalize: true,
-      });
-    });
-  }
-
-  private tryResetControlFromDoubleClick(target: EventTarget | null): boolean {
-    return this.numericInputInteraction.tryResetFromDoubleClick(target)
-      || this.tryResetCenterPickerSurface(target);
   }
 
   private tryResetNumericControl(target: EventTarget | null): boolean {
@@ -337,28 +250,6 @@ export class RackInteractionManager {
     }
 
     this.closeContextMenu();
-    return true;
-  }
-
-  private tryResetCenterPickerSurface(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLElement)) {
-      return false;
-    }
-
-    const centerPickerSurface = resolveCenterPickerSurface(target);
-    if (!centerPickerSurface) {
-      return false;
-    }
-
-    this.blurActiveTextEditingElement();
-    this.closeContextMenu();
-    if (this.resetCenterPickerToMidpoint(centerPickerSurface)) {
-      this.commitChainChange({
-        kind: 'center-picker-edit',
-        label: 'Edit center point',
-        finalize: true,
-      });
-    }
     return true;
   }
 

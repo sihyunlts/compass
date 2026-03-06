@@ -41,7 +41,7 @@ export type ActiveDragInfo =
       dropZone: RackDropZone | null;
     };
 
-type DragDropManagerOptions = {
+type RackDragControllerOptions = {
   chainDevices: HTMLElement;
   browserDragBadge: HTMLElement;
   isBlocked: () => boolean;
@@ -132,7 +132,7 @@ const snapshotDropZone = (dropZone: RackDropZone | null): RackDropZone | null =>
 };
 
 /** Handles drag/drop interactions for device reorder and browser insert actions. */
-export class DragDropManager {
+export class RackDragController {
   private readonly chainDevices: HTMLElement;
   private readonly browserDragBadge: HTMLElement;
   private readonly isBlocked: () => boolean;
@@ -144,7 +144,7 @@ export class DragDropManager {
   private lastPointerClientY = 0;
   private autoScrollRafId: number | null = null;
 
-  constructor(options: DragDropManagerOptions) {
+  constructor(options: RackDragControllerOptions) {
     this.chainDevices = options.chainDevices;
     this.browserDragBadge = options.browserDragBadge;
     this.isBlocked = options.isBlocked;

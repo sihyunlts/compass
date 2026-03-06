@@ -6,7 +6,6 @@
   import { onMount } from 'svelte';
   import { clamp } from '../../shared/math';
   import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/model';
-  import { normalizeOptionalId } from '../../shared/normalize-id';
   import type {
     RackInteractionCommit,
     RackScrollMetrics,
@@ -19,7 +18,14 @@
   import {
     createRackSelection,
   } from '../features/rack/selection.svelte';
-  import { DragDropManager, type ActiveDragInfo } from '../features/rack/dnd';
+  import { RackDragController, type ActiveDragInfo } from '../features/rack/drag-controller';
+  import { RackDropIndicator } from '../features/rack/drop-indicator';
+  import {
+    buildGroupColumns,
+    buildGroupMemberIdsByGroupId,
+    buildOrderedGroupIds,
+    buildRackContentItems,
+  } from '../features/rack/layout';
   import { createRackViewApi, type RackViewApi } from '../features/rack/api';
   import { RackInteractionManager } from '../features/rack/interaction-manager';
   import DeviceCard from './DeviceCard.svelte';
@@ -74,95 +80,27 @@
 
   const rackSelection = createRackSelection();
   let rackInteractionManager = $state<RackInteractionManager | null>(null);
-  let dragDropManager = $state<DragDropManager | null>(null);
+  let rackDragController = $state<RackDragController | null>(null);
+  let dropIndicator = $state<RackDropIndicator | null>(null);
   let activeDragInfo = $state<ActiveDragInfo | null>(null);
   let suppressDeviceSelectionClick = false;
-  let lastIndicatorKey: string | null = null;
   let resizeObserver: ResizeObserver | null = null;
   let resizeSyncFrameId: number | null = null;
   let lastScrollMetricsSignature: string | null = null;
   let lastMiniMapLayoutSignature: string | null = null;
   let miniMapContentRevision = 0;
 
-  type RackDeviceItem = {
-    kind: 'device';
-    key: string;
-    device: GeneratorDeviceNode;
-  };
-
-  type RackGroupItem = {
-    kind: 'group';
-    key: string;
-    groupId: string;
-    enabled: boolean;
-    devices: GeneratorDeviceNode[];
-  };
-
-  type RackItem = RackDeviceItem | RackGroupItem;
-  type RackContentItem = RackItem;
-
-  const TOP_LEVEL_DROP_TARGET_SELECTOR = '.device-slot--solo, .device-group.is-rack';
-  const GROUP_DROP_TARGET_SELECTOR = '.device-group.is-rack';
-  const DEVICE_CARD_SELECTOR = '.device-card';
-
-  type GroupColumn =
-    | {
-        kind: 'left-rail';
-        key: `rail-left-${string}`;
-        groupId: string;
-        enabled: boolean;
-      }
-    | {
-        kind: 'device';
-        key: string;
-        device: GeneratorDeviceNode;
-      }
-    | {
-        kind: 'right-rail';
-        key: `rail-right-${string}`;
-        groupId: string;
-      };
-
   const resolveGroupEnabled = (groupId: string): boolean =>
     chainState.groupStateById[groupId]?.enabled !== false;
 
-  const groupMemberIdsByGroupId = $derived.by(() => {
-    const byGroupId: Record<string, string[]> = {};
-    for (const device of devices) {
-      const groupId = normalizeOptionalId(device.groupId);
-      if (!groupId) {
-        continue;
-      }
-
-      const memberIds = byGroupId[groupId];
-      if (memberIds) {
-        memberIds.push(device.id);
-        continue;
-      }
-      byGroupId[groupId] = [device.id];
-    }
-    return byGroupId;
-  });
+  const groupMemberIdsByGroupId = $derived.by(() => buildGroupMemberIdsByGroupId(devices));
 
   const getGroupMemberIds = (groupId: string): string[] =>
     groupMemberIdsByGroupId[groupId] ?? [];
 
   const orderedDeviceIds = $derived.by(() =>
     devices.map((device: GeneratorDeviceNode) => device.id));
-  const orderedGroupIds = $derived.by(() => {
-    const groupIds: string[] = [];
-
-    for (const device of devices) {
-      const groupId = normalizeOptionalId(device.groupId);
-      if (!groupId || groupIds.includes(groupId)) {
-        continue;
-      }
-
-      groupIds.push(groupId);
-    }
-
-    return groupIds;
-  });
+  const orderedGroupIds = $derived.by(() => buildOrderedGroupIds(devices));
   const selectedDeviceIds = $derived.by(() => rackSelection.state.selectedDeviceIds);
   const selectedGroupIds = $derived.by(() => rackSelection.state.selectedGroupIds);
   const draggingDeviceIds = $derived.by(() =>
@@ -170,81 +108,10 @@
       ? activeDragInfo.sourceIds
       : []);
 
-  const rackContentItems = $derived.by((): RackContentItem[] => {
-    const items: RackContentItem[] = [];
-    let activeGroupId: string | null = null;
-    let activeGroupDevices: GeneratorDeviceNode[] = [];
-
-    const flushGroup = () => {
-      if (!activeGroupId || activeGroupDevices.length === 0) {
-        return;
-      }
-
-      const anchorId = activeGroupDevices.reduce(
-        (min, device) => (device.id < min ? device.id : min),
-        activeGroupDevices[0].id,
-      );
-      items.push({
-        kind: 'group',
-        key: `group-${activeGroupId}-${anchorId}`,
-        groupId: activeGroupId,
-        enabled: resolveGroupEnabled(activeGroupId),
-        devices: activeGroupDevices,
-      });
-      activeGroupId = null;
-      activeGroupDevices = [];
-    };
-
-    for (const device of devices) {
-      const groupId = normalizeOptionalId(device.groupId);
-
-      if (!groupId) {
-        flushGroup();
-        items.push({
-          kind: 'device',
-          key: `device-${device.id}`,
-          device,
-        });
-        continue;
-      }
-
-      if (activeGroupId === groupId) {
-        activeGroupDevices.push(device);
-        continue;
-      }
-
-      flushGroup();
-      activeGroupId = groupId;
-      activeGroupDevices = [device];
-    }
-
-    flushGroup();
-    return items;
-  });
+  const rackContentItems = $derived.by(() =>
+    buildRackContentItems(devices, resolveGroupEnabled));
 
   const collapsedSet = $derived.by(() => new Set(collapsedDeviceIds));
-
-  const buildGroupColumns = (groupItem: RackGroupItem): GroupColumn[] => {
-    const columns: GroupColumn[] = groupItem.devices.map((device): GroupColumn => ({
-      kind: 'device',
-      key: device.id,
-      device,
-    }));
-
-    const leftRail: GroupColumn = {
-      kind: 'left-rail',
-      key: `rail-left-${groupItem.groupId}`,
-      groupId: groupItem.groupId,
-      enabled: groupItem.enabled,
-    };
-    const rightRail: GroupColumn = {
-      kind: 'right-rail',
-      key: `rail-right-${groupItem.groupId}`,
-      groupId: groupItem.groupId,
-    };
-
-    return [leftRail, ...columns, rightRail];
-  };
 
   const toScrollMetricsSignature = (metrics: RackScrollMetrics): string => (
     `${metrics.scrollLeft.toFixed(2)}|${metrics.scrollWidth.toFixed(2)}|${metrics.clientWidth.toFixed(2)}`
@@ -315,185 +182,8 @@
     });
   };
 
-  type IndicatorLayout = {
-    key: string;
-    leftInScrollSpace: number;
-  };
-
-  const getTopLevelItems = (): HTMLElement[] => {
-    if (!chainDevicesEl) {
-      return [];
-    }
-    return [...chainDevicesEl.children].flatMap((node) =>
-      node instanceof HTMLElement
-      && (
-        node.classList.contains('device-slot--solo')
-        || (node.classList.contains('device-group') && node.classList.contains('is-rack'))
-      )
-        ? [node]
-        : []);
-  };
-
-  const getGroupSlots = (groupEl: HTMLElement): HTMLElement[] => {
-    const body = groupEl.querySelector<HTMLElement>('.device-group-body');
-    if (!body) {
-      return [];
-    }
-    return [...body.children].flatMap((node) =>
-      node instanceof HTMLElement && node.classList.contains('device-slot') ? [node] : []);
-  };
-
   const clearDropIndicator = (): void => {
-    lastIndicatorKey = null;
-    if (dropIndicatorEl) {
-      dropIndicatorEl.hidden = true;
-      dropIndicatorEl.style.removeProperty('left');
-    }
-  };
-
-  const resolveInsertionClientX = (
-    items: readonly HTMLElement[],
-    insertionIndex: number,
-  ): number | null => {
-    if (!chainDevicesEl) {
-      return null;
-    }
-
-    if (items.length === 0) {
-      return chainDevicesEl.getBoundingClientRect().left;
-    }
-
-    if (insertionIndex <= 0) {
-      return items[0].getBoundingClientRect().left;
-    }
-
-    if (insertionIndex >= items.length) {
-      return items[items.length - 1].getBoundingClientRect().right;
-    }
-
-    const prevRect = items[insertionIndex - 1].getBoundingClientRect();
-    const nextRect = items[insertionIndex].getBoundingClientRect();
-    return (prevRect.right + nextRect.left) / 2;
-  };
-
-  const toScrollSpaceLeft = (clientX: number): number | null => {
-    if (!chainDevicesEl) {
-      return null;
-    }
-
-    const containerRect = chainDevicesEl.getBoundingClientRect();
-    return clientX - containerRect.left + chainDevicesEl.scrollLeft;
-  };
-
-  const resolveOutsideIndicatorLayout = (
-    dropZone: { targetId: string | null; placement: 'before' | 'after' },
-  ): IndicatorLayout | null => {
-    if (!chainDevicesEl) {
-      return null;
-    }
-
-    const topLevelItems = getTopLevelItems();
-    let insertionIndex = topLevelItems.length;
-
-    if (dropZone.targetId) {
-      const targetCard = chainDevicesEl.querySelector<HTMLElement>(
-        `${DEVICE_CARD_SELECTOR}[data-device-id="${CSS.escape(dropZone.targetId)}"]`,
-      );
-      const targetRoot = targetCard?.closest<HTMLElement>(TOP_LEVEL_DROP_TARGET_SELECTOR);
-      const normalizedTargetRoot = targetRoot?.parentElement === chainDevicesEl
-        ? targetRoot
-        : null;
-      if (normalizedTargetRoot) {
-        const targetIndex = topLevelItems.indexOf(normalizedTargetRoot);
-        if (targetIndex >= 0) {
-          insertionIndex = dropZone.placement === 'before'
-            ? targetIndex
-            : targetIndex + 1;
-        }
-      }
-    }
-
-    const clientX = resolveInsertionClientX(topLevelItems, insertionIndex);
-    if (clientX === null) {
-      return null;
-    }
-    const leftInScrollSpace = toScrollSpaceLeft(clientX);
-    if (leftInScrollSpace === null) {
-      return null;
-    }
-
-    return {
-      key: `outside|${insertionIndex}`,
-      leftInScrollSpace,
-    };
-  };
-
-  const resolveInsideGroupIndicatorLayout = (
-    dropZone: { groupId: string; targetId: string; placement: 'before' | 'after' },
-  ): IndicatorLayout | null => {
-    if (!chainDevicesEl) {
-      return null;
-    }
-
-    const groupEl = chainDevicesEl.querySelector<HTMLElement>(
-      `${GROUP_DROP_TARGET_SELECTOR}[data-group-id="${CSS.escape(dropZone.groupId)}"]`,
-    );
-    if (!groupEl) {
-      return null;
-    }
-
-    const slots = getGroupSlots(groupEl);
-    const targetCard = groupEl.querySelector<HTMLElement>(
-      `${DEVICE_CARD_SELECTOR}[data-device-id="${CSS.escape(dropZone.targetId)}"]`,
-    );
-    const targetSlot = targetCard?.closest<HTMLElement>('.device-slot') ?? null;
-    const slotIndex = targetSlot ? slots.indexOf(targetSlot) : -1;
-    const baseIndex = slotIndex >= 0 ? slotIndex : slots.length;
-    const insertionIndex = dropZone.placement === 'before'
-      ? baseIndex
-      : baseIndex + 1;
-
-    const clientX = resolveInsertionClientX(slots, insertionIndex);
-    if (clientX === null) {
-      return null;
-    }
-    const leftInScrollSpace = toScrollSpaceLeft(clientX);
-    if (leftInScrollSpace === null) {
-      return null;
-    }
-
-    return {
-      key: `inside|${dropZone.groupId}|${insertionIndex}`,
-      leftInScrollSpace,
-    };
-  };
-
-  const applyDropIndicator = (info: ActiveDragInfo | null): void => {
-    if (!dropIndicatorEl || !chainDevicesEl) {
-      return;
-    }
-
-    if (!info || !info.didMove || !info.dropZone) {
-      clearDropIndicator();
-      return;
-    }
-
-    const layout = info.dropZone.kind === 'outside'
-      ? resolveOutsideIndicatorLayout(info.dropZone)
-      : resolveInsideGroupIndicatorLayout(info.dropZone);
-
-    if (!layout) {
-      clearDropIndicator();
-      return;
-    }
-
-    if (layout.key === lastIndicatorKey) {
-      return;
-    }
-
-    dropIndicatorEl.style.left = `${layout.leftInScrollSpace}px`;
-    dropIndicatorEl.hidden = false;
-    lastIndicatorKey = layout.key;
+    dropIndicator?.clear();
   };
 
   const getOrderedSelectedDeviceIdsInRack = (): string[] =>
@@ -533,7 +223,7 @@
   /** Reports whether rack pointer interactions are active. */
   function hasPointerInteraction() {
     return (
-      (dragDropManager?.hasActivePointer() ?? false)
+      (rackDragController?.hasActivePointer() ?? false)
       || (rackInteractionManager?.isCenterPickerActive() ?? false)
     );
   }
@@ -559,9 +249,9 @@
     kind: BrowserDeviceKind,
     itemEl: HTMLElement,
   ) {
-    if (!dragDropManager) return false;
+    if (!rackDragController) return false;
 
-    const started = dragDropManager.startBrowserDrag(
+    const started = rackDragController.startBrowserDrag(
       sourceEvent,
       kind,
       itemEl,
@@ -620,7 +310,7 @@
   }
 
   function handleGroupRailPointerDown(event: PointerEvent, groupId: string) {
-    if (!dragDropManager) {
+    if (!rackDragController) {
       return;
     }
 
@@ -644,7 +334,7 @@
       return;
     }
 
-    const started = dragDropManager.startChainDrag(event, sourceIds, 'group');
+    const started = rackDragController.startChainDrag(event, sourceIds, 'group');
     if (started) {
       clearDropIndicator();
       event.preventDefault();
@@ -679,7 +369,7 @@
   }
 
   function handleDeviceHeaderPointerDown(event: PointerEvent, deviceId: string) {
-    if (!dragDropManager) {
+    if (!rackDragController) {
       return;
     }
 
@@ -698,7 +388,7 @@
     const orderedSelectedIds = getOrderedSelectedDeviceIdsInRack();
     const shouldDragSelection = orderedSelectedIds.includes(deviceId) && orderedSelectedIds.length > 1;
     const sourceIds = shouldDragSelection ? orderedSelectedIds : [deviceId];
-    const started = dragDropManager.startChainDrag(event, sourceIds, 'devices');
+    const started = rackDragController.startChainDrag(event, sourceIds, 'devices');
     if (started) {
       clearDropIndicator();
       event.preventDefault();
@@ -823,7 +513,7 @@
       return;
     }
 
-    const didHandlePointerMove = dragDropManager?.handlePointerMove(event) ?? false;
+    const didHandlePointerMove = rackDragController?.handlePointerMove(event) ?? false;
     if (didHandlePointerMove) {
       event.preventDefault();
     }
@@ -835,7 +525,7 @@
       return;
     }
 
-    const pointerResult = dragDropManager?.handlePointerUp(event);
+    const pointerResult = rackDragController?.handlePointerUp(event);
     if (!pointerResult) {
       return;
     }
@@ -867,7 +557,7 @@
     if (rackInteractionManager?.handleWindowPointerCancel(event)) {
       return;
     }
-    dragDropManager?.handlePointerCancel(event);
+    rackDragController?.handlePointerCancel(event);
   }
 
   function handleWindowBlur() {
@@ -895,7 +585,7 @@
   });
 
   onMount(() => {
-    if (!chainDevicesEl || !browserDragBadgeEl) return;
+    if (!chainDevicesEl || !dropIndicatorEl || !browserDragBadgeEl) return;
 
     rackInteractionManager = new RackInteractionManager({
       chainDevices: chainDevicesEl,
@@ -905,14 +595,19 @@
       closeContextMenu: onCloseContextMenu,
     });
 
-    dragDropManager = new DragDropManager({
+    dropIndicator = new RackDropIndicator({
+      chainDevices: chainDevicesEl,
+      indicator: dropIndicatorEl,
+    });
+
+    rackDragController = new RackDragController({
       chainDevices: chainDevicesEl,
       browserDragBadge: browserDragBadgeEl,
       isBlocked: () => rackInteractionManager?.isCenterPickerActive() ?? false,
       closeContextMenu: onCloseContextMenu,
       onDragUpdate: (info) => {
         activeDragInfo = info;
-        applyDropIndicator(info);
+        dropIndicator?.sync(info);
       },
     });
 
@@ -935,7 +630,8 @@
       resizeObserver?.disconnect();
       resizeObserver = null;
       activeDragInfo = null;
-      dragDropManager = null;
+      rackDragController = null;
+      dropIndicator = null;
       rackInteractionManager = null;
     };
   });
