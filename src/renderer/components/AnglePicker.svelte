@@ -52,7 +52,6 @@
   const valueText = $derived(
     stepDecimals > 0 ? normalizedValue.toFixed(stepDecimals) : String(Math.round(normalizedValue)),
   );
-  const isDragging = $derived(activePointerId !== null);
   const dragSensitivity = $derived(Math.max((max - min) / 480, step));
   const canUsePointerLock = $derived(Boolean(dialEl && 'requestPointerLock' in dialEl));
 
@@ -211,7 +210,6 @@
     <div
       bind:this={dialEl}
       class="angle-picker-dial"
-      class:is-dragging={isDragging}
       role="slider"
       tabindex="0"
       aria-label={dialLabel}
@@ -281,7 +279,6 @@
       flex: 0 0 auto;
       cursor: n-resize;
       touch-action: none;
-      user-select: none;
       background-color: var(--neutral-20);
 
       &-ring {

@@ -364,7 +364,6 @@
     bind:clientWidth={trackWidthPx}
     bind:clientHeight={trackHeightPx}
     class="rack-header-scrollbar"
-    class:is-disabled={!hasOverflow}
     role="scrollbar"
     aria-label="Rack minimap scrollbar"
     aria-orientation="horizontal"

@@ -799,12 +799,10 @@
     position: relative;
     display: flex;
     flex: 0 0 auto;
-    align-items: stretch;
     height: 100%;
   }
 
   .device-group.is-rack {
-    position: relative;
     background: var(--neutral-10);
     border: 1px solid var(--neutral-20);
     border-radius: var(--radius-6);
@@ -829,8 +827,6 @@
   .device-group-body {
     display: flex;
     flex: 0 0 auto;
-    gap: 0;
-    align-items: stretch;
   }
 
   .device-group.is-rack :global(.device-card) {
@@ -849,16 +845,10 @@
     position: relative;
     display: flex;
     flex: 0 0 auto;
-    align-items: stretch;
   }
 
   .device-slot--solo {
-    position: relative;
     height: 100%;
-  }
-
-  .device-group.is-rack .device-slot {
-    position: relative;
   }
 
   .drop-indicator {
@@ -873,16 +863,11 @@
     z-index: 50;
   }
 
-  .drop-indicator[hidden] {
-    display: none;
-  }
-
   .group-rail {
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
     padding: var(--gap-10) var(--gap-6);
     gap: var(--gap-12);
     background: var(--neutral-10);

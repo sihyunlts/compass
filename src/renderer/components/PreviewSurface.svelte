@@ -30,7 +30,6 @@
   let stageEl: HTMLElement | null = $state(null);
   let overlayCanvasEl: HTMLCanvasElement | null = $state(null);
   let isMounted = false;
-  let ledCellsByPitch = new SvelteMap<number, HTMLElement>();
   let overlayContext: CanvasRenderingContext2D | null = null;
   let overlayStrokes: Array<PreviewSurfaceViewModel['overlayStrokes'][number]> = [];
   let canvasWidth = 0;
@@ -42,24 +41,29 @@
   let surfaceWidth = $state(0);
   let surfaceHeight = $state(0);
 
-  const resolveLedCellsByPitch = (): SvelteMap<number, HTMLElement> => {
-    if (!stageEl) {
-      return new SvelteMap<number, HTMLElement>();
+  const resolveLedRgbByCellKey = (
+    nextSurfaceModel: PreviewSurfaceViewModel,
+  ): SvelteMap<string, string> => {
+    const rgbByPitch = new SvelteMap<number, string>();
+    for (const cell of nextSurfaceModel.activeCells) {
+      rgbByPitch.set(cell.pitch, cell.rgb);
     }
 
-    const cells = stageEl.querySelectorAll<HTMLElement>('.preview-button');
-    const cellByPitch = new SvelteMap<number, HTMLElement>();
-    const count = Math.min(surfaceModel.cells.length, cells.length);
-    for (let index = 0; index < count; index += 1) {
-      const model = surfaceModel.cells[index];
-      const cellEl = cells[index];
-      for (const pitch of model.pitches) {
-        cellByPitch.set(pitch, cellEl);
+    const rgbByCellKey = new SvelteMap<string, string>();
+    for (const cell of nextSurfaceModel.cells) {
+      for (const pitch of cell.pitches) {
+        const rgb = rgbByPitch.get(pitch);
+        if (!rgb) {
+          continue;
+        }
+        rgbByCellKey.set(cell.key, rgb);
       }
     }
 
-    return cellByPitch;
+    return rgbByCellKey;
   };
+
+  const ledRgbByCellKey = $derived.by(() => resolveLedRgbByCellKey(surfaceModel));
 
   const resolveGridCenters = (): void => {
     if (!stageEl || !overlayCanvasEl) {
@@ -203,11 +207,6 @@
   };
 
   const applySurfaceModel = (nextSurfaceModel: PreviewSurfaceViewModel): void => {
-    for (const cell of ledCellsByPitch.values()) {
-      cell.classList.remove('is-lit');
-      cell.style.removeProperty('--led-rgb');
-    }
-
     overlayWorldBounds = nextSurfaceModel.overlayWorldBounds;
     if (!nextSurfaceModel.isGuideEnabled) {
       overlayStrokes = [];
@@ -215,15 +214,6 @@
     } else {
       overlayStrokes = [...nextSurfaceModel.overlayStrokes];
       drawOverlay();
-    }
-
-    for (const cell of nextSurfaceModel.activeCells) {
-      const target = ledCellsByPitch.get(cell.pitch);
-      if (!target) {
-        continue;
-      }
-      target.classList.add('is-lit');
-      target.style.setProperty('--led-rgb', cell.rgb);
     }
   };
 
@@ -234,7 +224,6 @@
       throw new Error('Launchpad preview surface bootstrap failed: missing required elements');
     }
 
-    ledCellsByPitch = resolveLedCellsByPitch();
     overlayContext = overlayCanvasEl.getContext('2d');
     if (!overlayContext) {
       throw new Error('Launchpad preview surface bootstrap failed: canvas context unavailable');
@@ -246,7 +235,6 @@
 
     return () => {
       isMounted = false;
-      ledCellsByPitch = new SvelteMap<number, HTMLElement>();
       overlayContext = null;
     };
   });
@@ -266,7 +254,6 @@
 
     if (lastRenderedModel !== surfaceModel.launchpadModel) {
       lastRenderedModel = surfaceModel.launchpadModel;
-      ledCellsByPitch = resolveLedCellsByPitch();
       resolveGridCenters();
     }
 
@@ -275,8 +262,9 @@
 </script>
 
 <div
-  class={`preview-launchpad mode-${mode}`}
+  class="preview-launchpad"
   class:is-guide-enabled={isGuideVisible()}
+  class:mode-popout={mode === 'popout'}
   bind:this={stageEl}
   bind:clientWidth={surfaceWidth}
   bind:clientHeight={surfaceHeight}
@@ -285,11 +273,14 @@
   aria-label="Launchpad LED preview"
 >
   {#each surfaceModel.cells as cell (cell.key)}
+    {@const ledRgb = ledRgbByCellKey.get(cell.key)}
     <div
       class="preview-button"
       class:is-button={cell.pitches.length > 0}
       class:is-edge-button={cell.isEdgeButton}
       class:is-corner-placeholder={cell.isCornerPlaceholder}
+      class:is-lit={ledRgb !== undefined}
+      style={ledRgb ? `--led-rgb: ${ledRgb}` : ''}
     ></div>
   {/each}
   <canvas
@@ -323,7 +314,6 @@
     }
 
     &.mode-popout {
-      flex: 1;
       width: 100%;
       min-height: 0;
       max-width: 100%;
@@ -343,7 +333,6 @@
 
   .preview-button {
     border-radius: var(--radius-percent-3);
-    z-index: 1;
     transition: opacity 200ms ease;
 
     &.is-button {

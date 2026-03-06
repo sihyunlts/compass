@@ -1,18 +1,31 @@
 <script lang="ts">
   import {
-    BROWSER_EFFECTS,
-    BROWSER_GENERATORS,
-  } from '../app/browser-device-catalog';
-  import {
+    getRendererDeviceLabel,
+    RENDERER_DEVICE_GROUPS,
     isRendererDeviceKind,
     type RendererDeviceKind,
   } from '../../devices';
+
+  interface BrowserCatalogItem {
+    kind: RendererDeviceKind;
+    label: string;
+  }
 
   type BrowserPointerDownPayload = {
     kind: RendererDeviceKind;
     sourceEvent: PointerEvent;
     itemEl: HTMLElement;
   };
+
+  const toBrowserCatalogItems = (
+    kinds: readonly RendererDeviceKind[],
+  ): BrowserCatalogItem[] => kinds.map((kind) => ({
+    kind,
+    label: getRendererDeviceLabel(kind),
+  }));
+
+  const browserGenerators = toBrowserCatalogItems(RENDERER_DEVICE_GROUPS.generator);
+  const browserEffects = toBrowserCatalogItems(RENDERER_DEVICE_GROUPS.effect);
 
   const noopDeviceAdd = (): void => {};
   const noopBrowserPointerDown = (): void => {};
@@ -81,7 +94,7 @@
     <section class="browser-group">
       <span class="browser-group-title">Generators</span>
       <ul class="browser-list">
-        {#each BROWSER_GENERATORS as item (item.kind)}
+        {#each browserGenerators as item (item.kind)}
           <li
             class="browser-item"
             data-browser-kind={item.kind}
@@ -94,7 +107,7 @@
     <section class="browser-group">
       <span class="browser-group-title">Effects</span>
       <ul class="browser-list">
-        {#each BROWSER_EFFECTS as item (item.kind)}
+        {#each browserEffects as item (item.kind)}
           <li
             class="browser-item"
             data-browser-kind={item.kind}

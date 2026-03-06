@@ -114,10 +114,8 @@
       border-bottom: 1px solid var(--neutral-20);
       display: flex;
       align-items: flex-start;
-      justify-content: space-between;
       gap: var(--gap-10);
       cursor: grab;
-      user-select: none;
       -webkit-user-drag: none;
 
       &-left {
@@ -127,7 +125,6 @@
       }
 
       .device-title {
-        margin: var(--gap-0);
         font-size: var(--text-13);
         min-width: 0;
       }
@@ -183,7 +180,6 @@
     :global(.device-controls) {
       padding: var(--gap-10);
       display: flex;
-      flex-direction: row;
       gap: var(--gap-10);
       flex: 1;
       min-width: 0;
@@ -211,7 +207,6 @@
       :global(.modulation-control-grid .control-field) {
         width: 100%;
         min-width: 0;
-        flex-shrink: 0;
       }
 
       :global(.modulation-control-grid .control-field input),
