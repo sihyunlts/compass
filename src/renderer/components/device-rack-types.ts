@@ -1,4 +1,4 @@
-import type { BrowserDeviceKind } from '../services/devices';
+import type { RendererDeviceKind } from '../../devices';
 import type {
   ChainDragSourceKind,
   RackDropZone,
@@ -19,6 +19,6 @@ export type RackInteractionCommit =
     }
   | {
       kind: 'insert';
-      sourceKind: BrowserDeviceKind;
+      sourceKind: RendererDeviceKind;
       dropZone: RackDropZone;
     };

@@ -9,7 +9,7 @@ import { reconcileGeneratorChainModulators } from '../../core/modulation/routing
 import {
   createInitialChainDevices,
   syncDeviceNodeIdSeeds,
-} from './devices';
+} from '../features/editor/device-node-factory';
 
 /**
  * Renderer persistence boundary for app state stored in localStorage.

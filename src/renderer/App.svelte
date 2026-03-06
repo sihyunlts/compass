@@ -5,12 +5,12 @@
    */
   import { onMount, tick } from 'svelte';
 
+  import {
+    getRendererDeviceLabel,
+    type RendererDeviceKind,
+  } from '../devices';
   import type { PaletteFilePayload } from '../shared/model';
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
-  import {
-    getBrowserDeviceLabel,
-    type BrowserDeviceKind,
-  } from './services/devices';
   import { sanitizeSidebarWidth } from './services/storage';
   import BrowserPanel from './components/BrowserPanel.svelte';
   import SidebarResizer from './components/SidebarResizer.svelte';
@@ -43,8 +43,8 @@
   const DEFAULT_LED_RGB = '255 166 57';
   const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, select, textarea, option';
 
-  const toBrowserDragBadgeLabel = (kind: BrowserDeviceKind): string =>
-    `+ ${getBrowserDeviceLabel(kind)}`;
+  const toBrowserDragBadgeLabel = (kind: RendererDeviceKind): string =>
+    `+ ${getRendererDeviceLabel(kind)}`;
   const bridgeClient = window.compass;
   let appVersionText = $state('');
   let rackViewApi: RackViewApi | null = $state(null);

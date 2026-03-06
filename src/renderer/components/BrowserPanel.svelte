@@ -2,12 +2,14 @@
   import {
     BROWSER_EFFECTS,
     BROWSER_GENERATORS,
-    isBrowserDeviceKind,
-    type BrowserDeviceKind,
-  } from '../services/devices';
+  } from '../app/browser-device-catalog';
+  import {
+    isRendererDeviceKind,
+    type RendererDeviceKind,
+  } from '../../devices';
 
   type BrowserPointerDownPayload = {
-    kind: BrowserDeviceKind;
+    kind: RendererDeviceKind;
     sourceEvent: PointerEvent;
     itemEl: HTMLElement;
   };
@@ -19,7 +21,7 @@
     onDeviceAdd = noopDeviceAdd,
     onBrowserPointerDown = noopBrowserPointerDown,
   } = $props<{
-    onDeviceAdd: (kind: BrowserDeviceKind) => void;
+    onDeviceAdd: (kind: RendererDeviceKind) => void;
     onBrowserPointerDown: (payload: BrowserPointerDownPayload) => void;
   }>();
 
@@ -37,7 +39,7 @@
     }
 
     const kindRaw = item.dataset.browserKind;
-    if (!isBrowserDeviceKind(kindRaw)) {
+    if (!isRendererDeviceKind(kindRaw)) {
       return;
     }
 
@@ -51,7 +53,7 @@
     }
 
     const kindRaw = item.dataset.browserKind;
-    if (!isBrowserDeviceKind(kindRaw)) {
+    if (!isRendererDeviceKind(kindRaw)) {
       return;
     }
 

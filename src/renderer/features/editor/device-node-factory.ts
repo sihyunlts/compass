@@ -1,29 +1,9 @@
 import {
   createRendererDeviceNode,
   getRendererDeviceGroup,
-  getRendererDeviceLabel,
-  isRendererDeviceKind,
-  RENDERER_DEVICE_GROUPS,
-  RENDERER_DEVICE_KINDS,
-} from '../../devices';
-import type { RendererDeviceGroup, RendererDeviceKind } from '../../devices';
-import type { GeneratorDeviceNode } from '../../shared/model';
-
-export type BrowserDeviceKind = RendererDeviceKind;
-export type BrowserDeviceGroup = RendererDeviceGroup;
-
-export const BROWSER_GENERATORS = RENDERER_DEVICE_GROUPS.generator.map((kind) => ({
-  kind,
-  label: getRendererDeviceLabel(kind),
-}));
-
-export const BROWSER_EFFECTS = RENDERER_DEVICE_GROUPS.effect.map((kind) => ({
-  kind,
-  label: getRendererDeviceLabel(kind),
-}));
-
-export const getBrowserDeviceLabel = (kind: BrowserDeviceKind): string =>
-  getRendererDeviceLabel(kind);
+} from '../../../devices';
+import type { RendererDeviceKind } from '../../../devices';
+import type { GeneratorDeviceNode } from '../../../shared/model';
 
 let generatorIdSeed = 1;
 let effectIdSeed = 1;
@@ -44,7 +24,7 @@ const readSeedSuffix = (
 };
 
 const createGeneratedDeviceNode = (
-  kind: BrowserDeviceKind,
+  kind: RendererDeviceKind,
 ): GeneratorDeviceNode => {
   const group = getRendererDeviceGroup(kind);
   const id = group === 'generator'
@@ -79,14 +59,6 @@ export const syncDeviceNodeIdSeeds = (
   effectIdSeed = Math.max(effectIdSeed, maxEffectSuffix + 1);
 };
 
-export const isBrowserDeviceKind = (
-  value: string | undefined,
-): value is BrowserDeviceKind => (
-  !!value
-  && isRendererDeviceKind(value)
-  && RENDERER_DEVICE_KINDS.includes(value as BrowserDeviceKind)
-);
-
 export const createDeviceNodeByKind = (
-  kind: BrowserDeviceKind,
+  kind: RendererDeviceKind,
 ): GeneratorDeviceNode => createGeneratedDeviceNode(kind);

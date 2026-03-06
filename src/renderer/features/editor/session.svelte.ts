@@ -1,9 +1,9 @@
 import type { BridgeSettings } from '../../../shared/bridge/types';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
+import type { RendererDeviceKind } from '../../../devices';
+import { isRendererDeviceKind } from '../../../devices';
 import type { ContextMenuTarget } from '../../components/context-menu-types';
 import type { RackInteractionCommit } from '../../components/device-rack-types';
-import type { BrowserDeviceKind } from '../../services/devices';
-import { isBrowserDeviceKind } from '../../services/devices';
 import type { GroupSelectionContext } from '../rack/selection.svelte';
 import {
   applyBridgeSettings as applyEditorBridgeSettings,
@@ -101,7 +101,7 @@ export interface EditorRackBinding {
   syncAfterRender(): void;
   handleBrowserPointerDown(
     event: PointerEvent,
-    kind: BrowserDeviceKind,
+    kind: RendererDeviceKind,
     itemEl: HTMLElement,
   ): void;
 }
@@ -180,8 +180,8 @@ export class EditorSession {
         persistChainState: () => this.persistChainState(),
       });
     },
-    addBrowserDevice: (kind: BrowserDeviceKind): void => {
-      if (!isBrowserDeviceKind(kind)) {
+    addBrowserDevice: (kind: RendererDeviceKind): void => {
+      if (!isRendererDeviceKind(kind)) {
         return;
       }
 
@@ -191,7 +191,7 @@ export class EditorSession {
       );
     },
     handleBrowserPointerDown: (payload: {
-      kind: BrowserDeviceKind;
+      kind: RendererDeviceKind;
       sourceEvent: PointerEvent;
       itemEl: HTMLElement;
     }): void => {

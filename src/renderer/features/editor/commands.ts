@@ -1,10 +1,7 @@
+import type { RendererDeviceKind } from '../../../devices';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/model';
 import type { RackInteractionCommit } from '../../components/device-rack-types';
-import {
-  createDeviceNodeByKind,
-  type BrowserDeviceKind,
-} from '../../services/devices';
 import {
   createRackClipboard,
   prepareClipboardInsert,
@@ -18,6 +15,7 @@ import {
   resolveTailDeviceIdByGroup,
   withDevices,
 } from './chain-ops';
+import { createDeviceNodeByKind } from './device-node-factory';
 import {
   applyInsertDeviceByDropZone,
   applyInsertDevicesByDropZone,
@@ -142,7 +140,7 @@ const coercePasteDropZone = (
 
 export const applyBrowserDeviceAdd = (
   chain: GeneratorChain,
-  kind: BrowserDeviceKind,
+  kind: RendererDeviceKind,
 ): GeneratorChain => withDevices(
   chain,
   applyInsertDeviceByDropZone(

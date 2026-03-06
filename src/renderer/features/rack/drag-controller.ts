@@ -1,4 +1,4 @@
-import type { BrowserDeviceKind } from '../../services/devices';
+import type { RendererDeviceKind } from '../../../devices';
 import { clamp } from '../../../shared/math';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import type {
@@ -19,7 +19,7 @@ export type DragDropPointerUpResult =
     }
   | {
       kind: 'browser';
-      sourceKind: BrowserDeviceKind;
+      sourceKind: RendererDeviceKind;
       dropZone: RackDropZone | null;
       didMove: boolean;
       shouldCommit: boolean;
@@ -36,7 +36,7 @@ export type ActiveDragInfo =
     }
   | {
       kind: 'browser';
-      sourceKind: BrowserDeviceKind;
+      sourceKind: RendererDeviceKind;
       didMove: boolean;
       dropZone: RackDropZone | null;
     };
@@ -83,7 +83,7 @@ type ChainDragState = {
 type BrowserDragState = {
   kind: 'browser';
   pointerId: number;
-  sourceKind: BrowserDeviceKind;
+  sourceKind: RendererDeviceKind;
   itemEl: HTMLElement;
   badgeLabel: string;
   startX: number;
@@ -212,7 +212,7 @@ export class RackDragController {
 
   startBrowserDrag(
     event: PointerEvent,
-    kind: BrowserDeviceKind,
+    kind: RendererDeviceKind,
     itemEl: HTMLElement,
     badgeLabel: string,
   ): boolean {

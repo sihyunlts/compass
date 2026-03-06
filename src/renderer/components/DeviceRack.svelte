@@ -6,12 +6,12 @@
   import { onMount } from 'svelte';
   import { clamp } from '../../shared/math';
   import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/model';
+  import type { RendererDeviceKind } from '../../devices';
   import type { ContextMenuTarget } from './context-menu-types';
   import type {
     RackInteractionCommit,
     RackScrollMetrics,
   } from './device-rack-types';
-  import type { BrowserDeviceKind } from '../services/devices';
   import { canCreateGroupFromSelection } from '../features/editor/chain-ops';
   import type { ChainMutationMeta } from '../features/editor/history-core';
   import { blurIfTextEditingElement } from '../features/rack/text-editing';
@@ -65,7 +65,7 @@
     onScheduleAutoPreview: (delayMs?: number) => void;
     onOpenContextMenu: (clientX: number, clientY: number, target: ContextMenuTarget) => void;
     onCloseContextMenu: () => void;
-    onGetBrowserDragBadgeLabel: (kind: BrowserDeviceKind) => string;
+    onGetBrowserDragBadgeLabel: (kind: RendererDeviceKind) => string;
     onCommit: (commit: RackInteractionCommit) => void;
     onScrollMetricsChange?: (metrics: RackScrollMetrics) => void;
     onMiniMapContentRevisionChange?: (revision: number) => void;
@@ -246,7 +246,7 @@
   /** Starts an insert drag from the browser panel into the rack. */
   function handleBrowserPointerDown(
     sourceEvent: PointerEvent,
-    kind: BrowserDeviceKind,
+    kind: RendererDeviceKind,
     itemEl: HTMLElement,
   ) {
     if (!rackDragController) return false;
