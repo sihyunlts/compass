@@ -1,6 +1,6 @@
 import type { Component } from 'svelte';
 
-import type { GeneratorDeviceNode } from '../shared/types';
+import type { GeneratorDeviceNode } from '../shared/model';
 
 export type RendererDeviceKind = GeneratorDeviceNode['kind'];
 export type RendererDeviceGroup = 'generator' | 'effect';

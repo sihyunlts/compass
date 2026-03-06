@@ -1,7 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import { IPC_CHANNELS } from './shared/ipc';
-import type { CompassApi, LiveTempoUpdate, PreviewWindowState } from './shared/types';
+import { IPC_CHANNELS } from './shared/contracts/ipc';
+import type { PreviewWindowState } from './shared/contracts/preview';
+import type { CompassApi } from './shared/contracts/ipc';
+import type { LiveTempoUpdate } from './shared/bridge';
 
 interface ListenerSet<T> {
   emit: (payload: T) => void;

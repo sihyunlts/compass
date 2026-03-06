@@ -1,5 +1,5 @@
 import { normalizeOptionalId } from '../../shared/normalize-id';
-import type { GeneratorChain, GeneratorDeviceNode } from '../../shared/types';
+import type { GeneratorChain, GeneratorDeviceNode } from '../../shared/model';
 
 const collectActiveGroupIds = (
   devices: readonly GeneratorDeviceNode[],

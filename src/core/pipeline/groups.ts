@@ -4,11 +4,7 @@ import {
   resolveEffectMutedSource,
   type PipelineEffectNode,
 } from '../../devices/engine';
-import type {
-  GeneratorChain,
-  GeneratorDeviceNode,
-  GeneratorNode,
-} from '../../shared/types';
+import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode } from '../../shared/model';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import type {

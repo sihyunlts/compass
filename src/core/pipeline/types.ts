@@ -1,9 +1,4 @@
-import type {
-  GeneratorChain,
-  GeneratorDeviceNode,
-  GeneratorNode,
-  LaunchpadButton,
-} from '../../shared/types';
+import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode, LaunchpadButton } from '../../shared/model';
 import type { Bounds, GeneratorLayer, Polyline, Vec2 } from '../core-types';
 
 export interface OriginWindow {

@@ -1,9 +1,5 @@
-import type {
-  BridgeSettings,
-  GeneratorChain,
-  LaunchpadModel,
-  PaletteFilePayload,
-} from '../../shared/types';
+import type { GeneratorChain, LaunchpadModel, PaletteFilePayload } from '../../shared/model';
+import type { BridgeSettings } from '../../shared/bridge';
 import { clamp } from '../../shared/math';
 import {
   DEFAULT_BRIDGE_SETTINGS,

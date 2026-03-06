@@ -1,5 +1,5 @@
 import type { Bounds, GeneratorLayer, Polyline } from '../core/core-types';
-import type { GeneratorDeviceNode, GeneratorNode } from '../shared/types';
+import type { GeneratorDeviceNode, GeneratorNode } from '../shared/model';
 import { maskEngineHandler } from './mask/engine';
 import { mirrorEngineHandler } from './mirror/engine';
 import { reverseEngineHandler } from './reverse/engine';

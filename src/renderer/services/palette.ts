@@ -3,7 +3,7 @@ import {
   DEFAULT_PALETTE_NAME,
 } from '../../assets/palettes/novation-rgb';
 import { clamp } from '../../shared/math';
-import type { PaletteFilePayload } from '../../shared/types';
+import type { PaletteFilePayload } from '../../shared/model';
 import {
   clearCustomPalette,
   loadCustomPalette,

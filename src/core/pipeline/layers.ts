@@ -4,11 +4,7 @@ import {
   doesDeviceToggleTimelineParity,
   type PipelineEffectNode,
 } from '../../devices/engine';
-import type {
-  GeneratorChain,
-  GeneratorDeviceNode,
-  GeneratorNode,
-} from '../../shared/types';
+import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode } from '../../shared/model';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import type { Bounds, GeneratorLayer } from '../core-types';
 import { isEffectNode, isGeneratorNode } from './groups';

@@ -1,5 +1,5 @@
 import { cloneDeviceNode } from '../../shared/device-registry';
-import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode, LaunchpadButton } from '../../shared/types';
+import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode, LaunchpadButton } from '../../shared/model';
 import type { Bounds, Polyline } from '../core-types';
 import {
   applyModulationProgramToChain,

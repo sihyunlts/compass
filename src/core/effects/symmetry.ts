@@ -1,5 +1,5 @@
 import type { Bounds, GeneratorLayer, Mask } from '../core-types';
-import type { SymmetryEffectNode } from '../../shared/types';
+import type { SymmetryEffectNode } from '../../shared/model';
 import {
   COMPOSITION_BOUNDS,
   COMPOSITION_CENTER,

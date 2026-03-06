@@ -1,4 +1,4 @@
-import type { GeneratorChain } from '../../../shared/types';
+import type { GeneratorChain } from '../../../shared/model';
 import { clamp } from '../../../shared/math';
 
 const DEFAULT_PICKER_MIN = 0;

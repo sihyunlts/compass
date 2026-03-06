@@ -1,4 +1,4 @@
-import type { GeneratorChain } from '../../../shared/types';
+import type { GeneratorChain } from '../../../shared/model';
 import {
   createChainHistory,
   type ChainHistory,

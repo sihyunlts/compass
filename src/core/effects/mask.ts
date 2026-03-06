@@ -1,5 +1,5 @@
 import type { GeneratorLayer, Mask } from '../core-types';
-import type { MaskEffectNode, MaskMode } from '../../shared/types';
+import type { MaskEffectNode, MaskMode } from '../../shared/model';
 import { applyMaskToLayer } from '../layer-utils';
 
 const TILE_MIN = 0;

@@ -1,7 +1,7 @@
 import { createLaunchpadMap } from '../core/launchpad-map';
 import { buildButtonIndex } from '../core/pipeline/buttons';
 import type { ButtonIndex } from '../core/pipeline/types';
-import type { LaunchpadButton, LaunchpadModel } from '../shared/types';
+import type { LaunchpadButton, LaunchpadModel } from '../shared/model';
 
 const DEFAULT_LAUNCHPAD_MODEL: LaunchpadModel = 'mk3';
 

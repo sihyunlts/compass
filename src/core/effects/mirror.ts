@@ -1,5 +1,5 @@
 import type { Bounds, GeneratorLayer } from '../core-types';
-import type { MirrorEffectNode } from '../../shared/types';
+import type { MirrorEffectNode } from '../../shared/model';
 import { COMPOSITION_CENTER, toMirrorTransformAt } from '../geometry';
 import { applySpatialTransformToLayer } from '../layer-utils';
 

@@ -1,5 +1,5 @@
 import type { Polyline, Vec2 } from '../core-types';
-import type { WaterdropParams } from '../../shared/types';
+import type { WaterdropParams } from '../../shared/model';
 
 const RING_TRAVEL_SPAN = 18;
 

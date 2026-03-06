@@ -1,4 +1,4 @@
-import type { GeneratorChain } from '../../../shared/types';
+import type { GeneratorChain } from '../../../shared/model';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
 import type { ChainMutationMeta } from '../../state/chain-history';

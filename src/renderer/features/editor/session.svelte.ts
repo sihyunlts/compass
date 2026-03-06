@@ -4,11 +4,8 @@ import {
   toLengthPresetLabel,
 } from '../../../shared/beat-length';
 import { sanitizePreviewBpm } from '../../services/storage';
-import type {
-  BridgeSettings,
-  GeneratorChain,
-  LaunchpadModel,
-} from '../../../shared/types';
+import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
+import type { BridgeSettings } from '../../../shared/bridge';
 import type { RackInteractionCommit } from '../../components/device-rack-types';
 import type { BrowserDeviceKind } from '../../services/devices';
 import { isBrowserDeviceKind } from '../../services/devices';

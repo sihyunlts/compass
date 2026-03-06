@@ -5,14 +5,10 @@
    */
   import { onMount, tick } from 'svelte';
 
-  import type {
-    BridgeSettings,
-    GenerateAndSendRequest,
-    GeneratorChain,
-    GeneratorPreview,
-    LaunchpadModel,
-    PaletteFilePayload,
-  } from '../shared/types';
+  import type { GeneratorChain, LaunchpadModel, PaletteFilePayload } from '../shared/model';
+import type { GeneratorPreview } from '../shared/contracts/preview';
+import type { GenerateAndSendRequest } from '../shared/contracts/ipc';
+import type { BridgeSettings } from '../shared/bridge';
   import {
     AUTO_CREATE_LENGTH_OPTIONS,
   } from '../shared/beat-length';

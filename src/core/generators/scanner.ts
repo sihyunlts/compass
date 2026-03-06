@@ -1,5 +1,5 @@
 import type { Bounds, Polyline, Vec2 } from '../core-types';
-import type { ScannerParams } from '../../shared/types';
+import type { ScannerParams } from '../../shared/model';
 import { toAxisBasis } from '../geometry';
 
 const SCAN_TRAVEL_PADDING = 0.5;

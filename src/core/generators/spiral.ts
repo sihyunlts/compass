@@ -1,5 +1,5 @@
 import type { Polyline, Vec2 } from '../core-types';
-import type { SpiralParams } from '../../shared/types';
+import type { SpiralParams } from '../../shared/model';
 
 const SPIRAL_TRAVEL_SPAN = 18;
 const SPIRAL_STRIDE = 4.5;

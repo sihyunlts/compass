@@ -1,5 +1,5 @@
 import { buildGeneratorPolyline } from '../../devices/engine';
-import type { GeneratorChain, MaskEffectNode } from '../../shared/types';
+import type { GeneratorChain, MaskEffectNode } from '../../shared/model';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import type { GeneratorLayer, Polyline } from '../core-types';

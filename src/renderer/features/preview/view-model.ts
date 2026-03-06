@@ -4,11 +4,8 @@ import {
   type OverlayFrameStroke,
 } from '../../../domain';
 import { clamp } from '../../../shared/math';
-import type {
-  LaunchpadButton,
-  LaunchpadModel,
-  PreviewWindowState,
-} from '../../../shared/types';
+import type { LaunchpadButton, LaunchpadModel } from '../../../shared/model';
+import type { PreviewWindowState } from '../../../shared/contracts/preview';
 import { toPreviewFrameIndex } from '../../services/preview-cache';
 
 const PREVIEW_COLS = 10;

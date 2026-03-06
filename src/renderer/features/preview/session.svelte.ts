@@ -12,12 +12,8 @@ import {
   evaluateModulationProgramReadouts,
 } from '../../../core/modulation/compiled-program';
 import { clamp } from '../../../shared/math';
-import type {
-  GeneratorChain,
-  GeneratorPreview,
-  LaunchpadModel,
-  PreviewWindowState,
-} from '../../../shared/types';
+import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
+import type { GeneratorPreview, PreviewWindowState } from '../../../shared/contracts/preview';
 import {
   PREVIEW_FRAME_COUNT,
   toPreviewFrameBeat,

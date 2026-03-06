@@ -1,8 +1,4 @@
-import type {
-  LaunchpadButton,
-  LaunchpadModel,
-  MidiAddress,
-} from '../shared/types';
+import type { LaunchpadButton, LaunchpadModel, MidiAddress } from '../shared/model';
 export type LaunchpadLayout = 'drum-rack';
 
 const CHANNEL = 1;

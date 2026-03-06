@@ -1,9 +1,5 @@
 import { doesDeviceToggleTimelineParity } from '../../devices/engine';
-import type {
-  CurveNode,
-  GeneratorChain,
-  GeneratorDeviceNode,
-} from '../../shared/types';
+import type { CurveNode, GeneratorChain, GeneratorDeviceNode } from '../../shared/model';
 import { readNumericDeviceParam, writeNumericDeviceParam } from '../../shared/device-registry';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { clamp } from '../../shared/math';

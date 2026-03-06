@@ -1,6 +1,6 @@
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { normalizeOptionalId } from '../../shared/normalize-id';
-import type { ClipNote, GeneratorChain } from '../../shared/types';
+import type { ClipNote, GeneratorChain } from '../../shared/model';
 import { isGeneratorEngineNode } from '../engine';
 
 export interface ClipNoteWithOrigin extends ClipNote {

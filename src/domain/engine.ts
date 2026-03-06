@@ -19,11 +19,7 @@ import {
   type ClipNoteWithOrigin,
 } from '../devices/color/engine';
 import { getLaunchpadRuntimeMap } from './launchpad-model';
-import type {
-  ClipNote,
-  GeneratorChain,
-  LaunchpadModel,
-} from '../shared/types';
+import type { ClipNote, GeneratorChain, LaunchpadModel } from '../shared/model';
 
 /** Statistics summary for generated notes. */
 export interface PreviewStats {

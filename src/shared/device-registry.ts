@@ -2,7 +2,7 @@ import type {
   CurveModulatorNode,
   GeneratorDeviceNode,
   ModulationCurve,
-} from './types';
+} from './model';
 
 export type DeviceKind = GeneratorDeviceNode['kind'];
 type DeviceNodeOfKind<K extends DeviceKind> = Extract<GeneratorDeviceNode, { kind: K }>;

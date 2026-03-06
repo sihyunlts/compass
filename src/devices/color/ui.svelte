@@ -1,7 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  import type { GeneratorDeviceNode } from '../../shared/types';
+  import type { GeneratorDeviceNode } from '../../shared/model';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   const BLACK_RGB = '0 0 0';

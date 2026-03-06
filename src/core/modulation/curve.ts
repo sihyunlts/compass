@@ -1,5 +1,5 @@
 import { clamp } from '../../shared/math';
-import type { CurveNode, ModulationCurve } from '../../shared/types';
+import type { CurveNode, ModulationCurve } from '../../shared/model';
 
 const MIN_CURVE_DIVISIONS = 2;
 const MAX_CURVE_DIVISIONS = 64;

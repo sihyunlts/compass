@@ -1,7 +1,7 @@
 import dgram from 'node:dgram';
 
-import { LIVE_TEMPO_ENDPOINT } from '../../shared/bridge-protocol';
-import type { LiveTempoUpdate } from '../../shared/types';
+import { LIVE_TEMPO_ENDPOINT } from '../../shared/bridge';
+import type { LiveTempoUpdate } from '../../shared/bridge';
 
 const OSC_ALIGNMENT = 4;
 const TEMPO_EPSILON = 0.001;

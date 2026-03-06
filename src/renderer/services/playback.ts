@@ -1,9 +1,7 @@
 import { clamp } from '../../shared/math';
-import type {
-  CompassApi,
-  GeneratorChain,
-  PreviewWindowState,
-} from '../../shared/types';
+import type { GeneratorChain } from '../../shared/model';
+import type { PreviewWindowState } from '../../shared/contracts/preview';
+import type { CompassApi } from '../../shared/contracts/ipc';
 import { cloneChainForIpc } from './clone-chain';
 
 /**

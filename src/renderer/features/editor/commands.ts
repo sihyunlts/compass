@@ -1,5 +1,5 @@
 import { normalizeOptionalId } from '../../../shared/normalize-id';
-import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/types';
+import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/model';
 import type { RackInteractionCommit } from '../../components/device-rack-types';
 import {
   createDeviceNodeByKind,

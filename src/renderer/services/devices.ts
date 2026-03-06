@@ -9,7 +9,7 @@ import {
   RENDERER_DEVICE_KINDS,
 } from '../../devices/metadata';
 import type { RendererDeviceGroup, RendererDeviceKind } from '../../devices';
-import type { GeneratorDeviceNode } from '../../shared/types';
+import type { GeneratorDeviceNode } from '../../shared/model';
 
 export {
   SCANNER_PARAM_KEYS,

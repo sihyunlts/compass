@@ -5,7 +5,7 @@
    */
   import { onMount } from 'svelte';
   import { clamp } from '../../shared/math';
-  import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/types';
+  import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/model';
   import { normalizeOptionalId } from '../../shared/normalize-id';
   import type {
     RackInteractionCommit,

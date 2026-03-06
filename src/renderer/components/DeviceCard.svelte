@@ -3,7 +3,7 @@
 <script lang="ts">
   /** Renders the shared device card shell and mounts the kind-specific editor body. */
   import { getRendererDeviceDefinition } from '../../devices';
-  import type { GeneratorDeviceNode } from '../../shared/types';
+  import type { GeneratorDeviceNode } from '../../shared/model';
 
   let {
     device,

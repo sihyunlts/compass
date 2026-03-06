@@ -9,7 +9,7 @@ import {
 } from '../../../shared/device-registry';
 import { sanitizeCurveDivisions, sanitizeCurveNodes } from '../../../core/modulation/curve';
 import { sanitizeModulationTarget } from '../../../core/modulation/routing';
-import type { GeneratorChain } from '../../../shared/types';
+import type { GeneratorChain } from '../../../shared/model';
 
 type ChainDevice = GeneratorChain['devices'][number];
 type ChainControlTarget = HTMLInputElement | HTMLSelectElement;

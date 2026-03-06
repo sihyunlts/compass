@@ -1,5 +1,5 @@
 import type { Bounds, GeneratorLayer, Polyline } from '../core/core-types';
-import type { GeneratorEffectNode, GeneratorNode } from '../shared/types';
+import type { GeneratorEffectNode, GeneratorNode } from '../shared/model';
 
 export type GeneratorDeviceKind = GeneratorNode['kind'];
 export type PipelineEffectNode = Exclude<GeneratorEffectNode, { kind: 'color' }>;

@@ -2,7 +2,7 @@ import { normalizeOptionalId } from './normalize-id';
 import type {
   GeneratorChain,
   GeneratorDeviceNode,
-} from './types';
+} from './model';
 
 const isGroupEnabled = (
   chain: GeneratorChain,

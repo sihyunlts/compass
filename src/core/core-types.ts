@@ -1,8 +1,4 @@
-import type {
-  ScannerParams,
-  SpiralParams,
-  WaterdropParams,
-} from '../shared/types';
+import type { ScannerParams, SpiralParams, WaterdropParams } from '../shared/model';
 
 export interface Vec2 {
   x: number;

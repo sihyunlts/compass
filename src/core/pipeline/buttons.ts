@@ -1,4 +1,4 @@
-import type { LaunchpadButton } from '../../shared/types';
+import type { LaunchpadButton } from '../../shared/model';
 import type { Vec2 } from '../core-types';
 import type { ButtonIndex, ButtonIndexGroup } from './types';
 

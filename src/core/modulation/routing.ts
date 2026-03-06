@@ -1,11 +1,5 @@
 import { clamp } from '../../shared/math';
-import type {
-  CurveModulatorNode,
-  GeneratorChain,
-  GeneratorDeviceNode,
-  ModulationTarget,
-  ModulationCurve,
-} from '../../shared/types';
+import type { CurveModulatorNode, GeneratorChain, GeneratorDeviceNode, ModulationTarget, ModulationCurve } from '../../shared/model';
 import { isModulationTargetDeviceKind, isModulationTargetParamKey } from '../../shared/device-registry';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';

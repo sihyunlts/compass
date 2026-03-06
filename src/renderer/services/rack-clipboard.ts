@@ -1,6 +1,6 @@
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import { cloneDeviceNode } from '../../shared/device-registry';
-import type { GeneratorDeviceNode } from '../../shared/types';
+import type { GeneratorDeviceNode } from '../../shared/model';
 
 export type RackClipboard =
   | {

@@ -1,7 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  import type { GeneratorDeviceNode } from '../../shared/types';
+  import type { GeneratorDeviceNode } from '../../shared/model';
   import AnglePicker from '../../renderer/components/AnglePicker.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
 

@@ -6,7 +6,7 @@
    * Owns node editing, snapping, and hidden-input synchronization for form events.
    */
   import { clamp } from '../../shared/math';
-  import type { CurveNode, ModulationCurve } from '../../shared/types';
+  import type { CurveNode, ModulationCurve } from '../../shared/model';
 
   let {
     deviceId,

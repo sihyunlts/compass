@@ -1,5 +1,5 @@
 import type { Bounds, GeneratorLayer } from '../core-types';
-import type { RotateEffectNode } from '../../shared/types';
+import type { RotateEffectNode } from '../../shared/model';
 import { COMPOSITION_CENTER, toRotateTransformAt } from '../geometry';
 import { applySpatialTransformToLayer } from '../layer-utils';
 
