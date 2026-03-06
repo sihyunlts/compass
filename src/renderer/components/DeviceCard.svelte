@@ -154,8 +154,8 @@
     }
 
     &.is-collapsed {
-      width: var(--gap-48);
-      min-width: var(--gap-48);
+      width: 2.2rem;
+      min-width: 2.2rem;
 
       :global(.device-controls) {
         display: none;
@@ -165,22 +165,18 @@
         flex: 1;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
-        padding: var(--gap-8) var(--gap-6);
+        padding: var(--gap-10) var(--gap-6);
         border-bottom: none;
       }
 
       .device-head-left {
         flex-direction: column;
-        align-items: center;
-        gap: var(--gap-6);
+        gap: var(--gap-12);
       }
 
       .device-title {
-        display: inline-block;
-        transform: rotate(-90deg);
-        transform-origin: center;
-        white-space: nowrap;
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
       }
     }
 
