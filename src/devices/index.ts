@@ -14,7 +14,7 @@ import type {
 } from './types';
 import { waterdropDeviceDefinition } from './waterdrop/index';
 
-export const rendererDeviceDefinitions = {
+const rendererDeviceDefinitions = {
   waterdrop: waterdropDeviceDefinition,
   scanner: scannerDeviceDefinition,
   spiral: spiralDeviceDefinition,
@@ -28,21 +28,14 @@ export const rendererDeviceDefinitions = {
 } as const satisfies Record<RendererDeviceKind, RendererDeviceDefinition>;
 
 export type {
-  RendererDeviceDefinition,
-  RendererDeviceEditorProps,
-  RendererDeviceSchema,
-  RendererDeviceGroup,
   RendererDeviceKind,
-  RendererModulationParamDefinition,
 } from './types';
 
 export {
   createRendererDeviceNode,
   getRendererDeviceGroup,
   getRendererDeviceLabel,
-  getRendererDeviceSchema,
   getRendererModulationTargetParamDefinitions,
-  getRendererNumericParamKeys,
   isRendererDeviceKind,
   RENDERER_DEVICE_GROUPS,
   RENDERER_DEVICE_KINDS,

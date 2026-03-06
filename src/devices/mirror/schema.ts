@@ -5,7 +5,7 @@ const DEFAULT_MIRROR_PARAMS: MirrorEffectNode['params'] = {
   angleDeg: 90,
 };
 
-export const MIRROR_MODULATION_TARGET_PARAMS = [
+const MIRROR_MODULATION_TARGET_PARAMS = [
   { key: 'angleDeg', label: 'Mirror Axis Angle' },
 ] as const;
 export const MIRROR_NUMERIC_PARAM_KEYS = ['angleDeg'] as const;

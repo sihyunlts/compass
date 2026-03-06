@@ -8,7 +8,7 @@ import type {
 } from './drop-ops';
 
 /** Drag end result: dropZone may be null; shouldCommit gates reorder/insert persistence. */
-export type DragDropPointerUpResult =
+type DragDropPointerUpResult =
   | {
       kind: 'chain';
       sourceIds: string[];

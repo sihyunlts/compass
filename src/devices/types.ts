@@ -18,7 +18,7 @@ export interface RendererDeviceEditorPropsBase {
   resolvePaletteRgb: (velocity: number) => string;
 }
 
-export type RendererDeviceEditorProps<K extends RendererDeviceKind = RendererDeviceKind> =
+type RendererDeviceEditorProps<K extends RendererDeviceKind = RendererDeviceKind> =
   RendererDeviceEditorPropsBase & {
     device: RendererDeviceNodeOfKind<K>;
   };
@@ -28,7 +28,7 @@ export interface RendererModulationParamDefinition {
   label: string;
 }
 
-export type RendererDeviceNodeFactory<K extends RendererDeviceKind = RendererDeviceKind> = (
+type RendererDeviceNodeFactory<K extends RendererDeviceKind = RendererDeviceKind> = (
   id: string,
   enabled: boolean,
 ) => RendererDeviceNodeOfKind<K>;

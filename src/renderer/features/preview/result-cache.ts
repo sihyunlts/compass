@@ -24,7 +24,7 @@ export interface PreviewResultCacheEntry {
   ledFramesByIndex: ReadonlyArray<ReadonlyMap<number, number>>;
 }
 
-export interface PreviewResultInput {
+interface PreviewResultInput {
   sourceChain: GeneratorChain;
   sourceKey: string;
   loopLengthBeats: number;

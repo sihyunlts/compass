@@ -6,9 +6,9 @@ import { clamp } from '../../shared/math';
 import { toLoopProgress01 } from './curve';
 import { collectValidatedModulationRoutes } from './routing';
 
-export type CompiledModulationCurve = { nodes: ReadonlyArray<CurveNode> };
+type CompiledModulationCurve = { nodes: ReadonlyArray<CurveNode> };
 
-export interface CompiledModulationRoute {
+interface CompiledModulationRoute {
   modulatorId: string;
   targetDeviceId: string;
   targetParamKey: string;
@@ -22,7 +22,7 @@ export interface CompiledModulationProgram {
   routes: ReadonlyArray<CompiledModulationRoute>;
 }
 
-export interface ModulationRuntimeReadout {
+interface ModulationRuntimeReadout {
   modulatorId: string;
   targetDeviceId: string;
   targetParamKey: string;

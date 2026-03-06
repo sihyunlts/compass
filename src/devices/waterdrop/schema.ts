@@ -8,7 +8,7 @@ const DEFAULT_WATERDROP_PARAMS: WaterdropGeneratorNode['params'] = {
   startRadius: 0,
 };
 
-export const WATERDROP_MODULATION_TARGET_PARAMS = [
+const WATERDROP_MODULATION_TARGET_PARAMS = [
   { key: 'centerX', label: 'Center X' },
   { key: 'centerY', label: 'Center Y' },
   { key: 'curvature', label: 'Curvature' },

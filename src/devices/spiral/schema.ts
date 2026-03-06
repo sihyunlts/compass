@@ -8,7 +8,7 @@ const DEFAULT_SPIRAL_PARAMS: SpiralGeneratorNode['params'] = {
   startRadius: 0,
 };
 
-export const SPIRAL_MODULATION_TARGET_PARAMS = [
+const SPIRAL_MODULATION_TARGET_PARAMS = [
   { key: 'centerX', label: 'Center X' },
   { key: 'centerY', label: 'Center Y' },
   { key: 'turns', label: 'Turns' },

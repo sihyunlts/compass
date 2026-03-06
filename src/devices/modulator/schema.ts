@@ -14,7 +14,7 @@ const DEFAULT_MODULATOR_PARAMS: CurveModulatorNode['params'] = {
   },
 };
 
-export const MODULATOR_NUMERIC_PARAM_KEYS = ['amount'] as const;
+const MODULATOR_NUMERIC_PARAM_KEYS = ['amount'] as const;
 
 export const modulatorDeviceSchema = {
   kind: 'modulator',

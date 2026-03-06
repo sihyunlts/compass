@@ -1,13 +1,13 @@
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import type { GeneratorDeviceNode } from '../../../shared/model';
 
-export type RackDeviceItem = {
+type RackDeviceItem = {
   kind: 'device';
   key: string;
   device: GeneratorDeviceNode;
 };
 
-export type RackGroupItem = {
+type RackGroupItem = {
   kind: 'group';
   key: string;
   groupId: string;
@@ -15,9 +15,9 @@ export type RackGroupItem = {
   devices: GeneratorDeviceNode[];
 };
 
-export type RackContentItem = RackDeviceItem | RackGroupItem;
+type RackContentItem = RackDeviceItem | RackGroupItem;
 
-export type GroupColumn =
+type GroupColumn =
   | {
       kind: 'left-rail';
       key: `rail-left-${string}`;

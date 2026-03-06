@@ -5,7 +5,7 @@ const DEFAULT_ROTATE_PARAMS: RotateEffectNode['params'] = {
   angleDeg: 90,
 };
 
-export const ROTATE_MODULATION_TARGET_PARAMS = [
+const ROTATE_MODULATION_TARGET_PARAMS = [
   { key: 'angleDeg', label: 'Angle' },
 ] as const;
 export const ROTATE_NUMERIC_PARAM_KEYS = ['angleDeg'] as const;

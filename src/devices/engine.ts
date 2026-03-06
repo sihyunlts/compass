@@ -48,7 +48,7 @@ export type {
   PipelineEffectNode,
 } from './engine-types';
 
-export const isGeneratorEngineKind = (
+const isGeneratorEngineKind = (
   kind: GeneratorDeviceNode['kind'],
 ): kind is GeneratorDeviceKind => GENERATOR_KIND_SET.has(kind as GeneratorDeviceKind);
 
@@ -56,7 +56,7 @@ export const isGeneratorEngineNode = (
   device: GeneratorDeviceNode,
 ): device is GeneratorNode => isGeneratorEngineKind(device.kind);
 
-export const isPipelineEffectKind = (
+const isPipelineEffectKind = (
   kind: GeneratorDeviceNode['kind'],
 ): kind is PipelineEffectKind => PIPELINE_EFFECT_KIND_SET.has(kind as PipelineEffectKind);
 

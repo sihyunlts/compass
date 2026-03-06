@@ -6,7 +6,7 @@ const DEFAULT_SCANNER_PARAMS: ScannerGeneratorNode['params'] = {
   startOffset: 0,
 };
 
-export const SCANNER_MODULATION_TARGET_PARAMS = [
+const SCANNER_MODULATION_TARGET_PARAMS = [
   { key: 'angleDeg', label: 'Angle' },
   { key: 'startOffset', label: 'Start Offset' },
 ] as const;

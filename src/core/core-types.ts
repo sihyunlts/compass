@@ -21,7 +21,7 @@ export interface AffineTransform {
   ty: number;
 }
 
-export interface TemporalTransform {
+interface TemporalTransform {
   alpha: number;
   beta: number;
 }
@@ -46,24 +46,19 @@ export interface GeneratorLayerBase {
   velocity: number;
 }
 
-export interface WaterdropLayer extends GeneratorLayerBase {
+interface WaterdropLayer extends GeneratorLayerBase {
   kind: 'waterdrop';
   params: WaterdropParams;
 }
 
-export interface ScannerLayer extends GeneratorLayerBase {
+interface ScannerLayer extends GeneratorLayerBase {
   kind: 'scanner';
   params: ScannerParams;
 }
 
-export interface SpiralLayer extends GeneratorLayerBase {
+interface SpiralLayer extends GeneratorLayerBase {
   kind: 'spiral';
   params: SpiralParams;
 }
 
 export type GeneratorLayer = WaterdropLayer | ScannerLayer | SpiralLayer;
-
-export interface EffectContext {
-  worldBounds: Bounds;
-  compositionBounds: Bounds;
-}

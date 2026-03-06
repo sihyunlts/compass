@@ -7,7 +7,7 @@ import {
 type DeviceKind = GeneratorDeviceNode['kind'];
 type DeviceNodeOfKind<K extends DeviceKind> = Extract<GeneratorDeviceNode, { kind: K }>;
 
-export type ModulationTargetDeviceKind = Exclude<
+type ModulationTargetDeviceKind = Exclude<
   DeviceKind,
   'reverse' | 'modulator' | 'symmetry' | 'mask' | 'color'
 >;

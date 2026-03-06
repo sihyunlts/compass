@@ -21,7 +21,7 @@ const RENDERER_DEVICE_GROUP_ORDER = {
   effect: ['modulator', 'mirror', 'symmetry', 'mask', 'rotate', 'reverse', 'color'],
 } as const satisfies Record<RendererDeviceGroup, readonly RendererDeviceKind[]>;
 
-export const rendererDeviceSchemas = {
+const rendererDeviceSchemas = {
   waterdrop: waterdropDeviceSchema,
   scanner: scannerDeviceSchema,
   spiral: spiralDeviceSchema,
@@ -52,7 +52,7 @@ export const isRendererDeviceKind = (
   !!value && RENDERER_DEVICE_KIND_SET.has(value as RendererDeviceKind)
 );
 
-export const getRendererDeviceSchema = <K extends RendererDeviceKind>(
+const getRendererDeviceSchema = <K extends RendererDeviceKind>(
   kind: K,
 ): RendererDeviceSchema<K> => rendererDeviceSchemas[kind] as RendererDeviceSchema<K>;
 
@@ -73,7 +73,3 @@ export const createRendererDeviceNode = <K extends RendererDeviceKind>(
   enabled = true,
 ): RendererDeviceNodeOfKind<K> =>
   getRendererDeviceSchema(kind).createDefaultNode(id, enabled);
-
-export const getRendererNumericParamKeys = (
-  kind: RendererDeviceKind,
-): readonly string[] => getRendererDeviceSchema(kind).numericParamKeys ?? [];

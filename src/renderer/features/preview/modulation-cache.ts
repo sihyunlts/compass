@@ -11,7 +11,7 @@ import { toWrappedLoopBeat01 } from './utils';
 
 const EMPTY_MODULATION_READOUT_BY_ID: Readonly<Record<string, string>> = Object.freeze({});
 
-export interface ModulationCacheEntry {
+interface ModulationCacheEntry {
   key: string;
   program: CompiledModulationProgram;
   baselineById: Readonly<Record<string, string>>;

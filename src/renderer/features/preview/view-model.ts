@@ -21,7 +21,7 @@ export interface OverlayWorldBounds {
   maxY: number;
 }
 
-export interface PreviewSurfaceCellModel {
+interface PreviewSurfaceCellModel {
   key: string;
   pitches: number[];
   isEdgeButton: boolean;
@@ -120,14 +120,14 @@ export const DEFAULT_OVERLAY_WORLD_BOUNDS = resolveOverlayWorldBounds(
   OVERLAY_WORLD_BASE_PADDING,
 );
 
-export const resolvePreviewSourceTimelineEndBeat = (
+const resolvePreviewSourceTimelineEndBeat = (
   state: PreviewWindowState | null,
 ): number => {
   const endBeat = state?.sourceTimelineEndBeat;
   return Number.isFinite(endBeat) && endBeat > 0 ? endBeat : 1;
 };
 
-export const resolvePreviewCellModels = (
+const resolvePreviewCellModels = (
   model?: LaunchpadModel,
 ): ReadonlyArray<PreviewSurfaceCellModel> => {
   const resolvedModel = resolveLaunchpadModel(model);
@@ -187,7 +187,7 @@ export const resolvePreviewCellModels = (
  * Approximates the brighter pad surface color instead of the bare LED color.
  * Keeps fully-off LEDs black so velocity 0 still reads as unlit.
  */
-export const resolvePreviewSurfaceRgb = (rgb: string): string => {
+const resolvePreviewSurfaceRgb = (rgb: string): string => {
   const channels = parseRgbChannels(rgb);
   if (!channels) {
     return rgb;

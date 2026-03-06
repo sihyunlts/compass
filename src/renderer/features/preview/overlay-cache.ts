@@ -23,7 +23,7 @@ const PREVIEW_FRAME_BEATS = Array.from(
   (_, index) => toPreviewFrameBeat(index),
 );
 
-export interface OverlayCacheEntry {
+interface OverlayCacheEntry {
   key: string;
   bounds: OverlayWorldBounds;
   framesByIndex: ReadonlyArray<ReadonlyArray<OverlayFrameStroke>>;

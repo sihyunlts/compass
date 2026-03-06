@@ -126,7 +126,7 @@ export const reconcileGeneratorChainModulators = (
   return changed;
 };
 
-export interface ValidatedModulationRoute {
+interface ValidatedModulationRoute {
   modulator: CurveModulatorNode;
   targetDevice: GeneratorDeviceNode;
   targetParamKey: string;
