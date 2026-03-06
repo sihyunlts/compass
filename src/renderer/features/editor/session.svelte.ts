@@ -1,53 +1,32 @@
-import {
-  AUTO_CREATE_LENGTH_OPTIONS,
-  parseBeatsValue,
-  toLengthPresetLabel,
-} from '../../../shared/beat-length';
-import { sanitizePreviewBpm } from '../../services/storage';
-import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import type { BridgeSettings } from '../../../shared/bridge/types';
+import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import type { RackInteractionCommit } from '../../components/device-rack-types';
 import type { BrowserDeviceKind } from '../../services/devices';
 import { isBrowserDeviceKind } from '../../services/devices';
 import type { RackClipboard } from '../../services/rack-clipboard';
-import {
-  loadBridgeSettings,
-  loadChainSettings,
-  loadCollapsedDeviceIds,
-  loadLaunchpadModel,
-  loadPreviewBpm,
-  loadPreviewGuideEnabled,
-  loadPreviewLoopEnabled,
-  loadSidebarWidth,
-  saveBridgeSettings,
-  saveChainSettings,
-  saveCollapsedDeviceIds,
-  saveLaunchpadModel,
-  savePreviewBpm,
-  savePreviewGuideEnabled,
-  savePreviewLoopEnabled,
-  saveSidebarWidth,
-  sanitizeBridgeSettings,
-} from '../../services/storage';
 import type { GroupSelectionContext } from '../rack/selection.svelte';
-import {
-  assignGroupIdToDevices,
-  canCreateGroupFromSelection,
-  removeDevicesById,
-  resolveGroupMemberIds,
-  resolveNextGroupId,
-  withDevices,
-} from '../../state/chain';
-import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
 import type { ChainMutationMeta } from '../../state/chain-history';
 import type { ContextMenuTarget } from '../../state/context-menu';
 import {
+  applyBridgeSettings as applyEditorBridgeSettings,
+  handleAutoCreateLengthChange,
+  readBridgeSettingsFromLabel,
+  setLaunchpadModelEnabled,
+  setPreviewGuideEnabled,
+  syncPreviewBpm,
+  togglePreviewLoopEnabled,
+} from './bridge-settings';
+import {
+  copySelectionToClipboard as copySelectionToEditorClipboard,
+  cutSelection as cutEditorSelection,
+  duplicateSelection as duplicateEditorSelection,
+  pasteClipboard as pasteEditorClipboard,
+  resolveContextSelection as resolveEditorContextSelection,
+} from './clipboard';
+import {
   EDITOR_HISTORY_META,
   applyBrowserDeviceAdd,
-  applyGroupEnabledChange,
   applyRackCommit,
-  buildChainWithClipboardPaste,
-  buildClipboardFromSelection,
 } from './commands';
 import {
   createEditorHistory,
@@ -55,11 +34,33 @@ import {
   type EditorHistoryListEntry,
 } from './editor-history';
 import {
-  resolveCurrentSelectionSnapshot,
-  resolveDeleteSelectionDeviceIds,
-  resolveSelectionSnapshotFromContextTarget,
-  type RackSelectionSnapshot,
-} from './selectors';
+  applyChainMutation as applyEditorChainMutation,
+  checkoutHistory as checkoutEditorHistory,
+  getCurrentHistoryEntry,
+  initializeHistoryBridge,
+  redoHistory,
+  saveChainWithHistory,
+  syncHistoryState,
+  undoHistory,
+} from './history-bridge';
+import {
+  deleteCurrentSelection as deleteEditorSelection,
+  deleteDevicesById as deleteEditorDevicesById,
+  deleteGroup as deleteEditorGroup,
+  groupCurrentSelection as groupEditorSelection,
+  groupDeviceIds as groupEditorDeviceIds,
+  toggleGroupEnabled as toggleEditorGroupEnabled,
+  ungroupGroup as ungroupEditorGroup,
+  ungroupSelectedGroups as ungroupEditorSelections,
+} from './grouping';
+import {
+  createInitialEditorState,
+  persistChainState as persistEditorChainState,
+  persistSidebarWidth,
+  reconcileCurrentChainModulators as reconcileEditorChainModulators,
+  toggleCollapse,
+} from './persistence';
+import type { RackSelectionSnapshot } from './selectors';
 
 const DEFAULT_AUTO_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_HISTORY_MAX_ENTRIES = 100;
@@ -112,44 +113,6 @@ interface EditorSessionOptions {
   onSyncAfterRender?: () => void | Promise<void>;
 }
 
-const readBridgeSettingsFromLabel = (lengthLabel: string): BridgeSettings =>
-  sanitizeBridgeSettings({
-    autoCreateLengthBeats: parseBeatsValue(lengthLabel),
-  });
-
-const resolveBridgeLengthLabel = (bridge: BridgeSettings): string =>
-  toLengthPresetLabel(bridge.autoCreateLengthBeats, AUTO_CREATE_LENGTH_OPTIONS[0].label);
-
-const createInitialEditorState = (): EditorSessionState => {
-  const bridge = loadBridgeSettings();
-  return {
-    chainState: loadChainSettings(),
-    chainRevision: 1,
-    launchpadModel: loadLaunchpadModel(),
-    headerIndicatorText: '',
-    paletteNameText: 'Default palette: loading...',
-    isSettingsOpen: false,
-    previewBpm: loadPreviewBpm(),
-    previewLoopLengthBeats: bridge.autoCreateLengthBeats,
-    isPreviewLoopEnabled: loadPreviewLoopEnabled(),
-    isPreviewGuideEnabled: loadPreviewGuideEnabled(),
-    isPreviewPopoutOpen: false,
-    previewScrubValue: 0,
-    autoCreateLengthLabel: resolveBridgeLengthLabel(bridge),
-    previewPlayLabel: 'Play',
-    sendButtonLabel: 'Send',
-    sendButtonDisabled: false,
-    sidebarWidthPx: loadSidebarWidth(),
-    isSidebarResizing: false,
-    collapsedDeviceIds: loadCollapsedDeviceIds(),
-    clipboardAvailable: false,
-    canUndo: false,
-    canRedo: false,
-    undoActionLabel: 'Undo',
-    redoActionLabel: 'Redo',
-  };
-};
-
 export class EditorSession {
   public readonly state: EditorSessionState = $state(createInitialEditorState());
 
@@ -167,24 +130,24 @@ export class EditorSession {
 
   private rackClipboard: RackClipboard | null = null;
 
-  constructor(options: EditorSessionOptions = {}) {
+  public constructor(options: EditorSessionOptions = {}) {
     this.history = createEditorHistory(this.state.chainState, {
       maxEntries: options.historyMaxEntries ?? DEFAULT_HISTORY_MAX_ENTRIES,
     });
-    this.autoPreviewDebounceMs = options.autoPreviewDebounceMs ?? DEFAULT_AUTO_PREVIEW_DEBOUNCE_MS;
+    this.autoPreviewDebounceMs =
+      options.autoPreviewDebounceMs ?? DEFAULT_AUTO_PREVIEW_DEBOUNCE_MS;
     this.onAutoPreview = options.onAutoPreview ?? null;
     this.onSyncAfterRender = options.onSyncAfterRender ?? null;
-    this.syncHistoryState();
+    syncHistoryState(this.state, this.history);
   }
 
   public readonly commands = {
     initialize: (): void => {
-      if (this.reconcileCurrentChainModulators()) {
-        this.bumpChainRevision();
-      }
-      this.history.replaceCurrent(this.state.chainState);
-      this.syncHistoryState();
-      this.requestSyncAfterRender();
+      initializeHistoryBridge(this.state, this.history, {
+        reconcileCurrentChainModulators: () => this.reconcileCurrentChainModulators(),
+        bumpChainRevision: () => this.bumpChainRevision(),
+        requestSyncAfterRender: () => this.requestSyncAfterRender(),
+      });
     },
     dispose: (): void => {
       this.cancelAutoPreview();
@@ -206,26 +169,22 @@ export class EditorSession {
       this.state.isSettingsOpen = false;
     },
     persistSidebarWidth: (nextWidth?: number): void => {
-      saveSidebarWidth(nextWidth ?? this.state.sidebarWidthPx);
+      persistSidebarWidth(this.state, nextWidth);
     },
     toggleCollapse: (id: string): void => {
-      const next = this.state.collapsedDeviceIds.includes(id)
-        ? this.state.collapsedDeviceIds.filter((item) => item !== id)
-        : [...this.state.collapsedDeviceIds, id];
-      this.state.collapsedDeviceIds = next;
-      saveCollapsedDeviceIds(next);
+      toggleCollapse(this.state, id);
     },
     saveChain: (chain: GeneratorChain, meta: ChainMutationMeta): void => {
-      this.state.chainState = chain;
-      this.bumpChainRevision();
-      this.persistChainState();
-      this.history.push(chain, meta);
-      this.syncHistoryState();
+      saveChainWithHistory(this.state, this.history, chain, meta, {
+        bumpChainRevision: () => this.bumpChainRevision(),
+        persistChainState: () => this.persistChainState(),
+      });
     },
     addBrowserDevice: (kind: BrowserDeviceKind): void => {
       if (!isBrowserDeviceKind(kind)) {
         return;
       }
+
       this.applyChainMutation(
         applyBrowserDeviceAdd(this.state.chainState, kind),
         EDITOR_HISTORY_META.addDevice,
@@ -247,6 +206,7 @@ export class EditorSession {
       if (!nextChain) {
         return;
       }
+
       this.applyChainMutation(
         nextChain,
         commit.kind === 'move'
@@ -255,27 +215,16 @@ export class EditorSession {
       );
     },
     toggleGroupEnabled: (groupId: string, nextEnabled: boolean): void => {
-      const nextChain = applyGroupEnabledChange(
-        this.state.chainState,
-        groupId,
-        nextEnabled,
-      );
-      if (!nextChain) {
-        return;
-      }
-      this.applyChainMutation(nextChain, EDITOR_HISTORY_META.groupToggleEnabled);
+      toggleEditorGroupEnabled(this.buildGroupingContext(), groupId, nextEnabled);
     },
     handleAutoCreateLengthChange: (): void => {
-      const bridge = this.readBridgeSettings();
-      this.state.previewLoopLengthBeats = bridge.autoCreateLengthBeats;
-      saveBridgeSettings(bridge);
-      this.scheduleAutoPreview(0);
+      handleAutoCreateLengthChange(this.state, (delayMs) => this.scheduleAutoPreview(delayMs));
     },
     undo: (): boolean => this.undo(),
     redo: (): boolean => this.redo(),
     listHistory: (): EditorHistoryListEntry[] => this.history.list(),
     getCurrentHistoryEntry: (): EditorHistoryListEntry | null =>
-      this.history.list().find((entry) => entry.isCurrent) ?? null,
+      getCurrentHistoryEntry(this.history),
     checkoutHistory: (target: string | number): boolean => this.checkoutHistory(target),
     copySelection: (): boolean => this.copySelectionToClipboard() !== null,
     cutSelection: (): boolean => this.cutSelection(),
@@ -286,6 +235,7 @@ export class EditorSession {
       if (!rackBinding) {
         return false;
       }
+
       rackBinding.selectAllDevices(
         this.state.chainState.devices.map((device) => device.id),
       );
@@ -302,6 +252,7 @@ export class EditorSession {
       if (target.deviceIds.length === 0) {
         return;
       }
+
       this.deleteDevicesById(target.deviceIds);
     },
     copyFromContextTarget: (target: ContextMenuTarget): void => {
@@ -325,44 +276,18 @@ export class EditorSession {
     clearSelection: (): void => {
       this.rackBinding?.clearSelection();
     },
-    setLaunchpadModelEnabled: (nextEnabled: boolean): boolean => {
-      const nextModel: LaunchpadModel = nextEnabled ? 'mk2' : 'mk3';
-      if (this.state.launchpadModel === nextModel) {
-        return false;
-      }
-      this.state.launchpadModel = nextModel;
-      saveLaunchpadModel(nextModel);
-      this.scheduleAutoPreview(0);
-      return true;
-    },
-    togglePreviewLoopEnabled: (): boolean => {
-      this.state.isPreviewLoopEnabled = !this.state.isPreviewLoopEnabled;
-      savePreviewLoopEnabled(this.state.isPreviewLoopEnabled);
-      return true;
-    },
-    setPreviewGuideEnabled: (nextEnabled: boolean): boolean => {
-      if (this.state.isPreviewGuideEnabled === nextEnabled) {
-        return false;
-      }
-      this.state.isPreviewGuideEnabled = nextEnabled;
-      savePreviewGuideEnabled(nextEnabled);
-      return true;
-    },
+    setLaunchpadModelEnabled: (nextEnabled: boolean): boolean =>
+      setLaunchpadModelEnabled(this.state, nextEnabled, (delayMs) => this.scheduleAutoPreview(delayMs)),
+    togglePreviewLoopEnabled: (): boolean => togglePreviewLoopEnabled(this.state),
+    setPreviewGuideEnabled: (nextEnabled: boolean): boolean =>
+      setPreviewGuideEnabled(this.state, nextEnabled),
     setPreviewPopoutOpen: (nextEnabled: boolean): void => {
       this.state.isPreviewPopoutOpen = nextEnabled;
     },
     setPreviewPlaying: (nextIsPlaying: boolean): void => {
       this.state.previewPlayLabel = nextIsPlaying ? 'Pause' : 'Play';
     },
-    syncPreviewBpm: (nextBpm: number): boolean => {
-      const sanitized = sanitizePreviewBpm(nextBpm);
-      if (Math.abs(sanitized - this.state.previewBpm) < 0.0001) {
-        return false;
-      }
-      this.state.previewBpm = sanitized;
-      savePreviewBpm(sanitized);
-      return true;
-    },
+    syncPreviewBpm: (nextBpm: number): boolean => syncPreviewBpm(this.state, nextBpm),
     setPreviewLoopLengthBeats: (nextBeats: number): void => {
       this.state.previewLoopLengthBeats = nextBeats;
     },
@@ -386,20 +311,9 @@ export class EditorSession {
         persist?: boolean;
       } = {},
     ): void => {
-      this.state.autoCreateLengthLabel = resolveBridgeLengthLabel(bridge);
-      this.state.previewLoopLengthBeats = bridge.autoCreateLengthBeats;
-      if (options.persist === true) {
-        saveBridgeSettings(bridge);
-      }
+      applyEditorBridgeSettings(this.state, bridge, options);
     },
   };
-
-  private syncHistoryState(): void {
-    this.state.canUndo = this.history.canUndo();
-    this.state.canRedo = this.history.canRedo();
-    this.state.undoActionLabel = this.history.getUndoEntry()?.label ?? 'Undo';
-    this.state.redoActionLabel = this.history.getRedoEntry()?.label ?? 'Redo';
-  }
 
   private scheduleAutoPreview(delayMs = this.autoPreviewDebounceMs): void {
     this.cancelAutoPreview();
@@ -408,6 +322,7 @@ export class EditorSession {
       if (!this.onAutoPreview) {
         return;
       }
+
       void Promise.resolve(this.onAutoPreview()).catch(() => {
         // Preview scheduling failures should not break editor mutations.
       });
@@ -418,6 +333,7 @@ export class EditorSession {
     if (this.autoPreviewTimer === null) {
       return;
     }
+
     window.clearTimeout(this.autoPreviewTimer);
     this.autoPreviewTimer = null;
   }
@@ -426,6 +342,7 @@ export class EditorSession {
     if (!this.onSyncAfterRender) {
       return;
     }
+
     void Promise.resolve(this.onSyncAfterRender()).catch(() => {
       // Render-sync failures should not block state persistence.
     });
@@ -436,87 +353,11 @@ export class EditorSession {
   }
 
   private reconcileCurrentChainModulators(): boolean {
-    const changed = reconcileGeneratorChainModulators(this.state.chainState);
-    if (!changed) {
-      return false;
-    }
-    this.state.chainState = withDevices(
-      this.state.chainState,
-      [...this.state.chainState.devices],
-    );
-    return true;
-  }
-
-  private pruneCollapsedDeviceIds(): void {
-    const validIds = this.state.chainState.devices.map((device) => device.id);
-    const next = this.state.collapsedDeviceIds.filter((id) => validIds.includes(id));
-    if (next.length === this.state.collapsedDeviceIds.length) {
-      return;
-    }
-    this.state.collapsedDeviceIds = next;
-    saveCollapsedDeviceIds(next);
+    return reconcileEditorChainModulators(this.state);
   }
 
   private persistChainState(): void {
-    this.reconcileCurrentChainModulators();
-    this.pruneCollapsedDeviceIds();
-    saveChainSettings(this.state.chainState);
-    this.requestSyncAfterRender();
-  }
-
-  private onChainMutated(meta: ChainMutationMeta): void {
-    this.persistChainState();
-    this.bumpChainRevision();
-    this.history.push(this.state.chainState, meta);
-    this.syncHistoryState();
-  }
-
-  private applyChainMutation(
-    nextChain: GeneratorChain,
-    meta: ChainMutationMeta,
-  ): void {
-    this.state.chainState = nextChain;
-    this.onChainMutated(meta);
-    this.scheduleAutoPreview(0);
-  }
-
-  private restoreChainFromHistory(chain: GeneratorChain): void {
-    this.state.chainState = chain;
-    this.persistChainState();
-    this.bumpChainRevision();
-    this.history.replaceCurrent(this.state.chainState);
-    this.syncHistoryState();
-    this.scheduleAutoPreview(0);
-  }
-
-  private undo(): boolean {
-    const restored = this.history.undo();
-    this.syncHistoryState();
-    if (!restored) {
-      return false;
-    }
-    this.restoreChainFromHistory(restored);
-    return true;
-  }
-
-  private redo(): boolean {
-    const restored = this.history.redo();
-    this.syncHistoryState();
-    if (!restored) {
-      return false;
-    }
-    this.restoreChainFromHistory(restored);
-    return true;
-  }
-
-  private checkoutHistory(target: string | number): boolean {
-    const restored = this.history.checkout(target);
-    this.syncHistoryState();
-    if (!restored) {
-      return false;
-    }
-    this.restoreChainFromHistory(restored);
-    return true;
+    persistEditorChainState(this.state, () => this.requestSyncAfterRender());
   }
 
   private readBridgeSettings(): BridgeSettings {
@@ -528,108 +369,56 @@ export class EditorSession {
     this.state.clipboardAvailable = nextClipboard !== null;
   }
 
-  private getCurrentSelectionSnapshot(): RackSelectionSnapshot | null {
-    const rackBinding = this.rackBinding;
-    if (!rackBinding) {
-      return null;
-    }
-
-    return resolveCurrentSelectionSnapshot(
-      this.state.chainState,
-      rackBinding.getSelectedGroupContexts(),
-      rackBinding.getOrderedSelectedDeviceIds(),
-    );
+  private applyChainMutation(
+    nextChain: GeneratorChain,
+    meta: ChainMutationMeta,
+  ): void {
+    applyEditorChainMutation(this.state, this.history, nextChain, meta, {
+      bumpChainRevision: () => this.bumpChainRevision(),
+      persistChainState: () => this.persistChainState(),
+      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),
+    });
   }
 
-  private resolveActionSelection(
-    selectionOverride?: RackSelectionSnapshot | null,
-  ): RackSelectionSnapshot | null {
-    return selectionOverride ?? this.getCurrentSelectionSnapshot();
+  private undo(): boolean {
+    return undoHistory(this.state, this.history, {
+      bumpChainRevision: () => this.bumpChainRevision(),
+      persistChainState: () => this.persistChainState(),
+      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),
+    });
+  }
+
+  private redo(): boolean {
+    return redoHistory(this.state, this.history, {
+      bumpChainRevision: () => this.bumpChainRevision(),
+      persistChainState: () => this.persistChainState(),
+      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),
+    });
+  }
+
+  private checkoutHistory(target: string | number): boolean {
+    return checkoutEditorHistory(this.state, this.history, target, {
+      bumpChainRevision: () => this.bumpChainRevision(),
+      persistChainState: () => this.persistChainState(),
+      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),
+    });
   }
 
   private resolveContextSelection(target: ContextMenuTarget): RackSelectionSnapshot | null {
-    return resolveSelectionSnapshotFromContextTarget(this.state.chainState, target);
-  }
-
-  private deleteDevicesById(
-    deviceIds: readonly string[],
-    meta: ChainMutationMeta = EDITOR_HISTORY_META.deleteDevices,
-  ): boolean {
-    this.rackBinding?.applyNextSelectionAfterDelete(deviceIds);
-    const nextChain = removeDevicesById(this.state.chainState, deviceIds);
-    if (!nextChain) {
-      return false;
-    }
-    this.applyChainMutation(nextChain, meta);
-    return true;
-  }
-
-  private deleteGroup(
-    rawGroupId: string,
-    meta: ChainMutationMeta = EDITOR_HISTORY_META.deleteDevices,
-  ): boolean {
-    const memberIds = resolveGroupMemberIds(this.state.chainState.devices, rawGroupId);
-    if (memberIds.length === 0) {
-      return false;
-    }
-    return this.deleteDevicesById(memberIds, meta);
-  }
-
-  private setGroupIdForDevices(
-    deviceIds: readonly string[],
-    groupId: string | null,
-    meta: ChainMutationMeta,
-  ): boolean {
-    const nextChain = assignGroupIdToDevices(this.state.chainState, deviceIds, groupId);
-    if (!nextChain) {
-      return false;
-    }
-    this.applyChainMutation(nextChain, meta);
-    return true;
-  }
-
-  private ungroupGroup(
-    rawGroupId: string,
-    meta: ChainMutationMeta = EDITOR_HISTORY_META.groupUngroup,
-  ): boolean {
-    const memberIds = resolveGroupMemberIds(this.state.chainState.devices, rawGroupId);
-    if (memberIds.length === 0) {
-      return false;
-    }
-    return this.setGroupIdForDevices(memberIds, null, meta);
+    return resolveEditorContextSelection(this.state, target);
   }
 
   private copySelectionToClipboard(
     selectionOverride?: RackSelectionSnapshot | null,
   ): RackClipboard | null {
-    const selection = this.resolveActionSelection(selectionOverride);
-    if (!selection) {
-      return null;
-    }
-
-    const nextClipboard = buildClipboardFromSelection(this.state.chainState, selection);
-    if (!nextClipboard) {
-      return null;
-    }
-
-    this.setClipboard(nextClipboard);
-    return nextClipboard;
+    return copySelectionToEditorClipboard(
+      this.buildClipboardContext(),
+      selectionOverride,
+    );
   }
 
   private cutSelection(selectionOverride?: RackSelectionSnapshot | null): boolean {
-    const selection = this.resolveActionSelection(selectionOverride);
-    if (!selection) {
-      return false;
-    }
-
-    const copied = this.copySelectionToClipboard(selection);
-    if (!copied) {
-      return false;
-    }
-
-    return selection.kind === 'group'
-      ? this.deleteGroup(selection.groupId, EDITOR_HISTORY_META.clipboardCut)
-      : this.deleteDevicesById(selection.deviceIds, EDITOR_HISTORY_META.clipboardCut);
+    return cutEditorSelection(this.buildClipboardContext(), selectionOverride);
   }
 
   private pasteClipboard(
@@ -637,92 +426,87 @@ export class EditorSession {
     selectionOverride?: RackSelectionSnapshot | null,
     meta: ChainMutationMeta = EDITOR_HISTORY_META.clipboardPaste,
   ): boolean {
-    const clipboard = clipboardOverride ?? this.rackClipboard;
-    if (!clipboard) {
-      return false;
-    }
-
-    const selection = this.resolveActionSelection(selectionOverride);
-    const nextChain = buildChainWithClipboardPaste(
-      this.state.chainState,
-      clipboard,
-      selection,
+    return pasteEditorClipboard(
+      this.buildClipboardContext(),
+      clipboardOverride,
+      selectionOverride,
+      meta,
     );
-    this.applyChainMutation(nextChain, meta);
-    return true;
   }
 
   private duplicateSelection(selectionOverride?: RackSelectionSnapshot | null): boolean {
-    const selection = this.resolveActionSelection(selectionOverride);
-    if (!selection) {
-      return false;
-    }
+    return duplicateEditorSelection(this.buildClipboardContext(), selectionOverride);
+  }
 
-    const copied = this.copySelectionToClipboard(selection);
-    if (!copied) {
-      return false;
-    }
+  private deleteDevicesById(
+    deviceIds: readonly string[],
+    meta: ChainMutationMeta = EDITOR_HISTORY_META.deleteDevices,
+  ): boolean {
+    return deleteEditorDevicesById(this.buildGroupingContext(), deviceIds, meta);
+  }
 
-    return this.pasteClipboard(copied, selection, EDITOR_HISTORY_META.duplicate);
+  private deleteGroup(
+    rawGroupId: string,
+    meta: ChainMutationMeta = EDITOR_HISTORY_META.deleteDevices,
+  ): boolean {
+    return deleteEditorGroup(this.buildGroupingContext(), rawGroupId, meta);
   }
 
   private deleteCurrentSelection(): boolean {
-    const rackBinding = this.rackBinding;
-    if (!rackBinding) {
-      return false;
-    }
-
-    const targetIds = resolveDeleteSelectionDeviceIds(
-      this.state.chainState,
-      rackBinding.getSelectedGroupContexts(),
-      rackBinding.getOrderedSelectedDeviceIds(),
-    );
-    if (targetIds.length === 0) {
-      return false;
-    }
-
-    return this.deleteDevicesById(targetIds);
+    return deleteEditorSelection(this.buildGroupingContext());
   }
 
   private groupCurrentSelection(): boolean {
-    const rackBinding = this.rackBinding;
-    if (!rackBinding) {
-      return false;
-    }
-
-    const selectedGroups = rackBinding.getSelectedGroupContexts();
-    if (selectedGroups.length > 0) {
-      return false;
-    }
-
-    return this.groupDeviceIds(rackBinding.getOrderedSelectedDeviceIds());
+    return groupEditorSelection(this.buildGroupingContext());
   }
 
   private groupDeviceIds(targetIds: readonly string[]): boolean {
-    if (!canCreateGroupFromSelection(this.state.chainState.devices, targetIds)) {
-      return false;
-    }
+    return groupEditorDeviceIds(this.buildGroupingContext(), targetIds);
+  }
 
-    return this.setGroupIdForDevices(
-      targetIds,
-      resolveNextGroupId(this.state.chainState.devices),
-      EDITOR_HISTORY_META.groupCreate,
-    );
+  private ungroupGroup(
+    rawGroupId: string,
+    meta: ChainMutationMeta = EDITOR_HISTORY_META.groupUngroup,
+  ): boolean {
+    return ungroupEditorGroup(this.buildGroupingContext(), rawGroupId, meta);
   }
 
   private ungroupSelectedGroups(): boolean {
-    const rackBinding = this.rackBinding;
-    if (!rackBinding) {
-      return false;
-    }
+    return ungroupEditorSelections(this.buildGroupingContext());
+  }
 
-    let didChange = false;
-    for (const selectedGroup of rackBinding.getSelectedGroupContexts()) {
-      if (this.ungroupGroup(selectedGroup.groupId, EDITOR_HISTORY_META.groupUngroup)) {
-        didChange = true;
-      }
-    }
-    return didChange;
+  private buildGroupingContext() {
+    return {
+      state: this.state,
+      rackBinding: this.rackBinding,
+      applyChainMutation: (
+        nextChain: EditorSessionState['chainState'],
+        meta: ChainMutationMeta,
+      ) => this.applyChainMutation(nextChain, meta),
+    };
+  }
+
+  private buildClipboardContext() {
+    return {
+      state: this.state,
+      rackBinding: this.rackBinding,
+      getClipboard: () => this.rackClipboard,
+      setClipboard: (clipboard: RackClipboard | null) => {
+        this.setClipboard(clipboard);
+      },
+      applyChainMutation: (
+        nextChain: EditorSessionState['chainState'],
+        meta: ChainMutationMeta,
+      ) => this.applyChainMutation(nextChain, meta),
+      deleteDevicesById: (
+        deviceIds: readonly string[],
+        meta?: ChainMutationMeta,
+      ) => this.deleteDevicesById(deviceIds, meta),
+      deleteGroup: (
+        groupId: string,
+        meta?: ChainMutationMeta,
+      ) => this.deleteGroup(groupId, meta),
+    };
   }
 }
 
