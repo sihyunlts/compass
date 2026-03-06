@@ -4,7 +4,10 @@ import type {
   RendererModulationParamDefinition,
 } from './types';
 
-export type RendererControlTarget = HTMLInputElement | HTMLSelectElement;
+export type RendererControlTarget =
+  | HTMLButtonElement
+  | HTMLInputElement
+  | HTMLSelectElement;
 export type RendererControlHandler = (
   device: GeneratorDeviceNode,
   target: RendererControlTarget,

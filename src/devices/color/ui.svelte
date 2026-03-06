@@ -83,6 +83,10 @@
               type="button"
               class="color-palette-cell"
               class:is-selected={device.params.velocities[selectedColorSlotIndex] === paletteIndex}
+              data-action="set-color-slot"
+              data-id={device.id}
+              data-slot-index={selectedColorSlotIndex}
+              data-palette-index={paletteIndex}
               disabled={isPaletteSlotDisabled(paletteRgb)}
               style={`background-color: rgb(${paletteRgb});`}
               aria-label={`Palette ${paletteIndex}`}
@@ -99,6 +103,10 @@
               type="button"
               class="color-palette-cell"
               class:is-selected={device.params.velocities[selectedColorSlotIndex] === paletteIndex}
+              data-action="set-color-slot"
+              data-id={device.id}
+              data-slot-index={selectedColorSlotIndex}
+              data-palette-index={paletteIndex}
               disabled={isPaletteSlotDisabled(paletteRgb)}
               style={`background-color: rgb(${paletteRgb});`}
               aria-label={`Palette ${paletteIndex}`}

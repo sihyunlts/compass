@@ -1,6 +1,9 @@
 import type { GeneratorDeviceNode } from '../shared/model';
 import type { RendererControlHandler, RendererControlTarget } from './control-types';
 
+export const requireButton = (target: RendererControlTarget): HTMLButtonElement | null =>
+  target instanceof HTMLButtonElement ? target : null;
+
 export const requireInput = (target: RendererControlTarget): HTMLInputElement | null =>
   target instanceof HTMLInputElement ? target : null;
 
@@ -108,8 +111,20 @@ export const createNumericParamSetter = <
 };
 
 export const getControlTarget = (target: EventTarget | null): RendererControlTarget | null => {
-  if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) {
-    return target;
+  if (!(target instanceof HTMLElement)) {
+    return null;
   }
+
+  const control = target.closest<HTMLElement>(
+    'button[data-action][data-id], input[data-action][data-id], select[data-action][data-id]',
+  );
+  if (
+    control instanceof HTMLButtonElement
+    || control instanceof HTMLInputElement
+    || control instanceof HTMLSelectElement
+  ) {
+    return control;
+  }
+
   return null;
 };

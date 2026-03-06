@@ -467,6 +467,10 @@
       return;
     }
 
+    if (rackInteractionManager?.handleControlClick(event)) {
+      return;
+    }
+
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
       return;

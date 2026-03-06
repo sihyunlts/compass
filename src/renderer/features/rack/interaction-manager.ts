@@ -236,6 +236,22 @@ export class RackInteractionManager {
       || this.centerPicker.tryResetFromDoubleClick(event.target);
   }
 
+  handleControlClick(event: MouseEvent): boolean {
+    if (!this.applyChainControlChange(event.target)) {
+      return false;
+    }
+
+    this.commitChainChange(
+      {
+        kind: 'control-edit',
+        label: 'Edit parameter',
+        mergeKey: resolveChainControlMergeKey(event.target),
+        finalize: true,
+      },
+    );
+    return true;
+  }
+
   private blurActiveTextEditingElement(): void {
     blurIfTextEditingElement(document.activeElement);
   }
