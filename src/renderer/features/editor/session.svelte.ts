@@ -52,6 +52,7 @@ import {
 import {
   createEditorHistory,
   type EditorHistory,
+  type EditorHistoryListEntry,
 } from './editor-history';
 import {
   resolveCurrentSelectionSnapshot,
@@ -152,7 +153,7 @@ const createInitialEditorState = (): EditorSessionState => {
 export class EditorSession {
   public readonly state: EditorSessionState = $state(createInitialEditorState());
 
-  public readonly history: EditorHistory;
+  private readonly history: EditorHistory;
 
   private readonly autoPreviewDebounceMs: number;
 
@@ -272,6 +273,10 @@ export class EditorSession {
     },
     undo: (): boolean => this.undo(),
     redo: (): boolean => this.redo(),
+    listHistory: (): EditorHistoryListEntry[] => this.history.list(),
+    getCurrentHistoryEntry: (): EditorHistoryListEntry | null =>
+      this.history.list().find((entry) => entry.isCurrent) ?? null,
+    checkoutHistory: (target: string | number): boolean => this.checkoutHistory(target),
     copySelection: (): boolean => this.copySelectionToClipboard() !== null,
     cutSelection: (): boolean => this.cutSelection(),
     pasteClipboard: (): boolean => this.pasteClipboard(),
@@ -496,6 +501,16 @@ export class EditorSession {
 
   private redo(): boolean {
     const restored = this.history.redo();
+    this.syncHistoryState();
+    if (!restored) {
+      return false;
+    }
+    this.restoreChainFromHistory(restored);
+    return true;
+  }
+
+  private checkoutHistory(target: string | number): boolean {
+    const restored = this.history.checkout(target);
     this.syncHistoryState();
     if (!restored) {
       return false;
