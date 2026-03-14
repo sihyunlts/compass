@@ -11,6 +11,8 @@ export type ChainHistoryKind =
   | 'group-create'
   | 'group-ungroup'
   | 'group-toggle-enabled'
+  | 'rename-device'
+  | 'rename-group'
   | 'clipboard-cut'
   | 'clipboard-paste'
   | 'duplicate'

@@ -1,13 +1,18 @@
 <script lang="ts">
-  import { tick } from 'svelte';
-  import { clamp } from '../../shared/math';
+  import { onMount, tick } from 'svelte';
   import type { ContextMenuTarget } from './context-menu-types';
+  import {
+    attachFloatingLayerDismissHandlers,
+    isEventTargetWithinFloatingLayer,
+    resolveViewportFloatingLayerPosition,
+  } from '../features/rack/floating-layer';
 
   let {
     onCopy,
     onCut,
     onPaste,
     onDuplicate,
+    onRename,
     onDelete,
     onGroup,
     onUngroupGroup,
@@ -17,6 +22,7 @@
     onCut: (target: ContextMenuTarget) => void;
     onPaste: (target: ContextMenuTarget) => void;
     onDuplicate: (target: ContextMenuTarget) => void;
+    onRename: (target: ContextMenuTarget) => void;
     onDelete: (target: ContextMenuTarget) => void;
     onGroup: (ids: string[]) => void;
     onUngroupGroup: (groupId: string) => void;
@@ -46,9 +52,9 @@
   ];
   const visibleClipboardActions = $derived.by(() =>
     CLIPBOARD_ACTIONS.filter((action) => !action.requiresClipboard || canPasteForTarget));
-
-  const MARGIN_PX = 8;
-
+  const canRenameTarget = $derived.by(() =>
+    target !== null
+    && (target.kind === 'group' || target.deviceIds.length === 1));
   export async function open(clientX: number, clientY: number, nextTarget: ContextMenuTarget) {
     if (
       (nextTarget.kind === 'devices' && nextTarget.deviceIds.length === 0)
@@ -78,13 +84,13 @@
       return;
     }
 
-    const menuWidth = menuEl.offsetWidth;
-    const menuHeight = menuEl.offsetHeight;
-    const maxX = Math.max(MARGIN_PX, window.innerWidth - menuWidth - MARGIN_PX);
-    const maxY = Math.max(MARGIN_PX, window.innerHeight - menuHeight - MARGIN_PX);
+    const nextPosition = resolveViewportFloatingLayerPosition(clientX, clientY, {
+      width: menuEl.offsetWidth,
+      height: menuEl.offsetHeight,
+    });
 
-    x = clamp(clientX, MARGIN_PX, maxX);
-    y = clamp(clientY, MARGIN_PX, maxY);
+    x = nextPosition.x;
+    y = nextPosition.y;
     isPositioned = true;
   }
 
@@ -93,16 +99,6 @@
     isOpen = false;
     isPositioned = false;
     target = null;
-  }
-
-  function handleWindowPointerDown(event: PointerEvent) {
-    if (!isOpen || !menuEl) return;
-    if (event.target instanceof Node && menuEl.contains(event.target)) return;
-    close();
-  }
-
-  function handleWindowResize() {
-    close();
   }
 
   function handleDeleteClick() {
@@ -135,6 +131,15 @@
     close();
   }
 
+  function handleRenameClick() {
+    if (!target || !canRenameTarget) {
+      return;
+    }
+
+    onRename(target);
+    close();
+  }
+
   function handleGroupClick() {
     if (target?.kind !== 'devices') {
       return;
@@ -150,9 +155,15 @@
     onUngroupGroup(target.groupId);
     close();
   }
-</script>
 
-<svelte:window onpointerdown={handleWindowPointerDown} onresize={handleWindowResize} />
+  onMount(() =>
+    attachFloatingLayerDismissHandlers({
+      isActive: () => isOpen,
+      containsEventTarget: (eventTarget) => isEventTargetWithinFloatingLayer(eventTarget, menuEl),
+      onPointerDownOutside: () => close(),
+      onResize: () => close(),
+    }));
+</script>
 
 <div
   bind:this={menuEl}
@@ -176,7 +187,18 @@
         {action.label}
       </button>
     {/each}
-    <hr class="context-menu-separator" role="separator" />
+    {#if canRenameTarget}
+      <button
+        id="context-rename"
+        class="context-menu-item"
+        type="button"
+        role="menuitem"
+        onclick={handleRenameClick}
+      >
+        Rename
+      </button>
+    {/if}
+    <hr class="context-menu-separator" />
     {#if target.kind === 'devices'}
       <button
         id="context-delete"

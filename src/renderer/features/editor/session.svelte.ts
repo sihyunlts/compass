@@ -56,9 +56,16 @@ import {
   reconcileCurrentChainModulators as reconcileEditorChainModulators,
   toggleCollapse,
 } from './persistence';
+import {
+  renameDeviceById,
+  renameGroupById,
+} from './naming';
 import type { RackClipboard } from './rack-clipboard';
 import type { ChainMutationMeta } from './history-core';
-import type { RackSelectionSnapshot } from './selectors';
+import {
+  resolveCurrentSelectionSnapshot,
+  type RackSelectionSnapshot,
+} from './selectors';
 
 const DEFAULT_AUTO_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_HISTORY_MAX_ENTRIES = 100;
@@ -97,6 +104,8 @@ export interface EditorRackBinding {
   applyNextSelectionAfterDelete(deviceIds: readonly string[]): void;
   clearSelection(): void;
   syncAfterRender(): void;
+  startRenamingDevice(deviceId: string): boolean;
+  startRenamingGroup(groupId: string): boolean;
   handleBrowserPointerDown(
     event: PointerEvent,
     kind: RendererDeviceKind,
@@ -173,10 +182,7 @@ export class EditorSession {
       toggleCollapse(this.state, id);
     },
     saveChain: (chain: GeneratorChain, meta: ChainMutationMeta): void => {
-      saveChainWithHistory(this.state, this.history, chain, meta, {
-        bumpChainRevision: () => this.bumpChainRevision(),
-        persistChainState: () => this.persistChainState(),
-      });
+      this.persistChainMutation(chain, meta);
     },
     addBrowserDevice: (kind: RendererDeviceKind): void => {
       if (!isRendererDeviceKind(kind)) {
@@ -239,6 +245,7 @@ export class EditorSession {
     deleteSelection: (): boolean => this.deleteCurrentSelection(),
     groupSelection: (): boolean => this.groupCurrentSelection(),
     ungroupSelectedGroups: (): boolean => this.ungroupSelectedGroups(),
+    beginRenameSelection: (): boolean => this.beginRenameSelection(),
     deleteFromContextTarget: (target: ContextMenuTarget): void => {
       if (target.kind === 'group') {
         this.deleteGroup(target.groupId);
@@ -262,12 +269,18 @@ export class EditorSession {
     duplicateFromContextTarget: (target: ContextMenuTarget): void => {
       this.duplicateSelection(this.resolveContextSelection(target));
     },
+    beginRenameFromContextTarget: (target: ContextMenuTarget): boolean =>
+      this.beginRenameFromContextTarget(target),
     groupDeviceIds: (targetIds: string[]): void => {
       this.groupDeviceIds(targetIds);
     },
     ungroupGroup: (groupId: string): void => {
       this.ungroupGroup(groupId, EDITOR_HISTORY_META.groupUngroup);
     },
+    renameDevice: (deviceId: string, rawName: string): boolean =>
+      this.renameDevice(deviceId, rawName),
+    renameGroup: (groupId: string, rawName: string): boolean =>
+      this.renameGroup(groupId, rawName),
     clearSelection: (): void => {
       this.rackBinding?.clearSelection();
     },
@@ -364,6 +377,16 @@ export class EditorSession {
     this.state.clipboardAvailable = nextClipboard !== null;
   }
 
+  private persistChainMutation(
+    nextChain: GeneratorChain,
+    meta: ChainMutationMeta,
+  ): void {
+    saveChainWithHistory(this.state, this.history, nextChain, meta, {
+      bumpChainRevision: () => this.bumpChainRevision(),
+      persistChainState: () => this.persistChainState(),
+    });
+  }
+
   private applyChainMutation(
     nextChain: GeneratorChain,
     meta: ChainMutationMeta,
@@ -401,6 +424,18 @@ export class EditorSession {
 
   private resolveContextSelection(target: ContextMenuTarget): RackSelectionSnapshot | null {
     return resolveEditorContextSelection(this.state, target);
+  }
+
+  private resolveCurrentSelection(): RackSelectionSnapshot | null {
+    if (!this.rackBinding) {
+      return null;
+    }
+
+    return resolveCurrentSelectionSnapshot(
+      this.state.chainState,
+      this.rackBinding.getSelectedGroupContexts(),
+      this.rackBinding.getOrderedSelectedDeviceIds(),
+    );
   }
 
   private copySelectionToClipboard(
@@ -457,6 +492,59 @@ export class EditorSession {
 
   private groupDeviceIds(targetIds: readonly string[]): boolean {
     return groupEditorDeviceIds(this.buildGroupingContext(), targetIds);
+  }
+
+  private beginRenameSelection(): boolean {
+    const selection = this.resolveCurrentSelection();
+    if (!selection || !this.rackBinding) {
+      return false;
+    }
+
+    if (selection.kind === 'group') {
+      return this.rackBinding.startRenamingGroup(selection.groupId);
+    }
+
+    if (selection.deviceIds.length !== 1) {
+      return false;
+    }
+
+    return this.rackBinding.startRenamingDevice(selection.deviceIds[0]);
+  }
+
+  private beginRenameFromContextTarget(target: ContextMenuTarget): boolean {
+    if (!this.rackBinding) {
+      return false;
+    }
+
+    if (target.kind === 'group') {
+      return this.rackBinding.startRenamingGroup(target.groupId);
+    }
+
+    if (target.deviceIds.length !== 1) {
+      return false;
+    }
+
+    return this.rackBinding.startRenamingDevice(target.deviceIds[0]);
+  }
+
+  private renameDevice(deviceId: string, rawName: string): boolean {
+    const nextChain = renameDeviceById(this.state.chainState, deviceId, rawName);
+    if (!nextChain) {
+      return false;
+    }
+
+    this.persistChainMutation(nextChain, EDITOR_HISTORY_META.renameDevice);
+    return true;
+  }
+
+  private renameGroup(groupId: string, rawName: string): boolean {
+    const nextChain = renameGroupById(this.state.chainState, groupId, rawName);
+    if (!nextChain) {
+      return false;
+    }
+
+    this.persistChainMutation(nextChain, EDITOR_HISTORY_META.renameGroup);
+    return true;
   }
 
   private ungroupGroup(

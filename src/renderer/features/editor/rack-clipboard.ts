@@ -9,6 +9,7 @@ export type RackClipboard =
   | {
       kind: 'group';
       enabled: boolean;
+      name: string | null;
       devices: GeneratorDeviceNode[];
     };
 
@@ -16,12 +17,12 @@ type IdMap = ReadonlyMap<string, string>;
 type GroupIdMap = Readonly<Record<string, string>>;
 type ClipboardBuildOptions =
   | { kind: 'devices' }
-  | { kind: 'group'; enabled: boolean };
+  | { kind: 'group'; enabled: boolean; name: string | null };
 
 type PreparedClipboardInsert = {
   devices: GeneratorDeviceNode[];
   forcedGroupId: string | null;
-  groupStatePatch: { groupId: string; enabled: boolean } | null;
+  groupStatePatch: { groupId: string; enabled: boolean; name: string | null } | null;
 };
 
 type PrepareClipboardInsertOptions = {
@@ -115,6 +116,7 @@ export const createRackClipboard = (
     return {
       kind: 'group',
       enabled: options.enabled,
+      name: options.name,
       devices: cloned,
     };
   }
@@ -155,6 +157,7 @@ export const prepareClipboardInsert = (
       groupStatePatch: {
         groupId: nextGroupId,
         enabled: clipboard.enabled,
+        name: clipboard.name,
       },
     };
   }

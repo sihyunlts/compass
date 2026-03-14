@@ -16,6 +16,7 @@
   let {
     device,
     devices = [] as GeneratorDeviceNode[],
+    deviceDisplayNameById = {},
     currentBeat = 0,
     modulationReadoutById = {},
   }: ModulatorDeviceEditorProps = $props();
@@ -47,7 +48,7 @@
             value={targetDevice.id}
             selected={device.params.target?.deviceId === targetDevice.id}
           >
-            {getRendererDeviceLabel(targetDevice.kind)} ({targetDevice.id})
+            {deviceDisplayNameById[targetDevice.id] ?? getRendererDeviceLabel(targetDevice.kind)}
           </option>
         {/each}
       </select>

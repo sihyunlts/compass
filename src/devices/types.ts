@@ -12,6 +12,8 @@ export type RendererDeviceNodeOfKind<K extends RendererDeviceKind> = Extract<
 
 export interface RendererDeviceEditorPropsBase {
   devices?: GeneratorDeviceNode[];
+  deviceDisplayNameById?: Record<string, string>;
+  groupDisplayNameById?: Record<string, string>;
   paletteRevision: number;
   currentBeat?: number;
   modulationReadoutById?: Record<string, string>;

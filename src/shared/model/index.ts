@@ -28,6 +28,11 @@ export type {
 export type { ClipNote } from './clip';
 export { cloneChainForIpc } from './chain-clone';
 export { cloneDeviceNode } from './device-clone';
+export {
+  applyNameIndex,
+  hasNameIndexToken,
+  normalizeCustomName,
+} from './naming';
 export type {
   LaunchpadButton,
   LaunchpadModel,

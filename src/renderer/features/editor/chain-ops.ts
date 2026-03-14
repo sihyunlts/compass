@@ -1,5 +1,6 @@
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/model';
+import { normalizeCustomName } from '../../../shared/model/naming';
 
 const collectActiveGroupIds = (
   devices: readonly GeneratorDeviceNode[],
@@ -25,6 +26,7 @@ export const reconcileGroupStateById = (
   for (const groupId of activeGroupIds) {
     next[groupId] = {
       enabled: prev[groupId]?.enabled !== false,
+      name: normalizeCustomName(prev[groupId]?.name),
     };
   }
 

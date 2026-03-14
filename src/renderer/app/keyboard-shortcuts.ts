@@ -54,6 +54,14 @@ export const mountKeyboardShortcuts = (
     if (isModifierShortcut) {
       const key = event.key.toLowerCase();
 
+      if (key === 'r' && !event.shiftKey) {
+        event.preventDefault();
+        if (options.editorSession.commands.beginRenameSelection()) {
+          options.closeContextMenu();
+        }
+        return;
+      }
+
       if (key === 'z' && !event.shiftKey) {
         closeContextMenuIfHandled(
           options.editorSession.commands.undo(),
@@ -135,6 +143,10 @@ export const mountKeyboardShortcuts = (
   const handleFocusIn = (event: FocusEvent): void => {
     const target = event.target instanceof Element ? event.target : null;
     if (!isTextEditingElement(target)) {
+      return;
+    }
+
+    if (target instanceof HTMLElement && target.dataset.preserveRackSelection === 'true') {
       return;
     }
 

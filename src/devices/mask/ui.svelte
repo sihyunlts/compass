@@ -14,6 +14,8 @@
   let {
     device,
     devices = [] as GeneratorDeviceNode[],
+    groupDisplayNameById = {},
+    deviceDisplayNameById = {},
   }: MaskDeviceEditorProps = $props();
 
   const maskGroupOptions = $derived.by(() => {
@@ -84,7 +86,7 @@
         </option>
         {#each maskGroupOptions as groupId (groupId)}
           <option value={groupId} selected={device.params.sourceId === groupId}>
-            {groupId}
+            {groupDisplayNameById[groupId] ?? groupId}
           </option>
         {/each}
       </select>
@@ -105,7 +107,7 @@
             value={generator.id}
             selected={device.params.sourceId === generator.id}
           >
-            {getRendererDeviceLabel(generator.kind)} ({generator.id})
+            {deviceDisplayNameById[generator.id] ?? getRendererDeviceLabel(generator.kind)}
           </option>
         {/each}
       </select>

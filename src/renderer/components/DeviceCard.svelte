@@ -2,20 +2,29 @@
 
 <script lang="ts">
   /** Renders the shared device card shell and mounts the kind-specific editor body. */
+  import { tick } from 'svelte';
   import { getRendererDeviceDefinition } from '../../devices';
   import type { GeneratorDeviceNode } from '../../shared/model';
 
   let {
     device,
     devices = [] as GeneratorDeviceNode[],
+    deviceDisplayNameById = {},
+    groupDisplayNameById = {},
     paletteRevision,
     currentBeat = 0,
     modulationReadoutById = {},
     resolvePaletteRgb,
+    title,
     isCollapsed = false,
     isDisabledByGroup = false,
     isSelected = false,
     isDragging = false,
+    isRenaming = false,
+    renameValue = '',
+    onRenameInput,
+    onRenameBlur,
+    onRenameKeyDown,
     onHeaderPointerDown,
     onHeaderClick,
     onHeaderContextMenu,
@@ -23,26 +32,47 @@
   } = $props<{
     device: GeneratorDeviceNode;
     devices?: GeneratorDeviceNode[];
+    deviceDisplayNameById?: Record<string, string>;
+    groupDisplayNameById?: Record<string, string>;
     paletteRevision: number;
     currentBeat?: number;
     modulationReadoutById?: Record<string, string>;
     resolvePaletteRgb: (velocity: number) => string;
+    title: string;
     isCollapsed?: boolean;
     isDisabledByGroup?: boolean;
     isSelected?: boolean;
     isDragging?: boolean;
+    isRenaming?: boolean;
+    renameValue?: string;
+    onRenameInput?: (event: Event) => void;
+    onRenameBlur?: (event: FocusEvent) => void;
+    onRenameKeyDown?: (event: KeyboardEvent) => void;
     onHeaderPointerDown?: (event: PointerEvent) => void;
     onHeaderClick?: (event: MouseEvent) => void;
     onHeaderContextMenu?: (event: MouseEvent) => void;
     onHeaderDoubleClick?: (event: MouseEvent) => void;
   }>();
 
+  let renameInputEl = $state<HTMLInputElement | null>(null);
   const isDeviceDisabled = $derived(!device.enabled || isDisabledByGroup);
+  const isInlineRenaming = $derived(isRenaming && !isCollapsed);
   const deviceDefinition = $derived(getRendererDeviceDefinition(device.kind));
   const deviceCardClass = $derived(
     deviceDefinition.group === 'generator' ? 'device-card instrument' : 'device-card effect',
   );
   const DeviceEditor = $derived(deviceDefinition.editor);
+
+  $effect(() => {
+    if (!isInlineRenaming) {
+      return;
+    }
+
+    void tick().then(() => {
+      renameInputEl?.focus();
+      renameInputEl?.select();
+    });
+  });
 </script>
 
 <div
@@ -51,6 +81,7 @@
   class:is-collapsed={isCollapsed}
   class:is-selected={isSelected}
   class:is-dragging={isDragging}
+  class:is-renaming={isRenaming}
   data-device-id={device.id}
   data-device-kind={device.kind}
 >
@@ -58,10 +89,10 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <header
     class="device-head"
-    onpointerdown={onHeaderPointerDown}
-    onclick={onHeaderClick}
-    oncontextmenu={onHeaderContextMenu}
-    ondblclick={onHeaderDoubleClick}
+    onpointerdown={isRenaming ? undefined : onHeaderPointerDown}
+    onclick={isRenaming ? undefined : onHeaderClick}
+    oncontextmenu={isRenaming ? undefined : onHeaderContextMenu}
+    ondblclick={isRenaming ? undefined : onHeaderDoubleClick}
   >
     <div class="device-head-left">
       <input
@@ -71,13 +102,32 @@
         data-action="set-device-enabled"
         data-id={device.id}
       />
-      <span class="device-title">{deviceDefinition.label}</span>
+      {#if isInlineRenaming}
+        <input
+          bind:this={renameInputEl}
+          class="device-title-input"
+          type="text"
+          value={renameValue}
+          data-preserve-rack-selection="true"
+          aria-label={`Rename ${title}`}
+          oninput={onRenameInput}
+          onblur={onRenameBlur}
+          onkeydown={onRenameKeyDown}
+          onpointerdown={(event) => event.stopPropagation()}
+          onclick={(event) => event.stopPropagation()}
+          oncontextmenu={(event) => event.stopPropagation()}
+        />
+      {:else}
+        <span class="device-title">{title}</span>
+      {/if}
     </div>
   </header>
 
   <DeviceEditor
     {device}
     {devices}
+    {deviceDisplayNameById}
+    {groupDisplayNameById}
     {paletteRevision}
     {currentBeat}
     {modulationReadoutById}
@@ -124,9 +174,17 @@
         gap: var(--gap-8);
       }
 
-      .device-title {
-        font-size: var(--text-13);
+      .device-title,
+      .device-title-input {
         min-width: 0;
+        font-size: var(--text-13);
+        line-height: 1.2;
+      }
+
+      .device-title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     }
 
@@ -140,8 +198,15 @@
       }
     }
 
+    &.is-renaming {
+      .device-head {
+        cursor: default;
+      }
+    }
+
     &.is-disabled {
-      .device-head .device-title {
+      .device-head .device-title,
+      .device-head .device-title-input {
         opacity: 0.45;
       }
 
@@ -175,6 +240,25 @@
         writing-mode: vertical-rl;
         transform: rotate(180deg);
       }
+
+      .device-title-input {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        text-align: center;
+      }
+    }
+
+    .device-title-input {
+      all: unset;
+      display: block;
+      field-sizing: content;
+      max-width: 100%;
+      font: inherit;
+      font-size: var(--text-13);
+      line-height: 1.2;
+      color: inherit;
+      caret-color: currentColor;
+      cursor: text;
     }
 
     :global(.device-controls) {

@@ -133,6 +133,10 @@
       syncAfterRender: () => {
         rackViewApi?.syncAfterRender();
       },
+      startRenamingDevice: (deviceId) =>
+        rackViewApi?.startRenamingDevice(deviceId) ?? false,
+      startRenamingGroup: (groupId) =>
+        rackViewApi?.startRenamingGroup(groupId) ?? false,
       handleBrowserPointerDown: (event, kind, itemEl) => {
         rackViewApi?.handleBrowserPointerDown(event, kind, itemEl);
       },
@@ -352,6 +356,8 @@
           onMiniMapContentRevisionChange={handleRackMiniMapContentRevisionChange}
           onToggleGroupEnabled={editorSession.commands.toggleGroupEnabled}
           onToggleCollapse={editorSession.commands.toggleCollapse}
+          onRenameDevice={editorSession.commands.renameDevice}
+          onRenameGroup={editorSession.commands.renameGroup}
           onRackApiReady={(api) => {
             rackViewApi = api;
           }}
@@ -464,6 +470,7 @@
     onCut={editorSession.commands.cutFromContextTarget}
     onPaste={editorSession.commands.pasteFromContextTarget}
     onDuplicate={editorSession.commands.duplicateFromContextTarget}
+    onRename={editorSession.commands.beginRenameFromContextTarget}
     onDelete={editorSession.commands.deleteFromContextTarget}
     onGroup={editorSession.commands.groupDeviceIds}
     onUngroupGroup={editorSession.commands.ungroupGroup}

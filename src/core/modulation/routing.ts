@@ -47,6 +47,8 @@ const sanitizeCurveModulatorNode = (
   id: node.id,
   kind: 'modulator',
   enabled: node.enabled,
+  groupId: node.groupId ?? null,
+  name: node.name ?? null,
   params: {
     amount: sanitizeAmount(node.params.amount),
     target: sanitizeModulationTarget(node.params.target),
@@ -189,6 +191,7 @@ export const stripModulationDevicesFromChain = (
   for (const groupId of activeGroupIds) {
     groupStateById[groupId] = {
       enabled: chain.groupStateById[groupId]?.enabled !== false,
+      name: chain.groupStateById[groupId]?.name ?? null,
     };
   }
 

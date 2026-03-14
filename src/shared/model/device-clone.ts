@@ -15,6 +15,7 @@ export const cloneDeviceNode = (
       kind: 'waterdrop',
       enabled: device.enabled,
       groupId: device.groupId ?? null,
+      name: device.name ?? null,
       params: { ...device.params },
     };
   }
@@ -25,6 +26,7 @@ export const cloneDeviceNode = (
       kind: 'scanner',
       enabled: device.enabled,
       groupId: device.groupId ?? null,
+      name: device.name ?? null,
       params: { ...device.params },
     };
   }
@@ -35,6 +37,7 @@ export const cloneDeviceNode = (
       kind: 'spiral',
       enabled: device.enabled,
       groupId: device.groupId ?? null,
+      name: device.name ?? null,
       params: { ...device.params },
     };
   }
@@ -45,6 +48,7 @@ export const cloneDeviceNode = (
       kind: 'reverse',
       enabled: device.enabled,
       groupId: device.groupId ?? null,
+      name: device.name ?? null,
     };
   }
 
@@ -54,6 +58,7 @@ export const cloneDeviceNode = (
       kind: 'modulator',
       enabled: device.enabled,
       groupId: device.groupId ?? null,
+      name: device.name ?? null,
       params: {
         amount: device.params.amount,
         target: device.params.target
@@ -73,6 +78,7 @@ export const cloneDeviceNode = (
       kind: 'mask',
       enabled: device.enabled,
       groupId: device.groupId ?? null,
+      name: device.name ?? null,
       params: {
         mode: device.params.mode,
         tiles: [...device.params.tiles],
@@ -89,6 +95,7 @@ export const cloneDeviceNode = (
       kind: 'color',
       enabled: device.enabled,
       groupId: device.groupId ?? null,
+      name: device.name ?? null,
       params: {
         velocities: [...device.params.velocities],
         noteLengthPercent: device.params.noteLengthPercent,
@@ -103,6 +110,7 @@ export const cloneDeviceNode = (
       kind: 'mirror',
       enabled: device.enabled,
       groupId: device.groupId ?? null,
+      name: device.name ?? null,
       params: { ...device.params },
     };
   }
@@ -113,6 +121,7 @@ export const cloneDeviceNode = (
       kind: 'symmetry',
       enabled: device.enabled,
       groupId: device.groupId ?? null,
+      name: device.name ?? null,
       params: { ...device.params },
     };
   }
@@ -122,6 +131,7 @@ export const cloneDeviceNode = (
     kind: 'rotate',
     enabled: device.enabled,
     groupId: device.groupId ?? null,
+    name: device.name ?? null,
     params: { ...device.params },
   };
 };

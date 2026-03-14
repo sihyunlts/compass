@@ -7,6 +7,7 @@ export const cloneChainForIpc = (chain: GeneratorChain): GeneratorChain => {
   for (const [groupId, state] of Object.entries(chain.groupStateById)) {
     groupStateById[groupId] = {
       enabled: state.enabled,
+      name: state.name ?? null,
     };
   }
 

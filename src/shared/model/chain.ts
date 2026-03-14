@@ -7,6 +7,7 @@ export interface WaterdropParams {
 
 export interface GroupedDeviceNode {
   groupId?: string | null;
+  name?: string | null;
 }
 
 export interface WaterdropGeneratorNode extends GroupedDeviceNode {
@@ -153,6 +154,7 @@ export type GeneratorDeviceNode =
 
 export interface GroupStateEntry {
   enabled: boolean;
+  name?: string | null;
 }
 
 export interface GeneratorChain {

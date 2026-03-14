@@ -3,7 +3,7 @@
    * Renders the rack surface and translates pointer/drag interactions into commit events.
    * Integrates rack selection, drop indicators, and group rendering state.
    */
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { clamp } from '../../shared/math';
   import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/model';
   import type { RendererDeviceKind } from '../../devices';
@@ -27,7 +27,28 @@
     buildRackContentItems,
   } from '../features/rack/layout';
   import { createRackViewApi, type RackViewApi } from '../features/rack/api';
+  import {
+    buildDeviceDisplayNameById,
+    buildGroupDisplayNameById,
+  } from '../features/rack/display-names';
+  import {
+    attachFloatingLayerDismissHandlers,
+    resolveAdjacentFloatingLayerPosition,
+  } from '../features/rack/floating-layer';
   import { RackInteractionManager } from '../features/rack/interaction-manager';
+  import {
+    isRenamingDevice,
+    isRenamingGroup,
+    resolveCommittedRenameDraft,
+    resolveDeviceDisplayName,
+    resolveDeviceRenameValue,
+    resolveEditableDeviceName,
+    resolveEditableGroupName,
+    resolveGroupDisplayName,
+    resolveRenamePopoverTarget,
+    type RackRenameTarget,
+  } from '../features/rack/rename';
+  import RackRenamePopover from './RackRenamePopover.svelte';
   import DeviceCard from './DeviceCard.svelte';
 
   let {
@@ -50,6 +71,8 @@
     onMiniMapContentRevisionChange = () => {},
     onToggleGroupEnabled = () => {},
     onToggleCollapse = () => {},
+    onRenameDevice = () => false,
+    onRenameGroup = () => false,
     onRackApiReady = () => {},
   } = $props<{
     devices: GeneratorDeviceNode[];
@@ -71,6 +94,8 @@
     onMiniMapContentRevisionChange?: (revision: number) => void;
     onToggleGroupEnabled?: (groupId: string, nextEnabled: boolean) => void;
     onToggleCollapse: (id: string) => void;
+    onRenameDevice?: (deviceId: string, rawName: string) => boolean;
+    onRenameGroup?: (groupId: string, rawName: string) => boolean;
     onRackApiReady?: (api: RackViewApi | null) => void;
   }>();
 
@@ -89,6 +114,14 @@
   let lastScrollMetricsSignature: string | null = null;
   let lastMiniMapLayoutSignature: string | null = null;
   let miniMapContentRevision = 0;
+  let renameTarget = $state<RackRenameTarget | null>(null);
+  let renameDraft = $state('');
+  let renamePopover = $state<ReturnType<typeof RackRenamePopover> | null>(null);
+  let renamePopoverPosition = $state<{ x: number; y: number } | null>(null);
+  let skipRenameBlur = false;
+  const RENAME_POPOVER_GAP_PX = 8;
+  const RENAME_POPOVER_FALLBACK_WIDTH_PX = 164;
+  const RENAME_POPOVER_FALLBACK_HEIGHT_PX = 42;
 
   const resolveGroupEnabled = (groupId: string): boolean =>
     chainState.groupStateById[groupId]?.enabled !== false;
@@ -107,11 +140,16 @@
     activeDragInfo?.kind === 'chain' && activeDragInfo.didMove
       ? activeDragInfo.sourceIds
       : []);
+  const deviceDisplayNameById = $derived.by(() => buildDeviceDisplayNameById(devices));
+  const groupDisplayNameById = $derived.by(() =>
+    buildGroupDisplayNameById(devices, chainState.groupStateById));
 
   const rackContentItems = $derived.by(() =>
     buildRackContentItems(devices, resolveGroupEnabled));
 
-  const collapsedSet = $derived.by(() => new Set(collapsedDeviceIds));
+  const collapsedSet = $derived.by(() => new Set<string>(collapsedDeviceIds));
+  const renamePopoverTarget = $derived.by(() =>
+    resolveRenamePopoverTarget(renameTarget, collapsedSet));
 
   const toScrollMetricsSignature = (metrics: RackScrollMetrics): string => (
     `${metrics.scrollLeft.toFixed(2)}|${metrics.scrollWidth.toFixed(2)}|${metrics.clientWidth.toFixed(2)}`
@@ -154,8 +192,8 @@
     const rackOrderSignature = rackContentItems
       .map((item) =>
         item.kind === 'device'
-          ? `d:${item.device.id}`
-          : `g:${item.groupId}:${item.enabled ? '1' : '0'}:${item.devices.map((device) => device.id).join(',')}`)
+          ? `d:${item.device.id}:${resolveDeviceDisplayName(deviceDisplayNameById, item.device.id)}`
+          : `g:${item.groupId}:${resolveGroupDisplayName(groupDisplayNameById, item.groupId)}:${item.enabled ? '1' : '0'}:${item.devices.map((device) => device.id).join(',')}`)
       .join('|');
     const collapsedSignature = collapsedDeviceIds.join('|');
     return `${rackOrderSignature}::collapsed:${collapsedSignature}`;
@@ -266,11 +304,159 @@
     return started;
   }
 
+  const clearRenameState = (): void => {
+    renameTarget = null;
+    renameDraft = '';
+    renamePopover = null;
+    renamePopoverPosition = null;
+  };
+
+  const releaseRenameBlurGuard = (): void => {
+    window.setTimeout(() => {
+      skipRenameBlur = false;
+    }, 0);
+  };
+
+  const focusRenameInput = (): void => {
+    void tick().then(() => {
+      renamePopover?.focusSelect();
+    });
+  };
+
+  const resolveRenamePopoverAnchor = (target: RackRenameTarget): HTMLElement | null => {
+    if (!chainDevicesEl) {
+      return null;
+    }
+
+    return target.kind === 'device'
+      ? chainDevicesEl.querySelector<HTMLElement>(
+        `.device-card[data-device-id="${target.id}"] .device-head`,
+      )
+      : chainDevicesEl.querySelector<HTMLElement>(
+        `.device-group[data-group-id="${target.id}"] .group-rail-left`,
+      );
+  };
+
+  const resolveRenamePopoverLabel = (target: RackRenameTarget): string => target.kind === 'device'
+    ? resolveDeviceDisplayName(deviceDisplayNameById, target.id)
+    : resolveGroupDisplayName(groupDisplayNameById, target.id);
+
+  const syncRenamePopoverPosition = (target: RackRenameTarget | null = renamePopoverTarget): void => {
+    if (!target) {
+      renamePopoverPosition = null;
+      return;
+    }
+
+    const anchor = resolveRenamePopoverAnchor(target);
+    if (!anchor) {
+      renamePopoverPosition = null;
+      return;
+    }
+
+    const anchorRect = anchor.getBoundingClientRect();
+    const popoverSize = renamePopover?.measure();
+    renamePopoverPosition = resolveAdjacentFloatingLayerPosition(anchorRect, {
+      width: popoverSize?.width || RENAME_POPOVER_FALLBACK_WIDTH_PX,
+      height: popoverSize?.height || RENAME_POPOVER_FALLBACK_HEIGHT_PX,
+    }, {
+      gapPx: RENAME_POPOVER_GAP_PX,
+    });
+  };
+
+  const queueRenamePopoverPositionSync = (target: RackRenameTarget | null = renamePopoverTarget): void => {
+    if (!target) {
+      renamePopoverPosition = null;
+      return;
+    }
+
+    void tick().then(() => {
+      syncRenamePopoverPosition(target);
+    });
+  };
+
+  const commitRename = (): boolean => {
+    if (!renameTarget) {
+      return false;
+    }
+
+    skipRenameBlur = true;
+    const committedDraft = resolveCommittedRenameDraft({
+      renameTarget,
+      renameDraft,
+      devices,
+      groupStateById: chainState.groupStateById,
+      deviceDisplayNameById,
+      groupDisplayNameById,
+    });
+    const didRename = renameTarget.kind === 'device'
+      ? onRenameDevice(renameTarget.id, committedDraft)
+      : onRenameGroup(renameTarget.id, committedDraft);
+    clearRenameState();
+    releaseRenameBlurGuard();
+    return didRename;
+  };
+
+  const cancelRename = (): void => {
+    if (!renameTarget) {
+      return;
+    }
+
+    skipRenameBlur = true;
+    clearRenameState();
+    releaseRenameBlurGuard();
+  };
+
+  const openRenameEditor = (
+    target: RackRenameTarget,
+    nextDraft: string,
+  ): boolean => {
+    if (renameTarget?.kind === target.kind && renameTarget.id === target.id && renameDraft === nextDraft) {
+      focusRenameInput();
+      return true;
+    }
+
+    if (renameTarget) {
+      commitRename();
+    }
+
+    renameTarget = target;
+    renameDraft = nextDraft;
+    onCloseContextMenu();
+    syncRenamePopoverPosition(resolveRenamePopoverTarget(target, collapsedSet));
+    focusRenameInput();
+    return true;
+  };
+
+  const startRenamingDevice = (deviceId: string): boolean => {
+    const device = devices.find((item: GeneratorDeviceNode) => item.id === deviceId);
+    if (!device) {
+      return false;
+    }
+
+    return openRenameEditor(
+      { kind: 'device', id: deviceId },
+      resolveEditableDeviceName(device, deviceDisplayNameById),
+    );
+  };
+
+  const startRenamingGroup = (groupId: string): boolean => {
+    if (!orderedGroupIds.includes(groupId)) {
+      return false;
+    }
+
+    return openRenameEditor(
+      { kind: 'group', id: groupId },
+      resolveEditableGroupName(groupId, chainState.groupStateById, groupDisplayNameById),
+    );
+  };
+
   const rackViewApi: RackViewApi = createRackViewApi({
     rackSelection,
     getDevices: () => devices,
     getOrderedDeviceIds: () => orderedDeviceIds,
     syncAfterRender,
+    startRenamingDevice,
+    startRenamingGroup,
     hasPointerInteraction,
     setScrollLeft,
     handleBrowserPointerDown,
@@ -287,6 +473,38 @@
 
   function handleChainKeyDown(event: KeyboardEvent) {
     rackInteractionManager?.handleChainKeyDown(event);
+  }
+
+  function handleRenameInput(event: Event) {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLInputElement)) {
+      return;
+    }
+
+    renameDraft = target.value;
+  }
+
+  function handleRenameInputBlur() {
+    if (skipRenameBlur) {
+      return;
+    }
+
+    commitRename();
+  }
+
+  function handleRenameInputKeyDown(event: KeyboardEvent) {
+    event.stopPropagation();
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitRename();
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelRename();
+    }
   }
 
   function handleGroupEnabledChange(event: Event, groupId: string) {
@@ -502,6 +720,9 @@
 
   function handleChainScroll() {
     emitScrollMetrics();
+    if (renamePopoverTarget) {
+      syncRenamePopoverPosition();
+    }
   }
 
   function handleDragStart(event: DragEvent) {
@@ -581,12 +802,48 @@
   }
 
   $effect(() => {
+    if (!renameTarget) {
+      renamePopoverPosition = null;
+      return;
+    }
+
+    const targetExists = renameTarget.kind === 'device'
+      ? devices.some((device: GeneratorDeviceNode) => device.id === renameTarget.id)
+      : orderedGroupIds.includes(renameTarget.id);
+
+    if (!targetExists) {
+      clearRenameState();
+    }
+  });
+
+  $effect(() => {
+    if (!renamePopoverTarget) {
+      renamePopoverPosition = null;
+      return;
+    }
+
+    queueRenamePopoverPositionSync();
+  });
+
+  $effect(() => {
     onRackApiReady(rackViewApi);
 
     return () => {
       onRackApiReady(null);
     };
   });
+
+  onMount(() =>
+    attachFloatingLayerDismissHandlers({
+      isActive: () => renamePopoverTarget !== null,
+      containsEventTarget: (eventTarget) => renamePopover?.containsTarget(eventTarget) ?? false,
+      onPointerDownOutside: () => {
+        commitRename();
+      },
+      onResize: () => {
+        commitRename();
+      },
+    }));
 
   onMount(() => {
     if (!chainDevicesEl || !dropIndicatorEl || !browserDragBadgeEl) return;
@@ -697,14 +954,22 @@
           <DeviceCard
             device={item.device}
             {devices}
+            {deviceDisplayNameById}
+            {groupDisplayNameById}
             {paletteRevision}
             {currentBeat}
             {modulationReadoutById}
             {resolvePaletteRgb}
+            title={resolveDeviceDisplayName(deviceDisplayNameById, item.device.id)}
             isCollapsed={collapsedSet.has(item.device.id)}
             isDisabledByGroup={false}
             isSelected={selectedDeviceIds.includes(item.device.id)}
             isDragging={draggingDeviceIds.includes(item.device.id)}
+            isRenaming={isRenamingDevice(renameTarget, item.device.id)}
+            renameValue={resolveDeviceRenameValue(renameTarget, renameDraft, item.device.id)}
+            onRenameInput={handleRenameInput}
+            onRenameBlur={handleRenameInputBlur}
+            onRenameKeyDown={handleRenameInputKeyDown}
             onHeaderPointerDown={(event) => handleDeviceHeaderPointerDown(event, item.device.id)}
             onHeaderClick={(event) => handleDeviceHeaderClick(event, item.device.id)}
             onHeaderContextMenu={(event) => handleDeviceHeaderContextMenu(event, item.device.id)}
@@ -720,28 +985,43 @@
                   : col.kind === 'left-rail'
                       ? 'group-rail group-rail-left'
                       : 'group-rail group-rail-right'}
+                class:is-renaming={col.kind === 'left-rail' && isRenamingGroup(renameTarget, col.groupId)}
                 onpointerdown={col.kind === 'device'
                   ? undefined
+                  : isRenamingGroup(renameTarget, col.groupId)
+                    ? undefined
                   : (event) => handleGroupRailPointerDown(event, col.groupId)}
                 onclick={col.kind === 'device'
                   ? undefined
+                  : isRenamingGroup(renameTarget, col.groupId)
+                    ? undefined
                   : handleGroupRailClick}
                 oncontextmenu={col.kind === 'device'
                   ? undefined
+                  : isRenamingGroup(renameTarget, col.groupId)
+                    ? undefined
                   : (event) => handleGroupRailContextMenu(event, col.groupId)}
               >
                 {#if col.kind === 'device'}
                   <DeviceCard
                     device={col.device}
                     {devices}
+                    {deviceDisplayNameById}
+                    {groupDisplayNameById}
                     {paletteRevision}
                     {currentBeat}
                     {modulationReadoutById}
                     {resolvePaletteRgb}
+                    title={resolveDeviceDisplayName(deviceDisplayNameById, col.device.id)}
                     isCollapsed={collapsedSet.has(col.device.id)}
                     isDisabledByGroup={!item.enabled}
                     isSelected={selectedDeviceIds.includes(col.device.id)}
                     isDragging={draggingDeviceIds.includes(col.device.id)}
+                    isRenaming={isRenamingDevice(renameTarget, col.device.id)}
+                    renameValue={resolveDeviceRenameValue(renameTarget, renameDraft, col.device.id)}
+                    onRenameInput={handleRenameInput}
+                    onRenameBlur={handleRenameInputBlur}
+                    onRenameKeyDown={handleRenameInputKeyDown}
                     onHeaderPointerDown={(event) => handleDeviceHeaderPointerDown(event, col.device.id)}
                     onHeaderClick={(event) => handleDeviceHeaderClick(event, col.device.id)}
                     onHeaderContextMenu={(event) => handleDeviceHeaderContextMenu(event, col.device.id)}
@@ -752,12 +1032,12 @@
                     class="group-enabled-toggle round-checkbox"
                     type="checkbox"
                     checked={col.enabled}
-                    aria-label={`${col.groupId} enabled`}
+                    aria-label={`${resolveGroupDisplayName(groupDisplayNameById, col.groupId)} enabled`}
                     onpointerdown={handleGroupTogglePointerDown}
                     onclick={handleGroupToggleClick}
                     onchange={(event) => handleGroupEnabledChange(event, col.groupId)}
                   />
-                  <span class="group-label">{col.groupId}</span>
+                  <span class="group-label">{resolveGroupDisplayName(groupDisplayNameById, col.groupId)}</span>
                 {/if}
               </div>
             {/each}
@@ -773,6 +1053,19 @@
     ></div>
   </div>
 </section>
+
+{#if renamePopoverTarget && renamePopoverPosition}
+  <RackRenamePopover
+    bind:this={renamePopover}
+    x={renamePopoverPosition.x}
+    y={renamePopoverPosition.y}
+    value={renameDraft}
+    ariaLabel={`Rename ${resolveRenamePopoverLabel(renamePopoverTarget)}`}
+    onInput={handleRenameInput}
+    onBlur={handleRenameInputBlur}
+    onKeyDown={handleRenameInputKeyDown}
+  />
+{/if}
 
 <div
   bind:this={browserDragBadgeEl}
@@ -896,6 +1189,7 @@
     transform: rotate(180deg);
     font-size: var(--text-12);
     color: var(--neutral-90);
+    line-height: 1.2;
     pointer-events: none;
   }
 

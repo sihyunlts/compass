@@ -10,6 +10,8 @@ export interface RackViewApi {
   selectAllDevices(deviceIds: readonly string[]): void;
   getSelectedGroupContexts(): GroupSelectionContext[];
   clearSelection(): void;
+  startRenamingDevice(deviceId: string): boolean;
+  startRenamingGroup(groupId: string): boolean;
   hasPointerInteraction(): boolean;
   setScrollLeft(nextScrollLeft: number): void;
   handleBrowserPointerDown(
@@ -24,6 +26,8 @@ interface CreateRackViewApiOptions {
   getDevices: () => readonly GeneratorDeviceNode[];
   getOrderedDeviceIds: () => readonly string[];
   syncAfterRender: () => void;
+  startRenamingDevice: (deviceId: string) => boolean;
+  startRenamingGroup: (groupId: string) => boolean;
   hasPointerInteraction: () => boolean;
   setScrollLeft: (nextScrollLeft: number) => void;
   handleBrowserPointerDown: (
@@ -63,6 +67,8 @@ export const createRackViewApi = (
   clearSelection: () => {
     options.rackSelection.clear();
   },
+  startRenamingDevice: options.startRenamingDevice,
+  startRenamingGroup: options.startRenamingGroup,
   hasPointerInteraction: options.hasPointerInteraction,
   setScrollLeft: options.setScrollLeft,
   handleBrowserPointerDown: options.handleBrowserPointerDown,
