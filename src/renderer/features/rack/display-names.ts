@@ -1,5 +1,6 @@
 import { getRendererDeviceLabel } from '../../../devices';
 import {
+  DEFAULT_GROUP_NAME_TEMPLATE,
   applyNameIndex,
   hasNameIndexToken,
   normalizeCustomName,
@@ -83,10 +84,11 @@ export const buildGroupDisplayNameById = (
 ): Record<string, string> => {
   const orderedGroupIds = collectOrderedGroupIds(devices);
   return buildDisplayNameById(
-    orderedGroupIds.map((groupId, index) => ({
+    orderedGroupIds.map((groupId) => ({
       id: groupId,
-      fallbackName: `Group ${index + 1}`,
-      rawName: resolveStoredGroupName(groupStateById, groupId),
+      fallbackName: groupId,
+      rawName: resolveStoredGroupName(groupStateById, groupId)
+        ?? DEFAULT_GROUP_NAME_TEMPLATE,
     })),
   );
 };

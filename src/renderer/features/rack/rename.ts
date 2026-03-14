@@ -1,5 +1,8 @@
 import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/model';
-import { normalizeCustomName } from '../../../shared/model/naming';
+import {
+  DEFAULT_GROUP_NAME_TEMPLATE,
+  normalizeCustomName,
+} from '../../../shared/model/naming';
 import { resolveStoredGroupName } from './display-names';
 
 export type RackRenameTarget = {
@@ -56,9 +59,8 @@ export const resolveEditableDeviceName = (
 export const resolveEditableGroupName = (
   groupId: string,
   groupStateById: GeneratorChain['groupStateById'],
-  groupDisplayNameById: Record<string, string>,
 ): string => resolveStoredGroupName(groupStateById, groupId)
-  ?? resolveGroupDisplayName(groupDisplayNameById, groupId);
+  ?? DEFAULT_GROUP_NAME_TEMPLATE;
 
 type ResolveCommittedRenameDraftOptions = {
   renameTarget: RackRenameTarget | null;
@@ -66,7 +68,6 @@ type ResolveCommittedRenameDraftOptions = {
   devices: readonly GeneratorDeviceNode[];
   groupStateById: GeneratorChain['groupStateById'];
   deviceDisplayNameById: Record<string, string>;
-  groupDisplayNameById: Record<string, string>;
 };
 
 export const resolveCommittedRenameDraft = ({
@@ -75,7 +76,6 @@ export const resolveCommittedRenameDraft = ({
   devices,
   groupStateById,
   deviceDisplayNameById,
-  groupDisplayNameById,
 }: ResolveCommittedRenameDraftOptions): string => {
   if (!renameTarget) {
     return renameDraft;
@@ -102,9 +102,7 @@ export const resolveCommittedRenameDraft = ({
 
   if (
     resolveStoredGroupName(groupStateById, renameTarget.id) === null
-    && nextName === normalizeCustomName(
-      resolveGroupDisplayName(groupDisplayNameById, renameTarget.id),
-    )
+    && nextName === normalizeCustomName(DEFAULT_GROUP_NAME_TEMPLATE)
   ) {
     return '';
   }

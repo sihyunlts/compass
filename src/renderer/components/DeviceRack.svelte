@@ -386,7 +386,6 @@
       devices,
       groupStateById: chainState.groupStateById,
       deviceDisplayNameById,
-      groupDisplayNameById,
     });
     const didRename = renameTarget.kind === 'device'
       ? onRenameDevice(renameTarget.id, committedDraft)
@@ -446,7 +445,7 @@
 
     return openRenameEditor(
       { kind: 'group', id: groupId },
-      resolveEditableGroupName(groupId, chainState.groupStateById, groupDisplayNameById),
+      resolveEditableGroupName(groupId, chainState.groupStateById),
     );
   };
 

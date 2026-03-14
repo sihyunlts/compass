@@ -29,6 +29,7 @@ export type { ClipNote } from './clip';
 export { cloneChainForIpc } from './chain-clone';
 export { cloneDeviceNode } from './device-clone';
 export {
+  DEFAULT_GROUP_NAME_TEMPLATE,
   applyNameIndex,
   hasNameIndexToken,
   normalizeCustomName,
