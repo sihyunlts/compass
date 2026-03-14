@@ -585,6 +585,27 @@
     });
   }
 
+  function handleGroupRailDoubleClick(event: MouseEvent, groupId: string) {
+    event.stopPropagation();
+    if (event.button !== 0) {
+      return;
+    }
+
+    const memberDeviceIds = getGroupMemberIds(groupId);
+    if (memberDeviceIds.length === 0) {
+      return;
+    }
+
+    const shouldCollapseGroup = memberDeviceIds.some((deviceId) => !collapsedSet.has(deviceId));
+    for (const deviceId of memberDeviceIds) {
+      if (collapsedSet.has(deviceId) === shouldCollapseGroup) {
+        continue;
+      }
+
+      onToggleCollapse(deviceId);
+    }
+  }
+
   function handleDeviceHeaderPointerDown(event: PointerEvent, deviceId: string) {
     if (!rackDragController) {
       return;
@@ -1000,6 +1021,11 @@
                   : isRenamingGroup(renameTarget, col.groupId)
                     ? undefined
                   : (event) => handleGroupRailContextMenu(event, col.groupId)}
+                ondblclick={col.kind === 'device'
+                  ? undefined
+                  : isRenamingGroup(renameTarget, col.groupId)
+                    ? undefined
+                  : (event) => handleGroupRailDoubleClick(event, col.groupId)}
               >
                 {#if col.kind === 'device'}
                   <DeviceCard
