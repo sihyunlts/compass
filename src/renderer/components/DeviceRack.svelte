@@ -1184,8 +1184,7 @@
   }
 
   .group-label {
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
+    writing-mode: sideways-lr;
     font-size: var(--text-12);
     color: var(--neutral-90);
     line-height: 1.2;

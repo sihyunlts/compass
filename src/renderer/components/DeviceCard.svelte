@@ -237,13 +237,11 @@
       }
 
       .device-title {
-        writing-mode: vertical-rl;
-        transform: rotate(180deg);
+        writing-mode: sideways-lr;
       }
 
       .device-title-input {
-        writing-mode: vertical-rl;
-        transform: rotate(180deg);
+        writing-mode: sideways-lr;
         text-align: center;
       }
     }
