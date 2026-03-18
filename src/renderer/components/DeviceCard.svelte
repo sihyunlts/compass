@@ -25,6 +25,7 @@
     onRenameInput,
     onRenameBlur,
     onRenameKeyDown,
+    onSavePreset,
     onHeaderPointerDown,
     onHeaderClick,
     onHeaderContextMenu,
@@ -48,6 +49,7 @@
     onRenameInput?: (event: Event) => void;
     onRenameBlur?: (event: FocusEvent) => void;
     onRenameKeyDown?: (event: KeyboardEvent) => void;
+    onSavePreset?: (deviceId: string) => void;
     onHeaderPointerDown?: (event: PointerEvent) => void;
     onHeaderClick?: (event: MouseEvent) => void;
     onHeaderContextMenu?: (event: MouseEvent) => void;
@@ -73,6 +75,20 @@
       renameInputEl?.select();
     });
   });
+
+  const handleSavePresetPointerDown = (event: PointerEvent): void => {
+    event.stopPropagation();
+  };
+
+  const handleSavePresetClick = (event: MouseEvent): void => {
+    event.stopPropagation();
+    onSavePreset?.(device.id);
+  };
+
+  const handleSavePresetContextMenu = (event: MouseEvent): void => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
 </script>
 
 <div
@@ -95,13 +111,24 @@
     ondblclick={isRenaming ? undefined : onHeaderDoubleClick}
   >
     <div class="device-head-left">
-      <input
-        class="round-checkbox device-toggle"
-        type="checkbox"
-        checked={device.enabled}
-        data-action="set-device-enabled"
-        data-id={device.id}
-      />
+      <div class="device-head-controls">
+        <input
+          class="round-checkbox device-toggle"
+          type="checkbox"
+          checked={device.enabled}
+          data-action="set-device-enabled"
+          data-id={device.id}
+        />
+        <button
+          class="preset-save-button"
+          type="button"
+          aria-label={`Save preset for ${title}`}
+          title={`Save preset for ${title}`}
+          onpointerdown={handleSavePresetPointerDown}
+          onclick={handleSavePresetClick}
+          oncontextmenu={handleSavePresetContextMenu}
+        ></button>
+      </div>
       {#if isInlineRenaming}
         <input
           bind:this={renameInputEl}
@@ -174,6 +201,14 @@
         gap: var(--gap-8);
       }
 
+      &-controls {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: var(--gap-6);
+        flex: 0 0 auto;
+      }
+
       .device-title,
       .device-title-input {
         min-width: 0;
@@ -233,7 +268,12 @@
 
       .device-head-left {
         flex-direction: column;
+        align-items: center;
         gap: var(--gap-12);
+      }
+
+      .device-head-controls {
+        flex-direction: column;
       }
 
       .device-title {

@@ -90,6 +90,10 @@ const api: CompassApi = {
     liveTempoListeners.subscribe(listener),
   openExternal: (url) =>
     ipcRenderer.invoke(IPC_CHANNELS.openExternal, url),
+  savePresetFile: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.savePresetFile, request),
+  openPresetFile: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.openPresetFile, request),
 };
 
 contextBridge.exposeInMainWorld('compass', api);

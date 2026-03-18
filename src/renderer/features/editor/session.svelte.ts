@@ -1,9 +1,15 @@
 import type { BridgeSettings } from '../../../shared/bridge/types';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
+import type {
+  DevicePresetFile,
+  GroupPresetFile,
+  RackPresetFile,
+} from '../../../shared/presets';
 import type { RendererDeviceKind } from '../../../devices';
 import { isRendererDeviceKind } from '../../../devices';
 import type { ContextMenuTarget } from '../../components/context-menu-types';
 import type { RackInteractionCommit } from '../../components/device-rack-types';
+import type { RackDropZone } from '../rack/drop-ops';
 import type { GroupSelectionContext } from '../rack/selection.svelte';
 import {
   applyBridgeSettings as applyEditorBridgeSettings,
@@ -57,9 +63,21 @@ import {
   toggleCollapse,
 } from './persistence';
 import {
+  allocateDeviceNodeId,
+  syncDeviceNodeIdSeeds,
+} from './device-node-factory';
+import {
   renameDeviceById,
   renameGroupById,
 } from './naming';
+import {
+  applyDevicePresetFile,
+  applyGroupPresetFile,
+  applyRackPresetFile,
+  insertDevicePresetFile,
+  insertGroupPresetFile,
+  type PresetApplyResult,
+} from './presets';
 import type { RackClipboard } from './rack-clipboard';
 import type { ChainMutationMeta } from './history-core';
 import {
@@ -281,6 +299,25 @@ export class EditorSession {
       this.renameDevice(deviceId, rawName),
     renameGroup: (groupId: string, rawName: string): boolean =>
       this.renameGroup(groupId, rawName),
+    applyDevicePreset: (
+      deviceId: string,
+      preset: DevicePresetFile,
+    ): PresetApplyResult => this.applyDevicePreset(deviceId, preset),
+    insertDevicePreset: (
+      dropZone: RackDropZone,
+      preset: DevicePresetFile,
+    ): PresetApplyResult => this.insertDevicePreset(dropZone, preset),
+    applyGroupPreset: (
+      groupId: string,
+      preset: GroupPresetFile,
+    ): PresetApplyResult => this.applyGroupPreset(groupId, preset),
+    insertGroupPreset: (
+      dropZone: RackDropZone,
+      preset: GroupPresetFile,
+    ): PresetApplyResult => this.insertGroupPreset(dropZone, preset),
+    applyRackPreset: (
+      preset: RackPresetFile,
+    ): PresetApplyResult => this.applyRackPreset(preset),
     clearSelection: (): void => {
       this.rackBinding?.clearSelection();
     },
@@ -545,6 +582,86 @@ export class EditorSession {
 
     this.persistChainMutation(nextChain, EDITOR_HISTORY_META.renameGroup);
     return true;
+  }
+
+  private applyDevicePreset(
+    deviceId: string,
+    preset: DevicePresetFile,
+  ): PresetApplyResult {
+    const result = applyDevicePresetFile(this.state.chainState, deviceId, preset);
+    if (!result.ok) {
+      return result;
+    }
+
+    this.applyChainMutation(result.chain, EDITOR_HISTORY_META.loadDevicePreset);
+    return result;
+  }
+
+  private insertDevicePreset(
+    dropZone: RackDropZone,
+    preset: DevicePresetFile,
+  ): PresetApplyResult {
+    const result = insertDevicePresetFile(
+      this.state.chainState,
+      dropZone,
+      preset,
+      (kind) => allocateDeviceNodeId(kind),
+    );
+    if (!result.ok) {
+      return result;
+    }
+
+    this.applyChainMutation(result.chain, EDITOR_HISTORY_META.insertDevicePreset);
+    return result;
+  }
+
+  private applyGroupPreset(
+    groupId: string,
+    preset: GroupPresetFile,
+  ): PresetApplyResult {
+    const result = applyGroupPresetFile(
+      this.state.chainState,
+      groupId,
+      preset,
+      (kind) => allocateDeviceNodeId(kind),
+    );
+    if (!result.ok) {
+      return result;
+    }
+
+    this.applyChainMutation(result.chain, EDITOR_HISTORY_META.loadGroupPreset);
+    return result;
+  }
+
+  private insertGroupPreset(
+    dropZone: RackDropZone,
+    preset: GroupPresetFile,
+  ): PresetApplyResult {
+    const result = insertGroupPresetFile(
+      this.state.chainState,
+      dropZone,
+      preset,
+      (kind) => allocateDeviceNodeId(kind),
+    );
+    if (!result.ok) {
+      return result;
+    }
+
+    this.applyChainMutation(result.chain, EDITOR_HISTORY_META.insertGroupPreset);
+    return result;
+  }
+
+  private applyRackPreset(
+    preset: RackPresetFile,
+  ): PresetApplyResult {
+    const result = applyRackPresetFile(preset);
+    if (!result.ok) {
+      return result;
+    }
+
+    syncDeviceNodeIdSeeds(result.chain.devices);
+    this.applyChainMutation(result.chain, EDITOR_HISTORY_META.loadRackPreset);
+    return result;
   }
 
   private ungroupGroup(

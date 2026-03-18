@@ -1,13 +1,14 @@
 import type { BridgeSettings } from '../../../shared/bridge/types';
-import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
+import {
+  sanitizeGeneratorChain,
+  type GeneratorChain,
+  type LaunchpadModel,
+} from '../../../shared/model';
 import { clamp } from '../../../shared/math';
-import { normalizeCustomName } from '../../../shared/model/naming';
 import {
   DEFAULT_BRIDGE_SETTINGS,
   sanitizeBridgeSettings,
 } from '../../../shared/validation/bridge-settings';
-import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
-import { normalizeColorDeviceParams } from '../../../devices/color/schema';
 import {
   createInitialChainDevices,
   syncDeviceNodeIdSeeds,
@@ -72,35 +73,6 @@ const createDefaultChain = (): GeneratorChain => ({
   groupStateById: {},
 });
 
-const reconcileColorDeviceParams = (chain: GeneratorChain): void => {
-  for (const device of chain.devices) {
-    if (device.kind !== 'color') {
-      continue;
-    }
-
-    device.params = normalizeColorDeviceParams(device.params);
-  }
-};
-
-const reconcileStoredNames = (chain: GeneratorChain): void => {
-  for (const device of chain.devices) {
-    device.name = normalizeCustomName((device as { name?: unknown }).name);
-  }
-
-  const nextGroupStateById: GeneratorChain['groupStateById'] = {};
-  for (const [groupId, state] of Object.entries(chain.groupStateById)) {
-    if (!isRecord(state)) {
-      continue;
-    }
-
-    nextGroupStateById[groupId] = {
-      enabled: toBoolean(state.enabled, true),
-      name: normalizeCustomName(state.name),
-    };
-  }
-  chain.groupStateById = nextGroupStateById;
-};
-
 const toBoolean = (value: unknown, fallback: boolean): boolean =>
   typeof value === 'boolean' ? value : fallback;
 
@@ -161,11 +133,9 @@ export const loadChainSettings = (): GeneratorChain => {
     return createDefaultChain();
   }
 
-  reconcileColorDeviceParams(chain);
-  reconcileStoredNames(chain);
-  syncDeviceNodeIdSeeds(chain.devices);
-  reconcileGeneratorChainModulators(chain);
-  return chain;
+  const sanitized = sanitizeGeneratorChain(chain);
+  syncDeviceNodeIdSeeds(sanitized.devices);
+  return sanitized;
 };
 
 /** Persists chain settings as provided by the renderer. */

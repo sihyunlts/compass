@@ -10,6 +10,18 @@ export interface RackScrollMetrics {
   clientWidth: number;
 }
 
+export interface RackPresetDropTargets {
+  dropZone: RackDropZone | null;
+  hoveredDeviceId: string | null;
+  hoveredGroupId: string | null;
+}
+
+export interface RackPresetFileDrop {
+  file: File;
+  fileCount: number;
+  targets: RackPresetDropTargets;
+}
+
 export type RackInteractionCommit =
   | {
       kind: 'move';

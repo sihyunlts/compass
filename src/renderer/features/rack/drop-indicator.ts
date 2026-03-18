@@ -1,4 +1,4 @@
-import type { ActiveDragInfo } from './drag-controller';
+import type { RackDropZone } from './drop-ops';
 
 type IndicatorLayout = {
   key: string;
@@ -24,7 +24,7 @@ export class RackDropIndicator {
     this.indicator = options.indicator;
   }
 
-  public sync(info: ActiveDragInfo | null): void {
+  public sync(info: { didMove: boolean; dropZone: RackDropZone | null } | null): void {
     if (!info || !info.didMove || !info.dropZone) {
       this.clear();
       return;

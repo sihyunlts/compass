@@ -27,6 +27,10 @@ export type {
 } from './chain';
 export type { ClipNote } from './clip';
 export { cloneChainForIpc } from './chain-clone';
+export {
+  reconcileChainGroupStateById,
+  sanitizeGeneratorChain,
+} from './chain-normalization';
 export { cloneDeviceNode } from './device-clone';
 export {
   DEFAULT_GROUP_NAME_TEMPLATE,

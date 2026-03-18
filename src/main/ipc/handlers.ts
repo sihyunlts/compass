@@ -4,16 +4,23 @@ import { IPC_CHANNELS } from '../../shared/contracts/ipc/channels';
 import type { PreviewWindowState } from '../../shared/contracts/preview/window-state';
 import type { GenerateAndSendRequest } from '../../shared/contracts/ipc/generator';
 import {
+  getMainWindow,
   getPreviewWindow,
   isPreviewWindowOpen,
   openPreviewWindow,
 } from '../app-window';
 import { GeneratorService } from '../services/generator-service';
+import { PresetService } from '../services/preset-service';
 
 let latestPreviewWindowState: PreviewWindowState | null = null;
 
+const resolveDialogParentWindow = () => getMainWindow() ?? BrowserWindow.getFocusedWindow() ?? undefined;
+
 /** Registers Electron IPC handlers for main-only responsibilities. */
-export const registerIpcHandlers = (generatorService: GeneratorService): void => {
+export const registerIpcHandlers = (
+  generatorService: GeneratorService,
+  presetService: PresetService,
+): void => {
   ipcMain.handle(
     IPC_CHANNELS.generateAndSend,
     (_event, request: GenerateAndSendRequest) =>
@@ -91,4 +98,16 @@ export const registerIpcHandlers = (generatorService: GeneratorService): void =>
   ipcMain.handle(IPC_CHANNELS.openExternal, (_event, url: string) => {
     void shell.openExternal(url);
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.savePresetFile,
+    (_event, request) =>
+      presetService.savePresetFile(request, resolveDialogParentWindow()),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.openPresetFile,
+    (_event, request) =>
+      presetService.openPresetFile(request, resolveDialogParentWindow()),
+  );
 };

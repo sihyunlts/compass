@@ -1,6 +1,9 @@
 import { normalizeOptionalId } from '../../../shared/normalize-id';
-import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/model';
-import { normalizeCustomName } from '../../../shared/model/naming';
+import {
+  reconcileChainGroupStateById,
+  type GeneratorChain,
+  type GeneratorDeviceNode,
+} from '../../../shared/model';
 
 const collectActiveGroupIds = (
   devices: readonly GeneratorDeviceNode[],
@@ -20,17 +23,7 @@ export const reconcileGroupStateById = (
   prev: GeneratorChain['groupStateById'],
   devices: readonly GeneratorDeviceNode[],
 ): GeneratorChain['groupStateById'] => {
-  const activeGroupIds = collectActiveGroupIds(devices);
-  const next: GeneratorChain['groupStateById'] = {};
-
-  for (const groupId of activeGroupIds) {
-    next[groupId] = {
-      enabled: prev[groupId]?.enabled !== false,
-      name: normalizeCustomName(prev[groupId]?.name),
-    };
-  }
-
-  return next;
+  return reconcileChainGroupStateById(prev, devices);
 };
 
 export const withDevices = (

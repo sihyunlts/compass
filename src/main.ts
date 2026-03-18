@@ -5,11 +5,13 @@ import { createMainWindow } from './main/app-window';
 import { LiveTempoListener } from './main/bridge/live-tempo-listener';
 import { registerIpcHandlers } from './main/ipc/handlers';
 import { GeneratorService } from './main/services/generator-service';
+import { PresetService } from './main/services/preset-service';
 import { IPC_CHANNELS } from './shared/contracts/ipc/channels';
 
 const generatorService = new GeneratorService();
+const presetService = new PresetService();
 const liveTempoListener = new LiveTempoListener();
-registerIpcHandlers(generatorService);
+registerIpcHandlers(generatorService, presetService);
 
 const sendToAllWindows = <T>(channel: string, payload: T): void => {
   for (const window of BrowserWindow.getAllWindows()) {

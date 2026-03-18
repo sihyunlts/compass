@@ -151,6 +151,10 @@ export const openPreviewWindow = (): BrowserWindow => {
 export const getPreviewWindow = (): BrowserWindow | null =>
   previewWindowRef && !previewWindowRef.isDestroyed() ? previewWindowRef : null;
 
+/** Returns the main window only while the current reference is still alive. */
+export const getMainWindow = (): BrowserWindow | null =>
+  mainWindowRef && !mainWindowRef.isDestroyed() ? mainWindowRef : null;
+
 /** Returns true only while a live preview popout window reference exists. */
 export const isPreviewWindowOpen = (): boolean =>
   previewWindowRef !== null && !previewWindowRef.isDestroyed();

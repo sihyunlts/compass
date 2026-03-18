@@ -46,6 +46,7 @@
     display: flex;
     align-items: center;
     gap: var(--gap-8);
+    min-width: 0;
   }
 
   &-rack {
@@ -69,6 +70,19 @@
     gap: var(--gap-6);
     color: var(--neutral-50);
     font-size: var(--text-12);
+
+    .field-label {
+      white-space: nowrap;
+    }
+  }
+
+  &-preset-group {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gap-6);
+    color: var(--neutral-50);
+    font-size: var(--text-12);
+    min-width: 0;
 
     .field-label {
       white-space: nowrap;

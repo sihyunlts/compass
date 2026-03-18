@@ -16,6 +16,11 @@ export type ChainHistoryKind =
   | 'clipboard-cut'
   | 'clipboard-paste'
   | 'duplicate'
+  | 'insert-device-preset'
+  | 'insert-group-preset'
+  | 'load-device-preset'
+  | 'load-group-preset'
+  | 'load-rack-preset'
   | 'control-edit'
   | 'center-picker-edit'
   | 'mask-tile-edit';

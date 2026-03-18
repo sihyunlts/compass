@@ -1,4 +1,10 @@
 import type { LiveTempoUpdate } from '../../bridge/types';
+import type {
+  OpenPresetFileRequest,
+  OpenPresetFileResponse,
+  SavePresetFileRequest,
+  SavePresetFileResponse,
+} from './presets';
 import type { PreviewWindowState } from '../preview/window-state';
 import type {
   GenerateAndSendRequest,
@@ -30,4 +36,10 @@ export interface CompassApi {
     listener: (update: LiveTempoUpdate) => void,
   ) => () => void;
   openExternal: (url: string) => Promise<void>;
+  savePresetFile: (
+    request: SavePresetFileRequest,
+  ) => Promise<SavePresetFileResponse>;
+  openPresetFile: (
+    request: OpenPresetFileRequest,
+  ) => Promise<OpenPresetFileResponse>;
 }

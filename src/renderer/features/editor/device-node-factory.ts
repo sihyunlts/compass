@@ -62,3 +62,7 @@ export const syncDeviceNodeIdSeeds = (
 export const createDeviceNodeByKind = (
   kind: RendererDeviceKind,
 ): GeneratorDeviceNode => createGeneratedDeviceNode(kind);
+
+export const allocateDeviceNodeId = (
+  kind: RendererDeviceKind,
+): string => createGeneratedDeviceNode(kind).id;

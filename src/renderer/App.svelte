@@ -10,12 +10,16 @@
     type RendererDeviceKind,
   } from '../devices';
   import type { PaletteFilePayload } from '../shared/model';
+  import { parsePresetFileText } from '../shared/presets';
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
   import { sanitizeSidebarWidth } from './features/editor/persistence-storage';
   import BrowserPanel from './components/BrowserPanel.svelte';
   import SidebarResizer from './components/SidebarResizer.svelte';
   import DeviceRack from './components/DeviceRack.svelte';
-  import type { RackScrollMetrics } from './components/device-rack-types';
+  import type {
+    RackPresetFileDrop,
+    RackScrollMetrics,
+  } from './components/device-rack-types';
   import RackHeaderScrollbar from './components/RackHeaderScrollbar.svelte';
   import PreviewPanel from './components/PreviewPanel.svelte';
   import ContextMenu from './components/ContextMenu.svelte';
@@ -30,11 +34,20 @@
     type EditorRackBinding,
   } from './features/editor/session.svelte';
   import {
+    buildDevicePresetFile,
+    buildGroupPresetFile,
+    buildRackPresetFile,
+    resolvePresetDropIntent,
+    resolveDevicePresetSuggestedName,
+    resolveGroupPresetSuggestedName,
+  } from './features/editor/presets';
+  import {
     selectClipboardAvailable,
     selectHistoryControls,
     selectPreviewBpmText,
     selectPreviewPanelControls,
   } from './features/editor/selectors';
+  import { resolveGroupMemberIds } from './features/editor/chain-ops';
   import { createPreviewSession } from './features/preview/session.svelte';
   import type { RackViewApi } from './features/rack/api';
 
@@ -209,6 +222,150 @@
     }
   };
 
+  const showPresetMessage = (message: string): void => {
+    headerIndicator.show(message);
+  };
+
+  const handleSaveDevicePreset = async (deviceId: string): Promise<void> => {
+    const payload = buildDevicePresetFile(uiState.chainState, deviceId);
+    if (!payload) {
+      showPresetMessage('Unable to build preset from this device.');
+      return;
+    }
+
+    const response = await bridgeClient.savePresetFile({
+      presetType: 'device',
+      suggestedName: resolveDevicePresetSuggestedName(uiState.chainState, deviceId),
+      payload,
+    });
+    if (response.status === 'saved') {
+      showPresetMessage('Device preset saved.');
+      return;
+    }
+
+    if (response.status === 'error') {
+      showPresetMessage(`Preset save failed | ${response.message}`);
+    }
+  };
+
+  const handleSaveGroupPreset = async (groupId: string): Promise<void> => {
+    const memberDeviceIds = resolveGroupMemberIds(uiState.chainState.devices, groupId);
+    const payload = buildGroupPresetFile(uiState.chainState, groupId, memberDeviceIds);
+    if (!payload) {
+      showPresetMessage('Unable to build preset from this group.');
+      return;
+    }
+
+    const response = await bridgeClient.savePresetFile({
+      presetType: 'group',
+      suggestedName: resolveGroupPresetSuggestedName(uiState.chainState, groupId),
+      payload,
+    });
+    if (response.status === 'saved') {
+      showPresetMessage('Group preset saved.');
+      return;
+    }
+
+    if (response.status === 'error') {
+      showPresetMessage(`Preset save failed | ${response.message}`);
+    }
+  };
+
+  const handleSaveRackPreset = async (): Promise<void> => {
+    const response = await bridgeClient.savePresetFile({
+      presetType: 'rack',
+      suggestedName: 'Rack Preset',
+      payload: buildRackPresetFile(uiState.chainState),
+    });
+    if (response.status === 'saved') {
+      showPresetMessage('Rack preset saved.');
+      return;
+    }
+
+    if (response.status === 'error') {
+      showPresetMessage(`Rack preset save failed | ${response.message}`);
+    }
+  };
+
+  const handleLoadRackPreset = async (): Promise<void> => {
+    const response = await bridgeClient.openPresetFile({
+      presetType: 'rack',
+    });
+    if (response.status !== 'opened') {
+      if (response.status === 'error') {
+        showPresetMessage(`Rack preset load failed | ${response.message}`);
+      }
+      return;
+    }
+
+    if (response.payload.presetType !== 'rack') {
+      showPresetMessage('Preset type does not match the rack loader.');
+      return;
+    }
+
+    const result = editorSession.commands.applyRackPreset(response.payload);
+    showPresetMessage(result.message);
+  };
+
+  const handlePresetFileDrop = async (payload: RackPresetFileDrop): Promise<void> => {
+    if (payload.fileCount !== 1) {
+      showPresetMessage('Drop a single preset file at a time.');
+      return;
+    }
+
+    let fileText: string;
+    try {
+      fileText = await payload.file.text();
+    } catch {
+      showPresetMessage('Preset load failed | Unable to read the dropped file.');
+      return;
+    }
+
+    const parsed = parsePresetFileText(fileText, {
+      fileName: payload.file.name,
+    });
+    if (parsed.ok === false) {
+      showPresetMessage(`Preset load failed | ${parsed.message}`);
+      return;
+    }
+
+    if (parsed.preset.presetType === 'rack') {
+      showPresetMessage('Rack presets can only be loaded from the rack header loader.');
+      return;
+    }
+
+    const intent = resolvePresetDropIntent(
+      uiState.chainState,
+      payload.targets,
+      parsed.preset,
+    );
+    if (intent.ok === false) {
+      showPresetMessage(intent.message);
+      return;
+    }
+
+    const result = intent.intent.kind === 'replace-device-preset'
+      ? editorSession.commands.applyDevicePreset(
+        intent.intent.deviceId,
+        intent.intent.preset,
+      )
+      : intent.intent.kind === 'replace-group-preset'
+        ? editorSession.commands.applyGroupPreset(
+          intent.intent.groupId,
+          intent.intent.preset,
+        )
+        : intent.intent.kind === 'insert-device-preset'
+          ? editorSession.commands.insertDevicePreset(
+            intent.intent.dropZone,
+            intent.intent.preset,
+          )
+          : editorSession.commands.insertGroupPreset(
+            intent.intent.dropZone,
+            intent.intent.preset,
+          );
+    showPresetMessage(result.message);
+  };
+
   onMount(() => {
     editorSession.commands.initialize();
     playbackSession.initialize();
@@ -300,6 +457,27 @@
               {/each}
             </select>
           </div>
+          <div class="header-preset-group">
+            <span class="field-label">Rack</span>
+            <button
+              id="rack-preset-save"
+              type="button"
+              title="Save the current rack state."
+              aria-label="Save rack preset"
+              onclick={handleSaveRackPreset}
+            >
+              Save
+            </button>
+            <button
+              id="rack-preset-load"
+              type="button"
+              title="Replace the current rack with a saved rack preset."
+              aria-label="Load rack preset"
+              onclick={handleLoadRackPreset}
+            >
+              Load
+            </button>
+          </div>
           <button
             id="undo-button"
             type="button"
@@ -354,6 +532,9 @@
           onCommit={editorSession.commands.handleRackCommit}
           onScrollMetricsChange={handleRackScrollMetricsChange}
           onMiniMapContentRevisionChange={handleRackMiniMapContentRevisionChange}
+          onPresetFileDrop={handlePresetFileDrop}
+          onSaveDevicePreset={handleSaveDevicePreset}
+          onSaveGroupPreset={handleSaveGroupPreset}
           onToggleGroupEnabled={editorSession.commands.toggleGroupEnabled}
           onToggleCollapse={editorSession.commands.toggleCollapse}
           onRenameDevice={editorSession.commands.renameDevice}
@@ -412,7 +593,7 @@
                 }}
               />
             </div>
-             <div class="settings-row">
+            <div class="settings-row">
               <div class="info">
                 <span class="label">Color Palette</span>
                 <span class="description">{uiState.paletteNameText || 'Default palette'}</span>

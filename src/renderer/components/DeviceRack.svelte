@@ -9,7 +9,9 @@
   import type { RendererDeviceKind } from '../../devices';
   import type { ContextMenuTarget } from './context-menu-types';
   import type {
+    RackPresetDropTargets,
     RackInteractionCommit,
+    RackPresetFileDrop,
     RackScrollMetrics,
   } from './device-rack-types';
   import { canCreateGroupFromSelection } from '../features/editor/chain-ops';
@@ -69,6 +71,9 @@
     onCommit,
     onScrollMetricsChange = () => {},
     onMiniMapContentRevisionChange = () => {},
+    onPresetFileDrop = async () => {},
+    onSaveDevicePreset = () => {},
+    onSaveGroupPreset = () => {},
     onToggleGroupEnabled = () => {},
     onToggleCollapse = () => {},
     onRenameDevice = () => false,
@@ -92,6 +97,9 @@
     onCommit: (commit: RackInteractionCommit) => void;
     onScrollMetricsChange?: (metrics: RackScrollMetrics) => void;
     onMiniMapContentRevisionChange?: (revision: number) => void;
+    onPresetFileDrop?: (payload: RackPresetFileDrop) => void | Promise<void>;
+    onSaveDevicePreset?: (deviceId: string) => void;
+    onSaveGroupPreset?: (groupId: string) => void;
     onToggleGroupEnabled?: (groupId: string, nextEnabled: boolean) => void;
     onToggleCollapse: (id: string) => void;
     onRenameDevice?: (deviceId: string, rawName: string) => boolean;
@@ -109,6 +117,7 @@
   let dropIndicator = $state<RackDropIndicator | null>(null);
   let activeDragInfo = $state<ActiveDragInfo | null>(null);
   let suppressDeviceSelectionClick = false;
+  let externalFileDragDepth = 0;
   let resizeObserver: ResizeObserver | null = null;
   let resizeSyncFrameId: number | null = null;
   let lastScrollMetricsSignature: string | null = null;
@@ -222,6 +231,32 @@
 
   const clearDropIndicator = (): void => {
     dropIndicator?.clear();
+  };
+
+  const clearExternalFileDragState = (): void => {
+    externalFileDragDepth = 0;
+  };
+
+  const isFileDragEvent = (event: DragEvent): boolean =>
+    Array.from(event.dataTransfer?.types ?? []).includes('Files');
+
+  const EMPTY_PRESET_DROP_TARGETS: RackPresetDropTargets = {
+    dropZone: null,
+    hoveredDeviceId: null,
+    hoveredGroupId: null,
+  };
+
+  const syncExternalFileDropIndicator = (
+    clientX: number,
+    clientY: number,
+  ): RackPresetDropTargets => {
+    const targets = rackDragController?.resolveExternalFileDropTargets(clientX, clientY)
+      ?? EMPTY_PRESET_DROP_TARGETS;
+    dropIndicator?.sync({
+      didMove: true,
+      dropZone: targets.dropZone,
+    });
+    return targets;
   };
 
   const getOrderedSelectedDeviceIdsInRack = (): string[] =>
@@ -526,6 +561,23 @@
     }
   }
 
+  function handleGroupSavePointerDown(event: PointerEvent) {
+    event.stopPropagation();
+  }
+
+  function handleGroupSaveClick(event: MouseEvent, groupId: string) {
+    event.stopPropagation();
+    onSaveGroupPreset(groupId);
+    if (suppressDeviceSelectionClick) {
+      suppressDeviceSelectionClick = false;
+    }
+  }
+
+  function handleGroupSaveContextMenu(event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
   function handleGroupRailPointerDown(event: PointerEvent, groupId: string) {
     if (!rackDragController) {
       return;
@@ -749,6 +801,72 @@
     event.preventDefault();
   }
 
+  function handleChainDragEnter(event: DragEvent) {
+    if (!isFileDragEvent(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    const isInitialEnter = externalFileDragDepth === 0;
+    externalFileDragDepth += 1;
+    if (isInitialEnter) {
+      onCloseContextMenu();
+    }
+    syncExternalFileDropIndicator(event.clientX, event.clientY);
+  }
+
+  function handleChainDragOver(event: DragEvent) {
+    if (!isFileDragEvent(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+    syncExternalFileDropIndicator(event.clientX, event.clientY);
+  }
+
+  function handleChainDragLeave(event: DragEvent) {
+    if (!isFileDragEvent(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    externalFileDragDepth = Math.max(0, externalFileDragDepth - 1);
+    if (externalFileDragDepth === 0) {
+      clearDropIndicator();
+    }
+  }
+
+  async function handleChainDrop(event: DragEvent) {
+    if (!isFileDragEvent(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    onCloseContextMenu();
+
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    const file = files[0] ?? null;
+    const targets = syncExternalFileDropIndicator(
+      event.clientX,
+      event.clientY,
+    );
+    clearExternalFileDragState();
+    clearDropIndicator();
+
+    if (!file) {
+      return;
+    }
+
+    await onPresetFileDrop({
+      file,
+      fileCount: files.length,
+      targets,
+    });
+  }
+
   // Routes global pointer movement to drag-and-drop and picker controllers.
   function handleWindowPointerMove(event: PointerEvent) {
     if (isSidebarResizing) return;
@@ -960,6 +1078,10 @@
     ondblclick={handleChainDoubleClick}
     onscroll={handleChainScroll}
     ondragstart={handleDragStart}
+    ondragenter={handleChainDragEnter}
+    ondragover={handleChainDragOver}
+    ondragleave={handleChainDragLeave}
+    ondrop={handleChainDrop}
   >
     {#each rackContentItems as item (item.key)}
       <div
@@ -990,6 +1112,7 @@
             onRenameInput={handleRenameInput}
             onRenameBlur={handleRenameInputBlur}
             onRenameKeyDown={handleRenameInputKeyDown}
+            onSavePreset={onSaveDevicePreset}
             onHeaderPointerDown={(event) => handleDeviceHeaderPointerDown(event, item.device.id)}
             onHeaderClick={(event) => handleDeviceHeaderClick(event, item.device.id)}
             onHeaderContextMenu={(event) => handleDeviceHeaderContextMenu(event, item.device.id)}
@@ -1047,6 +1170,7 @@
                     onRenameInput={handleRenameInput}
                     onRenameBlur={handleRenameInputBlur}
                     onRenameKeyDown={handleRenameInputKeyDown}
+                    onSavePreset={onSaveDevicePreset}
                     onHeaderPointerDown={(event) => handleDeviceHeaderPointerDown(event, col.device.id)}
                     onHeaderClick={(event) => handleDeviceHeaderClick(event, col.device.id)}
                     onHeaderContextMenu={(event) => handleDeviceHeaderContextMenu(event, col.device.id)}
@@ -1062,6 +1186,15 @@
                     onclick={handleGroupToggleClick}
                     onchange={(event) => handleGroupEnabledChange(event, col.groupId)}
                   />
+                  <button
+                    class="preset-save-button"
+                    type="button"
+                    aria-label={`Save preset for ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
+                    title={`Save preset for ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
+                    onpointerdown={handleGroupSavePointerDown}
+                    onclick={(event) => handleGroupSaveClick(event, col.groupId)}
+                    oncontextmenu={handleGroupSaveContextMenu}
+                  ></button>
                   <span class="group-label">{resolveGroupDisplayName(groupDisplayNameById, col.groupId)}</span>
                 {/if}
               </div>

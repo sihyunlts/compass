@@ -12,4 +12,6 @@ export const IPC_CHANNELS = {
   requestPreviewGuideEnabledUpdate: 'preview:request-guide-enabled-update',
   previewGuideEnabledUpdate: 'preview:guide-enabled-update',
   openExternal: 'bridge:open-external',
+  savePresetFile: 'preset:save-file',
+  openPresetFile: 'preset:open-file',
 } as const;
