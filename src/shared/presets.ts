@@ -1,3 +1,4 @@
+import { isRendererDeviceKind } from '../devices/schema-registry';
 import type { GeneratorChain, GeneratorDeviceNode } from './model';
 
 export const PRESET_FILE_SCHEMA_VERSION = 1 as const;
@@ -47,11 +48,63 @@ export type ParsedPresetFileResult =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
+const isModulationTargetLike = (value: unknown): boolean =>
+  value === null
+  || (
+    isRecord(value)
+    && typeof value.deviceId === 'string'
+    && typeof value.paramKey === 'string'
+  );
+
+const isCurveNodeLike = (value: unknown): boolean =>
+  isRecord(value)
+  && typeof value.id === 'string'
+  && typeof value.t === 'number'
+  && Number.isFinite(value.t)
+  && typeof value.v === 'number'
+  && Number.isFinite(value.v);
+
+const isModulationCurveLike = (value: unknown): boolean =>
+  isRecord(value)
+  && Array.isArray(value.nodes)
+  && value.nodes.every(isCurveNodeLike);
+
 const isDeviceLike = (value: unknown): value is GeneratorDeviceNode =>
   isRecord(value)
   && typeof value.id === 'string'
   && typeof value.kind === 'string'
-  && typeof value.enabled === 'boolean';
+  && isRendererDeviceKind(value.kind)
+  && typeof value.enabled === 'boolean'
+  && (
+    value.kind === 'reverse'
+    || (
+      isRecord(value.params)
+      && (
+        value.kind === 'waterdrop'
+        || value.kind === 'scanner'
+        || value.kind === 'spiral'
+        || value.kind === 'mirror'
+        || value.kind === 'symmetry'
+        || value.kind === 'rotate'
+      )
+    )
+    || (
+      value.kind === 'mask'
+      && isRecord(value.params)
+      && Array.isArray(value.params.tiles)
+    )
+    || (
+      value.kind === 'color'
+      && isRecord(value.params)
+      && Array.isArray(value.params.velocities)
+    )
+    || (
+      value.kind === 'modulator'
+      && isRecord(value.params)
+      && isModulationTargetLike(value.params.target)
+      && isModulationCurveLike(value.params.curve)
+    )
+  );
 
 const isGroupLike = (
   value: unknown,

@@ -6,6 +6,11 @@ const cloneCurve = (curve: ModulationCurve): ModulationCurve => ({
   nodes: curve.nodes.map((node) => ({ ...node })),
 });
 
+const assertUnsupportedDeviceKind = (device: never): never => {
+  const kind = (device as { kind?: unknown }).kind;
+  throw new Error(`Unsupported device kind: ${String(kind ?? 'unknown')}`);
+};
+
 export const cloneDeviceNode = (
   device: GeneratorDeviceNode,
 ): GeneratorDeviceNode => {
@@ -126,12 +131,16 @@ export const cloneDeviceNode = (
     };
   }
 
-  return {
-    id: device.id,
-    kind: 'rotate',
-    enabled: device.enabled,
-    groupId: device.groupId ?? null,
-    name: device.name ?? null,
-    params: { ...device.params },
-  };
+  if (device.kind === 'rotate') {
+    return {
+      id: device.id,
+      kind: 'rotate',
+      enabled: device.enabled,
+      groupId: device.groupId ?? null,
+      name: device.name ?? null,
+      params: { ...device.params },
+    };
+  }
+
+  return assertUnsupportedDeviceKind(device);
 };
