@@ -18,8 +18,6 @@ export type ChainHistoryKind =
   | 'duplicate'
   | 'insert-device-preset'
   | 'insert-group-preset'
-  | 'load-device-preset'
-  | 'load-group-preset'
   | 'load-rack-preset'
   | 'control-edit'
   | 'center-picker-edit'

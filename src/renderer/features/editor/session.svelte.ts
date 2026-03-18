@@ -71,8 +71,6 @@ import {
   renameGroupById,
 } from './naming';
 import {
-  applyDevicePresetFile,
-  applyGroupPresetFile,
   applyRackPresetFile,
   insertDevicePresetFile,
   insertGroupPresetFile,
@@ -299,18 +297,10 @@ export class EditorSession {
       this.renameDevice(deviceId, rawName),
     renameGroup: (groupId: string, rawName: string): boolean =>
       this.renameGroup(groupId, rawName),
-    applyDevicePreset: (
-      deviceId: string,
-      preset: DevicePresetFile,
-    ): PresetApplyResult => this.applyDevicePreset(deviceId, preset),
     insertDevicePreset: (
       dropZone: RackDropZone,
       preset: DevicePresetFile,
     ): PresetApplyResult => this.insertDevicePreset(dropZone, preset),
-    applyGroupPreset: (
-      groupId: string,
-      preset: GroupPresetFile,
-    ): PresetApplyResult => this.applyGroupPreset(groupId, preset),
     insertGroupPreset: (
       dropZone: RackDropZone,
       preset: GroupPresetFile,
@@ -584,19 +574,6 @@ export class EditorSession {
     return true;
   }
 
-  private applyDevicePreset(
-    deviceId: string,
-    preset: DevicePresetFile,
-  ): PresetApplyResult {
-    const result = applyDevicePresetFile(this.state.chainState, deviceId, preset);
-    if (!result.ok) {
-      return result;
-    }
-
-    this.applyChainMutation(result.chain, EDITOR_HISTORY_META.loadDevicePreset);
-    return result;
-  }
-
   private insertDevicePreset(
     dropZone: RackDropZone,
     preset: DevicePresetFile,
@@ -612,24 +589,6 @@ export class EditorSession {
     }
 
     this.applyChainMutation(result.chain, EDITOR_HISTORY_META.insertDevicePreset);
-    return result;
-  }
-
-  private applyGroupPreset(
-    groupId: string,
-    preset: GroupPresetFile,
-  ): PresetApplyResult {
-    const result = applyGroupPresetFile(
-      this.state.chainState,
-      groupId,
-      preset,
-      (kind) => allocateDeviceNodeId(kind),
-    );
-    if (!result.ok) {
-      return result;
-    }
-
-    this.applyChainMutation(result.chain, EDITOR_HISTORY_META.loadGroupPreset);
     return result;
   }
 

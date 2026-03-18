@@ -14,7 +14,6 @@ import {
   type GeneratorChain,
   type GeneratorDeviceNode,
 } from '../../../shared/model';
-import type { RackPresetDropTargets } from '../../components/device-rack-types';
 import {
   buildDeviceDisplayNameById,
   buildGroupDisplayNameById,
@@ -24,11 +23,6 @@ import {
   coerceOutsideTargetIdToGroupBoundaryByDevices,
   type RackDropZone,
 } from '../rack/drop-ops';
-import { normalizeOptionalId } from '../../../shared/normalize-id';
-import {
-  cloneDevicesWithFreshIds,
-  remapInternalDeviceReferences,
-} from './device-reference-remap';
 import {
   createRackClipboard,
   prepareClipboardInsert,
@@ -37,7 +31,6 @@ import {
   reconcileGroupStateById,
   resolveNextGroupId,
   resolveDevicesByIds,
-  resolveGroupMemberIds,
 } from './chain-ops';
 
 export type PresetApplyResult =
@@ -45,38 +38,6 @@ export type PresetApplyResult =
       ok: true;
       chain: GeneratorChain;
       message: string;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export type PresetDropIntent =
-  | {
-      kind: 'insert-device-preset';
-      dropZone: RackDropZone;
-      preset: DevicePresetFile;
-    }
-  | {
-      kind: 'replace-device-preset';
-      deviceId: string;
-      preset: DevicePresetFile;
-    }
-  | {
-      kind: 'insert-group-preset';
-      dropZone: RackDropZone;
-      preset: GroupPresetFile;
-    }
-  | {
-      kind: 'replace-group-preset';
-      groupId: string;
-      preset: GroupPresetFile;
-    };
-
-type PresetDropIntentResult =
-  | {
-      ok: true;
-      intent: PresetDropIntent;
     }
   | {
       ok: false;
@@ -224,53 +185,6 @@ export const buildRackPresetFile = (
   chain: cloneChainForIpc(chain),
 });
 
-export const applyDevicePresetFile = (
-  chain: GeneratorChain,
-  deviceId: string,
-  preset: DevicePresetFile,
-): PresetApplyResult => {
-  const current = chain.devices.find((device) => device.id === deviceId) ?? null;
-  if (!current) {
-    return {
-      ok: false,
-      message: 'Selected device is no longer available.',
-    };
-  }
-
-  if (current.kind !== preset.device.kind) {
-    return {
-      ok: false,
-      message: 'Device preset kind does not match the selected device.',
-    };
-  }
-
-  const nextDevices = chain.devices.map((device) => {
-    if (device.id !== deviceId) {
-      return device;
-    }
-
-    const cloned = cloneDeviceNode(preset.device);
-    remapInternalDeviceReferences(
-      cloned,
-      new Map<string, string>(),
-      undefined,
-      CLEAR_UNRESOLVED_IMPORT_REFERENCES,
-    );
-    cloned.id = current.id;
-    cloned.groupId = current.groupId ?? null;
-    return cloned;
-  });
-
-  return {
-    ok: true,
-    chain: sanitizeGeneratorChain({
-      ...chain,
-      devices: nextDevices,
-    }),
-    message: 'Device preset loaded.',
-  };
-};
-
 export const insertDevicePresetFile = (
   chain: GeneratorChain,
   dropZone: RackDropZone,
@@ -289,77 +203,6 @@ export const insertDevicePresetFile = (
     ok: true,
     chain: buildChainWithPreparedPresetInsert(chain, dropZone, prepared),
     message: 'Device preset inserted.',
-  };
-};
-
-export const applyGroupPresetFile = (
-  chain: GeneratorChain,
-  groupId: string,
-  preset: GroupPresetFile,
-  allocateDeviceId: (kind: GeneratorDeviceNode['kind']) => string,
-): PresetApplyResult => {
-  const currentMemberIds = resolveGroupMemberIds(chain.devices, groupId);
-  if (currentMemberIds.length === 0) {
-    return {
-      ok: false,
-      message: 'Selected group is no longer available.',
-    };
-  }
-
-  if (preset.group.devices.length === 0) {
-    return {
-      ok: false,
-      message: 'Group preset does not contain any devices.',
-    };
-  }
-
-  const firstIndex = chain.devices.findIndex((device) => device.id === currentMemberIds[0]);
-  const remainingDevices = chain.devices.filter(
-    (device) => !currentMemberIds.includes(device.id),
-  );
-  const { devices: clonedDevices, idMap } = cloneDevicesWithFreshIds(
-    preset.group.devices,
-    allocateDeviceId,
-  );
-  const groupIdMap: Record<string, string> = {};
-  for (const source of preset.group.devices) {
-    const sourceGroupId = normalizeOptionalId(source.groupId);
-    if (!sourceGroupId) {
-      continue;
-    }
-
-    groupIdMap[sourceGroupId] = groupId;
-  }
-
-  for (const device of clonedDevices) {
-    remapInternalDeviceReferences(
-      device,
-      idMap,
-      groupIdMap,
-      CLEAR_UNRESOLVED_IMPORT_REFERENCES,
-    );
-    device.groupId = groupId;
-  }
-
-  const nextDevices = [...remainingDevices];
-  nextDevices.splice(firstIndex, 0, ...clonedDevices);
-  const nextGroupStateById = reconcileGroupStateById(
-    chain.groupStateById,
-    nextDevices,
-  );
-  nextGroupStateById[groupId] = {
-    enabled: preset.group.enabled,
-    name: preset.group.name,
-  };
-
-  return {
-    ok: true,
-    chain: sanitizeGeneratorChain({
-      ...chain,
-      devices: nextDevices,
-      groupStateById: nextGroupStateById,
-    }),
-    message: 'Group preset loaded.',
   };
 };
 
@@ -410,71 +253,5 @@ export const applyRackPresetFile = (
     ok: true,
     chain,
     message: 'Rack preset loaded.',
-  };
-};
-
-export const resolvePresetDropIntent = (
-  chain: GeneratorChain,
-  targets: RackPresetDropTargets,
-  preset: DevicePresetFile | GroupPresetFile,
-): PresetDropIntentResult => {
-  if (preset.presetType === 'device') {
-    const hoveredDevice = targets.hoveredDeviceId
-      ? chain.devices.find((device) => device.id === targets.hoveredDeviceId) ?? null
-      : null;
-    if (hoveredDevice && hoveredDevice.kind === preset.device.kind) {
-      return {
-        ok: true,
-        intent: {
-          kind: 'replace-device-preset',
-          deviceId: hoveredDevice.id,
-          preset,
-        },
-      };
-    }
-
-    if (!targets.dropZone) {
-      return {
-        ok: false,
-        message: 'Drop the preset onto the rack to load it.',
-      };
-    }
-
-    return {
-      ok: true,
-      intent: {
-        kind: 'insert-device-preset',
-        dropZone: targets.dropZone,
-        preset,
-      },
-    };
-  }
-
-  const hoveredGroupId = normalizeOptionalId(targets.hoveredGroupId);
-  if (hoveredGroupId && resolveGroupMemberIds(chain.devices, hoveredGroupId).length > 0) {
-    return {
-      ok: true,
-      intent: {
-        kind: 'replace-group-preset',
-        groupId: hoveredGroupId,
-        preset,
-      },
-    };
-  }
-
-  if (!targets.dropZone) {
-    return {
-      ok: false,
-      message: 'Drop the preset onto the rack to load it.',
-    };
-  }
-
-  return {
-    ok: true,
-    intent: {
-      kind: 'insert-group-preset',
-      dropZone: targets.dropZone,
-      preset,
-    },
   };
 };

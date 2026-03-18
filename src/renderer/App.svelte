@@ -37,7 +37,6 @@
     buildDevicePresetFile,
     buildGroupPresetFile,
     buildRackPresetFile,
-    resolvePresetDropIntent,
     resolveDevicePresetSuggestedName,
     resolveGroupPresetSuggestedName,
   } from './features/editor/presets';
@@ -356,35 +355,20 @@
       return;
     }
 
-    const intent = resolvePresetDropIntent(
-      uiState.chainState,
-      payload.targets,
-      parsed.preset,
-    );
-    if (intent.ok === false) {
-      showPresetMessage(intent.message);
+    if (!payload.targets.dropZone) {
+      showPresetMessage('Drop the preset onto the rack to load it.');
       return;
     }
 
-    const result = intent.intent.kind === 'replace-device-preset'
-      ? editorSession.commands.applyDevicePreset(
-        intent.intent.deviceId,
-        intent.intent.preset,
+    const result = parsed.preset.presetType === 'device'
+      ? editorSession.commands.insertDevicePreset(
+        payload.targets.dropZone,
+        parsed.preset,
       )
-      : intent.intent.kind === 'replace-group-preset'
-        ? editorSession.commands.applyGroupPreset(
-          intent.intent.groupId,
-          intent.intent.preset,
-        )
-        : intent.intent.kind === 'insert-device-preset'
-          ? editorSession.commands.insertDevicePreset(
-            intent.intent.dropZone,
-            intent.intent.preset,
-          )
-          : editorSession.commands.insertGroupPreset(
-            intent.intent.dropZone,
-            intent.intent.preset,
-          );
+      : editorSession.commands.insertGroupPreset(
+        payload.targets.dropZone,
+        parsed.preset,
+      );
     showPresetMessage(result.message);
   };
 
