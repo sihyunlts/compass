@@ -9,6 +9,7 @@ import {
 import {
   cloneChainForIpc,
   cloneDeviceNode,
+  hydrateImportedGeneratorChain,
   sanitizeGeneratorChain,
   type GeneratorChain,
   type GeneratorDeviceNode,
@@ -383,11 +384,21 @@ export const insertGroupPresetFile = (
 
 export const applyRackPresetFile = (
   preset: RackPresetFile,
-): PresetApplyResult => ({
-  ok: true,
-  chain: sanitizeGeneratorChain(preset.chain),
-  message: 'Rack preset loaded.',
-});
+): PresetApplyResult => {
+  const chain = hydrateImportedGeneratorChain(preset.chain);
+  if (!chain) {
+    return {
+      ok: false,
+      message: 'Rack preset data is invalid.',
+    };
+  }
+
+  return {
+    ok: true,
+    chain,
+    message: 'Rack preset loaded.',
+  };
+};
 
 export const resolvePresetDropIntent = (
   chain: GeneratorChain,

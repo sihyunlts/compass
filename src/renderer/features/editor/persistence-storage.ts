@@ -1,6 +1,6 @@
 import type { BridgeSettings } from '../../../shared/bridge/types';
 import {
-  sanitizeGeneratorChain,
+  hydrateImportedGeneratorChain,
   type GeneratorChain,
   type LaunchpadModel,
 } from '../../../shared/model';
@@ -129,13 +129,13 @@ export const saveBridgeSettings = (bridge: BridgeSettings): void => {
 /** Loads persisted chain state or returns defaults when stored data is malformed. */
 export const loadChainSettings = (): GeneratorChain => {
   const chain = readPersistedState().chain;
-  if (!chain || !Array.isArray(chain.devices) || !isRecord(chain.groupStateById)) {
+  const hydrated = hydrateImportedGeneratorChain(chain);
+  if (!hydrated) {
     return createDefaultChain();
   }
 
-  const sanitized = sanitizeGeneratorChain(chain);
-  syncDeviceNodeIdSeeds(sanitized.devices);
-  return sanitized;
+  syncDeviceNodeIdSeeds(hydrated.devices);
+  return hydrated;
 };
 
 /** Persists chain settings as provided by the renderer. */
