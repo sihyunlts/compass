@@ -3,6 +3,7 @@ import { cloneDeviceNode, type GeneratorDeviceNode } from '../../../shared/model
 import {
   cloneDevicesWithFreshIds,
   remapInternalDeviceReferences,
+  type UnresolvedReferencePolicy,
 } from './device-reference-remap';
 
 export type RackClipboard =
@@ -30,6 +31,7 @@ type PreparedClipboardInsert = {
 type PrepareClipboardInsertOptions = {
   allocateDeviceId: (kind: GeneratorDeviceNode['kind']) => string;
   resolveNextGroupId: () => string;
+  unresolvedReferencePolicy?: UnresolvedReferencePolicy;
 };
 
 const cloneClipboardDevices = (
@@ -64,6 +66,7 @@ export const prepareClipboardInsert = (
   clipboard: RackClipboard,
   options: PrepareClipboardInsertOptions,
 ): PreparedClipboardInsert => {
+  const unresolvedReferencePolicy = options.unresolvedReferencePolicy ?? 'preserve';
   const { devices: cloned, idMap } = cloneDevicesWithFreshIds(
     clipboard.devices,
     options.allocateDeviceId,
@@ -81,7 +84,12 @@ export const prepareClipboardInsert = (
     }
 
     for (const device of cloned) {
-      remapInternalDeviceReferences(device, idMap, groupIdMap);
+      remapInternalDeviceReferences(
+        device,
+        idMap,
+        groupIdMap,
+        unresolvedReferencePolicy,
+      );
     }
 
     return {
@@ -96,7 +104,12 @@ export const prepareClipboardInsert = (
   }
 
   for (const device of cloned) {
-    remapInternalDeviceReferences(device, idMap);
+    remapInternalDeviceReferences(
+      device,
+      idMap,
+      undefined,
+      unresolvedReferencePolicy,
+    );
   }
 
   return {

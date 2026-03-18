@@ -3,6 +3,7 @@ import { normalizeOptionalId } from '../../../shared/normalize-id';
 
 type IdMap = ReadonlyMap<string, string>;
 type GroupIdMap = Readonly<Record<string, string>>;
+export type UnresolvedReferencePolicy = 'preserve' | 'clear';
 
 export const cloneDevicesWithFreshIds = (
   devices: readonly GeneratorDeviceNode[],
@@ -39,6 +40,7 @@ export const remapInternalDeviceReferences = (
   device: GeneratorDeviceNode,
   idMap: IdMap,
   groupIdMap?: GroupIdMap,
+  unresolvedReferencePolicy: UnresolvedReferencePolicy = 'preserve',
 ): void => {
   if (device.kind === 'modulator') {
     const target = device.params.target;
@@ -49,7 +51,13 @@ export const remapInternalDeviceReferences = (
     const remappedId = idMap.get(target.deviceId) ?? null;
     if (remappedId) {
       target.deviceId = remappedId;
+      return;
     }
+
+    if (unresolvedReferencePolicy === 'clear') {
+      device.params.target = null;
+    }
+
     return;
   }
 
@@ -66,6 +74,11 @@ export const remapInternalDeviceReferences = (
     const remappedId = idMap.get(sourceId) ?? null;
     if (remappedId) {
       device.params.sourceId = remappedId;
+      return;
+    }
+
+    if (unresolvedReferencePolicy === 'clear') {
+      device.params.sourceId = null;
     }
     return;
   }
@@ -74,6 +87,11 @@ export const remapInternalDeviceReferences = (
     const remappedGroupId = readMappedGroupId(sourceId, groupIdMap);
     if (remappedGroupId) {
       device.params.sourceId = remappedGroupId;
+      return;
+    }
+
+    if (unresolvedReferencePolicy === 'clear') {
+      device.params.sourceId = null;
     }
   }
 };

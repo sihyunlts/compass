@@ -84,6 +84,7 @@ type PresetDropIntentResult =
     };
 
 const createSavedAtIso = (): string => new Date().toISOString();
+const CLEAR_UNRESOLVED_IMPORT_REFERENCES = 'clear' as const;
 
 const buildPreparedPresetInsert = (
   chain: GeneratorChain,
@@ -104,6 +105,7 @@ const buildPreparedPresetInsert = (
   return prepareClipboardInsert(clipboard, {
     allocateDeviceId,
     resolveNextGroupId: () => resolveNextGroupId(chain.devices),
+    unresolvedReferencePolicy: CLEAR_UNRESOLVED_IMPORT_REFERENCES,
   });
 };
 
@@ -248,6 +250,12 @@ export const applyDevicePresetFile = (
     }
 
     const cloned = cloneDeviceNode(preset.device);
+    remapInternalDeviceReferences(
+      cloned,
+      new Map<string, string>(),
+      undefined,
+      CLEAR_UNRESOLVED_IMPORT_REFERENCES,
+    );
     cloned.id = current.id;
     cloned.groupId = current.groupId ?? null;
     return cloned;
@@ -324,7 +332,12 @@ export const applyGroupPresetFile = (
   }
 
   for (const device of clonedDevices) {
-    remapInternalDeviceReferences(device, idMap, groupIdMap);
+    remapInternalDeviceReferences(
+      device,
+      idMap,
+      groupIdMap,
+      CLEAR_UNRESOLVED_IMPORT_REFERENCES,
+    );
     device.groupId = groupId;
   }
 
