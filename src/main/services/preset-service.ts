@@ -101,6 +101,31 @@ const resolveDialogOptions = (
   };
 };
 
+const isSavePresetFileRequest = (
+  value: unknown,
+): value is SavePresetFileRequest =>
+  typeof value === 'object'
+  && value !== null
+  && typeof (value as { presetType?: unknown }).presetType === 'string'
+  && (
+    (value as { presetType: string }).presetType === 'device'
+    || (value as { presetType: string }).presetType === 'group'
+    || (value as { presetType: string }).presetType === 'rack'
+  )
+  && typeof (value as { suggestedName?: unknown }).suggestedName === 'string'
+  && isPresetFile((value as { payload?: unknown }).payload);
+
+const isOpenPresetFileRequest = (
+  value: unknown,
+): value is OpenPresetFileRequest =>
+  typeof value === 'object'
+  && value !== null
+  && (
+    (value as { presetType?: unknown }).presetType === 'device'
+    || (value as { presetType?: unknown }).presetType === 'group'
+    || (value as { presetType?: unknown }).presetType === 'rack'
+  );
+
 /** Handles preset file dialogs and JSON serialization for preset payloads. */
 export class PresetService {
   private async resolvePresetDirectory(
@@ -117,9 +142,16 @@ export class PresetService {
   }
 
   public async savePresetFile(
-    request: SavePresetFileRequest,
+    request: unknown,
     parentWindow?: BaseWindow,
   ): Promise<SavePresetFileResponse> {
+    if (!isSavePresetFileRequest(request)) {
+      return {
+        status: 'error',
+        message: 'Invalid preset save request.',
+      };
+    }
+
     if (!isPresetFile(request.payload) || request.payload.presetType !== request.presetType) {
       return {
         status: 'error',
@@ -127,107 +159,108 @@ export class PresetService {
       };
     }
 
-    const spec = PRESET_FILE_SPECS[request.presetType];
-    const directory = await this.resolvePresetDirectory(request.presetType);
-    const suggestedFileName = `${sanitizeFileStem(
-      request.suggestedName,
-      spec.defaultName,
-    )}${spec.extension}`;
-    const dialogOptions: SaveDialogOptions = {
-      ...resolveDialogOptions(
-        request.presetType,
-        path.join(directory, suggestedFileName),
-      ),
-      buttonLabel: 'Save',
-      properties: ['createDirectory'],
-      title: `Save ${spec.defaultName}`,
-    };
-
-    const result = parentWindow
-      ? await dialog.showSaveDialog(parentWindow, dialogOptions)
-      : await dialog.showSaveDialog(dialogOptions);
-    if (result.canceled || !result.filePath) {
-      return { status: 'canceled' };
-    }
-
-    const filePath = ensurePresetExtension(result.filePath, spec.extension);
-
     try {
+      const spec = PRESET_FILE_SPECS[request.presetType];
+      const directory = await this.resolvePresetDirectory(request.presetType);
+      const suggestedFileName = `${sanitizeFileStem(
+        request.suggestedName,
+        spec.defaultName,
+      )}${spec.extension}`;
+      const dialogOptions: SaveDialogOptions = {
+        ...resolveDialogOptions(
+          request.presetType,
+          path.join(directory, suggestedFileName),
+        ),
+        buttonLabel: 'Save',
+        properties: ['createDirectory'],
+        title: `Save ${spec.defaultName}`,
+      };
+
+      const result = parentWindow
+        ? await dialog.showSaveDialog(parentWindow, dialogOptions)
+        : await dialog.showSaveDialog(dialogOptions);
+      if (result.canceled || !result.filePath) {
+        return { status: 'canceled' };
+      }
+
+      const filePath = ensurePresetExtension(result.filePath, spec.extension);
       await writeFile(
         filePath,
         `${JSON.stringify(request.payload, null, 2)}\n`,
         'utf8',
       );
+      return {
+        status: 'saved',
+        filePath,
+      };
     } catch (error) {
       return {
         status: 'error',
         message: toErrorMessage(error, 'Failed to save preset file.'),
-        filePath,
       };
     }
-
-    return {
-      status: 'saved',
-      filePath,
-    };
   }
 
   public async openPresetFile(
-    request: OpenPresetFileRequest,
+    request: unknown,
     parentWindow?: BaseWindow,
   ): Promise<OpenPresetFileResponse> {
-    const spec = PRESET_FILE_SPECS[request.presetType];
-    const directory = await this.resolvePresetDirectory(request.presetType);
-    const dialogOptions: OpenDialogOptions = {
-      ...resolveDialogOptions(request.presetType, directory),
-      buttonLabel: 'Open',
-      properties: ['openFile'],
-      title: `Open ${spec.defaultName}`,
-    };
-
-    const result = parentWindow
-      ? await dialog.showOpenDialog(parentWindow, dialogOptions)
-      : await dialog.showOpenDialog(dialogOptions);
-    const filePath = result.filePaths[0] ?? '';
-    if (result.canceled || !filePath) {
-      return { status: 'canceled' };
-    }
-
-    if (!hasPresetExtension(filePath, spec.extension)) {
+    if (!isOpenPresetFileRequest(request)) {
       return {
         status: 'error',
-        message: `Expected a ${spec.extension} file.`,
-        filePath,
+        message: 'Invalid preset open request.',
       };
     }
 
-    let text: string;
     try {
-      text = await readFile(filePath, 'utf8');
+      const spec = PRESET_FILE_SPECS[request.presetType];
+      const directory = await this.resolvePresetDirectory(request.presetType);
+      const dialogOptions: OpenDialogOptions = {
+        ...resolveDialogOptions(request.presetType, directory),
+        buttonLabel: 'Open',
+        properties: ['openFile'],
+        title: `Open ${spec.defaultName}`,
+      };
+
+      const result = parentWindow
+        ? await dialog.showOpenDialog(parentWindow, dialogOptions)
+        : await dialog.showOpenDialog(dialogOptions);
+      const filePath = result.filePaths[0] ?? '';
+      if (result.canceled || !filePath) {
+        return { status: 'canceled' };
+      }
+
+      if (!hasPresetExtension(filePath, spec.extension)) {
+        return {
+          status: 'error',
+          message: `Expected a ${spec.extension} file.`,
+          filePath,
+        };
+      }
+
+      const text = await readFile(filePath, 'utf8');
+      const parsed = parsePresetFileText(text, {
+        fileName: filePath,
+        expectedType: request.presetType,
+      });
+      if (parsed.ok === false) {
+        return {
+          status: 'error',
+          message: parsed.message,
+          filePath,
+        };
+      }
+
+      return {
+        status: 'opened',
+        filePath,
+        payload: parsed.preset,
+      };
     } catch (error) {
       return {
         status: 'error',
         message: toErrorMessage(error, 'Failed to read preset file.'),
-        filePath,
       };
     }
-
-    const parsed = parsePresetFileText(text, {
-      fileName: filePath,
-      expectedType: request.presetType,
-    });
-    if (parsed.ok === false) {
-      return {
-        status: 'error',
-        message: parsed.message,
-        filePath,
-      };
-    }
-
-    return {
-      status: 'opened',
-      filePath,
-      payload: parsed.preset,
-    };
   }
 }
