@@ -1,4 +1,5 @@
 import {
+  formatInvalidHydratedDeviceWarning,
   hydrateImportedGeneratorChain,
   hydrateImportedGeneratorDevice,
   hydrateImportedGeneratorDevices,
@@ -69,11 +70,6 @@ const isPresetFileHeader = (
   && isPresetFileKind(value.presetType)
   && typeof value.savedAtIso === 'string';
 
-const formatDroppedDeviceWarning = (invalidDeviceCount: number): string | undefined =>
-  invalidDeviceCount > 0
-    ? `Skipped ${invalidDeviceCount} invalid ${invalidDeviceCount === 1 ? 'device' : 'devices'} while importing preset.`
-    : undefined;
-
 interface ParsedPresetPayload {
   preset: PresetFile;
   warning?: string;
@@ -143,7 +139,10 @@ const parseGroupPresetFile = (
         devices: hydratedDevices.devices,
       },
     },
-    warning: formatDroppedDeviceWarning(hydratedDevices.invalidDeviceCount),
+    warning: formatInvalidHydratedDeviceWarning(
+      hydratedDevices.invalidDeviceCount,
+      'importing preset',
+    ),
   };
 };
 
@@ -178,7 +177,10 @@ const parseRackPresetFile = (
       savedAtIso: value.savedAtIso,
       chain: hydratedChain.chain,
     },
-    warning: formatDroppedDeviceWarning(hydratedChain.invalidDeviceCount),
+    warning: formatInvalidHydratedDeviceWarning(
+      hydratedChain.invalidDeviceCount,
+      'importing preset',
+    ),
   };
 };
 

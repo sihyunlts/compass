@@ -388,6 +388,9 @@
   onMount(() => {
     editorSession.commands.initialize();
     playbackSession.initialize();
+    if (uiState.headerIndicatorText.trim()) {
+      headerIndicator.show(uiState.headerIndicatorText);
+    }
     const disposeBridgeSubscriptions = mountBridgeSubscriptions({
       bridgeClient,
       playbackSession,

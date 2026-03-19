@@ -1,5 +1,6 @@
 import type { BridgeSettings } from '../../../shared/bridge/types';
 import {
+  formatInvalidHydratedDeviceWarning,
   hydrateImportedGeneratorChain,
   type GeneratorChain,
   type LaunchpadModel,
@@ -38,6 +39,11 @@ interface PersistedState {
     collapsedDeviceIds?: string[];
     launchpadModel?: LaunchpadModel;
   };
+}
+
+export interface LoadedChainSettingsResult {
+  chain: GeneratorChain;
+  warning?: string;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -127,17 +133,33 @@ export const saveBridgeSettings = (bridge: BridgeSettings): void => {
 };
 
 /** Loads persisted chain state or returns defaults when stored data is malformed. */
-export const loadChainSettings = (): GeneratorChain => {
+export const loadChainSettings = (): LoadedChainSettingsResult => {
   const chain = readPersistedState().chain;
   const hydrated = hydrateImportedGeneratorChain(chain, {
-    rejectInvalidDevices: true,
+    rejectInvalidDevices: false,
   });
   if (!hydrated) {
-    return createDefaultChain();
+    return {
+      chain: createDefaultChain(),
+    };
   }
 
   syncDeviceNodeIdSeeds(hydrated.chain.devices);
-  return hydrated.chain;
+  const warning = formatInvalidHydratedDeviceWarning(
+    hydrated.invalidDeviceCount,
+    'restoring the saved rack',
+  );
+  if (warning) {
+    writePersistedState((previous) => ({
+      ...previous,
+      chain: hydrated.chain,
+    }));
+  }
+
+  return {
+    chain: hydrated.chain,
+    warning,
+  };
 };
 
 /** Persists chain settings as provided by the renderer. */

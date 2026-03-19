@@ -220,6 +220,14 @@ export interface HydratedGeneratorDevicesResult {
   invalidDeviceCount: number;
 }
 
+export const formatInvalidHydratedDeviceWarning = (
+  invalidDeviceCount: number,
+  action: string,
+): string | undefined =>
+  invalidDeviceCount > 0
+    ? `Skipped ${invalidDeviceCount} invalid ${invalidDeviceCount === 1 ? 'device' : 'devices'} while ${action}.`
+    : undefined;
+
 export const hydrateImportedGeneratorDevices = (
   value: unknown,
   options: {

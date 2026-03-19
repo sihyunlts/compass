@@ -20,11 +20,12 @@ import type { EditorSessionState } from './session.svelte';
 
 export const createInitialEditorState = (): EditorSessionState => {
   const bridge = loadBridgeSettings();
+  const loadedChain = loadChainSettings();
   return {
-    chainState: loadChainSettings(),
+    chainState: loadedChain.chain,
     chainRevision: 1,
     launchpadModel: loadLaunchpadModel(),
-    headerIndicatorText: '',
+    headerIndicatorText: loadedChain.warning ?? '',
     paletteNameText: 'Default palette: loading...',
     isSettingsOpen: false,
     previewBpm: loadPreviewBpm(),
