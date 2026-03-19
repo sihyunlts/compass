@@ -32,7 +32,7 @@ import {
   resolveNextGroupId,
   resolveDevicesByIds,
 } from './chain-ops';
-import { hydrateExternalGeneratorChain } from './imported-chain';
+import { syncDeviceNodeIdSeeds } from './device-node-factory';
 
 export type PresetApplyResult =
   | {
@@ -329,17 +329,10 @@ export const replaceGroupPresetFile = (
 export const applyRackPresetFile = (
   preset: RackPresetFile,
 ): PresetApplyResult => {
-  const chain = hydrateExternalGeneratorChain(preset.chain);
-  if (!chain) {
-    return {
-      ok: false,
-      message: 'Rack preset data is invalid.',
-    };
-  }
-
+  syncDeviceNodeIdSeeds(preset.chain.devices);
   return {
     ok: true,
-    chain,
+    chain: preset.chain,
     message: 'Rack preset loaded.',
   };
 };

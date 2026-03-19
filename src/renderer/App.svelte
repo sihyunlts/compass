@@ -327,7 +327,9 @@
       }
 
       const result = editorSession.commands.applyRackPreset(response.payload);
-      showPresetMessage(result.message);
+      showPresetMessage(
+        response.warning ? `${result.message} | ${response.warning}` : result.message,
+      );
     }, 'Rack preset load failed.');
   };
 
@@ -378,7 +380,9 @@
           payload.targets.dropZone,
           parsed.preset,
         );
-    showPresetMessage(result.message);
+    showPresetMessage(
+      parsed.warning ? `${result.message} | ${parsed.warning}` : result.message,
+    );
   };
 
   onMount(() => {

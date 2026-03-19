@@ -1,5 +1,10 @@
-import { isRendererDeviceKind } from '../devices/schema-registry';
-import type { GeneratorChain, GeneratorDeviceNode } from './model';
+import {
+  hydrateImportedGeneratorChain,
+  hydrateImportedGeneratorDevice,
+  hydrateImportedGeneratorDevices,
+  type GeneratorChain,
+  type GeneratorDeviceNode,
+} from './model';
 
 export const PRESET_FILE_SCHEMA_VERSION = 1 as const;
 
@@ -39,6 +44,7 @@ export type ParsedPresetFileResult =
   | {
       ok: true;
       preset: PresetFile;
+      warning?: string;
     }
   | {
       ok: false;
@@ -48,107 +54,143 @@ export type ParsedPresetFileResult =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-const isModulationTargetLike = (value: unknown): boolean =>
-  value === null
-  || (
-    isRecord(value)
-    && typeof value.deviceId === 'string'
-    && typeof value.paramKey === 'string'
-  );
-
-const isCurveNodeLike = (value: unknown): boolean =>
-  isRecord(value)
-  && typeof value.id === 'string'
-  && typeof value.t === 'number'
-  && Number.isFinite(value.t)
-  && typeof value.v === 'number'
-  && Number.isFinite(value.v);
-
-const isModulationCurveLike = (value: unknown): boolean =>
-  isRecord(value)
-  && Array.isArray(value.nodes)
-  && value.nodes.every(isCurveNodeLike);
-
-const isDeviceLike = (value: unknown): value is GeneratorDeviceNode =>
-  isRecord(value)
-  && typeof value.id === 'string'
-  && typeof value.kind === 'string'
-  && isRendererDeviceKind(value.kind)
-  && typeof value.enabled === 'boolean'
-  && (
-    value.kind === 'reverse'
-    || (
-      isRecord(value.params)
-      && (
-        value.kind === 'waterdrop'
-        || value.kind === 'scanner'
-        || value.kind === 'spiral'
-        || value.kind === 'mirror'
-        || value.kind === 'symmetry'
-        || value.kind === 'rotate'
-      )
-    )
-    || (
-      value.kind === 'mask'
-      && isRecord(value.params)
-      && Array.isArray(value.params.tiles)
-    )
-    || (
-      value.kind === 'color'
-      && isRecord(value.params)
-      && Array.isArray(value.params.velocities)
-    )
-    || (
-      value.kind === 'modulator'
-      && isRecord(value.params)
-      && isModulationTargetLike(value.params.target)
-      && isModulationCurveLike(value.params.curve)
-    )
-  );
-
-const isGroupLike = (
-  value: unknown,
-): value is GroupPresetFile['group'] =>
-  isRecord(value)
-  && typeof value.enabled === 'boolean'
-  && (value.name === null || typeof value.name === 'string')
-  && Array.isArray(value.devices)
-  && value.devices.every(isDeviceLike);
-
-const isChainLike = (value: unknown): value is GeneratorChain =>
-  isRecord(value)
-  && Array.isArray(value.devices)
-  && value.devices.every(isDeviceLike)
-  && isRecord(value.groupStateById);
-
 export const isPresetFileKind = (value: unknown): value is PresetFileKind =>
   value === 'device' || value === 'group' || value === 'rack';
 
-export const isDevicePresetFile = (value: unknown): value is DevicePresetFile =>
+const isPresetFileHeader = (
+  value: unknown,
+): value is {
+  schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
+  presetType: PresetFileKind;
+  savedAtIso: string;
+} =>
   isRecord(value)
   && value.schemaVersion === PRESET_FILE_SCHEMA_VERSION
-  && value.presetType === 'device'
-  && typeof value.savedAtIso === 'string'
-  && isDeviceLike(value.device);
+  && isPresetFileKind(value.presetType)
+  && typeof value.savedAtIso === 'string';
 
-export const isGroupPresetFile = (value: unknown): value is GroupPresetFile =>
-  isRecord(value)
-  && value.schemaVersion === PRESET_FILE_SCHEMA_VERSION
-  && value.presetType === 'group'
-  && typeof value.savedAtIso === 'string'
-  && isGroupLike(value.group);
+const formatDroppedDeviceWarning = (invalidDeviceCount: number): string | undefined =>
+  invalidDeviceCount > 0
+    ? `Skipped ${invalidDeviceCount} invalid ${invalidDeviceCount === 1 ? 'device' : 'devices'} while importing preset.`
+    : undefined;
 
-export const isRackPresetFile = (value: unknown): value is RackPresetFile =>
-  isRecord(value)
-  && value.schemaVersion === PRESET_FILE_SCHEMA_VERSION
-  && value.presetType === 'rack'
-  && typeof value.savedAtIso === 'string'
-  && isChainLike(value.chain);
+interface ParsedPresetPayload {
+  preset: PresetFile;
+  warning?: string;
+}
 
-export const isPresetFile = (value: unknown): value is PresetFile =>
-  isDevicePresetFile(value)
-  || isGroupPresetFile(value)
-  || isRackPresetFile(value);
+const parseDevicePresetFile = (
+  value: unknown,
+): ParsedPresetPayload | null => {
+  if (!isPresetFileHeader(value) || value.presetType !== 'device') {
+    return null;
+  }
+
+  const device = hydrateImportedGeneratorDevice((value as { device?: unknown }).device);
+  if (!device) {
+    return null;
+  }
+
+  return {
+    preset: {
+      schemaVersion: value.schemaVersion,
+      presetType: value.presetType,
+      savedAtIso: value.savedAtIso,
+      device,
+    },
+  };
+};
+
+const parseGroupPresetFile = (
+  value: unknown,
+  options: {
+    rejectInvalidDevices?: boolean;
+  } = {},
+): ParsedPresetPayload | null => {
+  if (!isPresetFileHeader(value) || value.presetType !== 'group') {
+    return null;
+  }
+
+  const group = (value as { group?: unknown }).group;
+  if (
+    !isRecord(group)
+    || typeof group.enabled !== 'boolean'
+    || (group.name !== null && typeof group.name !== 'string')
+    || !Array.isArray(group.devices)
+  ) {
+    return null;
+  }
+
+  const hydratedDevices = hydrateImportedGeneratorDevices(group.devices, options);
+  if (!hydratedDevices) {
+    return null;
+  }
+  if (group.devices.length > 0 && hydratedDevices.devices.length === 0) {
+    return null;
+  }
+
+  const groupEnabled = group.enabled as boolean;
+  const groupName = group.name as string | null;
+
+  return {
+    preset: {
+      schemaVersion: value.schemaVersion,
+      presetType: value.presetType,
+      savedAtIso: value.savedAtIso,
+      group: {
+        enabled: groupEnabled,
+        name: groupName,
+        devices: hydratedDevices.devices,
+      },
+    },
+    warning: formatDroppedDeviceWarning(hydratedDevices.invalidDeviceCount),
+  };
+};
+
+const parseRackPresetFile = (
+  value: unknown,
+  options: {
+    rejectInvalidDevices?: boolean;
+  } = {},
+): ParsedPresetPayload | null => {
+  if (!isPresetFileHeader(value) || value.presetType !== 'rack') {
+    return null;
+  }
+
+  const hydratedChain = hydrateImportedGeneratorChain(
+    (value as { chain?: unknown }).chain,
+    options,
+  );
+  const sourceDevices = (value as {
+    chain?: { devices?: unknown };
+  }).chain?.devices;
+  if (
+    !hydratedChain
+    || (Array.isArray(sourceDevices) && sourceDevices.length > 0 && hydratedChain.chain.devices.length === 0)
+  ) {
+    return null;
+  }
+
+  return {
+    preset: {
+      schemaVersion: value.schemaVersion,
+      presetType: value.presetType,
+      savedAtIso: value.savedAtIso,
+      chain: hydratedChain.chain,
+    },
+    warning: formatDroppedDeviceWarning(hydratedChain.invalidDeviceCount),
+  };
+};
+
+export const parsePresetFile = (
+  value: unknown,
+  options: {
+    rejectInvalidDevices?: boolean;
+  } = {},
+): ParsedPresetPayload | null =>
+  parseDevicePresetFile(value)
+  ?? parseGroupPresetFile(value, options)
+  ?? parseRackPresetFile(value, options);
 
 export const resolvePresetFileKindFromName = (
   fileName: string,
@@ -194,21 +236,23 @@ export const parsePresetFileText = (
     };
   }
 
-  if (!isPresetFile(parsed)) {
+  const parsedPreset = parsePresetFile(parsed);
+  if (!parsedPreset) {
     return {
       ok: false,
       message: 'Invalid preset file format.',
     };
   }
 
-  if (extensionType && parsed.presetType !== extensionType) {
+  const { preset, warning } = parsedPreset;
+  if (extensionType && preset.presetType !== extensionType) {
     return {
       ok: false,
       message: 'Preset file extension does not match the preset payload.',
     };
   }
 
-  if (options.expectedType && parsed.presetType !== options.expectedType) {
+  if (options.expectedType && preset.presetType !== options.expectedType) {
     return {
       ok: false,
       message: `Expected a ${options.expectedType} preset file.`,
@@ -217,6 +261,7 @@ export const parsePresetFileText = (
 
   return {
     ok: true,
-    preset: parsed,
+    preset,
+    warning,
   };
 };

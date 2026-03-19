@@ -29,6 +29,7 @@ export type OpenPresetFileResponse =
       status: 'opened';
       filePath: string;
       payload: PresetFile;
+      warning?: string;
     }
   | {
       status: 'canceled';

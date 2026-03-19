@@ -28,6 +28,8 @@ export type {
 export type { ClipNote } from './clip';
 export { cloneChainForIpc } from './chain-clone';
 export {
+  hydrateImportedGeneratorDevices,
+  hydrateImportedGeneratorDevice,
   hydrateImportedGeneratorChain,
   reconcileChainGroupStateById,
   sanitizeGeneratorChain,
