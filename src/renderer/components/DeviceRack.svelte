@@ -1174,24 +1174,26 @@
                     onHeaderDoubleClick={(event) => handleDeviceHeaderDoubleClick(event, col.device.id)}
                   />
                 {:else if col.kind === 'left-rail'}
-                  <input
-                    class="group-enabled-toggle round-checkbox"
-                    type="checkbox"
-                    checked={col.enabled}
-                    aria-label={`${resolveGroupDisplayName(groupDisplayNameById, col.groupId)} enabled`}
-                    onpointerdown={handleGroupTogglePointerDown}
-                    onclick={handleGroupToggleClick}
-                    onchange={(event) => handleGroupEnabledChange(event, col.groupId)}
-                  />
-                  <button
-                    class="preset-save-button"
-                    type="button"
-                    aria-label={`Save preset for ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
-                    title={`Save preset for ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
-                    onpointerdown={handleGroupSavePointerDown}
-                    onclick={(event) => handleGroupSaveClick(event, col.groupId)}
-                    oncontextmenu={handleGroupSaveContextMenu}
-                  ></button>
+                  <div class="group-rail-controls">
+                    <input
+                      class="group-enabled-toggle round-checkbox"
+                      type="checkbox"
+                      checked={col.enabled}
+                      aria-label={`${resolveGroupDisplayName(groupDisplayNameById, col.groupId)} enabled`}
+                      onpointerdown={handleGroupTogglePointerDown}
+                      onclick={handleGroupToggleClick}
+                      onchange={(event) => handleGroupEnabledChange(event, col.groupId)}
+                    />
+                    <button
+                      class="preset-save-button"
+                      type="button"
+                      aria-label={`Save preset for ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
+                      title={`Save preset for ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
+                      onpointerdown={handleGroupSavePointerDown}
+                      onclick={(event) => handleGroupSaveClick(event, col.groupId)}
+                      oncontextmenu={handleGroupSaveContextMenu}
+                    ></button>
+                  </div>
                   <span class="group-label">{resolveGroupDisplayName(groupDisplayNameById, col.groupId)}</span>
                 {/if}
               </div>
@@ -1323,6 +1325,14 @@
     padding: var(--gap-10) var(--gap-6);
     gap: var(--gap-12);
     background: var(--neutral-10);
+  }
+
+  .group-rail-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--gap-6);
+    flex: 0 0 auto;
   }
 
   .group-rail-left {
