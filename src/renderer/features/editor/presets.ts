@@ -46,11 +46,23 @@ export type PresetApplyResult =
       message: string;
     };
 
+export type GroupPresetApplyResult =
+  | {
+      ok: true;
+      chain: GeneratorChain;
+      groupId: string;
+      message: string;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
 export type GroupPresetReplaceResult =
   | {
       ok: true;
       chain: GeneratorChain;
-      insertedDeviceIds: string[];
+      groupId: string;
       message: string;
     }
   | {
@@ -229,7 +241,7 @@ export const insertGroupPresetFile = (
   dropZone: RackDropZone,
   preset: GroupPresetFile,
   allocateDeviceId: (kind: GeneratorDeviceNode['kind']) => string,
-): PresetApplyResult => {
+): GroupPresetApplyResult => {
   if (preset.group.devices.length === 0) {
     return {
       ok: false,
@@ -244,9 +256,17 @@ export const insertGroupPresetFile = (
       message: 'Group preset could not be inserted.',
     };
   }
+  const groupId = prepared.groupStatePatch?.groupId ?? prepared.forcedGroupId;
+  if (!groupId) {
+    return {
+      ok: false,
+      message: 'Group preset could not be inserted.',
+    };
+  }
 
   return {
     ok: true,
+    groupId,
     chain: buildChainWithPreparedPresetInsert(
       chain,
       coerceGroupInsertDropZone(chain, dropZone),
@@ -322,7 +342,7 @@ export const replaceGroupPresetFile = (
       devices: nextDevices,
       groupStateById: nextGroupStateById,
     }),
-    insertedDeviceIds: insertedDevices.map((device) => device.id),
+    groupId,
     message: 'Group preset replaced.',
   };
 };

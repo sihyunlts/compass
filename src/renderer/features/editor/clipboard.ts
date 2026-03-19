@@ -30,6 +30,11 @@ interface ClipboardContext {
     rawGroupId: string,
     meta?: ChainMutationMeta,
   ) => boolean;
+  applyInsertedSelection: (
+    clipboard: RackClipboard,
+    previousChain: EditorSessionState['chainState'],
+    nextChain: EditorSessionState['chainState'],
+  ) => void;
 }
 
 const getCurrentSelectionSnapshot = (
@@ -129,7 +134,13 @@ export const pasteClipboard = (
     clipboard,
     selection,
   );
+  const previousChain = context.state.chainState;
   context.applyChainMutation(nextChain, meta);
+  context.applyInsertedSelection(
+    clipboard,
+    previousChain,
+    nextChain,
+  );
   return true;
 };
 

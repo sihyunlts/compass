@@ -12,7 +12,6 @@ export interface RackScrollMetrics {
 
 export interface RackPresetDropTargets {
   dropZone: RackDropZone | null;
-  hoveredGroupId: string | null;
 }
 
 export interface RackPresetFileDrop {

@@ -12,6 +12,10 @@ export interface RackViewApi {
     deviceIds: readonly string[],
     orderedDeviceIds?: readonly string[],
   ): void;
+  setSelectedGroupIds(
+    groupIds: readonly string[],
+    orderedGroupIds?: readonly string[],
+  ): void;
   getSelectedGroupContexts(): GroupSelectionContext[];
   clearSelection(): void;
   startRenamingDevice(deviceId: string): boolean;
@@ -29,6 +33,7 @@ interface CreateRackViewApiOptions {
   rackSelection: RackSelection;
   getDevices: () => readonly GeneratorDeviceNode[];
   getOrderedDeviceIds: () => readonly string[];
+  getOrderedGroupIds: () => readonly string[];
   syncAfterRender: () => void;
   startRenamingDevice: (deviceId: string) => boolean;
   startRenamingGroup: (groupId: string) => boolean;
@@ -73,6 +78,14 @@ export const createRackViewApi = (
       anchorId,
       orderedDeviceIds,
     );
+  },
+  setSelectedGroupIds: (groupIds, orderedGroupIds = options.getOrderedGroupIds()) => {
+    options.rackSelection.clear();
+    if (groupIds.length === 0) {
+      return;
+    }
+
+    options.rackSelection.setSelectedGroupIds(groupIds, orderedGroupIds);
   },
   getSelectedGroupContexts: () =>
     options.rackSelection.getSelectedGroupContexts(options.getDevices()),

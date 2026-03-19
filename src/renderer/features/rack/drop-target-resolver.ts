@@ -99,32 +99,15 @@ export class RackDropTargetResolver {
     clientX: number,
     clientY: number,
   ): RackPresetDropTargets {
-    const dropZone = this.resolveChainDropZone({
+    return {
+      dropZone: this.resolveChainDropZone({
       sourceIds: [],
       sourceKind: 'devices',
       clientX,
       clientY,
       prevDropZone: null,
-    });
-
-    return {
-      dropZone,
-      hoveredGroupId: dropZone?.kind === 'inside-group'
-        ? this.resolveHoveredGroupId(clientX, clientY)
-        : null,
+      }),
     };
-  }
-
-  private resolveHoveredGroupId(
-    clientX: number,
-    clientY: number,
-  ): string | null {
-    const pointerElement = document.elementFromPoint(clientX, clientY);
-    if (!(pointerElement instanceof HTMLElement)) {
-      return null;
-    }
-
-    return pointerElement.closest<HTMLElement>(GROUP_SELECTOR)?.dataset.groupId ?? null;
   }
 
   private resolveInsideGroupContext(

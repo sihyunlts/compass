@@ -51,12 +51,10 @@ import {
   deleteGroup as deleteEditorGroup,
   groupCurrentSelection as groupEditorSelection,
   groupDeviceIds as groupEditorDeviceIds,
-  handoffDeviceSelection as handoffEditorDeviceSelection,
   toggleGroupEnabled as toggleEditorGroupEnabled,
   ungroupGroup as ungroupEditorGroup,
   ungroupSelectedGroups as ungroupEditorSelections,
 } from './grouping';
-import { resolveGroupMemberIds } from './chain-ops';
 import {
   createInitialEditorState,
   persistChainState as persistEditorChainState,
@@ -64,6 +62,7 @@ import {
   reconcileCurrentChainModulators as reconcileEditorChainModulators,
   toggleCollapse,
 } from './persistence';
+import { buildOrderedGroupIds } from '../rack/layout';
 import {
   allocateDeviceNodeId,
 } from './device-node-factory';
@@ -73,6 +72,7 @@ import {
 } from './naming';
 import {
   applyRackPresetFile,
+  type GroupPresetApplyResult,
   insertDevicePresetFile,
   insertGroupPresetFile,
   replaceGroupPresetFile,
@@ -123,6 +123,10 @@ export interface EditorRackBinding {
   setSelectedDeviceIds(
     ids: readonly string[],
     orderedDeviceIds?: readonly string[],
+  ): void;
+  setSelectedGroupIds(
+    ids: readonly string[],
+    orderedGroupIds?: readonly string[],
   ): void;
   applyNextSelectionAfterDelete(deviceIds: readonly string[]): void;
   clearSelection(): void;
@@ -212,10 +216,13 @@ export class EditorSession {
         return;
       }
 
+      const previousChain = this.state.chainState;
+      const nextChain = applyBrowserDeviceAdd(previousChain, kind);
       this.applyChainMutation(
-        applyBrowserDeviceAdd(this.state.chainState, kind),
+        nextChain,
         EDITOR_HISTORY_META.addDevice,
       );
+      this.selectInsertedDevices(previousChain, nextChain);
     },
     handleBrowserPointerDown: (payload: {
       kind: RendererDeviceKind;
@@ -229,7 +236,8 @@ export class EditorSession {
       );
     },
     handleRackCommit: (commit: RackInteractionCommit): void => {
-      const nextChain = applyRackCommit(this.state.chainState, commit);
+      const previousChain = this.state.chainState;
+      const nextChain = applyRackCommit(previousChain, commit);
       if (!nextChain) {
         return;
       }
@@ -240,6 +248,9 @@ export class EditorSession {
           ? EDITOR_HISTORY_META.moveDevices
           : EDITOR_HISTORY_META.insertDevice,
       );
+      if (commit.kind === 'insert') {
+        this.selectInsertedDevices(previousChain, nextChain);
+      }
     },
     toggleGroupEnabled: (groupId: string, nextEnabled: boolean): void => {
       toggleEditorGroupEnabled(this.buildGroupingContext(), groupId, nextEnabled);
@@ -311,7 +322,7 @@ export class EditorSession {
     insertGroupPreset: (
       dropZone: RackDropZone,
       preset: GroupPresetFile,
-    ): PresetApplyResult => this.insertGroupPreset(dropZone, preset),
+    ): GroupPresetApplyResult => this.insertGroupPreset(dropZone, preset),
     replaceGroupPreset: (
       groupId: string,
       preset: GroupPresetFile,
@@ -585,12 +596,55 @@ export class EditorSession {
     return true;
   }
 
+  private selectInsertedDevices(
+    previousChain: GeneratorChain,
+    nextChain: GeneratorChain,
+  ): void {
+    const previousDeviceIds = previousChain.devices.map((device) => device.id);
+    const insertedDeviceIds = nextChain.devices
+      .filter((device) => !previousDeviceIds.includes(device.id))
+      .map((device) => device.id);
+    if (insertedDeviceIds.length === 0) {
+      return;
+    }
+
+    this.rackBinding?.setSelectedDeviceIds(
+      insertedDeviceIds,
+      nextChain.devices.map((device) => device.id),
+    );
+  }
+
+  private selectGroupIds(
+    groupIds: readonly string[],
+    chain: GeneratorChain,
+  ): void {
+    if (groupIds.length === 0) {
+      return;
+    }
+
+    this.rackBinding?.setSelectedGroupIds(
+      groupIds,
+      buildOrderedGroupIds(chain.devices),
+    );
+  }
+
+  private selectInsertedGroups(
+    previousChain: GeneratorChain,
+    nextChain: GeneratorChain,
+  ): void {
+    const previousGroupIds = buildOrderedGroupIds(previousChain.devices);
+    const insertedGroupIds = buildOrderedGroupIds(nextChain.devices)
+      .filter((groupId) => !previousGroupIds.includes(groupId));
+    this.selectGroupIds(insertedGroupIds, nextChain);
+  }
+
   private insertDevicePreset(
     dropZone: RackDropZone,
     preset: DevicePresetFile,
   ): PresetApplyResult {
+    const previousChain = this.state.chainState;
     const result = insertDevicePresetFile(
-      this.state.chainState,
+      previousChain,
       dropZone,
       preset,
       (kind) => allocateDeviceNodeId(kind),
@@ -600,15 +654,17 @@ export class EditorSession {
     }
 
     this.applyChainMutation(result.chain, EDITOR_HISTORY_META.insertDevicePreset);
+    this.selectInsertedDevices(previousChain, result.chain);
     return result;
   }
 
   private insertGroupPreset(
     dropZone: RackDropZone,
     preset: GroupPresetFile,
-  ): PresetApplyResult {
+  ): GroupPresetApplyResult {
+    const previousChain = this.state.chainState;
     const result = insertGroupPresetFile(
-      this.state.chainState,
+      previousChain,
       dropZone,
       preset,
       (kind) => allocateDeviceNodeId(kind),
@@ -618,6 +674,7 @@ export class EditorSession {
     }
 
     this.applyChainMutation(result.chain, EDITOR_HISTORY_META.insertGroupPreset);
+    this.selectGroupIds([result.groupId], result.chain);
     return result;
   }
 
@@ -625,8 +682,9 @@ export class EditorSession {
     groupId: string,
     preset: GroupPresetFile,
   ): GroupPresetReplaceResult {
+    const previousChain = this.state.chainState;
     const result = replaceGroupPresetFile(
-      this.state.chainState,
+      previousChain,
       groupId,
       preset,
       (kind) => allocateDeviceNodeId(kind),
@@ -635,13 +693,8 @@ export class EditorSession {
       return result;
     }
 
-    handoffEditorDeviceSelection(
-      this.buildGroupingContext(),
-      resolveGroupMemberIds(this.state.chainState.devices, groupId),
-      result.insertedDeviceIds,
-      result.chain.devices.map((device) => device.id),
-    );
     this.applyChainMutation(result.chain, EDITOR_HISTORY_META.replaceGroupPreset);
+    this.selectGroupIds([result.groupId], result.chain);
     return result;
   }
 
@@ -653,6 +706,7 @@ export class EditorSession {
       return result;
     }
 
+    this.rackBinding?.clearSelection();
     this.applyChainMutation(result.chain, EDITOR_HISTORY_META.loadRackPreset);
     return result;
   }
@@ -699,6 +753,18 @@ export class EditorSession {
         groupId: string,
         meta?: ChainMutationMeta,
       ) => this.deleteGroup(groupId, meta),
+      applyInsertedSelection: (
+        clipboard: RackClipboard,
+        previousChain: EditorSessionState['chainState'],
+        nextChain: EditorSessionState['chainState'],
+      ) => {
+        if (clipboard.kind === 'group') {
+          this.selectInsertedGroups(previousChain, nextChain);
+          return;
+        }
+
+        this.selectInsertedDevices(previousChain, nextChain);
+      },
     };
   }
 }

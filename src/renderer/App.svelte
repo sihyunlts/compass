@@ -139,6 +139,9 @@
       setSelectedDeviceIds: (ids, orderedDeviceIds) => {
         rackViewApi?.setSelectedDeviceIds(ids, orderedDeviceIds);
       },
+      setSelectedGroupIds: (ids, orderedGroupIds) => {
+        rackViewApi?.setSelectedGroupIds(ids, orderedGroupIds);
+      },
       applyNextSelectionAfterDelete: (deviceIds) => {
         rackViewApi?.applyNextSelectionAfterDelete(deviceIds);
       },
@@ -388,7 +391,6 @@
         parsed.preset,
       )
       : payload.targets.dropZone.kind === 'inside-group'
-        && payload.targets.hoveredGroupId === payload.targets.dropZone.groupId
         ? editorSession.commands.replaceGroupPreset(
           payload.targets.dropZone.groupId,
           parsed.preset,

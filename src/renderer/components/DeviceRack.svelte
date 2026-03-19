@@ -243,7 +243,6 @@
     const targets = rackDragController?.resolveExternalFileDropTargets(clientX, clientY)
       ?? {
         dropZone: null,
-        hoveredGroupId: null,
       };
     dropIndicator?.sync({
       didMove: true,
@@ -495,6 +494,7 @@
     rackSelection,
     getDevices: () => devices,
     getOrderedDeviceIds: () => orderedDeviceIds,
+    getOrderedGroupIds: () => orderedGroupIds,
     syncAfterRender,
     startRenamingDevice,
     startRenamingGroup,
