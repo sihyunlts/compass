@@ -5,6 +5,7 @@ import type {
 } from '../../../shared/presets';
 import {
   PRESET_FILE_SCHEMA_VERSION,
+  toStandaloneDevicePresetDevice,
 } from '../../../shared/presets';
 import {
   cloneChainForIpc,
@@ -167,7 +168,7 @@ export const buildDevicePresetFile = (
     schemaVersion: PRESET_FILE_SCHEMA_VERSION,
     presetType: 'device',
     savedAtIso: createSavedAtIso(),
-    device: cloneDeviceNode(device),
+    device: toStandaloneDevicePresetDevice(device),
   };
 };
 

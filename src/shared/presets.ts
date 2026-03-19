@@ -1,4 +1,5 @@
 import {
+  cloneDeviceNode,
   formatInvalidHydratedDeviceWarning,
   hydrateImportedGeneratorChain,
   hydrateImportedGeneratorDevice,
@@ -75,6 +76,14 @@ interface ParsedPresetPayload {
   warning?: string;
 }
 
+export const toStandaloneDevicePresetDevice = (
+  device: GeneratorDeviceNode,
+): GeneratorDeviceNode => {
+  const next = cloneDeviceNode(device);
+  next.groupId = null;
+  return next;
+};
+
 const parseDevicePresetFile = (
   value: unknown,
 ): ParsedPresetPayload | null => {
@@ -92,7 +101,7 @@ const parseDevicePresetFile = (
       schemaVersion: value.schemaVersion,
       presetType: value.presetType,
       savedAtIso: value.savedAtIso,
-      device,
+      device: toStandaloneDevicePresetDevice(device),
     },
   };
 };
