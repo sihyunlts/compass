@@ -1,11 +1,13 @@
 import type { BridgeSettings } from '../../../shared/bridge/types';
 import {
-  formatInvalidHydratedDeviceWarning,
-  hydrateImportedGeneratorChain,
   type GeneratorChain,
   type LaunchpadModel,
 } from '../../../shared/model';
 import { clamp } from '../../../shared/math';
+import {
+  formatInvalidHydratedDeviceWarning,
+  hydrateImportedGeneratorChain,
+} from '../../../shared/model/chain-normalization';
 import {
   DEFAULT_BRIDGE_SETTINGS,
   sanitizeBridgeSettings,

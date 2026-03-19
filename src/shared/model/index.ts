@@ -27,14 +27,6 @@ export type {
 } from './chain';
 export type { ClipNote } from './clip';
 export { cloneChainForIpc } from './chain-clone';
-export {
-  formatInvalidHydratedDeviceWarning,
-  hydrateImportedGeneratorDevices,
-  hydrateImportedGeneratorDevice,
-  hydrateImportedGeneratorChain,
-  reconcileChainGroupStateById,
-  sanitizeGeneratorChain,
-} from './chain-normalization';
 export { cloneDeviceNode } from './device-clone';
 export {
   DEFAULT_GROUP_NAME_TEMPLATE,

@@ -10,10 +10,10 @@ import {
 import {
   cloneChainForIpc,
   cloneDeviceNode,
-  sanitizeGeneratorChain,
   type GeneratorChain,
   type GeneratorDeviceNode,
 } from '../../../shared/model';
+import { sanitizeGeneratorChain } from '../../../shared/model/chain-normalization';
 import {
   buildDeviceDisplayNameById,
   buildGroupDisplayNameById,

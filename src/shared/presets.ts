@@ -1,12 +1,14 @@
 import {
   cloneDeviceNode,
+  type GeneratorChain,
+  type GeneratorDeviceNode,
+} from './model';
+import {
   formatInvalidHydratedDeviceWarning,
   hydrateImportedGeneratorChain,
   hydrateImportedGeneratorDevice,
   hydrateImportedGeneratorDevices,
-  type GeneratorChain,
-  type GeneratorDeviceNode,
-} from './model';
+} from './model/chain-normalization';
 
 export const PRESET_FILE_SCHEMA_VERSION = 1 as const;
 

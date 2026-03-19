@@ -1,8 +1,4 @@
 import type { GeneratorDeviceNode } from '../shared/model';
-import {
-  getRendererModulationTargetParamDefinitions,
-  RENDERER_DEVICE_KINDS,
-} from './schema-registry';
 
 type DeviceKind = GeneratorDeviceNode['kind'];
 type DeviceNodeOfKind<K extends DeviceKind> = Extract<GeneratorDeviceNode, { kind: K }>;
@@ -11,27 +7,6 @@ type ModulationTargetDeviceKind = Exclude<
   DeviceKind,
   'reverse' | 'modulator' | 'symmetry' | 'mask' | 'color'
 >;
-
-const MODULATION_TARGET_DEVICE_KINDS = RENDERER_DEVICE_KINDS.filter(
-  (kind) => getRendererModulationTargetParamDefinitions(kind).length > 0,
-) as readonly ModulationTargetDeviceKind[];
-
-const MODULATION_TARGET_KIND_SET = new Set<ModulationTargetDeviceKind>(
-  MODULATION_TARGET_DEVICE_KINDS,
-);
-
-export const isModulationTargetDeviceKind = (
-  kind: DeviceKind,
-): kind is ModulationTargetDeviceKind =>
-  MODULATION_TARGET_KIND_SET.has(kind as ModulationTargetDeviceKind);
-
-export const isModulationTargetParamKey = (
-  kind: DeviceKind,
-  paramKey: string,
-): boolean =>
-  isModulationTargetDeviceKind(kind)
-    && getRendererModulationTargetParamDefinitions(kind)
-      .some((definition) => definition.key === paramKey);
 
 type NumericParamAccessor = {
   read: (device: GeneratorDeviceNode) => number;
@@ -125,6 +100,26 @@ const NUMERIC_PARAM_ACCESSORS: Record<
     },
   },
 };
+
+const MODULATION_TARGET_DEVICE_KINDS = Object.freeze(
+  Object.keys(NUMERIC_PARAM_ACCESSORS),
+) as readonly ModulationTargetDeviceKind[];
+
+const MODULATION_TARGET_KIND_SET = new Set<ModulationTargetDeviceKind>(
+  MODULATION_TARGET_DEVICE_KINDS,
+);
+
+export const isModulationTargetDeviceKind = (
+  kind: DeviceKind,
+): kind is ModulationTargetDeviceKind =>
+  MODULATION_TARGET_KIND_SET.has(kind as ModulationTargetDeviceKind);
+
+export const isModulationTargetParamKey = (
+  kind: DeviceKind,
+  paramKey: string,
+): boolean =>
+  isModulationTargetDeviceKind(kind)
+  && paramKey in NUMERIC_PARAM_ACCESSORS[kind];
 
 export const readNumericDeviceParam = (
   device: GeneratorDeviceNode,

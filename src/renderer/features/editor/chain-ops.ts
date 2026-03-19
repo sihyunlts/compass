@@ -1,9 +1,9 @@
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import {
-  reconcileChainGroupStateById,
   type GeneratorChain,
   type GeneratorDeviceNode,
 } from '../../../shared/model';
+import { reconcileChainGroupStateById } from '../../../shared/model/chain-normalization';
 
 const collectActiveGroupIds = (
   devices: readonly GeneratorDeviceNode[],
