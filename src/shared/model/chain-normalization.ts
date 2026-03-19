@@ -239,6 +239,7 @@ export const hydrateImportedGeneratorDevices = (
   }
 
   const devices: GeneratorDeviceNode[] = [];
+  const seenIds = new Set<string>();
   let invalidDeviceCount = 0;
   for (const device of value) {
     const hydrated = hydrateImportedGeneratorDevice(device);
@@ -250,6 +251,15 @@ export const hydrateImportedGeneratorDevices = (
       continue;
     }
 
+    if (seenIds.has(hydrated.id)) {
+      invalidDeviceCount += 1;
+      if (options.rejectInvalidDevices === true) {
+        return null;
+      }
+      continue;
+    }
+
+    seenIds.add(hydrated.id);
     devices.push(hydrated);
   }
 
