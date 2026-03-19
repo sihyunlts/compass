@@ -125,6 +125,7 @@ const parseGroupPresetFile = (
     || typeof group.enabled !== 'boolean'
     || (group.name !== null && typeof group.name !== 'string')
     || !Array.isArray(group.devices)
+    || group.devices.length === 0
   ) {
     return null;
   }
@@ -223,13 +224,14 @@ export const resolvePresetFileKindFromName = (
   return null;
 };
 
+interface ParsePresetFileTextOptions {
+  fileName?: string;
+  mode?: ImportedDataMode;
+}
+
 export const parsePresetFileText = (
   text: string,
-  options: {
-    fileName?: string;
-    expectedType?: PresetFileKind;
-    mode?: ImportedDataMode;
-  } = {},
+  options: ParsePresetFileTextOptions = {},
 ): ParsedPresetFileResult => {
   const extensionType = options.fileName
     ? resolvePresetFileKindFromName(options.fileName)
@@ -266,13 +268,6 @@ export const parsePresetFileText = (
     return {
       ok: false,
       message: 'Preset file extension does not match the preset payload.',
-    };
-  }
-
-  if (options.expectedType && preset.presetType !== options.expectedType) {
-    return {
-      ok: false,
-      message: `Expected a ${options.expectedType} preset file.`,
     };
   }
 

@@ -242,13 +242,6 @@ export const insertGroupPresetFile = (
   preset: GroupPresetFile,
   allocateDeviceId: (kind: GeneratorDeviceNode['kind']) => string,
 ): GroupPresetApplyResult => {
-  if (preset.group.devices.length === 0) {
-    return {
-      ok: false,
-      message: 'Group preset does not contain any devices.',
-    };
-  }
-
   const prepared = buildPreparedPresetInsert(chain, preset, allocateDeviceId);
   if (!prepared) {
     return {
@@ -287,13 +280,6 @@ export const replaceGroupPresetFile = (
     return {
       ok: false,
       message: 'Group preset could not be applied to this group.',
-    };
-  }
-
-  if (preset.group.devices.length === 0) {
-    return {
-      ok: false,
-      message: 'Group preset does not contain any devices.',
     };
   }
 

@@ -285,7 +285,6 @@
     await savePreset(
       payload
         ? {
-          presetType: 'device',
           suggestedName: resolveDevicePresetSuggestedName(uiState.chainState, deviceId),
           payload,
         }
@@ -304,7 +303,6 @@
     await savePreset(
       payload
         ? {
-          presetType: 'group',
           suggestedName: resolveGroupPresetSuggestedName(uiState.chainState, groupId),
           payload,
         }
@@ -320,7 +318,6 @@
   const handleSaveRackPreset = async (): Promise<void> => {
     await savePreset(
       {
-        presetType: 'rack',
         suggestedName: 'Rack Preset',
         payload: buildRackPresetFile(uiState.chainState),
       },
@@ -340,11 +337,6 @@
         if (response.status === 'error') {
           showPresetMessage(`Rack preset load failed | ${response.message}`);
         }
-        return;
-      }
-
-      if (response.payload.presetType !== 'rack') {
-        showPresetMessage('Preset type does not match the rack loader.');
         return;
       }
 

@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { IPC_CHANNELS } from './shared/contracts/ipc/channels';
+import type { PresetFileKind } from './shared/presets';
+import type {
+  OpenPresetFileRequest,
+  OpenPresetFileResponse,
+} from './shared/contracts/ipc/presets';
 import type { PreviewWindowState } from './shared/contracts/preview/window-state';
 import type { CompassApi } from './shared/contracts/ipc/api';
 import type { LiveTempoUpdate } from './shared/bridge/types';
@@ -92,8 +97,8 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.openExternal, url),
   savePresetFile: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.savePresetFile, request),
-  openPresetFile: (request) =>
-    ipcRenderer.invoke(IPC_CHANNELS.openPresetFile, request),
+  openPresetFile: <K extends PresetFileKind>(request: OpenPresetFileRequest<K>) =>
+    ipcRenderer.invoke(IPC_CHANNELS.openPresetFile, request) as Promise<OpenPresetFileResponse<K>>,
 };
 
 contextBridge.exposeInMainWorld('compass', api);

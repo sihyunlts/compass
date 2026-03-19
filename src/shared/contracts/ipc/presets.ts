@@ -1,10 +1,14 @@
 import type { PresetFile, PresetFileKind } from '../../presets';
 
 export interface SavePresetFileRequest {
-  presetType: PresetFileKind;
   suggestedName: string;
   payload: PresetFile;
 }
+
+export type PresetFileByKind<K extends PresetFileKind> = Extract<
+  PresetFile,
+  { presetType: K }
+>;
 
 export type SavePresetFileResponse =
   | {
@@ -20,15 +24,15 @@ export type SavePresetFileResponse =
       filePath?: string;
     };
 
-export interface OpenPresetFileRequest {
-  presetType: PresetFileKind;
+export interface OpenPresetFileRequest<K extends PresetFileKind = PresetFileKind> {
+  presetType: K;
 }
 
-export type OpenPresetFileResponse =
+export type OpenPresetFileResponse<K extends PresetFileKind = PresetFileKind> =
   | {
       status: 'opened';
       filePath: string;
-      payload: PresetFile;
+      payload: PresetFileByKind<K>;
       warning?: string;
     }
   | {

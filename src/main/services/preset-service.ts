@@ -19,7 +19,6 @@ import {
   parsePresetFile,
   parsePresetFileText,
   PRESET_FILE_EXTENSIONS,
-  type PresetFile,
   type PresetFileKind,
 } from '../../shared/presets';
 
@@ -105,26 +104,23 @@ const resolveDialogOptions = (
 
 const parseSavePresetFileRequest = (
   value: unknown,
-): (SavePresetFileRequest & { payload: PresetFile }) | null => {
+): SavePresetFileRequest | null => {
   if (
     typeof value !== 'object'
     || value === null
-    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
     || typeof (value as { suggestedName?: unknown }).suggestedName !== 'string'
   ) {
     return null;
   }
 
-  const presetType = (value as { presetType: PresetFileKind }).presetType;
   const payload = parsePresetFile((value as { payload?: unknown }).payload, {
     mode: 'strict',
   });
-  if (!payload || payload.warning || payload.preset.presetType !== presetType) {
+  if (!payload) {
     return null;
   }
 
   return {
-    presetType,
     suggestedName: (value as { suggestedName: string }).suggestedName,
     payload: payload.preset,
   };
@@ -167,15 +163,16 @@ export class PresetService {
     }
 
     try {
-      const spec = PRESET_FILE_SPECS[parsedRequest.presetType];
-      const directory = await this.resolvePresetDirectory(parsedRequest.presetType);
+      const presetType = parsedRequest.payload.presetType;
+      const spec = PRESET_FILE_SPECS[presetType];
+      const directory = await this.resolvePresetDirectory(presetType);
       const suggestedFileName = `${sanitizeFileStem(
         parsedRequest.suggestedName,
         spec.defaultName,
       )}${spec.extension}`;
       const dialogOptions: SaveDialogOptions = {
         ...resolveDialogOptions(
-          parsedRequest.presetType,
+          presetType,
           path.join(directory, suggestedFileName),
         ),
         buttonLabel: 'Save',
@@ -238,24 +235,22 @@ export class PresetService {
         return { status: 'canceled' };
       }
 
-      if (!hasPresetExtension(filePath, spec.extension)) {
-        return {
-          status: 'error',
-          message: `Expected a ${spec.extension} file.`,
-          filePath,
-        };
-      }
-
       const text = await readFile(filePath, 'utf8');
       const parsed = parsePresetFileText(text, {
         fileName: filePath,
-        expectedType: parsedRequest.presetType,
         mode: 'recover',
       });
       if (parsed.ok === false) {
         return {
           status: 'error',
           message: parsed.message,
+          filePath,
+        };
+      }
+      if (parsed.preset.presetType !== parsedRequest.presetType) {
+        return {
+          status: 'error',
+          message: `Expected a ${parsedRequest.presetType} preset file.`,
           filePath,
         };
       }
