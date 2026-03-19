@@ -269,6 +269,20 @@
     blurIfTextEditingElement(document.activeElement);
   };
 
+  const consumeSuppressedDeviceSelectionClick = (): boolean => {
+    if (!suppressDeviceSelectionClick) {
+      return false;
+    }
+
+    suppressDeviceSelectionClick = false;
+    return true;
+  };
+
+  const handleDeviceSavePreset = (deviceId: string): void => {
+    consumeSuppressedDeviceSelectionClick();
+    onSaveDevicePreset(deviceId);
+  };
+
   const selectDeviceForContextMenu = (deviceId: string): void => {
     if (selectedDeviceIds.includes(deviceId)) {
       return;
@@ -556,9 +570,7 @@
 
   function handleGroupToggleClick(event: MouseEvent) {
     event.stopPropagation();
-    if (suppressDeviceSelectionClick) {
-      suppressDeviceSelectionClick = false;
-    }
+    consumeSuppressedDeviceSelectionClick();
   }
 
   function handleGroupSavePointerDown(event: PointerEvent) {
@@ -567,10 +579,8 @@
 
   function handleGroupSaveClick(event: MouseEvent, groupId: string) {
     event.stopPropagation();
+    consumeSuppressedDeviceSelectionClick();
     onSaveGroupPreset(groupId);
-    if (suppressDeviceSelectionClick) {
-      suppressDeviceSelectionClick = false;
-    }
   }
 
   function handleGroupSaveContextMenu(event: MouseEvent) {
@@ -613,8 +623,7 @@
   function handleGroupRailClick(event: MouseEvent) {
     event.stopPropagation();
 
-    if (suppressDeviceSelectionClick) {
-      suppressDeviceSelectionClick = false;
+    if (consumeSuppressedDeviceSelectionClick()) {
       return;
     }
 
@@ -688,8 +697,7 @@
   function handleDeviceHeaderClick(event: MouseEvent, deviceId: string) {
     event.stopPropagation();
 
-    if (suppressDeviceSelectionClick) {
-      suppressDeviceSelectionClick = false;
+    if (consumeSuppressedDeviceSelectionClick()) {
       return;
     }
 
@@ -752,8 +760,7 @@
   }
 
   function handleChainClick(event: MouseEvent) {
-    if (suppressDeviceSelectionClick) {
-      suppressDeviceSelectionClick = false;
+    if (consumeSuppressedDeviceSelectionClick()) {
       return;
     }
 
@@ -1112,7 +1119,7 @@
             onRenameInput={handleRenameInput}
             onRenameBlur={handleRenameInputBlur}
             onRenameKeyDown={handleRenameInputKeyDown}
-            onSavePreset={onSaveDevicePreset}
+            onSavePreset={handleDeviceSavePreset}
             onHeaderPointerDown={(event) => handleDeviceHeaderPointerDown(event, item.device.id)}
             onHeaderClick={(event) => handleDeviceHeaderClick(event, item.device.id)}
             onHeaderContextMenu={(event) => handleDeviceHeaderContextMenu(event, item.device.id)}
@@ -1170,7 +1177,7 @@
                     onRenameInput={handleRenameInput}
                     onRenameBlur={handleRenameInputBlur}
                     onRenameKeyDown={handleRenameInputKeyDown}
-                    onSavePreset={onSaveDevicePreset}
+                    onSavePreset={handleDeviceSavePreset}
                     onHeaderPointerDown={(event) => handleDeviceHeaderPointerDown(event, col.device.id)}
                     onHeaderClick={(event) => handleDeviceHeaderClick(event, col.device.id)}
                     onHeaderContextMenu={(event) => handleDeviceHeaderContextMenu(event, col.device.id)}

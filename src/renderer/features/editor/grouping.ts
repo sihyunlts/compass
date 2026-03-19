@@ -22,12 +22,41 @@ interface GroupingContext {
   ) => void;
 }
 
+export const handoffDeviceSelection = (
+  context: GroupingContext,
+  removedDeviceIds: readonly string[],
+  replacementDeviceIds: readonly string[] = [],
+  nextOrderedDeviceIds?: readonly string[],
+): void => {
+  const rackBinding = context.rackBinding;
+  if (!rackBinding) {
+    return;
+  }
+
+  if (replacementDeviceIds.length === 0) {
+    rackBinding.applyNextSelectionAfterDelete(removedDeviceIds);
+    return;
+  }
+
+  const removedIdSet = new Set(removedDeviceIds);
+  const selectedDeviceIds = rackBinding.getOrderedSelectedDeviceIds();
+  if (!selectedDeviceIds.some((id) => removedIdSet.has(id))) {
+    return;
+  }
+
+  const preservedDeviceIds = selectedDeviceIds.filter((id) => !removedIdSet.has(id));
+  rackBinding.setSelectedDeviceIds(
+    [...preservedDeviceIds, ...replacementDeviceIds],
+    nextOrderedDeviceIds,
+  );
+};
+
 export const deleteDevicesById = (
   context: GroupingContext,
   deviceIds: readonly string[],
   meta: ChainMutationMeta = EDITOR_HISTORY_META.deleteDevices,
 ): boolean => {
-  context.rackBinding?.applyNextSelectionAfterDelete(deviceIds);
+  handoffDeviceSelection(context, deviceIds);
   const nextChain = removeDevicesById(context.state.chainState, deviceIds);
   if (!nextChain) {
     return false;

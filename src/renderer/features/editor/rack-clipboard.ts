@@ -31,6 +31,7 @@ type PreparedClipboardInsert = {
 type PrepareClipboardInsertOptions = {
   allocateDeviceId: (kind: GeneratorDeviceNode['kind']) => string;
   resolveNextGroupId: () => string;
+  groupIdOverride?: string | null;
   unresolvedReferencePolicy?: UnresolvedReferencePolicy;
 };
 
@@ -73,7 +74,8 @@ export const prepareClipboardInsert = (
   );
 
   if (clipboard.kind === 'group') {
-    const nextGroupId = options.resolveNextGroupId();
+    const nextGroupId =
+      normalizeOptionalId(options.groupIdOverride) ?? options.resolveNextGroupId();
     const groupIdMap: Record<string, string> = {};
     for (const source of clipboard.devices) {
       const sourceGroupId = normalizeOptionalId(source.groupId);

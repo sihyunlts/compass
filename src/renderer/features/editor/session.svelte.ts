@@ -51,10 +51,12 @@ import {
   deleteGroup as deleteEditorGroup,
   groupCurrentSelection as groupEditorSelection,
   groupDeviceIds as groupEditorDeviceIds,
+  handoffDeviceSelection as handoffEditorDeviceSelection,
   toggleGroupEnabled as toggleEditorGroupEnabled,
   ungroupGroup as ungroupEditorGroup,
   ungroupSelectedGroups as ungroupEditorSelections,
 } from './grouping';
+import { resolveGroupMemberIds } from './chain-ops';
 import {
   createInitialEditorState,
   persistChainState as persistEditorChainState,
@@ -64,7 +66,6 @@ import {
 } from './persistence';
 import {
   allocateDeviceNodeId,
-  syncDeviceNodeIdSeeds,
 } from './device-node-factory';
 import {
   renameDeviceById,
@@ -74,6 +75,8 @@ import {
   applyRackPresetFile,
   insertDevicePresetFile,
   insertGroupPresetFile,
+  replaceGroupPresetFile,
+  type GroupPresetReplaceResult,
   type PresetApplyResult,
 } from './presets';
 import type { RackClipboard } from './rack-clipboard';
@@ -117,6 +120,10 @@ export interface EditorRackBinding {
   getSelectedGroupContexts(): GroupSelectionContext[];
   getOrderedSelectedDeviceIds(): string[];
   selectAllDevices(ids: string[]): void;
+  setSelectedDeviceIds(
+    ids: readonly string[],
+    orderedDeviceIds?: readonly string[],
+  ): void;
   applyNextSelectionAfterDelete(deviceIds: readonly string[]): void;
   clearSelection(): void;
   syncAfterRender(): void;
@@ -305,6 +312,10 @@ export class EditorSession {
       dropZone: RackDropZone,
       preset: GroupPresetFile,
     ): PresetApplyResult => this.insertGroupPreset(dropZone, preset),
+    replaceGroupPreset: (
+      groupId: string,
+      preset: GroupPresetFile,
+    ): GroupPresetReplaceResult => this.replaceGroupPreset(groupId, preset),
     applyRackPreset: (
       preset: RackPresetFile,
     ): PresetApplyResult => this.applyRackPreset(preset),
@@ -610,6 +621,30 @@ export class EditorSession {
     return result;
   }
 
+  private replaceGroupPreset(
+    groupId: string,
+    preset: GroupPresetFile,
+  ): GroupPresetReplaceResult {
+    const result = replaceGroupPresetFile(
+      this.state.chainState,
+      groupId,
+      preset,
+      (kind) => allocateDeviceNodeId(kind),
+    );
+    if (!result.ok) {
+      return result;
+    }
+
+    handoffEditorDeviceSelection(
+      this.buildGroupingContext(),
+      resolveGroupMemberIds(this.state.chainState.devices, groupId),
+      result.insertedDeviceIds,
+      result.chain.devices.map((device) => device.id),
+    );
+    this.applyChainMutation(result.chain, EDITOR_HISTORY_META.replaceGroupPreset);
+    return result;
+  }
+
   private applyRackPreset(
     preset: RackPresetFile,
   ): PresetApplyResult {
@@ -618,7 +653,6 @@ export class EditorSession {
       return result;
     }
 
-    syncDeviceNodeIdSeeds(result.chain.devices);
     this.applyChainMutation(result.chain, EDITOR_HISTORY_META.loadRackPreset);
     return result;
   }

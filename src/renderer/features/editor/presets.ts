@@ -9,7 +9,6 @@ import {
 import {
   cloneChainForIpc,
   cloneDeviceNode,
-  hydrateImportedGeneratorChain,
   sanitizeGeneratorChain,
   type GeneratorChain,
   type GeneratorDeviceNode,
@@ -29,14 +28,28 @@ import {
 } from './rack-clipboard';
 import {
   reconcileGroupStateById,
+  resolveGroupMemberIds,
   resolveNextGroupId,
   resolveDevicesByIds,
 } from './chain-ops';
+import { hydrateExternalGeneratorChain } from './imported-chain';
 
 export type PresetApplyResult =
   | {
       ok: true;
       chain: GeneratorChain;
+      message: string;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+export type GroupPresetReplaceResult =
+  | {
+      ok: true;
+      chain: GeneratorChain;
+      insertedDeviceIds: string[];
       message: string;
     }
   | {
@@ -51,6 +64,9 @@ const buildPreparedPresetInsert = (
   chain: GeneratorChain,
   preset: DevicePresetFile | GroupPresetFile,
   allocateDeviceId: (kind: GeneratorDeviceNode['kind']) => string,
+  options: {
+    groupIdOverride?: string | null;
+  } = {},
 ) => {
   const clipboard = preset.presetType === 'group'
     ? createRackClipboard(preset.group.devices, {
@@ -66,6 +82,7 @@ const buildPreparedPresetInsert = (
   return prepareClipboardInsert(clipboard, {
     allocateDeviceId,
     resolveNextGroupId: () => resolveNextGroupId(chain.devices),
+    groupIdOverride: options.groupIdOverride,
     unresolvedReferencePolicy: CLEAR_UNRESOLVED_IMPORT_REFERENCES,
   });
 };
@@ -238,10 +255,81 @@ export const insertGroupPresetFile = (
   };
 };
 
+export const replaceGroupPresetFile = (
+  chain: GeneratorChain,
+  groupId: string,
+  preset: GroupPresetFile,
+  allocateDeviceId: (kind: GeneratorDeviceNode['kind']) => string,
+): GroupPresetReplaceResult => {
+  const memberIds = resolveGroupMemberIds(chain.devices, groupId);
+  if (memberIds.length === 0) {
+    return {
+      ok: false,
+      message: 'Group preset could not be applied to this group.',
+    };
+  }
+
+  if (preset.group.devices.length === 0) {
+    return {
+      ok: false,
+      message: 'Group preset does not contain any devices.',
+    };
+  }
+
+  const prepared = buildPreparedPresetInsert(chain, preset, allocateDeviceId, {
+    groupIdOverride: groupId,
+  });
+  if (!prepared) {
+    return {
+      ok: false,
+      message: 'Group preset could not be applied to this group.',
+    };
+  }
+
+  const memberIdSet = new Set(memberIds);
+  const replaceIndex = chain.devices.findIndex((device) => memberIdSet.has(device.id));
+  if (replaceIndex < 0) {
+    return {
+      ok: false,
+      message: 'Group preset could not be applied to this group.',
+    };
+  }
+
+  const insertedDevices = prepared.devices.map((device) => ({
+    ...device,
+    groupId: prepared.forcedGroupId,
+  }));
+  const remainingDevices = chain.devices.filter((device) => !memberIdSet.has(device.id));
+  const nextDevices = [...remainingDevices];
+  nextDevices.splice(replaceIndex, 0, ...insertedDevices);
+
+  const nextGroupStateById = reconcileGroupStateById(
+    chain.groupStateById,
+    nextDevices,
+  );
+  if (prepared.groupStatePatch) {
+    nextGroupStateById[prepared.groupStatePatch.groupId] = {
+      enabled: prepared.groupStatePatch.enabled,
+      name: prepared.groupStatePatch.name,
+    };
+  }
+
+  return {
+    ok: true,
+    chain: sanitizeGeneratorChain({
+      ...chain,
+      devices: nextDevices,
+      groupStateById: nextGroupStateById,
+    }),
+    insertedDeviceIds: insertedDevices.map((device) => device.id),
+    message: 'Group preset replaced.',
+  };
+};
+
 export const applyRackPresetFile = (
   preset: RackPresetFile,
 ): PresetApplyResult => {
-  const chain = hydrateImportedGeneratorChain(preset.chain);
+  const chain = hydrateExternalGeneratorChain(preset.chain);
   if (!chain) {
     return {
       ok: false,

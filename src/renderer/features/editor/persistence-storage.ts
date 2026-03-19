@@ -1,6 +1,5 @@
 import type { BridgeSettings } from '../../../shared/bridge/types';
 import {
-  hydrateImportedGeneratorChain,
   type GeneratorChain,
   type LaunchpadModel,
 } from '../../../shared/model';
@@ -11,8 +10,8 @@ import {
 } from '../../../shared/validation/bridge-settings';
 import {
   createInitialChainDevices,
-  syncDeviceNodeIdSeeds,
 } from './device-node-factory';
+import { hydrateExternalGeneratorChain } from './imported-chain';
 
 /** Editor persistence boundary for renderer localStorage-backed state. */
 
@@ -129,12 +128,11 @@ export const saveBridgeSettings = (bridge: BridgeSettings): void => {
 /** Loads persisted chain state or returns defaults when stored data is malformed. */
 export const loadChainSettings = (): GeneratorChain => {
   const chain = readPersistedState().chain;
-  const hydrated = hydrateImportedGeneratorChain(chain);
+  const hydrated = hydrateExternalGeneratorChain(chain);
   if (!hydrated) {
     return createDefaultChain();
   }
 
-  syncDeviceNodeIdSeeds(hydrated.devices);
   return hydrated;
 };
 

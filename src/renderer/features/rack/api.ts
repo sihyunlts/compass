@@ -8,6 +8,10 @@ export interface RackViewApi {
   applyNextSelectionAfterDelete(deletedIds: readonly string[]): void;
   getOrderedSelectedDeviceIds(): string[];
   selectAllDevices(deviceIds: readonly string[]): void;
+  setSelectedDeviceIds(
+    deviceIds: readonly string[],
+    orderedDeviceIds?: readonly string[],
+  ): void;
   getSelectedGroupContexts(): GroupSelectionContext[];
   clearSelection(): void;
   startRenamingDevice(deviceId: string): boolean;
@@ -60,6 +64,14 @@ export const createRackViewApi = (
       deviceIds,
       anchorId,
       options.getOrderedDeviceIds(),
+    );
+  },
+  setSelectedDeviceIds: (deviceIds, orderedDeviceIds = options.getOrderedDeviceIds()) => {
+    const anchorId = deviceIds[deviceIds.length - 1] ?? null;
+    options.rackSelection.selectDeviceIds(
+      deviceIds,
+      anchorId,
+      orderedDeviceIds,
     );
   },
   getSelectedGroupContexts: () =>

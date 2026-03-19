@@ -136,6 +136,9 @@
       selectAllDevices: (ids) => {
         rackViewApi?.selectAllDevices(ids);
       },
+      setSelectedDeviceIds: (ids, orderedDeviceIds) => {
+        rackViewApi?.setSelectedDeviceIds(ids, orderedDeviceIds);
+      },
       applyNextSelectionAfterDelete: (deviceIds) => {
         rackViewApi?.applyNextSelectionAfterDelete(deviceIds);
       },
@@ -365,10 +368,16 @@
         payload.targets.dropZone,
         parsed.preset,
       )
-      : editorSession.commands.insertGroupPreset(
-        payload.targets.dropZone,
-        parsed.preset,
-      );
+      : payload.targets.dropZone.kind === 'inside-group'
+        && payload.targets.hoveredGroupId === payload.targets.dropZone.groupId
+        ? editorSession.commands.replaceGroupPreset(
+          payload.targets.dropZone.groupId,
+          parsed.preset,
+        )
+        : editorSession.commands.insertGroupPreset(
+          payload.targets.dropZone,
+          parsed.preset,
+        );
     showPresetMessage(result.message);
   };
 
