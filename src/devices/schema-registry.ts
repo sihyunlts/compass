@@ -73,3 +73,9 @@ export const createRendererDeviceNode = <K extends RendererDeviceKind>(
   enabled = true,
 ): RendererDeviceNodeOfKind<K> =>
   getRendererDeviceSchema(kind).createDefaultNode(id, enabled);
+
+export const hydrateImportedRendererDeviceNode = <K extends RendererDeviceKind>(
+  kind: K,
+  source: Record<string, unknown>,
+): RendererDeviceNodeOfKind<K> | null =>
+  getRendererDeviceSchema(kind).hydrateImportedNode(source);

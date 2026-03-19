@@ -35,6 +35,10 @@ type RendererDeviceNodeFactory<K extends RendererDeviceKind = RendererDeviceKind
   enabled: boolean,
 ) => RendererDeviceNodeOfKind<K>;
 
+type ImportedRendererDeviceHydrator<K extends RendererDeviceKind = RendererDeviceKind> = (
+  source: Record<string, unknown>,
+) => RendererDeviceNodeOfKind<K> | null;
+
 export interface RendererDeviceSchema<K extends RendererDeviceKind = RendererDeviceKind> {
   kind: K;
   label: string;
@@ -42,6 +46,7 @@ export interface RendererDeviceSchema<K extends RendererDeviceKind = RendererDev
   modulationTargetParams?: readonly RendererModulationParamDefinition[];
   numericParamKeys?: readonly string[];
   createDefaultNode: RendererDeviceNodeFactory<K>;
+  hydrateImportedNode: ImportedRendererDeviceHydrator<K>;
 }
 
 export interface RendererDeviceDefinition<K extends RendererDeviceKind = RendererDeviceKind>
