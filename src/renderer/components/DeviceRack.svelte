@@ -242,7 +242,6 @@
 
   const EMPTY_PRESET_DROP_TARGETS: RackPresetDropTargets = {
     dropZone: null,
-    hoveredDeviceId: null,
     hoveredGroupId: null,
   };
 

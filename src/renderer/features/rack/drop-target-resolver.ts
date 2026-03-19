@@ -102,7 +102,6 @@ export class RackDropTargetResolver {
     if (!this.isPointWithinChainDropZone(clientX, clientY, false)) {
       return {
         dropZone: null,
-        hoveredDeviceId: null,
         hoveredGroupId: null,
       };
     }
@@ -115,21 +114,8 @@ export class RackDropTargetResolver {
         clientY,
         prevDropZone: null,
       }),
-      hoveredDeviceId: this.resolveHoveredDeviceId(clientX, clientY),
       hoveredGroupId: this.resolveHoveredGroupId(clientX, clientY),
     };
-  }
-
-  private resolveHoveredDeviceId(
-    clientX: number,
-    clientY: number,
-  ): string | null {
-    const pointerElement = document.elementFromPoint(clientX, clientY);
-    if (!(pointerElement instanceof HTMLElement)) {
-      return null;
-    }
-
-    return pointerElement.closest<HTMLElement>(DEVICE_CARD_SELECTOR)?.dataset.deviceId ?? null;
   }
 
   private resolveHoveredGroupId(
