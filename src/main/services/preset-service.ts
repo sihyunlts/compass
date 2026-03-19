@@ -8,6 +8,7 @@ import {
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { getRendererDeviceLabel } from '../../devices/schema-registry';
 import type {
   OpenPresetFileRequest,
   OpenPresetFileResponse,
@@ -22,23 +23,23 @@ import {
   type PresetFileKind,
 } from '../../shared/presets';
 
-const PRESET_ROOT_DIR_NAME = 'presets';
+const PRESET_ROOT_DIR_NAME = 'Presets';
 
 const PRESET_FILE_SPECS = {
   device: {
-    directory: 'devices',
+    directory: 'Devices',
     extension: PRESET_FILE_EXTENSIONS.device,
     filterName: 'Compass Device Presets',
     defaultName: 'Device Preset',
   },
   group: {
-    directory: 'groups',
+    directory: 'Groups',
     extension: PRESET_FILE_EXTENSIONS.group,
     filterName: 'Compass Group Presets',
     defaultName: 'Group Preset',
   },
   rack: {
-    directory: 'racks',
+    directory: 'Racks',
     extension: PRESET_FILE_EXTENSIONS.rack,
     filterName: 'Compass Rack Presets',
     defaultName: 'Rack Preset',
@@ -60,6 +61,21 @@ const sanitizeFileStem = (value: string, fallback: string): string => {
     .replace(/\s+/g, ' ')
     .trim();
   return sanitized || fallback;
+};
+
+const resolvePresetSaveDirectory = (
+  baseDirectory: string,
+  request: SavePresetFileRequest,
+): string => {
+  if (request.payload.presetType !== 'device') {
+    return baseDirectory;
+  }
+
+  const deviceDirectoryName = sanitizeFileStem(
+    getRendererDeviceLabel(request.payload.device.kind),
+    'Device',
+  );
+  return path.join(baseDirectory, deviceDirectoryName);
 };
 
 const hasPresetExtension = (
@@ -165,7 +181,9 @@ export class PresetService {
     try {
       const presetType = parsedRequest.payload.presetType;
       const spec = PRESET_FILE_SPECS[presetType];
-      const directory = await this.resolvePresetDirectory(presetType);
+      const baseDirectory = await this.resolvePresetDirectory(presetType);
+      const directory = resolvePresetSaveDirectory(baseDirectory, parsedRequest);
+      await mkdir(directory, { recursive: true });
       const suggestedFileName = `${sanitizeFileStem(
         parsedRequest.suggestedName,
         spec.defaultName,
