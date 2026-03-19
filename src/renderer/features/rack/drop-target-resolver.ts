@@ -99,22 +99,19 @@ export class RackDropTargetResolver {
     clientX: number,
     clientY: number,
   ): RackPresetDropTargets {
-    if (!this.isPointWithinChainDropZone(clientX, clientY, false)) {
-      return {
-        dropZone: null,
-        hoveredGroupId: null,
-      };
-    }
+    const dropZone = this.resolveChainDropZone({
+      sourceIds: [],
+      sourceKind: 'devices',
+      clientX,
+      clientY,
+      prevDropZone: null,
+    });
 
     return {
-      dropZone: this.resolveChainDropZone({
-        sourceIds: [],
-        sourceKind: 'devices',
-        clientX,
-        clientY,
-        prevDropZone: null,
-      }),
-      hoveredGroupId: this.resolveHoveredGroupId(clientX, clientY),
+      dropZone,
+      hoveredGroupId: dropZone?.kind === 'inside-group'
+        ? this.resolveHoveredGroupId(clientX, clientY)
+        : null,
     };
   }
 

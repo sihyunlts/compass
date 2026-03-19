@@ -233,24 +233,18 @@
     dropIndicator?.clear();
   };
 
-  const clearExternalFileDragState = (): void => {
-    externalFileDragDepth = 0;
-  };
-
   const isFileDragEvent = (event: DragEvent): boolean =>
     Array.from(event.dataTransfer?.types ?? []).includes('Files');
-
-  const EMPTY_PRESET_DROP_TARGETS: RackPresetDropTargets = {
-    dropZone: null,
-    hoveredGroupId: null,
-  };
 
   const syncExternalFileDropIndicator = (
     clientX: number,
     clientY: number,
   ): RackPresetDropTargets => {
     const targets = rackDragController?.resolveExternalFileDropTargets(clientX, clientY)
-      ?? EMPTY_PRESET_DROP_TARGETS;
+      ?? {
+        dropZone: null,
+        hoveredGroupId: null,
+      };
     dropIndicator?.sync({
       didMove: true,
       dropZone: targets.dropZone,
@@ -859,7 +853,7 @@
       event.clientX,
       event.clientY,
     );
-    clearExternalFileDragState();
+    externalFileDragDepth = 0;
     clearDropIndicator();
 
     if (!file) {

@@ -242,71 +242,90 @@
     }
   };
 
-  const handleSaveDevicePreset = async (deviceId: string): Promise<void> => {
+  const showPresetActionMessage = (
+    message: string,
+    warning?: string,
+  ): void => {
+    showPresetMessage(warning ? `${message} | ${warning}` : message);
+  };
+
+  const savePreset = async (
+    request: Parameters<typeof bridgeClient.savePresetFile>[0] | null,
+    options: {
+      emptyMessage?: string;
+      successMessage: string;
+      errorSummary: string;
+    },
+  ): Promise<void> => {
     await runPresetAction(async () => {
-      const payload = buildDevicePresetFile(uiState.chainState, deviceId);
-      if (!payload) {
-        showPresetMessage('Unable to build preset from this device.');
+      if (!request) {
+        if (options.emptyMessage) {
+          showPresetMessage(options.emptyMessage);
+        }
         return;
       }
 
-      const response = await bridgeClient.savePresetFile({
-        presetType: 'device',
-        suggestedName: resolveDevicePresetSuggestedName(uiState.chainState, deviceId),
-        payload,
-      });
+      const response = await bridgeClient.savePresetFile(request);
       if (response.status === 'saved') {
-        showPresetMessage('Device preset saved.');
+        showPresetMessage(options.successMessage);
         return;
       }
 
       if (response.status === 'error') {
-        showPresetMessage(`Preset save failed | ${response.message}`);
+        showPresetMessage(`${options.errorSummary} | ${response.message}`);
       }
-    }, 'Preset save failed.');
+    }, `${options.errorSummary}.`);
+  };
+
+  const handleSaveDevicePreset = async (deviceId: string): Promise<void> => {
+    const payload = buildDevicePresetFile(uiState.chainState, deviceId);
+    await savePreset(
+      payload
+        ? {
+          presetType: 'device',
+          suggestedName: resolveDevicePresetSuggestedName(uiState.chainState, deviceId),
+          payload,
+        }
+        : null,
+      {
+        emptyMessage: 'Unable to build preset from this device.',
+        successMessage: 'Device preset saved.',
+        errorSummary: 'Preset save failed',
+      },
+    );
   };
 
   const handleSaveGroupPreset = async (groupId: string): Promise<void> => {
-    await runPresetAction(async () => {
-      const memberDeviceIds = resolveGroupMemberIds(uiState.chainState.devices, groupId);
-      const payload = buildGroupPresetFile(uiState.chainState, groupId, memberDeviceIds);
-      if (!payload) {
-        showPresetMessage('Unable to build preset from this group.');
-        return;
-      }
-
-      const response = await bridgeClient.savePresetFile({
-        presetType: 'group',
-        suggestedName: resolveGroupPresetSuggestedName(uiState.chainState, groupId),
-        payload,
-      });
-      if (response.status === 'saved') {
-        showPresetMessage('Group preset saved.');
-        return;
-      }
-
-      if (response.status === 'error') {
-        showPresetMessage(`Preset save failed | ${response.message}`);
-      }
-    }, 'Preset save failed.');
+    const memberDeviceIds = resolveGroupMemberIds(uiState.chainState.devices, groupId);
+    const payload = buildGroupPresetFile(uiState.chainState, groupId, memberDeviceIds);
+    await savePreset(
+      payload
+        ? {
+          presetType: 'group',
+          suggestedName: resolveGroupPresetSuggestedName(uiState.chainState, groupId),
+          payload,
+        }
+        : null,
+      {
+        emptyMessage: 'Unable to build preset from this group.',
+        successMessage: 'Group preset saved.',
+        errorSummary: 'Preset save failed',
+      },
+    );
   };
 
   const handleSaveRackPreset = async (): Promise<void> => {
-    await runPresetAction(async () => {
-      const response = await bridgeClient.savePresetFile({
+    await savePreset(
+      {
         presetType: 'rack',
         suggestedName: 'Rack Preset',
         payload: buildRackPresetFile(uiState.chainState),
-      });
-      if (response.status === 'saved') {
-        showPresetMessage('Rack preset saved.');
-        return;
-      }
-
-      if (response.status === 'error') {
-        showPresetMessage(`Rack preset save failed | ${response.message}`);
-      }
-    }, 'Rack preset save failed.');
+      },
+      {
+        successMessage: 'Rack preset saved.',
+        errorSummary: 'Rack preset save failed',
+      },
+    );
   };
 
   const handleLoadRackPreset = async (): Promise<void> => {
@@ -327,9 +346,7 @@
       }
 
       const result = editorSession.commands.applyRackPreset(response.payload);
-      showPresetMessage(
-        response.warning ? `${result.message} | ${response.warning}` : result.message,
-      );
+      showPresetActionMessage(result.message, response.warning);
     }, 'Rack preset load failed.');
   };
 
@@ -380,9 +397,7 @@
           payload.targets.dropZone,
           parsed.preset,
         );
-    showPresetMessage(
-      parsed.warning ? `${result.message} | ${parsed.warning}` : result.message,
-    );
+    showPresetActionMessage(result.message, parsed.warning);
   };
 
   onMount(() => {
