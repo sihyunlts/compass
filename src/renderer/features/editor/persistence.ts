@@ -1,4 +1,3 @@
-import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
 import {
   loadBridgeSettings,
   loadChainSettings,
@@ -12,7 +11,6 @@ import {
   saveCollapsedDeviceIds,
   saveSidebarWidth,
 } from './persistence-storage';
-import { withDevices } from './chain-ops';
 import {
   resolveBridgeLengthLabel,
 } from './bridge-settings';
@@ -67,21 +65,6 @@ export const toggleCollapse = (
   saveCollapsedDeviceIds(next);
 };
 
-export const reconcileCurrentChainModulators = (
-  state: EditorSessionState,
-): boolean => {
-  const changed = reconcileGeneratorChainModulators(state.chainState);
-  if (!changed) {
-    return false;
-  }
-
-  state.chainState = withDevices(
-    state.chainState,
-    [...state.chainState.devices],
-  );
-  return true;
-};
-
 const pruneCollapsedDeviceIds = (state: EditorSessionState): void => {
   const validIds = state.chainState.devices.map((device) => device.id);
   const next = state.collapsedDeviceIds.filter((id) => validIds.includes(id));
@@ -97,7 +80,6 @@ export const persistChainState = (
   state: EditorSessionState,
   requestSyncAfterRender: () => void,
 ): void => {
-  reconcileCurrentChainModulators(state);
   pruneCollapsedDeviceIds(state);
   saveChainSettings(state.chainState);
   requestSyncAfterRender();

@@ -59,7 +59,6 @@ import {
   createInitialEditorState,
   persistChainState as persistEditorChainState,
   persistSidebarWidth,
-  reconcileCurrentChainModulators as reconcileEditorChainModulators,
   toggleCollapse,
 } from './persistence';
 import { buildOrderedGroupIds } from '../rack/layout';
@@ -176,8 +175,6 @@ export class EditorSession {
   public readonly commands = {
     initialize: (): void => {
       initializeHistoryBridge(this.state, this.history, {
-        reconcileCurrentChainModulators: () => this.reconcileCurrentChainModulators(),
-        bumpChainRevision: () => this.bumpChainRevision(),
         requestSyncAfterRender: () => this.requestSyncAfterRender(),
       });
     },
@@ -401,10 +398,6 @@ export class EditorSession {
 
   private bumpChainRevision(): void {
     this.state.chainRevision += 1;
-  }
-
-  private reconcileCurrentChainModulators(): boolean {
-    return reconcileEditorChainModulators(this.state);
   }
 
   private persistChainState(): void {

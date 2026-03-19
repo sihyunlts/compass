@@ -1,4 +1,5 @@
 import type { GeneratorChain } from '../../../shared/model';
+import { sanitizeGeneratorChain } from '../../../shared/model/chain-normalization';
 import type { ChainMutationMeta } from './history-core';
 import type { EditorHistory } from './editor-history';
 import type { EditorSessionState } from './session.svelte';
@@ -17,14 +18,10 @@ export const initializeHistoryBridge = (
   state: EditorSessionState,
   history: EditorHistory,
   options: {
-    reconcileCurrentChainModulators: () => boolean;
-    bumpChainRevision: () => void;
     requestSyncAfterRender: () => void;
   },
 ): void => {
-  if (options.reconcileCurrentChainModulators()) {
-    options.bumpChainRevision();
-  }
+  state.chainState = sanitizeGeneratorChain(state.chainState);
   history.replaceCurrent(state.chainState);
   syncHistoryState(state, history);
   options.requestSyncAfterRender();
@@ -40,10 +37,11 @@ export const saveChainWithHistory = (
     persistChainState: () => void;
   },
 ): void => {
-  state.chainState = chain;
+  const normalizedChain = sanitizeGeneratorChain(chain);
+  state.chainState = normalizedChain;
   options.bumpChainRevision();
   options.persistChainState();
-  history.push(chain, meta);
+  history.push(normalizedChain, meta);
   syncHistoryState(state, history);
 };
 
@@ -58,7 +56,7 @@ export const applyChainMutation = (
     scheduleAutoPreview: (delayMs?: number) => void;
   },
 ): void => {
-  state.chainState = nextChain;
+  state.chainState = sanitizeGeneratorChain(nextChain);
   options.persistChainState();
   options.bumpChainRevision();
   history.push(state.chainState, meta);
@@ -76,7 +74,7 @@ const restoreChainFromHistory = (
     scheduleAutoPreview: (delayMs?: number) => void;
   },
 ): void => {
-  state.chainState = chain;
+  state.chainState = sanitizeGeneratorChain(chain);
   options.persistChainState();
   options.bumpChainRevision();
   history.replaceCurrent(state.chainState);
