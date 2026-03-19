@@ -369,6 +369,7 @@
 
     const parsed = parsePresetFileText(fileText, {
       fileName: payload.file.name,
+      mode: 'recover',
     });
     if (parsed.ok === false) {
       showPresetMessage(`Preset load failed | ${parsed.message}`);

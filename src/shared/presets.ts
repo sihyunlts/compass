@@ -8,6 +8,7 @@ import {
   hydrateImportedGeneratorChain,
   hydrateImportedGeneratorDevice,
   hydrateImportedGeneratorDevices,
+  type ImportedDataMode,
 } from './model/chain-normalization';
 
 export const PRESET_FILE_SCHEMA_VERSION = 1 as const;
@@ -111,7 +112,7 @@ const parseDevicePresetFile = (
 const parseGroupPresetFile = (
   value: unknown,
   options: {
-    rejectInvalidDevices?: boolean;
+    mode?: ImportedDataMode;
   } = {},
 ): ParsedPresetPayload | null => {
   if (!isPresetFileHeader(value) || value.presetType !== 'group') {
@@ -160,7 +161,7 @@ const parseGroupPresetFile = (
 const parseRackPresetFile = (
   value: unknown,
   options: {
-    rejectInvalidDevices?: boolean;
+    mode?: ImportedDataMode;
   } = {},
 ): ParsedPresetPayload | null => {
   if (!isPresetFileHeader(value) || value.presetType !== 'rack') {
@@ -198,7 +199,7 @@ const parseRackPresetFile = (
 export const parsePresetFile = (
   value: unknown,
   options: {
-    rejectInvalidDevices?: boolean;
+    mode?: ImportedDataMode;
   } = {},
 ): ParsedPresetPayload | null =>
   parseDevicePresetFile(value)
@@ -227,6 +228,7 @@ export const parsePresetFileText = (
   options: {
     fileName?: string;
     expectedType?: PresetFileKind;
+    mode?: ImportedDataMode;
   } = {},
 ): ParsedPresetFileResult => {
   const extensionType = options.fileName
@@ -249,7 +251,9 @@ export const parsePresetFileText = (
     };
   }
 
-  const parsedPreset = parsePresetFile(parsed);
+  const parsedPreset = parsePresetFile(parsed, {
+    mode: options.mode,
+  });
   if (!parsedPreset) {
     return {
       ok: false,

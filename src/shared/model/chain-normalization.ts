@@ -40,6 +40,8 @@ export interface HydratedGeneratorDevicesResult {
   invalidDeviceCount: number;
 }
 
+export type ImportedDataMode = 'strict' | 'recover';
+
 export const formatInvalidHydratedDeviceWarning = (
   invalidDeviceCount: number,
   action: string,
@@ -51,9 +53,10 @@ export const formatInvalidHydratedDeviceWarning = (
 export const hydrateImportedGeneratorDevices = (
   value: unknown,
   options: {
-    rejectInvalidDevices?: boolean;
+    mode?: ImportedDataMode;
   } = {},
 ): HydratedGeneratorDevicesResult | null => {
+  const mode = options.mode ?? 'recover';
   if (!Array.isArray(value)) {
     return null;
   }
@@ -65,7 +68,7 @@ export const hydrateImportedGeneratorDevices = (
     const hydrated = hydrateImportedGeneratorDevice(device);
     if (!hydrated) {
       invalidDeviceCount += 1;
-      if (options.rejectInvalidDevices === true) {
+      if (mode === 'strict') {
         return null;
       }
       continue;
@@ -73,7 +76,7 @@ export const hydrateImportedGeneratorDevices = (
 
     if (seenIds.has(hydrated.id)) {
       invalidDeviceCount += 1;
-      if (options.rejectInvalidDevices === true) {
+      if (mode === 'strict') {
         return null;
       }
       continue;
@@ -234,14 +237,18 @@ export interface HydratedGeneratorChainResult {
 export const hydrateImportedGeneratorChain = (
   value: unknown,
   options: {
-    rejectInvalidDevices?: boolean;
+    mode?: ImportedDataMode;
   } = {},
 ): HydratedGeneratorChainResult | null => {
-  if (!isRecord(value) || !Array.isArray(value.devices) || !isRecord(value.groupStateById)) {
+  const mode = options.mode ?? 'recover';
+  if (!isRecord(value) || !Array.isArray(value.devices)) {
+    return null;
+  }
+  if (mode === 'strict' && !isRecord(value.groupStateById)) {
     return null;
   }
 
-  const hydratedDevices = hydrateImportedGeneratorDevices(value.devices, options);
+  const hydratedDevices = hydrateImportedGeneratorDevices(value.devices, { mode });
   if (!hydratedDevices) {
     return null;
   }

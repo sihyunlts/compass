@@ -117,7 +117,7 @@ const parseSavePresetFileRequest = (
 
   const presetType = (value as { presetType: PresetFileKind }).presetType;
   const payload = parsePresetFile((value as { payload?: unknown }).payload, {
-    rejectInvalidDevices: true,
+    mode: 'strict',
   });
   if (!payload || payload.warning || payload.preset.presetType !== presetType) {
     return null;
@@ -250,6 +250,7 @@ export class PresetService {
       const parsed = parsePresetFileText(text, {
         fileName: filePath,
         expectedType: parsedRequest.presetType,
+        mode: 'recover',
       });
       if (parsed.ok === false) {
         return {

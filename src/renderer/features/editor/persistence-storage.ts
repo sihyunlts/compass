@@ -138,7 +138,7 @@ export const saveBridgeSettings = (bridge: BridgeSettings): void => {
 export const loadChainSettings = (): LoadedChainSettingsResult => {
   const chain = readPersistedState().chain;
   const hydrated = hydrateImportedGeneratorChain(chain, {
-    rejectInvalidDevices: false,
+    mode: 'recover',
   });
   if (!hydrated) {
     return {
