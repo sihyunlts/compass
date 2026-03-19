@@ -29,7 +29,6 @@ import {
 } from './rack-clipboard';
 import {
   reconcileGroupStateById,
-  resolveGroupMemberIds,
   resolveNextGroupId,
   resolveDevicesByIds,
 } from './chain-ops';
@@ -47,18 +46,6 @@ export type PresetApplyResult =
     };
 
 export type GroupPresetApplyResult =
-  | {
-      ok: true;
-      chain: GeneratorChain;
-      groupId: string;
-      message: string;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export type GroupPresetReplaceResult =
   | {
       ok: true;
       chain: GeneratorChain;
@@ -266,70 +253,6 @@ export const insertGroupPresetFile = (
       prepared,
     ),
     message: 'Group preset inserted.',
-  };
-};
-
-export const replaceGroupPresetFile = (
-  chain: GeneratorChain,
-  groupId: string,
-  preset: GroupPresetFile,
-  allocateDeviceId: (kind: GeneratorDeviceNode['kind']) => string,
-): GroupPresetReplaceResult => {
-  const memberIds = resolveGroupMemberIds(chain.devices, groupId);
-  if (memberIds.length === 0) {
-    return {
-      ok: false,
-      message: 'Group preset could not be applied to this group.',
-    };
-  }
-
-  const prepared = buildPreparedPresetInsert(chain, preset, allocateDeviceId, {
-    groupIdOverride: groupId,
-  });
-  if (!prepared) {
-    return {
-      ok: false,
-      message: 'Group preset could not be applied to this group.',
-    };
-  }
-
-  const memberIdSet = new Set(memberIds);
-  const replaceIndex = chain.devices.findIndex((device) => memberIdSet.has(device.id));
-  if (replaceIndex < 0) {
-    return {
-      ok: false,
-      message: 'Group preset could not be applied to this group.',
-    };
-  }
-
-  const insertedDevices = prepared.devices.map((device) => ({
-    ...device,
-    groupId: prepared.forcedGroupId,
-  }));
-  const remainingDevices = chain.devices.filter((device) => !memberIdSet.has(device.id));
-  const nextDevices = [...remainingDevices];
-  nextDevices.splice(replaceIndex, 0, ...insertedDevices);
-
-  const nextGroupStateById = reconcileGroupStateById(
-    chain.groupStateById,
-    nextDevices,
-  );
-  if (prepared.groupStatePatch) {
-    nextGroupStateById[prepared.groupStatePatch.groupId] = {
-      enabled: prepared.groupStatePatch.enabled,
-      name: prepared.groupStatePatch.name,
-    };
-  }
-
-  return {
-    ok: true,
-    chain: sanitizeGeneratorChain({
-      ...chain,
-      devices: nextDevices,
-      groupStateById: nextGroupStateById,
-    }),
-    groupId,
-    message: 'Group preset replaced.',
   };
 };
 

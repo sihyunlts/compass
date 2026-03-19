@@ -75,8 +75,6 @@ import {
   type GroupPresetApplyResult,
   insertDevicePresetFile,
   insertGroupPresetFile,
-  replaceGroupPresetFile,
-  type GroupPresetReplaceResult,
   type PresetApplyResult,
 } from './presets';
 import type { RackClipboard } from './rack-clipboard';
@@ -323,10 +321,6 @@ export class EditorSession {
       dropZone: RackDropZone,
       preset: GroupPresetFile,
     ): GroupPresetApplyResult => this.insertGroupPreset(dropZone, preset),
-    replaceGroupPreset: (
-      groupId: string,
-      preset: GroupPresetFile,
-    ): GroupPresetReplaceResult => this.replaceGroupPreset(groupId, preset),
     applyRackPreset: (
       preset: RackPresetFile,
     ): PresetApplyResult => this.applyRackPreset(preset),
@@ -674,26 +668,6 @@ export class EditorSession {
     }
 
     this.applyChainMutation(result.chain, EDITOR_HISTORY_META.insertGroupPreset);
-    this.selectGroupIds([result.groupId], result.chain);
-    return result;
-  }
-
-  private replaceGroupPreset(
-    groupId: string,
-    preset: GroupPresetFile,
-  ): GroupPresetReplaceResult {
-    const previousChain = this.state.chainState;
-    const result = replaceGroupPresetFile(
-      previousChain,
-      groupId,
-      preset,
-      (kind) => allocateDeviceNodeId(kind),
-    );
-    if (!result.ok) {
-      return result;
-    }
-
-    this.applyChainMutation(result.chain, EDITOR_HISTORY_META.replaceGroupPreset);
     this.selectGroupIds([result.groupId], result.chain);
     return result;
   }

@@ -383,15 +383,10 @@
         payload.dropZone,
         parsed.preset,
       )
-      : payload.dropZone.kind === 'inside-group'
-        ? editorSession.commands.replaceGroupPreset(
-          payload.dropZone.groupId,
-          parsed.preset,
-        )
-        : editorSession.commands.insertGroupPreset(
-          payload.dropZone,
-          parsed.preset,
-        );
+      : editorSession.commands.insertGroupPreset(
+        payload.dropZone,
+        parsed.preset,
+      );
     showPresetActionMessage(result.message, parsed.warning);
   };
 

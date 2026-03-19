@@ -41,7 +41,6 @@ export const EDITOR_HISTORY_META = {
   duplicate: { kind: 'duplicate', label: 'Duplicate selection' },
   insertDevicePreset: { kind: 'insert-device-preset', label: 'Insert device preset' },
   insertGroupPreset: { kind: 'insert-group-preset', label: 'Insert group preset' },
-  replaceGroupPreset: { kind: 'replace-group-preset', label: 'Replace group preset' },
   loadRackPreset: { kind: 'load-rack-preset', label: 'Load rack preset' },
 } as const satisfies Record<string, ChainMutationMeta>;
 
