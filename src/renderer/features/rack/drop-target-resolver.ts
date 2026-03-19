@@ -1,5 +1,4 @@
 import { normalizeOptionalId } from '../../../shared/normalize-id';
-import type { RackPresetDropTargets } from '../../components/device-rack-types';
 import type {
   ChainDragSourceKind,
   DropPlacement,
@@ -95,19 +94,17 @@ export class RackDropTargetResolver {
     return dropZone;
   }
 
-  public resolveExternalFileDropTargets(
+  public resolveExternalFileDropZone(
     clientX: number,
     clientY: number,
-  ): RackPresetDropTargets {
-    return {
-      dropZone: this.resolveChainDropZone({
+  ): RackDropZone | null {
+    return this.resolveChainDropZone({
       sourceIds: [],
       sourceKind: 'devices',
       clientX,
       clientY,
       prevDropZone: null,
-      }),
-    };
+    });
   }
 
   private resolveInsideGroupContext(

@@ -373,23 +373,23 @@
       return;
     }
 
-    if (!payload.targets.dropZone) {
+    if (!payload.dropZone) {
       showPresetMessage('Drop the preset onto the rack to load it.');
       return;
     }
 
     const result = parsed.preset.presetType === 'device'
       ? editorSession.commands.insertDevicePreset(
-        payload.targets.dropZone,
+        payload.dropZone,
         parsed.preset,
       )
-      : payload.targets.dropZone.kind === 'inside-group'
+      : payload.dropZone.kind === 'inside-group'
         ? editorSession.commands.replaceGroupPreset(
-          payload.targets.dropZone.groupId,
+          payload.dropZone.groupId,
           parsed.preset,
         )
         : editorSession.commands.insertGroupPreset(
-          payload.targets.dropZone,
+          payload.dropZone,
           parsed.preset,
         );
     showPresetActionMessage(result.message, parsed.warning);

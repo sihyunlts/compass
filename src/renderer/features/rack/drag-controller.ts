@@ -1,6 +1,5 @@
 import type { RendererDeviceKind } from '../../../devices';
 import { clamp } from '../../../shared/math';
-import type { RackPresetDropTargets } from '../../components/device-rack-types';
 import type {
   ChainDragSourceKind,
   RackDropZone,
@@ -134,11 +133,11 @@ export class RackDragController {
     return this.activeDrag !== null;
   }
 
-  resolveExternalFileDropTargets(
+  resolveExternalFileDropZone(
     clientX: number,
     clientY: number,
-  ): RackPresetDropTargets {
-    return this.dropTargetResolver.resolveExternalFileDropTargets(clientX, clientY);
+  ): RackDropZone | null {
+    return this.dropTargetResolver.resolveExternalFileDropZone(clientX, clientY);
   }
 
   private getActiveDragInfoSnapshot(): ActiveDragInfo | null {

@@ -134,7 +134,7 @@ const parseGroupPresetFile = (
   if (!hydratedDevices) {
     return null;
   }
-  if (group.devices.length > 0 && hydratedDevices.devices.length === 0) {
+  if (hydratedDevices.devices.length === 0) {
     return null;
   }
 

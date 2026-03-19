@@ -186,10 +186,9 @@ const reconcileColorDeviceParams = (chain: GeneratorChain): void => {
   }
 };
 
-const reconcileMaskSourceIds = (chain: GeneratorChain): boolean => {
+const reconcileMaskSourceIds = (chain: GeneratorChain): void => {
   const groupIds = collectActiveGroupIds(chain.devices);
   const generatorIds = collectGeneratorIds(chain.devices);
-  let changed = false;
 
   for (const device of chain.devices) {
     if (device.kind !== 'mask') {
@@ -210,10 +209,7 @@ const reconcileMaskSourceIds = (chain: GeneratorChain): boolean => {
     }
 
     device.params.sourceId = nextSourceId;
-    changed = true;
   }
-
-  return changed;
 };
 
 /** Clones and normalizes a chain loaded from persistence or preset files. */

@@ -9,7 +9,6 @@
   import type { RendererDeviceKind } from '../../devices';
   import type { ContextMenuTarget } from './context-menu-types';
   import type {
-    RackPresetDropTargets,
     RackInteractionCommit,
     RackPresetFileDrop,
     RackScrollMetrics,
@@ -28,6 +27,7 @@
     buildOrderedGroupIds,
     buildRackContentItems,
   } from '../features/rack/layout';
+  import type { RackDropZone } from '../features/rack/drop-ops';
   import { createRackViewApi, type RackViewApi } from '../features/rack/api';
   import {
     buildDeviceDisplayNameById,
@@ -239,16 +239,13 @@
   const syncExternalFileDropIndicator = (
     clientX: number,
     clientY: number,
-  ): RackPresetDropTargets => {
-    const targets = rackDragController?.resolveExternalFileDropTargets(clientX, clientY)
-      ?? {
-        dropZone: null,
-      };
+  ): RackDropZone | null => {
+    const dropZone = rackDragController?.resolveExternalFileDropZone(clientX, clientY) ?? null;
     dropIndicator?.sync({
       didMove: true,
-      dropZone: targets.dropZone,
+      dropZone,
     });
-    return targets;
+    return dropZone;
   };
 
   const getOrderedSelectedDeviceIdsInRack = (): string[] =>
@@ -849,7 +846,7 @@
 
     const files = Array.from(event.dataTransfer?.files ?? []);
     const file = files[0] ?? null;
-    const targets = syncExternalFileDropIndicator(
+    const dropZone = syncExternalFileDropIndicator(
       event.clientX,
       event.clientY,
     );
@@ -863,7 +860,7 @@
     await onPresetFileDrop({
       file,
       fileCount: files.length,
-      targets,
+      dropZone,
     });
   }
 

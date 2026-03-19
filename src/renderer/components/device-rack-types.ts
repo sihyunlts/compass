@@ -10,14 +10,10 @@ export interface RackScrollMetrics {
   clientWidth: number;
 }
 
-export interface RackPresetDropTargets {
-  dropZone: RackDropZone | null;
-}
-
 export interface RackPresetFileDrop {
   file: File;
   fileCount: number;
-  targets: RackPresetDropTargets;
+  dropZone: RackDropZone | null;
 }
 
 export type RackInteractionCommit =
