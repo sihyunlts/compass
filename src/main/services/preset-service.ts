@@ -11,11 +11,11 @@ import path from 'node:path';
 
 import { getRendererDeviceLabel } from '../../devices/schema-registry';
 import type {
-  ListPresetBrowserSectionsResponse,
+  ListPresetBrowserTreeResponse,
   OpenPresetFileRequest,
   OpenPresetFileResponse,
-  PresetBrowserFileItem,
-  PresetBrowserSection,
+  PresetBrowserTreeFolderNode,
+  PresetBrowserTreeNode,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
   SavePresetFileRequest,
@@ -293,12 +293,11 @@ export class PresetService {
     }
   }
 
-  private async collectPresetSectionEntries(
+  private async buildPresetBrowserTreeChildren(
     presetType: PresetFileKind,
     rootDirectory: string,
     relativePath: readonly string[],
-    labelPrefix = '',
-  ): Promise<PresetBrowserFileItem[]> {
+  ): Promise<PresetBrowserTreeNode[]> {
     const directoryPath = resolvePresetPath(rootDirectory, relativePath);
     if (!directoryPath) {
       return [];
@@ -306,86 +305,74 @@ export class PresetService {
 
     const spec = PRESET_FILE_SPECS[presetType];
     const directoryEntries = await this.readDirectoryEntries(directoryPath);
-    const entries: PresetBrowserFileItem[] = [];
-
-    const fileEntries = directoryEntries
-      .filter((entry) => entry.isFile() && hasPresetExtension(entry.name, spec.extension))
-      .sort((left, right) => compareEntryNames(left.name, right.name));
-
-    for (const entry of fileEntries) {
-      entries.push({
-        presetType,
-        name: labelPrefix ? `${labelPrefix} / ${path.parse(entry.name).name}` : path.parse(entry.name).name,
-        relativePath: [...relativePath, entry.name],
-      });
-    }
+    const entries: PresetBrowserTreeNode[] = [];
 
     const childDirectories = directoryEntries
       .filter((entry) => entry.isDirectory())
       .sort((left, right) => compareEntryNames(left.name, right.name));
 
     for (const directory of childDirectories) {
-      const nextPrefix = labelPrefix ? `${labelPrefix} / ${directory.name}` : directory.name;
-      entries.push(
-        ...(await this.collectPresetSectionEntries(
-          presetType,
-          rootDirectory,
-          [...relativePath, directory.name],
-          nextPrefix,
-        )),
+      const nextRelativePath = [...relativePath, directory.name];
+      const children = await this.buildPresetBrowserTreeChildren(
+        presetType,
+        rootDirectory,
+        nextRelativePath,
       );
+      if (children.length === 0) {
+        continue;
+      }
+
+      entries.push({
+        kind: 'folder',
+        id: `preset:${presetType}:${nextRelativePath.join('/')}`,
+        label: directory.name,
+        children,
+      });
+    }
+
+    const fileEntries = directoryEntries
+      .filter((entry) => entry.isFile() && hasPresetExtension(entry.name, spec.extension))
+      .sort((left, right) => compareEntryNames(left.name, right.name));
+
+    for (const entry of fileEntries) {
+      const nextRelativePath = [...relativePath, entry.name];
+      const filePath = resolvePresetPath(rootDirectory, nextRelativePath);
+      if (!filePath) {
+        continue;
+      }
+
+      const readResult = await this.readPresetFileByType(presetType, filePath);
+      if (readResult.status === 'error') {
+        continue;
+      }
+
+      entries.push({
+        kind: 'preset',
+        id: `preset:${presetType}:${nextRelativePath.join('/')}`,
+        presetType,
+        label: path.parse(entry.name).name,
+        relativePath: nextRelativePath,
+        savedAtIso: readResult.payload.savedAtIso,
+      });
     }
 
     return entries;
   }
 
-  private async listPresetBrowserSectionsByType(
+  private async buildPresetBrowserRootNode(
     presetType: PresetFileKind,
-  ): Promise<PresetBrowserSection[]> {
+  ): Promise<PresetBrowserTreeFolderNode> {
     const rootDirectory = await this.resolvePresetDirectory(presetType);
-    const rootEntries = await this.readDirectoryEntries(rootDirectory);
-    const spec = PRESET_FILE_SPECS[presetType];
-    const sections: PresetBrowserSection[] = [];
-
-    const rootFiles = rootEntries
-      .filter((entry) => entry.isFile() && hasPresetExtension(entry.name, spec.extension))
-      .sort((left, right) => compareEntryNames(left.name, right.name))
-      .map<PresetBrowserFileItem>((entry) => ({
-        presetType,
-        name: path.parse(entry.name).name,
-        relativePath: [entry.name],
-      }));
-
-    const rootDirectories = rootEntries
-      .filter((entry) => entry.isDirectory())
-      .sort((left, right) => compareEntryNames(left.name, right.name));
-
-    if (rootFiles.length > 0 || rootDirectories.length === 0) {
-      sections.push({
-        id: `${presetType}:root`,
-        title: PRESET_ROOT_SECTION_LABELS[presetType],
-        entries: rootFiles,
-      });
-    }
-
-    for (const directory of rootDirectories) {
-      const entries = await this.collectPresetSectionEntries(
+    return {
+      kind: 'folder',
+      id: `preset-root:${presetType}`,
+      label: PRESET_ROOT_SECTION_LABELS[presetType],
+      children: await this.buildPresetBrowserTreeChildren(
         presetType,
         rootDirectory,
-        [directory.name],
-      );
-      if (entries.length === 0) {
-        continue;
-      }
-
-      sections.push({
-        id: `${presetType}:${directory.name}`,
-        title: directory.name,
-        entries,
-      });
-    }
-
-    return sections;
+        [],
+      ),
+    };
   }
 
   public async savePresetFile(
@@ -494,22 +481,22 @@ export class PresetService {
     }
   }
 
-  public async listPresetBrowserSections(): Promise<ListPresetBrowserSectionsResponse> {
+  public async listPresetBrowserTree(): Promise<ListPresetBrowserTreeResponse> {
     try {
       return {
         status: 'ok',
-        sections: (
+        tree: (
           await Promise.all(
             (['device', 'group', 'rack'] as const).map((presetType) =>
-              this.listPresetBrowserSectionsByType(presetType)
+              this.buildPresetBrowserRootNode(presetType)
             ),
           )
-        ).flat(),
+        ).filter((node) => node.children.length > 0),
       };
     } catch (error) {
       return {
         status: 'error',
-        message: toErrorMessage(error, 'Failed to list preset browser sections.'),
+        message: toErrorMessage(error, 'Failed to list preset browser tree.'),
       };
     }
   }

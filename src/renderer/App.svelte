@@ -5,15 +5,25 @@
    */
   import { onMount, tick } from 'svelte';
 
+  import {
+    getRendererDeviceLabel,
+    RENDERER_DEVICE_GROUPS,
+    type RendererDeviceKind,
+  } from '../devices';
   import type { PaletteFilePayload } from '../shared/model';
   import { parsePresetFileText } from '../shared/presets';
   import type {
-    PresetBrowserFileItem,
-    PresetBrowserSection,
+    PresetBrowserTreeNode,
   } from '../shared/contracts/ipc/presets';
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
   import { sanitizeSidebarWidth } from './features/editor/persistence-storage';
   import BrowserPanel from './components/BrowserPanel.svelte';
+  import type {
+    BrowserTreeDeviceLeafNode,
+    BrowserTreeFolderNode,
+    BrowserTreePresetLeafNode,
+    BrowserTreeNode,
+  } from './components/browser-tree-types';
   import Button from './components/Button.svelte';
   import SidebarResizer from './components/SidebarResizer.svelte';
   import DeviceRack from './components/DeviceRack.svelte';
@@ -61,6 +71,31 @@
     targetId: null,
     placement: 'after',
   };
+
+  const toDeviceLeafNode = (
+    kind: RendererDeviceKind,
+  ): BrowserTreeDeviceLeafNode => ({
+    kind: 'device',
+    id: `device:${kind}`,
+    label: getRendererDeviceLabel(kind),
+    deviceKind: kind,
+  });
+
+  const DEVICE_BROWSER_TREE: BrowserTreeFolderNode[] = [
+    {
+      kind: 'folder',
+      id: 'device-group:generators',
+      label: 'Generators',
+      children: RENDERER_DEVICE_GROUPS.generator.map((kind) => toDeviceLeafNode(kind)),
+    },
+    {
+      kind: 'folder',
+      id: 'device-group:effects',
+      label: 'Effects',
+      children: RENDERER_DEVICE_GROUPS.effect.map((kind) => toDeviceLeafNode(kind)),
+    },
+  ];
+
   const bridgeClient = window.compass;
   let appVersionText = $state('');
   let rackViewApi: RackViewApi | null = $state(null);
@@ -127,7 +162,7 @@
     clientWidth: 1,
   });
   let rackMiniMapContentRevision = $state(0);
-  let presetSections = $state<PresetBrowserSection[]>([]);
+  let presetTree = $state<BrowserTreeFolderNode[]>([]);
   let isPresetLoading = $state(false);
   let presetErrorText = $state<string | null>(null);
   let presetListRequestToken = 0;
@@ -182,7 +217,7 @@
       return;
     }
 
-    void loadPresetSections();
+    void loadPresetTree();
   });
 
   const handleUndoClick = (): void => {
@@ -207,13 +242,35 @@
     rackViewApi?.setScrollLeft(nextScrollLeft);
   };
 
-  const loadPresetSections = async (): Promise<void> => {
+  const mapPresetTreeNode = (
+    node: PresetBrowserTreeNode,
+  ): BrowserTreeNode => {
+    if (node.kind === 'folder') {
+      return {
+        kind: 'folder',
+        id: node.id,
+        label: node.label,
+        children: node.children.map((child) => mapPresetTreeNode(child)),
+      };
+    }
+
+    return {
+      kind: 'preset',
+      id: node.id,
+      label: node.label,
+      presetType: node.presetType,
+      relativePath: [...node.relativePath],
+      savedAtIso: node.savedAtIso,
+    };
+  };
+
+  const loadPresetTree = async (): Promise<void> => {
     const requestToken = ++presetListRequestToken;
     isPresetLoading = true;
     presetErrorText = null;
 
     try {
-      const response = await bridgeClient.listPresetBrowserSections();
+      const response = await bridgeClient.listPresetBrowserTree();
       if (response.status === 'error') {
         throw new Error(response.message);
       }
@@ -221,14 +278,15 @@
         return;
       }
 
-      presetSections = response.sections;
+      presetTree = response.tree.map((node) =>
+        mapPresetTreeNode(node) as BrowserTreeFolderNode);
       presetErrorText = null;
     } catch (error) {
       if (requestToken !== presetListRequestToken) {
         return;
       }
 
-      presetSections = [];
+      presetTree = [];
       presetErrorText = error instanceof Error && error.message.trim()
         ? error.message.trim()
         : 'Failed to load presets.';
@@ -324,14 +382,14 @@
   };
 
   const toReadPresetEntryRequest = (
-    entry: PresetBrowserFileItem,
+    entry: BrowserTreePresetLeafNode,
   ): Parameters<typeof bridgeClient.readPresetEntry>[0] => ({
     presetType: entry.presetType,
     relativePath: [...entry.relativePath],
   });
 
   const handlePresetEntryOpen = async (
-    entry: PresetBrowserFileItem,
+    entry: BrowserTreePresetLeafNode,
   ): Promise<void> => {
     await runPresetAction(async () => {
       const response = await bridgeClient.readPresetEntry(
@@ -366,7 +424,7 @@
   };
 
   const handlePresetFilePointerDown = async (
-    entry: PresetBrowserFileItem,
+    entry: BrowserTreePresetLeafNode,
     sourceEvent: PointerEvent,
     itemEl: HTMLElement,
   ): Promise<void> => {
@@ -390,7 +448,7 @@
 
       editorSession.commands.handleBrowserPointerDown({
         source,
-        badgeLabel: `+ ${entry.name}`,
+        badgeLabel: `+ ${entry.label}`,
         sourceEvent,
         itemEl,
       });
@@ -581,7 +639,8 @@
 <section class="live-main" hidden={uiState.isSettingsOpen}>
     <BrowserPanel
       activePage={uiState.sidebarPage}
-      {presetSections}
+      deviceTree={DEVICE_BROWSER_TREE}
+      {presetTree}
       {isPresetLoading}
       {presetErrorText}
       onPageSelect={editorSession.commands.setSidebarPage}

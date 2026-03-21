@@ -112,9 +112,9 @@ export const registerIpcHandlers = (
   );
 
   ipcMain.handle(
-    IPC_CHANNELS.listPresetBrowserSections,
+    IPC_CHANNELS.listPresetBrowserTree,
     () =>
-      presetService.listPresetBrowserSections(),
+      presetService.listPresetBrowserTree(),
   );
 
   ipcMain.handle(

@@ -38,28 +38,36 @@ export type OpenPresetFileResponse<K extends PresetFileKind = PresetFileKind> =
   | {
       status: 'canceled';
     }
-  | {
-      status: 'error';
-      message: string;
-      filePath?: string;
-    };
+    | {
+        status: 'error';
+        message: string;
+        filePath?: string;
+      };
 
-export interface PresetBrowserFileItem<K extends PresetFileKind = PresetFileKind> {
-  presetType: K;
-  name: string;
-  relativePath: string[];
-}
-
-export interface PresetBrowserSection {
+export interface PresetBrowserTreeLeafNode<K extends PresetFileKind = PresetFileKind> {
+  kind: 'preset';
   id: string;
-  title: string;
-  entries: PresetBrowserFileItem[];
+  label: string;
+  presetType: K;
+  relativePath: string[];
+  savedAtIso: string;
 }
 
-export type ListPresetBrowserSectionsResponse =
+export interface PresetBrowserTreeFolderNode {
+  kind: 'folder';
+  id: string;
+  label: string;
+  children: PresetBrowserTreeNode[];
+}
+
+export type PresetBrowserTreeNode =
+  | PresetBrowserTreeFolderNode
+  | PresetBrowserTreeLeafNode;
+
+export type ListPresetBrowserTreeResponse =
   | {
       status: 'ok';
-      sections: PresetBrowserSection[];
+      tree: PresetBrowserTreeFolderNode[];
     }
   | {
       status: 'error';

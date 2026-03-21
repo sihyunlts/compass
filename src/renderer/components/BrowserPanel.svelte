@@ -1,21 +1,24 @@
 <script lang="ts">
+  import { tick } from 'svelte';
+
+  import type { RendererDeviceKind } from '../../devices';
   import Button from './Button.svelte';
-  import {
-    getRendererDeviceLabel,
-    RENDERER_DEVICE_GROUPS,
-    type RendererDeviceKind,
-  } from '../../devices';
   import type {
-    PresetBrowserFileItem,
-    PresetBrowserSection,
-  } from '../../shared/contracts/ipc/presets';
+    BrowserTreeDeviceLeafNode,
+    BrowserTreeFolderNode,
+    BrowserTreeNode,
+    BrowserTreePresetLeafNode,
+  } from './browser-tree-types';
   import type { BrowserInsertSource } from './device-rack-types';
 
   export type BrowserPanelPage = 'devices' | 'presets';
 
-  interface BrowserCatalogItem {
-    kind: RendererDeviceKind;
-    label: string;
+  interface VisibleTreeRow {
+    node: BrowserTreeNode;
+    level: number;
+    parentId: string | null;
+    posInSet: number;
+    setSize: number;
   }
 
   type BrowserPointerDownPayload = {
@@ -25,19 +28,54 @@
     itemEl: HTMLElement;
   };
 
-  const toBrowserCatalogItems = (
-    kinds: readonly RendererDeviceKind[],
-  ): BrowserCatalogItem[] => kinds.map((kind) => ({
-    kind,
-    label: getRendererDeviceLabel(kind),
-  }));
+  const collectVisibleRows = (
+    nodes: readonly BrowserTreeNode[],
+    expandedFolderIdSet: ReadonlySet<string>,
+    level = 1,
+    parentId: string | null = null,
+  ): VisibleTreeRow[] => {
+    const rows: VisibleTreeRow[] = [];
 
-  const browserGenerators = toBrowserCatalogItems(RENDERER_DEVICE_GROUPS.generator);
-  const browserEffects = toBrowserCatalogItems(RENDERER_DEVICE_GROUPS.effect);
+    nodes.forEach((node, index) => {
+      rows.push({
+        node,
+        level,
+        parentId,
+        posInSet: index + 1,
+        setSize: nodes.length,
+      });
+
+      if (node.kind === 'folder' && expandedFolderIdSet.has(node.id)) {
+        rows.push(
+          ...collectVisibleRows(
+            node.children,
+            expandedFolderIdSet,
+            level + 1,
+            node.id,
+          ),
+        );
+      }
+    });
+
+    return rows;
+  };
+
+  const treeItemRefs: Record<string, HTMLDivElement | undefined> = {};
+
+  const registerTreeItem = (element: HTMLDivElement, nodeId: string) => {
+    treeItemRefs[nodeId] = element;
+
+    return {
+      destroy() {
+        delete treeItemRefs[nodeId];
+      },
+    };
+  };
 
   let {
     activePage = 'devices',
-    presetSections = [] as PresetBrowserSection[],
+    deviceTree = [] as BrowserTreeFolderNode[],
+    presetTree = [] as BrowserTreeFolderNode[],
     isPresetLoading = false,
     presetErrorText = null,
     onPageSelect = () => {},
@@ -47,59 +85,210 @@
     onPresetFilePointerDown,
   } = $props<{
     activePage?: BrowserPanelPage;
-    presetSections?: PresetBrowserSection[];
+    deviceTree: BrowserTreeFolderNode[];
+    presetTree: BrowserTreeFolderNode[];
     isPresetLoading?: boolean;
     presetErrorText?: string | null;
     onPageSelect?: (page: BrowserPanelPage) => void;
     onDeviceAdd: (kind: RendererDeviceKind) => void;
     onBrowserPointerDown: (payload: BrowserPointerDownPayload) => void;
-    onPresetEntryOpen: (entry: PresetBrowserFileItem) => void | Promise<void>;
+    onPresetEntryOpen: (entry: BrowserTreePresetLeafNode) => void | Promise<void>;
     onPresetFilePointerDown: (
-      entry: PresetBrowserFileItem,
+      entry: BrowserTreePresetLeafNode,
       event: PointerEvent,
       itemEl: HTMLElement,
     ) => void | Promise<void>;
   }>();
 
-  const handleDevicePointerDown = (
-    item: BrowserCatalogItem,
-    event: PointerEvent,
-  ): void => {
-    const itemEl = event.currentTarget;
-    if (!(itemEl instanceof HTMLElement)) {
-      return;
-    }
+  let expandedFolderIds = $state<string[]>([]);
+  let initializedRootFolderIds = $state<string[]>([]);
+  let selectedRowId = $state<string | null>(null);
 
-    onBrowserPointerDown({
-      source: {
-        kind: 'device-kind',
-        deviceKind: item.kind,
-      },
-      badgeLabel: `+ ${item.label}`,
-      sourceEvent: event,
-      itemEl,
-    });
+  const activeTreeRoots = $derived(
+    activePage === 'devices' ? deviceTree : presetTree,
+  );
+  const expandedFolderIdSet = $derived.by(() => new Set(expandedFolderIds));
+  const visibleRows = $derived.by(() =>
+    collectVisibleRows(activeTreeRoots, expandedFolderIdSet));
+
+  const isFolderExpanded = (folderId: string): boolean =>
+    expandedFolderIdSet.has(folderId);
+
+  const selectRow = (rowId: string): void => {
+    selectedRowId = rowId;
   };
 
-  const handlePresetPointerDown = (
-    entry: PresetBrowserFileItem,
-    event: PointerEvent,
-  ): void => {
-    if (entry.presetType === 'rack') {
+  const focusRow = async (rowId: string): Promise<void> => {
+    selectedRowId = rowId;
+    await tick();
+    treeItemRefs[rowId]?.focus();
+  };
+
+  const toggleFolder = (folderId: string): void => {
+    if (expandedFolderIdSet.has(folderId)) {
+      expandedFolderIds = expandedFolderIds.filter((id) => id !== folderId);
       return;
     }
 
+    expandedFolderIds = [...expandedFolderIds, folderId];
+  };
+
+  const resolveRowIndex = (rowId: string): number =>
+    visibleRows.findIndex((row) => row.node.id === rowId);
+
+  const resolveLeafIcon = (node: BrowserTreeDeviceLeafNode | BrowserTreePresetLeafNode): string => {
+    if (node.kind === 'device') {
+      return 'tune';
+    }
+
+    if (node.presetType === 'group') {
+      return 'stacks';
+    }
+
+    if (node.presetType === 'rack') {
+      return 'view_week';
+    }
+
+    return 'tune';
+  };
+
+  const handleLeafPointerDown = (
+    node: BrowserTreeDeviceLeafNode | BrowserTreePresetLeafNode,
+    event: PointerEvent,
+  ): void => {
     const itemEl = event.currentTarget;
     if (!(itemEl instanceof HTMLElement)) {
       return;
     }
 
-    void onPresetFilePointerDown(entry, event, itemEl);
+    if (node.kind === 'device') {
+      onBrowserPointerDown({
+        source: {
+          kind: 'device-kind',
+          deviceKind: node.deviceKind,
+        },
+        badgeLabel: `+ ${node.label}`,
+        sourceEvent: event,
+        itemEl,
+      });
+      return;
+    }
+
+    if (node.presetType === 'rack') {
+      return;
+    }
+
+    void onPresetFilePointerDown(node, event, itemEl);
+  };
+
+  const handleLeafDoubleClick = (
+    node: BrowserTreeDeviceLeafNode | BrowserTreePresetLeafNode,
+  ): void => {
+    if (node.kind === 'device') {
+      onDeviceAdd(node.deviceKind);
+      return;
+    }
+
+    void onPresetEntryOpen(node);
+  };
+
+  const handleTreeItemKeyDown = async (
+    row: VisibleTreeRow,
+    event: KeyboardEvent,
+  ): Promise<void> => {
+    const rowIndex = resolveRowIndex(row.node.id);
+    if (rowIndex < 0) {
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      const nextRow = visibleRows[rowIndex + 1];
+      if (nextRow) {
+        event.preventDefault();
+        await focusRow(nextRow.node.id);
+      }
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      const prevRow = visibleRows[rowIndex - 1];
+      if (prevRow) {
+        event.preventDefault();
+        await focusRow(prevRow.node.id);
+      }
+      return;
+    }
+
+    if (event.key === 'ArrowRight') {
+      if (row.node.kind !== 'folder') {
+        return;
+      }
+
+      event.preventDefault();
+      if (!isFolderExpanded(row.node.id)) {
+        toggleFolder(row.node.id);
+        return;
+      }
+
+      const nextRow = visibleRows[rowIndex + 1];
+      if (nextRow && nextRow.parentId === row.node.id) {
+        await focusRow(nextRow.node.id);
+      }
+      return;
+    }
+
+    if (event.key === 'ArrowLeft') {
+      if (row.node.kind === 'folder' && isFolderExpanded(row.node.id)) {
+        event.preventDefault();
+        toggleFolder(row.node.id);
+        return;
+      }
+
+      if (row.parentId) {
+        event.preventDefault();
+        await focusRow(row.parentId);
+      }
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (row.node.kind === 'folder') {
+        toggleFolder(row.node.id);
+        return;
+      }
+
+      handleLeafDoubleClick(row.node);
+    }
   };
 
   const handleDragStart = (event: DragEvent): void => {
     event.preventDefault();
   };
+
+  $effect(() => {
+    const nextRootIds = [...deviceTree, ...presetTree]
+      .map((node) => node.id)
+      .filter((id) => !initializedRootFolderIds.includes(id));
+    if (nextRootIds.length === 0) {
+      return;
+    }
+
+    initializedRootFolderIds = [...initializedRootFolderIds, ...nextRootIds];
+    expandedFolderIds = [...expandedFolderIds, ...nextRootIds];
+  });
+
+  $effect(() => {
+    const firstVisibleRowId = visibleRows[0]?.node.id ?? null;
+    if (!firstVisibleRowId) {
+      selectedRowId = null;
+      return;
+    }
+
+    if (!selectedRowId || resolveRowIndex(selectedRowId) === -1) {
+      selectedRowId = firstVisibleRowId;
+    }
+  });
 </script>
 
 <aside class="browser-panel">
@@ -123,77 +312,81 @@
       />
     </div>
 
-    {#if activePage === 'devices'}
-      <div class="browser-page-panel">
-        <section class="browser-group">
-          <span class="browser-group-title">Generators</span>
-          <ul class="browser-list">
-            {#each browserGenerators as item (item.kind)}
-              <li>
-                <button
-                  class="browser-item"
-                  type="button"
-                  ondragstart={handleDragStart}
-                  ondblclick={() => onDeviceAdd(item.kind)}
-                  onpointerdown={(event) => handleDevicePointerDown(item, event)}
-                >
-                  <span>{item.label}</span>
-                </button>
-              </li>
-            {/each}
-          </ul>
-        </section>
-        <section class="browser-group">
-          <span class="browser-group-title">Effects</span>
-          <ul class="browser-list">
-            {#each browserEffects as item (item.kind)}
-              <li>
-                <button
-                  class="browser-item"
-                  type="button"
-                  ondragstart={handleDragStart}
-                  ondblclick={() => onDeviceAdd(item.kind)}
-                  onpointerdown={(event) => handleDevicePointerDown(item, event)}
-                >
-                  <span>{item.label}</span>
-                </button>
-              </li>
-            {/each}
-          </ul>
-        </section>
-      </div>
-    {:else}
-      <div class="browser-page-panel">
-        {#if isPresetLoading}
-          <p class="browser-status">Loading presets...</p>
-        {:else if presetErrorText}
-          <p class="browser-status browser-status-error">{presetErrorText}</p>
-        {:else if presetSections.length === 0}
-          <p class="browser-status">No presets yet.</p>
-        {:else}
-          {#each presetSections as section (section.id)}
-            <section class="browser-group">
-              <span class="browser-group-title">{section.title}</span>
-              <ul class="browser-list">
-                {#each section.entries as entry (`${entry.presetType}:${entry.relativePath.join('/')}`)}
-                  <li>
-                    <button
-                      class="browser-item"
-                      type="button"
-                      ondragstart={handleDragStart}
-                      ondblclick={() => onPresetEntryOpen(entry)}
-                      onpointerdown={(event) => handlePresetPointerDown(entry, event)}
-                    >
-                      <span>{entry.name}</span>
-                    </button>
-                  </li>
-                {/each}
-              </ul>
-            </section>
+    <div class="browser-page-panel">
+      {#if activePage === 'presets' && isPresetLoading}
+        <p class="browser-status">Loading presets...</p>
+      {:else if activePage === 'presets' && presetErrorText}
+        <p class="browser-status browser-status-error">{presetErrorText}</p>
+      {:else if activePage === 'presets' && visibleRows.length === 0}
+        <p class="browser-status">No presets yet.</p>
+      {:else}
+        <ul
+          class="browser-tree-list browser-tree-root"
+          role="tree"
+          aria-label={activePage === 'devices' ? 'Devices browser' : 'Presets browser'}
+        >
+          {#each visibleRows as row (row.node.id)}
+            <li role="none" class:is-selected={selectedRowId === row.node.id}>
+              <div
+                use:registerTreeItem={row.node.id}
+                class="browser-tree-item"
+                style={`--browser-tree-level:${row.level};`}
+                role="treeitem"
+                aria-level={row.level}
+                aria-posinset={row.posInSet}
+                aria-setsize={row.setSize}
+                aria-selected={selectedRowId === row.node.id}
+                aria-expanded={row.node.kind === 'folder' ? isFolderExpanded(row.node.id) : undefined}
+                tabindex={selectedRowId === row.node.id ? 0 : -1}
+                ondragstart={handleDragStart}
+                onclick={() => selectRow(row.node.id)}
+                ondblclick={() => {
+                  selectRow(row.node.id);
+                  if (row.node.kind === 'folder') {
+                    toggleFolder(row.node.id);
+                    return;
+                  }
+
+                  handleLeafDoubleClick(row.node);
+                }}
+                onkeydown={(event) => void handleTreeItemKeyDown(row, event)}
+                onpointerdown={(event) => {
+                  selectRow(row.node.id);
+                  if (row.node.kind === 'folder') {
+                    return;
+                  }
+
+                  handleLeafPointerDown(row.node, event);
+                }}
+              >
+                {#if row.node.kind === 'folder'}
+                  <button
+                    class="browser-tree-leading-slot browser-tree-chevron"
+                    type="button"
+                    aria-label={isFolderExpanded(row.node.id) ? 'Collapse folder' : 'Expand folder'}
+                    tabindex="-1"
+                    onclick={(event) => {
+                      event.stopPropagation();
+                      selectRow(row.node.id);
+                      toggleFolder(row.node.id);
+                    }}
+                  >
+                    <span class="material-symbols-rounded" aria-hidden="true">
+                      {isFolderExpanded(row.node.id) ? 'expand_more' : 'chevron_right'}
+                    </span>
+                  </button>
+                {:else}
+                  <span class="browser-tree-leading-slot browser-tree-item-icon material-symbols-rounded" aria-hidden="true">
+                    {resolveLeafIcon(row.node)}
+                  </span>
+                {/if}
+                <span class="browser-tree-item-label">{row.node.label}</span>
+              </div>
+            </li>
           {/each}
-        {/if}
-      </div>
-    {/if}
+        </ul>
+      {/if}
+    </div>
   </div>
 </aside>
 
@@ -201,6 +394,7 @@
   .browser-panel {
     display: flex;
     flex: 0 0 var(--sidebar-width);
+    min-width: 0;
     padding: var(--gap-10);
     background: var(--neutral-10);
 
@@ -242,44 +436,81 @@
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-app-region: no-drag;
   }
 
-  .browser-group {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: var(--gap-16);
-    gap: var(--gap-8);
+  .browser-tree-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
 
-    &-title {
-      font-size: var(--text-12);
-      color: var(--neutral-50);
+    li.is-selected {
+      background: var(--neutral-20);
+      border-radius: var(--radius-4);
     }
   }
 
-  .browser-list {
-    margin: var(--gap-0);
-    padding: var(--gap-0);
-    list-style: none;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--gap-6);
+  .browser-tree-leading-slot {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: 0 0 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .browser-item {
-    width: 100%;
+  .browser-tree-chevron {
     border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--neutral-50);
+    cursor: pointer;
+
+    .material-symbols-rounded {
+      font-size: var(--text-16);
+      line-height: 1;
+      font-variation-settings: 'FILL' 1, 'wght' 400;
+    }
+  }
+
+  .browser-tree-item {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    padding: 0 var(--gap-4);
+    padding-left: calc((var(--browser-tree-level, 1) - 1) * var(--gap-12));
+    padding-right: var(--gap-2);
     border-radius: var(--radius-4);
-    padding: var(--gap-6) var(--gap-8);
-    font-size: var(--text-12);
-    background: var(--neutral-20);
+    background: transparent;
     color: var(--neutral-90);
+    display: flex;
+    align-items: center;
+    font-size: var(--text-12);
     text-align: left;
     cursor: pointer;
+
+    &:focus-visible {
+      outline: none;
+    }
 
     &:global(.is-dragging) {
       opacity: 0.7;
     }
+  }
+
+  .browser-tree-item-icon {
+    font-size: var(--text-14);
+    line-height: 1;
+    color: var(--neutral-50);
+    font-variation-settings: 'FILL' 1, 'wght' 400;
+  }
+
+  .browser-tree-item-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .browser-status {

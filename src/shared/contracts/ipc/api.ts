@@ -1,7 +1,7 @@
 import type { LiveTempoUpdate } from '../../bridge/types';
 import type { PresetFileKind } from '../../presets';
 import type {
-  ListPresetBrowserSectionsResponse,
+  ListPresetBrowserTreeResponse,
   OpenPresetFileRequest,
   OpenPresetFileResponse,
   ReadPresetEntryRequest,
@@ -43,7 +43,7 @@ export interface CompassApi {
   savePresetFile: (
     request: SavePresetFileRequest,
   ) => Promise<SavePresetFileResponse>;
-  listPresetBrowserSections: () => Promise<ListPresetBrowserSectionsResponse>;
+  listPresetBrowserTree: () => Promise<ListPresetBrowserTreeResponse>;
   readPresetEntry: <K extends PresetFileKind>(
     request: ReadPresetEntryRequest<K>,
   ) => Promise<ReadPresetEntryResponse<K>>;
