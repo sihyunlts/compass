@@ -33,7 +33,6 @@ export const createInitialEditorState = (): EditorSessionState => {
     isPreviewPopoutOpen: false,
     previewScrubValue: 0,
     autoCreateLengthLabel: resolveBridgeLengthLabel(bridge),
-    previewPlayLabel: 'Play',
     sendButtonLabel: 'Send',
     sendButtonDisabled: false,
     sidebarWidthPx: loadSidebarWidth(),

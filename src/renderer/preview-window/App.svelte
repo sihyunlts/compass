@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
 
   import type { PreviewWindowState } from '../../shared/contracts/preview/window-state';
+  import Button from '../components/Button.svelte';
   import { createPreviewSession } from '../features/preview/session.svelte';
   import PreviewSurface from '../components/PreviewSurface.svelte';
 
@@ -77,14 +78,12 @@
       mode="popout"
       surfaceModel={previewViewState.surfaceModel}
     />
-    <button
+    <Button
       class="preview-guide-toggle"
-      type="button"
-      aria-pressed={isGuideVisible() ? 'true' : 'false'}
-      onclick={handleGuideToggle}
-    >
-      {isGuideVisible() ? 'Guide On' : 'Guide Off'}
-    </button>
+      text={isGuideVisible() ? 'Guide On' : 'Guide Off'}
+      pressed={isGuideVisible()}
+      onClick={handleGuideToggle}
+    />
   </div>
 
   <p id="preview-popout-meta" class="preview-popout-meta">

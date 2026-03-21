@@ -6,6 +6,7 @@
    * Owns node editing, snapping, and hidden-input synchronization for form events.
    */
   import { clamp } from '../../shared/math';
+  import Button from './Button.svelte';
   import type { CurveNode, ModulationCurve } from '../../shared/model';
 
   let {
@@ -253,14 +254,12 @@
 
 <div class="curve-editor-wrap modulation-curve-control">
   <div class="curve-editor-toolbar">
-    <button type="button" onclick={handleAddNode}>Add Node</button>
-    <button
-      type="button"
-      onclick={handleDeleteNode}
+    <Button text="Add Node" onClick={handleAddNode} />
+    <Button
+      text="Delete Selected Node"
       disabled={!selectedNodeId || sortedNodes.length <= 2}
-    >
-      Delete Selected Node
-    </button>
+      onClick={handleDeleteNode}
+    />
     <span class="curve-editor-readout">
       {#if selectedNode}
         T {selectedNode.t.toFixed(3)} | V {selectedNode.v.toFixed(3)}

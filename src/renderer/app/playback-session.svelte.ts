@@ -76,7 +76,6 @@ export class PlaybackSessionController {
       },
       onPlayStateChange: (nextIsPlaying) => {
         this.state.isPlaying = nextIsPlaying;
-        this.options.editorSession.commands.setPreviewPlaying(nextIsPlaying);
       },
     });
   }

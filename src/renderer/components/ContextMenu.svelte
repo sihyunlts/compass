@@ -264,11 +264,14 @@
     &-item {
       display: block;
       width: 100%;
+      border: 0;
       border-radius: var(--radius-4);
       background: transparent;
+      color: var(--neutral-90);
       text-align: start;
       font-size: var(--text-13);
       padding: var(--gap-6) var(--gap-8);
+      cursor: pointer;
 
       &:hover {
         background: var(--neutral-20);

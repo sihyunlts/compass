@@ -14,6 +14,7 @@
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
   import { sanitizeSidebarWidth } from './features/editor/persistence-storage';
   import BrowserPanel from './components/BrowserPanel.svelte';
+  import Button from './components/Button.svelte';
   import SidebarResizer from './components/SidebarResizer.svelte';
   import DeviceRack from './components/DeviceRack.svelte';
   import type {
@@ -44,7 +45,6 @@
     selectClipboardAvailable,
     selectHistoryControls,
     selectPreviewBpmText,
-    selectPreviewPanelControls,
   } from './features/editor/selectors';
   import { resolveGroupMemberIds } from './features/editor/chain-ops';
   import { createPreviewSession } from './features/preview/session.svelte';
@@ -82,7 +82,6 @@
   const uiState = editorSession.state;
   const previewState = previewSession.state;
   const historyControls = $derived.by(() => selectHistoryControls(uiState));
-  const previewPanelControls = $derived.by(() => selectPreviewPanelControls(uiState));
   const bpmText = $derived.by(() => selectPreviewBpmText(uiState.previewBpm));
   const clipboardAvailable = $derived.by(() => selectClipboardAvailable(uiState));
 
@@ -486,57 +485,49 @@
           </div>
           <div class="header-preset-group">
             <span class="field-label">Rack</span>
-            <button
+            <Button
               id="rack-preset-save"
-              type="button"
+              text="Save"
               title="Save the current rack state."
-              aria-label="Save rack preset"
-              onclick={handleSaveRackPreset}
-            >
-              Save
-            </button>
-            <button
+              label="Save rack preset"
+              onClick={handleSaveRackPreset}
+            />
+            <Button
               id="rack-preset-load"
-              type="button"
+              text="Load"
               title="Replace the current rack with a saved rack preset."
-              aria-label="Load rack preset"
-              onclick={handleLoadRackPreset}
-            >
-              Load
-            </button>
+              label="Load rack preset"
+              onClick={handleLoadRackPreset}
+            />
           </div>
-          <button
+          <Button
             id="undo-button"
-            type="button"
+            text="Undo"
             disabled={!historyControls.canUndo}
             title={historyControls.canUndo ? `Undo: ${historyControls.undoActionLabel}` : 'Nothing to undo'}
-            aria-label={historyControls.canUndo ? `Undo: ${historyControls.undoActionLabel}` : 'Undo unavailable'}
-            onclick={handleUndoClick}
-          >
-            Undo
-          </button>
-          <button
+            label={historyControls.canUndo ? `Undo: ${historyControls.undoActionLabel}` : 'Undo unavailable'}
+            onClick={handleUndoClick}
+          />
+          <Button
             id="redo-button"
-            type="button"
+            text="Redo"
             disabled={!historyControls.canRedo}
             title={historyControls.canRedo ? `Redo: ${historyControls.redoActionLabel}` : 'Nothing to redo'}
-            aria-label={historyControls.canRedo ? `Redo: ${historyControls.redoActionLabel}` : 'Redo unavailable'}
-            onclick={handleRedoClick}
-          >
-            Redo
-          </button>
-          <button id="settings-button" type="button" onclick={editorSession.commands.openSettings}>
-            Settings
-          </button>
-          <button
+            label={historyControls.canRedo ? `Redo: ${historyControls.redoActionLabel}` : 'Redo unavailable'}
+            onClick={handleRedoClick}
+          />
+          <Button
+            id="settings-button"
+            text="Settings"
+            onClick={editorSession.commands.openSettings}
+          />
+          <Button
             id="send-button"
-            class="primary"
-            type="button"
+            variant="primary"
+            text={uiState.sendButtonLabel}
             disabled={uiState.sendButtonDisabled}
-            onclick={() => sendFlow.send()}
-          >
-            {uiState.sendButtonLabel}
-          </button>
+            onClick={() => sendFlow.send()}
+          />
         </div>
       </header>
 
@@ -575,8 +566,8 @@
             surfaceModel={previewState.surfaceModel}
             onGuideToggle={(enabled) => playbackSession.setPreviewGuideEnabled(enabled)}
             onPopout={() => playbackSession.openPreviewPopout()}
-            playLabel={previewPanelControls.playLabel}
-            loopEnabled={previewPanelControls.loopEnabled}
+            isPlaying={playbackSession.state.isPlaying}
+            loopEnabled={uiState.isPreviewLoopEnabled}
             onPlayClick={() => playbackSession.togglePlayback()}
             onLoopToggle={() => playbackSession.togglePreviewLoop()}
             bind:scrubValue={uiState.previewScrubValue}
@@ -594,9 +585,11 @@
     hidden={!uiState.isSettingsOpen}
   >
     <header class="settings-screen-head">
-      <button id="settings-close" type="button" onclick={editorSession.commands.closeSettings}>
-        Close
-      </button>
+      <Button
+        id="settings-close"
+        text="Close"
+        onClick={editorSession.commands.closeSettings}
+      />
     </header>
 
     <div class="settings-screen-body">
@@ -627,9 +620,11 @@
               </div>
               
               <div class="settings-actions">
-                <button id="palette-reset" type="button" onclick={handlePaletteReset}>
-                  Reset to Default
-                </button>
+                <Button
+                  id="palette-reset"
+                  text="Reset to Default"
+                  onClick={handlePaletteReset}
+                />
                 <div class="file-input-wrapper">
                   <div class="file-button">Upload File</div>
                   <input
@@ -658,13 +653,11 @@
                 <span class="label">sihyunlights</span>
                 <span class="description">https://sihyunlights.com</span>
               </div>
-              <button
-                type="button"
+              <Button
+                text="Visit"
                 title="Visit website"
-                onclick={() => bridgeClient.openExternal('https://sihyunlights.com')}
-              >
-                Visit
-              </button>
+                onClick={() => bridgeClient.openExternal('https://sihyunlights.com')}
+              />
             </div>
           </div>
         </section>

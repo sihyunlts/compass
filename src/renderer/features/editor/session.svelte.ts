@@ -100,7 +100,6 @@ export interface EditorSessionState {
   isPreviewPopoutOpen: boolean;
   previewScrubValue: number;
   autoCreateLengthLabel: string;
-  previewPlayLabel: string;
   sendButtonLabel: string;
   sendButtonDisabled: boolean;
   sidebarWidthPx: number;
@@ -331,9 +330,6 @@ export class EditorSession {
       setPreviewGuideEnabled(this.state, nextEnabled),
     setPreviewPopoutOpen: (nextEnabled: boolean): void => {
       this.state.isPreviewPopoutOpen = nextEnabled;
-    },
-    setPreviewPlaying: (nextIsPlaying: boolean): void => {
-      this.state.previewPlayLabel = nextIsPlaying ? 'Pause' : 'Play';
     },
     syncPreviewBpm: (nextBpm: number): boolean => syncPreviewBpm(this.state, nextBpm),
     setPreviewLoopLengthBeats: (nextBeats: number): void => {

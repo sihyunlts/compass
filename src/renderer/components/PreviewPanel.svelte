@@ -1,7 +1,7 @@
 <script lang="ts">
   import { clamp } from '../../shared/math';
   import type { PreviewSurfaceViewModel } from '../features/preview/view-model';
-  import IconButton from './IconButton.svelte';
+  import Button from './Button.svelte';
   import PreviewSurface from './PreviewSurface.svelte';
 
   const SCRUB_MAX = 1000;
@@ -10,7 +10,7 @@
     surfaceModel,
     onGuideToggle,
     onPopout,
-    playLabel,
+    isPlaying = false,
     loopEnabled,
     onPlayClick,
     onLoopToggle,
@@ -20,7 +20,7 @@
     surfaceModel: PreviewSurfaceViewModel;
     onGuideToggle: (nextEnabled: boolean) => void;
     onPopout: () => void | Promise<void>;
-    playLabel: string;
+    isPlaying?: boolean;
     loopEnabled: boolean;
     onPlayClick: () => void;
     onLoopToggle: () => void;
@@ -29,10 +29,9 @@
   }>();
 
   const isGuideVisible = (): boolean => surfaceModel.isGuideEnabled;
-  const isPreviewPlaying = (): boolean => playLabel === 'Pause';
-  const resolvePlayIcon = (): string => (isPreviewPlaying() ? 'pause' : 'play_arrow');
+  const resolvePlayIcon = (): string => (isPlaying ? 'pause' : 'play_arrow');
   const resolvePlayButtonLabel = (): string =>
-    isPreviewPlaying() ? 'Pause preview' : 'Play preview';
+    isPlaying ? 'Pause preview' : 'Play preview';
   const resolveLoopButtonLabel = (): string =>
     loopEnabled ? 'Disable preview loop' : 'Enable preview loop';
   const resolveGuideButtonLabel = (): string =>
@@ -65,33 +64,35 @@
     />
   </div>
   <div class="preview-panel-controls">
-    <IconButton
+    <Button
       id="preview-play"
+      variant="icon"
       label={resolvePlayButtonLabel()}
       icon={resolvePlayIcon()}
       onClick={onPlayClick}
     />
-    <IconButton
+    <Button
       id="preview-loop-toggle"
+      variant="icon"
       label={resolveLoopButtonLabel()}
       icon="repeat"
-      isActive={loopEnabled}
-      isPressed={loopEnabled}
+      pressed={loopEnabled}
       onClick={onLoopToggle}
     />
-    <IconButton
+    <Button
       id="preview-popout"
       class="preview-popout-toggle"
+      variant="icon"
       label="Open preview in a separate window"
       icon="open_in_new"
       onClick={handlePopout}
     />
-    <IconButton
+    <Button
       class="preview-guide-toggle"
+      variant="icon"
       label={resolveGuideButtonLabel()}
       icon="grid_guides"
-      isActive={isGuideVisible()}
-      isPressed={isGuideVisible()}
+      pressed={isGuideVisible()}
       onClick={handleGuideToggle}
     />
   </div>
@@ -121,5 +122,4 @@
   .preview-panel-scrub {
     margin-block: var(--gap-4);
   }
-
 </style>

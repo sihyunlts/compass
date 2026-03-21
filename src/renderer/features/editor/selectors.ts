@@ -41,16 +41,6 @@ export const selectHistoryControls = (state: {
   redoActionLabel: state.redoActionLabel,
 });
 
-export const selectPreviewPanelControls = (state: {
-  previewPlayLabel: string;
-  isPreviewLoopEnabled: boolean;
-  previewScrubValue: number;
-}) => ({
-  playLabel: state.previewPlayLabel,
-  loopEnabled: state.isPreviewLoopEnabled,
-  scrubValue: state.previewScrubValue,
-});
-
 export const selectClipboardAvailable = (state: {
   clipboardAvailable: boolean;
 }): boolean => state.clipboardAvailable;
