@@ -20,6 +20,7 @@ export const createInitialEditorState = (): EditorSessionState => {
   const bridge = loadBridgeSettings();
   const loadedChain = loadChainSettings();
   return {
+    sidebarPage: 'devices',
     chainState: loadedChain.chain,
     chainRevision: 1,
     launchpadModel: loadLaunchpadModel(),

@@ -434,6 +434,8 @@
 
 <section class="live-main" hidden={uiState.isSettingsOpen}>
     <BrowserPanel
+      activePage={uiState.sidebarPage}
+      onPageSelect={editorSession.commands.setSidebarPage}
       onDeviceAdd={editorSession.commands.addBrowserDevice}
       onBrowserPointerDown={editorSession.commands.handleBrowserPointerDown}
     />

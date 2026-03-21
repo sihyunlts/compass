@@ -87,6 +87,7 @@ const DEFAULT_AUTO_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_HISTORY_MAX_ENTRIES = 100;
 
 export interface EditorSessionState {
+  sidebarPage: 'devices' | 'presets';
   chainState: GeneratorChain;
   chainRevision: number;
   launchpadModel: LaunchpadModel;
@@ -195,6 +196,9 @@ export class EditorSession {
     },
     closeSettings: (): void => {
       this.state.isSettingsOpen = false;
+    },
+    setSidebarPage: (nextPage: EditorSessionState['sidebarPage']): void => {
+      this.state.sidebarPage = nextPage;
     },
     persistSidebarWidth: (nextWidth?: number): void => {
       persistSidebarWidth(this.state, nextWidth);
