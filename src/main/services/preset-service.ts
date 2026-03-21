@@ -12,6 +12,7 @@ import path from 'node:path';
 
 import { getRendererDeviceLabel } from '../../devices/schema-registry';
 import type {
+  DeletePresetEntryResponse,
   ListPresetBrowserTreeResponse,
   OpenPresetFileRequest,
   OpenPresetFileResponse,
@@ -641,6 +642,48 @@ export class PresetService {
       return {
         status: 'error',
         message: toErrorMessage(error, 'Failed to reveal presets folder.'),
+      };
+    }
+  }
+
+  public async deletePresetEntry(
+    request: unknown,
+  ): Promise<DeletePresetEntryResponse> {
+    const parsedRequest = parseShowPresetEntryInFolderRequest(request);
+    if (!parsedRequest) {
+      return {
+        status: 'error',
+        message: 'Invalid preset entry request.',
+      };
+    }
+
+    try {
+      const rootDirectory = await this.resolvePresetDirectory(parsedRequest.presetType);
+      const filePath = resolvePresetPath(rootDirectory, parsedRequest.relativePath);
+      if (!filePath) {
+        return {
+          status: 'error',
+          message: 'Invalid preset file path.',
+        };
+      }
+
+      if (
+        parsedRequest.entryKind === 'file'
+        && !hasPresetExtension(filePath, PRESET_FILE_SPECS[parsedRequest.presetType].extension)
+      ) {
+        return {
+          status: 'error',
+          message: 'Invalid preset file type.',
+        };
+      }
+
+      await access(filePath);
+      await shell.trashItem(filePath);
+      return { status: 'ok' };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to delete preset entry.'),
       };
     }
   }

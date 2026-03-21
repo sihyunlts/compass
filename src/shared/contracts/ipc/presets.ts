@@ -87,6 +87,9 @@ export interface ShowPresetEntryInFolderRequest<K extends PresetFileKind = Prese
   entryKind: 'file' | 'directory';
 }
 
+export type DeletePresetEntryRequest<K extends PresetFileKind = PresetFileKind> =
+  ShowPresetEntryInFolderRequest<K>;
+
 export type ShowPresetEntryInFolderResponse =
   | {
       status: 'ok';
@@ -97,6 +100,15 @@ export type ShowPresetEntryInFolderResponse =
     };
 
 export type ShowPresetsRootInFolderResponse =
+  | {
+      status: 'ok';
+    }
+  | {
+      status: 'error';
+      message: string;
+    };
+
+export type DeletePresetEntryResponse =
   | {
       status: 'ok';
     }

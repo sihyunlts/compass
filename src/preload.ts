@@ -3,6 +3,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from './shared/contracts/ipc/channels';
 import type { PresetFileKind } from './shared/presets';
 import type {
+  DeletePresetEntryRequest,
+  DeletePresetEntryResponse,
   ListPresetBrowserTreeResponse,
   OpenPresetFileRequest,
   OpenPresetFileResponse,
@@ -109,6 +111,8 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.showPresetEntryInFolder, request) as Promise<ShowPresetEntryInFolderResponse>,
   showPresetsRootInFolder: () =>
     ipcRenderer.invoke(IPC_CHANNELS.showPresetsRootInFolder) as Promise<ShowPresetsRootInFolderResponse>,
+  deletePresetEntry: (request: DeletePresetEntryRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.deletePresetEntry, request) as Promise<DeletePresetEntryResponse>,
   readPresetEntry: <K extends PresetFileKind>(request: ReadPresetEntryRequest<K>) =>
     ipcRenderer.invoke(IPC_CHANNELS.readPresetEntry, request) as Promise<ReadPresetEntryResponse<K>>,
   openPresetFile: <K extends PresetFileKind>(request: OpenPresetFileRequest<K>) =>

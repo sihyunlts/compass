@@ -7,11 +7,6 @@
     resolveViewportFloatingLayerPosition,
   } from '../features/rack/floating-layer';
 
-  type PresetContextMenuTarget = Extract<
-    ContextMenuTarget,
-    { kind: 'preset-entry' | 'presets-root' }
-  >;
-
   let {
     onCopy,
     onCut,
@@ -45,10 +40,6 @@
   let target = $state<ContextMenuTarget | null>(null);
   let menuEl = $state<HTMLElement | null>(null);
   let openToken = 0;
-  const isPresetContextTarget = (
-    value: ContextMenuTarget | null,
-  ): value is PresetContextMenuTarget =>
-    value?.kind === 'preset-entry' || value?.kind === 'presets-root';
   const cloneContextMenuTarget = (nextTarget: ContextMenuTarget): ContextMenuTarget => {
     switch (nextTarget.kind) {
       case 'devices':
@@ -76,10 +67,14 @@
         };
     }
   };
-  const isPresetEntryTarget = $derived.by(() => isPresetContextTarget(target));
+  const isPresetBrowserTarget = $derived.by(() =>
+    target?.kind === 'preset-entry' || target?.kind === 'presets-root');
+  const isDeletablePresetTarget = $derived.by(() =>
+    target?.kind === 'preset-entry');
   const canPasteForTarget = $derived.by(() =>
     target !== null
-    && !isPresetContextTarget(target)
+    && target.kind !== 'preset-entry'
+    && target.kind !== 'presets-root'
     && clipboardAvailable);
   type ClipboardActionKind = 'copy' | 'cut' | 'paste' | 'duplicate';
   type ClipboardActionMeta = {
@@ -95,12 +90,13 @@
     { id: 'context-duplicate', kind: 'duplicate', label: 'Duplicate' },
   ];
   const visibleClipboardActions = $derived.by(() =>
-    isPresetContextTarget(target)
+    target?.kind === 'preset-entry' || target?.kind === 'presets-root'
       ? []
       : CLIPBOARD_ACTIONS.filter((action) => !action.requiresClipboard || canPasteForTarget));
   const canRenameTarget = $derived.by(() =>
     target !== null
-    && !isPresetContextTarget(target)
+    && target.kind !== 'preset-entry'
+    && target.kind !== 'presets-root'
     && (target.kind === 'group' || target.deviceIds.length === 1));
   export async function open(clientX: number, clientY: number, nextTarget: ContextMenuTarget) {
     if (
@@ -178,7 +174,7 @@
   }
 
   function handleShowInFolderClick() {
-    if (!isPresetContextTarget(target)) {
+    if (target?.kind !== 'preset-entry' && target?.kind !== 'presets-root') {
       return;
     }
 
@@ -222,7 +218,19 @@
   style:transform={isOpen ? `translate3d(${x}px, ${y}px, 0)` : undefined}
 >
   {#if target}
-    {#if isPresetEntryTarget}
+    {#if isPresetBrowserTarget}
+      {#if isDeletablePresetTarget}
+        <button
+          id="context-delete"
+          class="context-menu-item"
+          type="button"
+          role="menuitem"
+          onclick={handleDeleteClick}
+        >
+          Delete
+        </button>
+        <hr class="context-menu-separator" />
+      {/if}
       <button
         id="context-show-in-folder"
         class="context-menu-item"

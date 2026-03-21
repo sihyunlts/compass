@@ -469,6 +469,22 @@
     contextMenuComponent?.open(clientX, clientY, target);
   };
 
+  const handlePresetBrowserDelete = async (
+    target: Extract<ContextMenuTarget, { kind: 'preset-entry' }>,
+  ): Promise<void> => {
+    const response = await bridgeClient.deletePresetEntry({
+      presetType: target.presetType,
+      relativePath: [...target.relativePath],
+      entryKind: target.entryKind,
+    });
+    if (response.status === 'error') {
+      showPresetMessage(`Preset delete failed | ${response.message}`);
+      return;
+    }
+
+    await loadPresetTree();
+  };
+
   const handleShowPresetEntryInFolder = async (
     target: Extract<ContextMenuTarget, { kind: 'preset-entry' | 'presets-root' }>,
   ): Promise<void> => {
@@ -488,6 +504,17 @@
     if (response.status === 'error') {
       showPresetMessage(`Show in Folder failed | ${response.message}`);
     }
+  };
+
+  const handleContextMenuDelete = (
+    target: ContextMenuTarget,
+  ): void => {
+    if (target.kind === 'preset-entry') {
+      void handlePresetBrowserDelete(target);
+      return;
+    }
+
+    editorSession.commands.deleteFromContextTarget(target);
   };
 
   const savePreset = async (
@@ -920,7 +947,7 @@
     onPaste={editorSession.commands.pasteFromContextTarget}
     onDuplicate={editorSession.commands.duplicateFromContextTarget}
     onRename={editorSession.commands.beginRenameFromContextTarget}
-    onDelete={editorSession.commands.deleteFromContextTarget}
+    onDelete={handleContextMenuDelete}
     onShowInFolder={handleShowPresetEntryInFolder}
     onGroup={editorSession.commands.groupDeviceIds}
     onUngroupGroup={editorSession.commands.ungroupGroup}

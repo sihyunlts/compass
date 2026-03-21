@@ -1,6 +1,8 @@
 import type { LiveTempoUpdate } from '../../bridge/types';
 import type { PresetFileKind } from '../../presets';
 import type {
+  DeletePresetEntryRequest,
+  DeletePresetEntryResponse,
   ListPresetBrowserTreeResponse,
   OpenPresetFileRequest,
   OpenPresetFileResponse,
@@ -51,6 +53,9 @@ export interface CompassApi {
     request: ShowPresetEntryInFolderRequest,
   ) => Promise<ShowPresetEntryInFolderResponse>;
   showPresetsRootInFolder: () => Promise<ShowPresetsRootInFolderResponse>;
+  deletePresetEntry: (
+    request: DeletePresetEntryRequest,
+  ) => Promise<DeletePresetEntryResponse>;
   readPresetEntry: <K extends PresetFileKind>(
     request: ReadPresetEntryRequest<K>,
   ) => Promise<ReadPresetEntryResponse<K>>;

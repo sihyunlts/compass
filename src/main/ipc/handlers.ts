@@ -130,6 +130,12 @@ export const registerIpcHandlers = (
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.deletePresetEntry,
+    (_event, request) =>
+      presetService.deletePresetEntry(request),
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.readPresetEntry,
     (_event, request) =>
       presetService.readPresetEntry(request),
