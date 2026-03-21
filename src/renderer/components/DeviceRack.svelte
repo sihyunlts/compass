@@ -1202,7 +1202,9 @@
                       onpointerdown={handleGroupSavePointerDown}
                       onclick={(event) => handleGroupSaveClick(event, col.groupId)}
                       oncontextmenu={handleGroupSaveContextMenu}
-                    ></button>
+                    >
+                      <span class="material-symbols-rounded" aria-hidden="true">save</span>
+                    </button>
                   </div>
                   <span class="group-label">{resolveGroupDisplayName(groupDisplayNameById, col.groupId)}</span>
                 {/if}

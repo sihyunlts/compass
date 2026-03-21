@@ -127,7 +127,9 @@
           onpointerdown={handleSavePresetPointerDown}
           onclick={handleSavePresetClick}
           oncontextmenu={handleSavePresetContextMenu}
-        ></button>
+        >
+          <span class="material-symbols-rounded" aria-hidden="true">save</span>
+        </button>
       </div>
       {#if isInlineRenaming}
         <input
