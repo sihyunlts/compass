@@ -1,6 +1,7 @@
 <script lang="ts">
   import { clamp } from '../../shared/math';
   import type { PreviewSurfaceViewModel } from '../features/preview/view-model';
+  import IconButton from './IconButton.svelte';
   import PreviewSurface from './PreviewSurface.svelte';
 
   const SCRUB_MAX = 1000;
@@ -28,6 +29,14 @@
   }>();
 
   const isGuideVisible = (): boolean => surfaceModel.isGuideEnabled;
+  const isPreviewPlaying = (): boolean => playLabel === 'Pause';
+  const resolvePlayIcon = (): string => (isPreviewPlaying() ? 'pause' : 'play_arrow');
+  const resolvePlayButtonLabel = (): string =>
+    isPreviewPlaying() ? 'Pause preview' : 'Play preview';
+  const resolveLoopButtonLabel = (): string =>
+    loopEnabled ? 'Disable preview loop' : 'Enable preview loop';
+  const resolveGuideButtonLabel = (): string =>
+    isGuideVisible() ? 'Hide preview guide' : 'Show preview guide';
 
   const handleGuideToggle = (): void => {
     onGuideToggle(!isGuideVisible());
@@ -56,38 +65,35 @@
     />
   </div>
   <div class="preview-panel-controls">
-    <button
+    <IconButton
       id="preview-play"
-      type="button"
-      onclick={onPlayClick}
-    >
-      {playLabel}
-    </button>
-    <button
+      label={resolvePlayButtonLabel()}
+      icon={resolvePlayIcon()}
+      onClick={onPlayClick}
+    />
+    <IconButton
       id="preview-loop-toggle"
-      class:is-active={loopEnabled}
-      type="button"
-      aria-pressed={loopEnabled ? 'true' : 'false'}
-      onclick={onLoopToggle}
-    >
-      {loopEnabled ? 'Loop On' : 'Loop Off'}
-    </button>
-    <button
+      label={resolveLoopButtonLabel()}
+      icon="repeat"
+      isActive={loopEnabled}
+      isPressed={loopEnabled}
+      onClick={onLoopToggle}
+    />
+    <IconButton
       id="preview-popout"
       class="preview-popout-toggle"
-      type="button"
-      onclick={handlePopout}
-    >
-      Pop Out
-    </button>
-    <button
+      label="Open preview in a separate window"
+      icon="open_in_new"
+      onClick={handlePopout}
+    />
+    <IconButton
       class="preview-guide-toggle"
-      type="button"
-      aria-pressed={isGuideVisible() ? 'true' : 'false'}
-      onclick={handleGuideToggle}
-    >
-      {isGuideVisible() ? 'Guide On' : 'Guide Off'}
-    </button>
+      label={resolveGuideButtonLabel()}
+      icon="grid_guides"
+      isActive={isGuideVisible()}
+      isPressed={isGuideVisible()}
+      onClick={handleGuideToggle}
+    />
   </div>
 </section>
 
