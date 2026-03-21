@@ -118,6 +118,18 @@ export const registerIpcHandlers = (
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.showPresetEntryInFolder,
+    (_event, request) =>
+      presetService.showPresetEntryInFolder(request),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.showPresetsRootInFolder,
+    () =>
+      presetService.showPresetsRootInFolder(),
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.readPresetEntry,
     (_event, request) =>
       presetService.readPresetEntry(request),

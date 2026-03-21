@@ -297,6 +297,10 @@ export class EditorSession {
     ungroupSelectedGroups: (): boolean => this.ungroupSelectedGroups(),
     beginRenameSelection: (): boolean => this.beginRenameSelection(),
     deleteFromContextTarget: (target: ContextMenuTarget): void => {
+      if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+        return;
+      }
+
       if (target.kind === 'group') {
         this.deleteGroup(target.groupId);
         return;
@@ -308,15 +312,31 @@ export class EditorSession {
       this.deleteDevicesById(target.deviceIds);
     },
     copyFromContextTarget: (target: ContextMenuTarget): void => {
+      if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+        return;
+      }
+
       this.copySelectionToClipboard(this.resolveContextSelection(target));
     },
     cutFromContextTarget: (target: ContextMenuTarget): void => {
+      if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+        return;
+      }
+
       this.cutSelection(this.resolveContextSelection(target));
     },
     pasteFromContextTarget: (target: ContextMenuTarget): void => {
+      if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+        return;
+      }
+
       this.pasteClipboard(undefined, this.resolveContextSelection(target));
     },
     duplicateFromContextTarget: (target: ContextMenuTarget): void => {
+      if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+        return;
+      }
+
       this.duplicateSelection(this.resolveContextSelection(target));
     },
     beginRenameFromContextTarget: (target: ContextMenuTarget): boolean =>
@@ -567,6 +587,10 @@ export class EditorSession {
 
   private beginRenameFromContextTarget(target: ContextMenuTarget): boolean {
     if (!this.rackBinding) {
+      return false;
+    }
+
+    if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
       return false;
     }
 

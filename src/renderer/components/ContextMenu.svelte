@@ -7,6 +7,11 @@
     resolveViewportFloatingLayerPosition,
   } from '../features/rack/floating-layer';
 
+  type PresetContextMenuTarget = Extract<
+    ContextMenuTarget,
+    { kind: 'preset-entry' | 'presets-root' }
+  >;
+
   let {
     onCopy,
     onCut,
@@ -14,6 +19,7 @@
     onDuplicate,
     onRename,
     onDelete,
+    onShowInFolder,
     onGroup,
     onUngroupGroup,
     clipboardAvailable = false,
@@ -24,6 +30,9 @@
     onDuplicate: (target: ContextMenuTarget) => void;
     onRename: (target: ContextMenuTarget) => void;
     onDelete: (target: ContextMenuTarget) => void;
+    onShowInFolder: (
+      target: Extract<ContextMenuTarget, { kind: 'preset-entry' | 'presets-root' }>,
+    ) => void;
     onGroup: (ids: string[]) => void;
     onUngroupGroup: (groupId: string) => void;
     clipboardAvailable?: boolean;
@@ -36,7 +45,42 @@
   let target = $state<ContextMenuTarget | null>(null);
   let menuEl = $state<HTMLElement | null>(null);
   let openToken = 0;
-  const canPasteForTarget = $derived.by(() => target !== null && clipboardAvailable);
+  const isPresetContextTarget = (
+    value: ContextMenuTarget | null,
+  ): value is PresetContextMenuTarget =>
+    value?.kind === 'preset-entry' || value?.kind === 'presets-root';
+  const cloneContextMenuTarget = (nextTarget: ContextMenuTarget): ContextMenuTarget => {
+    switch (nextTarget.kind) {
+      case 'devices':
+        return {
+          kind: 'devices',
+          deviceIds: [...nextTarget.deviceIds],
+          canGroup: nextTarget.canGroup,
+        };
+      case 'group':
+        return {
+          kind: 'group',
+          groupId: nextTarget.groupId,
+          memberDeviceIds: [...nextTarget.memberDeviceIds],
+        };
+      case 'preset-entry':
+        return {
+          kind: 'preset-entry',
+          presetType: nextTarget.presetType,
+          relativePath: [...nextTarget.relativePath],
+          entryKind: nextTarget.entryKind,
+        };
+      case 'presets-root':
+        return {
+          kind: 'presets-root',
+        };
+    }
+  };
+  const isPresetEntryTarget = $derived.by(() => isPresetContextTarget(target));
+  const canPasteForTarget = $derived.by(() =>
+    target !== null
+    && !isPresetContextTarget(target)
+    && clipboardAvailable);
   type ClipboardActionKind = 'copy' | 'cut' | 'paste' | 'duplicate';
   type ClipboardActionMeta = {
     id: string;
@@ -51,9 +95,12 @@
     { id: 'context-duplicate', kind: 'duplicate', label: 'Duplicate' },
   ];
   const visibleClipboardActions = $derived.by(() =>
-    CLIPBOARD_ACTIONS.filter((action) => !action.requiresClipboard || canPasteForTarget));
+    isPresetContextTarget(target)
+      ? []
+      : CLIPBOARD_ACTIONS.filter((action) => !action.requiresClipboard || canPasteForTarget));
   const canRenameTarget = $derived.by(() =>
     target !== null
+    && !isPresetContextTarget(target)
     && (target.kind === 'group' || target.deviceIds.length === 1));
   export async function open(clientX: number, clientY: number, nextTarget: ContextMenuTarget) {
     if (
@@ -64,17 +111,7 @@
       return;
     }
 
-    target = nextTarget.kind === 'devices'
-      ? {
-        kind: 'devices',
-        deviceIds: [...nextTarget.deviceIds],
-        canGroup: nextTarget.canGroup,
-      }
-      : {
-        kind: 'group',
-        groupId: nextTarget.groupId,
-        memberDeviceIds: [...nextTarget.memberDeviceIds],
-      };
+    target = cloneContextMenuTarget(nextTarget);
     isPositioned = false;
     isOpen = true;
     const token = ++openToken;
@@ -140,6 +177,15 @@
     close();
   }
 
+  function handleShowInFolderClick() {
+    if (!isPresetContextTarget(target)) {
+      return;
+    }
+
+    onShowInFolder(target);
+    close();
+  }
+
   function handleGroupClick() {
     if (target?.kind !== 'devices') {
       return;
@@ -176,69 +222,81 @@
   style:transform={isOpen ? `translate3d(${x}px, ${y}px, 0)` : undefined}
 >
   {#if target}
-    {#each visibleClipboardActions as action (action.id)}
+    {#if isPresetEntryTarget}
       <button
-        id={action.id}
+        id="context-show-in-folder"
         class="context-menu-item"
         type="button"
         role="menuitem"
-        onclick={() => handleClipboardAction(action.kind)}
+        onclick={handleShowInFolderClick}
       >
-        {action.label}
+        Show in Folder
       </button>
-    {/each}
-    {#if canRenameTarget}
-      <button
-        id="context-rename"
-        class="context-menu-item"
-        type="button"
-        role="menuitem"
-        onclick={handleRenameClick}
-      >
-        Rename
-      </button>
-    {/if}
-    <hr class="context-menu-separator" />
-    {#if target.kind === 'devices'}
-      <button
-        id="context-delete"
-        class="context-menu-item"
-        type="button"
-        role="menuitem"
-        onclick={handleDeleteClick}
-      >
-        Delete
-      </button>
-      {#if target.canGroup}
+    {:else}
+      {#each visibleClipboardActions as action (action.id)}
         <button
-          id="context-group"
+          id={action.id}
           class="context-menu-item"
           type="button"
           role="menuitem"
-          onclick={handleGroupClick}
+          onclick={() => handleClipboardAction(action.kind)}
         >
-          Group
+          {action.label}
+        </button>
+      {/each}
+      {#if canRenameTarget}
+        <button
+          id="context-rename"
+          class="context-menu-item"
+          type="button"
+          role="menuitem"
+          onclick={handleRenameClick}
+        >
+          Rename
         </button>
       {/if}
-    {:else}
-      <button
-        id="context-delete"
-        class="context-menu-item"
-        type="button"
-        role="menuitem"
-        onclick={handleDeleteClick}
-      >
-        Delete
-      </button>
-      <button
-        id="context-ungroup"
-        class="context-menu-item"
-        type="button"
-        role="menuitem"
-        onclick={handleUngroupClick}
-      >
-        Ungroup
-      </button>
+      <hr class="context-menu-separator" />
+      {#if target.kind === 'devices'}
+        <button
+          id="context-delete"
+          class="context-menu-item"
+          type="button"
+          role="menuitem"
+          onclick={handleDeleteClick}
+        >
+          Delete
+        </button>
+        {#if target.canGroup}
+          <button
+            id="context-group"
+            class="context-menu-item"
+            type="button"
+            role="menuitem"
+            onclick={handleGroupClick}
+          >
+            Group
+          </button>
+        {/if}
+      {:else}
+        <button
+          id="context-delete"
+          class="context-menu-item"
+          type="button"
+          role="menuitem"
+          onclick={handleDeleteClick}
+        >
+          Delete
+        </button>
+        <button
+          id="context-ungroup"
+          class="context-menu-item"
+          type="button"
+          role="menuitem"
+          onclick={handleUngroupClick}
+        >
+          Ungroup
+        </button>
+      {/if}
     {/if}
   {/if}
 </div>

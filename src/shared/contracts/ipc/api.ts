@@ -8,6 +8,9 @@ import type {
   ReadPresetEntryResponse,
   SavePresetFileRequest,
   SavePresetFileResponse,
+  ShowPresetEntryInFolderRequest,
+  ShowPresetEntryInFolderResponse,
+  ShowPresetsRootInFolderResponse,
 } from './presets';
 import type { PreviewWindowState } from '../preview/window-state';
 import type {
@@ -44,6 +47,10 @@ export interface CompassApi {
     request: SavePresetFileRequest,
   ) => Promise<SavePresetFileResponse>;
   listPresetBrowserTree: () => Promise<ListPresetBrowserTreeResponse>;
+  showPresetEntryInFolder: (
+    request: ShowPresetEntryInFolderRequest,
+  ) => Promise<ShowPresetEntryInFolderResponse>;
+  showPresetsRootInFolder: () => Promise<ShowPresetsRootInFolderResponse>;
   readPresetEntry: <K extends PresetFileKind>(
     request: ReadPresetEntryRequest<K>,
   ) => Promise<ReadPresetEntryResponse<K>>;

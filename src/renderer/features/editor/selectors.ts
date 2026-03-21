@@ -97,8 +97,12 @@ export const resolveCurrentSelectionSnapshot = (
 export const resolveSelectionSnapshotFromContextTarget = (
   chain: GeneratorChain,
   target: ContextMenuTarget,
-): RackSelectionSnapshot | null =>
-  target.kind === 'group'
+): RackSelectionSnapshot | null => {
+  if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+    return null;
+  }
+
+  return target.kind === 'group'
     ? toSelectionSnapshot(chain, {
         kind: 'group',
         groupId: target.groupId,
@@ -108,6 +112,7 @@ export const resolveSelectionSnapshotFromContextTarget = (
         kind: 'devices',
         deviceIds: target.deviceIds,
       });
+};
 
 export const resolveDeleteSelectionDeviceIds = (
   chain: GeneratorChain,

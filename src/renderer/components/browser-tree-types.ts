@@ -1,11 +1,21 @@
 import type { RendererDeviceKind } from '../../devices';
 import type { PresetFileKind } from '../../shared/presets';
 
-export interface BrowserTreeFolderNode {
+interface BrowserTreeBaseFolderNode {
   kind: 'folder';
   id: string;
   label: string;
   children: BrowserTreeNode[];
+}
+
+export interface BrowserTreeDeviceFolderNode extends BrowserTreeBaseFolderNode {
+  treeKind: 'device';
+}
+
+export interface BrowserTreePresetFolderNode extends BrowserTreeBaseFolderNode {
+  treeKind: 'preset';
+  presetType: PresetFileKind;
+  relativePath: string[];
 }
 
 export interface BrowserTreeDeviceLeafNode {
@@ -25,6 +35,7 @@ export interface BrowserTreePresetLeafNode {
 }
 
 export type BrowserTreeNode =
-  | BrowserTreeFolderNode
+  | BrowserTreeDeviceFolderNode
+  | BrowserTreePresetFolderNode
   | BrowserTreeDeviceLeafNode
   | BrowserTreePresetLeafNode;

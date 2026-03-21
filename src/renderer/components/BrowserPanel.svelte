@@ -5,10 +5,12 @@
   import Button from './Button.svelte';
   import type {
     BrowserTreeDeviceLeafNode,
-    BrowserTreeFolderNode,
+    BrowserTreeDeviceFolderNode,
     BrowserTreeNode,
     BrowserTreePresetLeafNode,
+    BrowserTreePresetFolderNode,
   } from './browser-tree-types';
+  import type { ContextMenuTarget } from './context-menu-types';
   import type { BrowserInsertSource } from './device-rack-types';
 
   export type BrowserPanelPage = 'devices' | 'presets';
@@ -27,6 +29,11 @@
     sourceEvent: PointerEvent;
     itemEl: HTMLElement;
   };
+
+  type PresetContextMenuTarget = Extract<
+    ContextMenuTarget,
+    { kind: 'preset-entry' | 'presets-root' }
+  >;
 
   const collectVisibleRows = (
     nodes: readonly BrowserTreeNode[],
@@ -74,24 +81,30 @@
 
   let {
     activePage = 'devices',
-    deviceTree = [] as BrowserTreeFolderNode[],
-    presetTree = [] as BrowserTreeFolderNode[],
+    deviceTree = [] as BrowserTreeDeviceFolderNode[],
+    presetTree = [] as BrowserTreePresetFolderNode[],
     isPresetLoading = false,
     presetErrorText = null,
     onPageSelect = () => {},
     onDeviceAdd,
     onBrowserPointerDown,
+    onOpenContextMenu = () => {},
     onPresetEntryOpen,
     onPresetFilePointerDown,
   } = $props<{
     activePage?: BrowserPanelPage;
-    deviceTree: BrowserTreeFolderNode[];
-    presetTree: BrowserTreeFolderNode[];
+    deviceTree: BrowserTreeDeviceFolderNode[];
+    presetTree: BrowserTreePresetFolderNode[];
     isPresetLoading?: boolean;
     presetErrorText?: string | null;
     onPageSelect?: (page: BrowserPanelPage) => void;
     onDeviceAdd: (kind: RendererDeviceKind) => void;
     onBrowserPointerDown: (payload: BrowserPointerDownPayload) => void;
+    onOpenContextMenu?: (
+      clientX: number,
+      clientY: number,
+      target: ContextMenuTarget,
+    ) => void;
     onPresetEntryOpen: (entry: BrowserTreePresetLeafNode) => void | Promise<void>;
     onPresetFilePointerDown: (
       entry: BrowserTreePresetLeafNode,
@@ -190,6 +203,44 @@
     }
 
     void onPresetEntryOpen(node);
+  };
+
+  const resolvePresetContextMenuTarget = (
+    node: BrowserTreeNode,
+  ): PresetContextMenuTarget | null => {
+    if (node.kind === 'preset') {
+      return {
+        kind: 'preset-entry',
+        presetType: node.presetType,
+        relativePath: [...node.relativePath],
+        entryKind: 'file',
+      };
+    }
+
+    if (node.kind === 'folder' && node.treeKind === 'preset') {
+      return {
+        kind: 'preset-entry',
+        presetType: node.presetType,
+        relativePath: [...node.relativePath],
+        entryKind: 'directory',
+      };
+    }
+
+    return null;
+  };
+
+  const handleTreeItemContextMenu = (
+    node: BrowserTreeNode,
+    event: MouseEvent,
+  ): void => {
+    const target = resolvePresetContextMenuTarget(node);
+    if (!target) {
+      return;
+    }
+
+    event.preventDefault();
+    selectRow(node.id);
+    onOpenContextMenu(event.clientX, event.clientY, target);
   };
 
   const handleTreeItemKeyDown = async (
@@ -309,6 +360,12 @@
         icon="inventory_2"
         pressed={activePage === 'presets'}
         onClick={() => onPageSelect('presets')}
+        oncontextmenu={(event: MouseEvent) => {
+          event.preventDefault();
+          onOpenContextMenu(event.clientX, event.clientY, {
+            kind: 'presets-root',
+          });
+        }}
       />
     </div>
 
@@ -358,6 +415,7 @@
 
                   handleLeafPointerDown(row.node, event);
                 }}
+                oncontextmenu={(event) => handleTreeItemContextMenu(row.node, event)}
               >
                 {#if row.node.kind === 'folder'}
                   <button

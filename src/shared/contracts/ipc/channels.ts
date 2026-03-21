@@ -15,5 +15,7 @@ export const IPC_CHANNELS = {
   savePresetFile: 'preset:save-file',
   openPresetFile: 'preset:open-file',
   listPresetBrowserTree: 'preset:list-browser-tree',
+  showPresetEntryInFolder: 'preset:show-entry-in-folder',
+  showPresetsRootInFolder: 'preset:show-root-in-folder',
   readPresetEntry: 'preset:read-entry',
 } as const;

@@ -1,12 +1,13 @@
 import {
   app,
   dialog,
+  shell,
   type BaseWindow,
   type OpenDialogOptions,
   type SaveDialogOptions,
 } from 'electron';
 import type { Dirent } from 'node:fs';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { getRendererDeviceLabel } from '../../devices/schema-registry';
@@ -20,6 +21,9 @@ import type {
   ReadPresetEntryResponse,
   SavePresetFileRequest,
   SavePresetFileResponse,
+  ShowPresetEntryInFolderRequest,
+  ShowPresetEntryInFolderResponse,
+  ShowPresetsRootInFolderResponse,
 } from '../../shared/contracts/ipc/presets';
 import {
   isPresetFileKind,
@@ -202,6 +206,30 @@ const parseReadPresetEntryRequest = (
   };
 };
 
+const parseShowPresetEntryInFolderRequest = (
+  value: unknown,
+): ShowPresetEntryInFolderRequest | null => {
+  if (
+    typeof value !== 'object'
+    || value === null
+    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
+  ) {
+    return null;
+  }
+
+  const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
+  const entryKind = (value as { entryKind?: unknown }).entryKind;
+  if (!relativePath || (entryKind !== 'file' && entryKind !== 'directory')) {
+    return null;
+  }
+
+  return {
+    presetType: (value as { presetType: PresetFileKind }).presetType,
+    relativePath,
+    entryKind,
+  };
+};
+
 const resolvePresetPath = (
   rootDirectory: string,
   relativePath: readonly string[],
@@ -223,13 +251,21 @@ const compareEntryNames = (left: string, right: string): number =>
 
 /** Handles preset file dialogs and JSON serialization for preset payloads. */
 export class PresetService {
+  private async resolvePresetsRootDirectory(): Promise<string> {
+    const directory = path.join(
+      app.getPath('userData'),
+      PRESET_ROOT_DIR_NAME,
+    );
+    await mkdir(directory, { recursive: true });
+    return directory;
+  }
+
   private async resolvePresetDirectory(
     presetType: PresetFileKind,
   ): Promise<string> {
     const spec = PRESET_FILE_SPECS[presetType];
     const directory = path.join(
-      app.getPath('userData'),
-      PRESET_ROOT_DIR_NAME,
+      await this.resolvePresetsRootDirectory(),
       spec.directory,
     );
     await mkdir(directory, { recursive: true });
@@ -326,6 +362,8 @@ export class PresetService {
         kind: 'folder',
         id: `preset:${presetType}:${nextRelativePath.join('/')}`,
         label: directory.name,
+        presetType,
+        relativePath: nextRelativePath,
         children,
       });
     }
@@ -367,6 +405,8 @@ export class PresetService {
       kind: 'folder',
       id: `preset-root:${presetType}`,
       label: PRESET_ROOT_SECTION_LABELS[presetType],
+      presetType,
+      relativePath: [],
       children: await this.buildPresetBrowserTreeChildren(
         presetType,
         rootDirectory,
@@ -530,5 +570,78 @@ export class PresetService {
     }
 
     return this.readPresetFileByType(parsedRequest.presetType, filePath);
+  }
+
+  public async showPresetEntryInFolder(
+    request: unknown,
+  ): Promise<ShowPresetEntryInFolderResponse> {
+    const parsedRequest = parseShowPresetEntryInFolderRequest(request);
+    if (!parsedRequest) {
+      return {
+        status: 'error',
+        message: 'Invalid preset entry request.',
+      };
+    }
+
+    try {
+      const rootDirectory = await this.resolvePresetDirectory(parsedRequest.presetType);
+      const filePath = resolvePresetPath(rootDirectory, parsedRequest.relativePath);
+      if (!filePath) {
+        return {
+          status: 'error',
+          message: 'Invalid preset file path.',
+        };
+      }
+
+      if (
+        parsedRequest.entryKind === 'file'
+        && !hasPresetExtension(filePath, PRESET_FILE_SPECS[parsedRequest.presetType].extension)
+      ) {
+        return {
+          status: 'error',
+          message: 'Invalid preset file type.',
+        };
+      }
+
+      await access(filePath);
+      if (parsedRequest.entryKind === 'directory') {
+        const openError = await shell.openPath(filePath);
+        if (openError) {
+          return {
+            status: 'error',
+            message: openError,
+          };
+        }
+      } else {
+        shell.showItemInFolder(filePath);
+      }
+
+      return { status: 'ok' };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to reveal preset file.'),
+      };
+    }
+  }
+
+  public async showPresetsRootInFolder(): Promise<ShowPresetsRootInFolderResponse> {
+    try {
+      const directory = await this.resolvePresetsRootDirectory();
+      const openError = await shell.openPath(directory);
+      if (openError) {
+        return {
+          status: 'error',
+          message: openError,
+        };
+      }
+
+      return { status: 'ok' };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to reveal presets folder.'),
+      };
+    }
   }
 }

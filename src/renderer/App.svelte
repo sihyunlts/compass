@@ -20,10 +20,11 @@
   import BrowserPanel from './components/BrowserPanel.svelte';
   import type {
     BrowserTreeDeviceLeafNode,
-    BrowserTreeFolderNode,
+    BrowserTreeDeviceFolderNode,
+    BrowserTreePresetFolderNode,
     BrowserTreePresetLeafNode,
-    BrowserTreeNode,
   } from './components/browser-tree-types';
+  import type { ContextMenuTarget } from './components/context-menu-types';
   import Button from './components/Button.svelte';
   import SidebarResizer from './components/SidebarResizer.svelte';
   import DeviceRack from './components/DeviceRack.svelte';
@@ -81,15 +82,17 @@
     deviceKind: kind,
   });
 
-  const DEVICE_BROWSER_TREE: BrowserTreeFolderNode[] = [
+  const DEVICE_BROWSER_TREE: BrowserTreeDeviceFolderNode[] = [
     {
       kind: 'folder',
+      treeKind: 'device',
       id: 'device-group:generators',
       label: 'Generators',
       children: RENDERER_DEVICE_GROUPS.generator.map((kind) => toDeviceLeafNode(kind)),
     },
     {
       kind: 'folder',
+      treeKind: 'device',
       id: 'device-group:effects',
       label: 'Effects',
       children: RENDERER_DEVICE_GROUPS.effect.map((kind) => toDeviceLeafNode(kind)),
@@ -162,7 +165,7 @@
     clientWidth: 1,
   });
   let rackMiniMapContentRevision = $state(0);
-  let presetTree = $state<BrowserTreeFolderNode[]>([]);
+  let presetTree = $state<BrowserTreePresetFolderNode[]>([]);
   let isPresetLoading = $state(false);
   let presetErrorText = $state<string | null>(null);
   let presetListRequestToken = 0;
@@ -244,12 +247,15 @@
 
   const mapPresetTreeNode = (
     node: PresetBrowserTreeNode,
-  ): BrowserTreeNode => {
+  ): BrowserTreePresetFolderNode | BrowserTreePresetLeafNode => {
     if (node.kind === 'folder') {
       return {
         kind: 'folder',
+        treeKind: 'preset',
         id: node.id,
         label: node.label,
+        presetType: node.presetType,
+        relativePath: [...node.relativePath],
         children: node.children.map((child) => mapPresetTreeNode(child)),
       };
     }
@@ -279,7 +285,7 @@
       }
 
       presetTree = response.tree.map((node) =>
-        mapPresetTreeNode(node) as BrowserTreeFolderNode);
+        mapPresetTreeNode(node));
       presetErrorText = null;
     } catch (error) {
       if (requestToken !== presetListRequestToken) {
@@ -453,6 +459,35 @@
         itemEl,
       });
     }, 'Preset load failed.');
+  };
+
+  const handlePresetBrowserContextMenu = (
+    clientX: number,
+    clientY: number,
+    target: ContextMenuTarget,
+  ): void => {
+    contextMenuComponent?.open(clientX, clientY, target);
+  };
+
+  const handleShowPresetEntryInFolder = async (
+    target: Extract<ContextMenuTarget, { kind: 'preset-entry' | 'presets-root' }>,
+  ): Promise<void> => {
+    if (target.kind === 'presets-root') {
+      const response = await bridgeClient.showPresetsRootInFolder();
+      if (response.status === 'error') {
+        showPresetMessage(`Show in Folder failed | ${response.message}`);
+      }
+      return;
+    }
+
+    const response = await bridgeClient.showPresetEntryInFolder({
+      presetType: target.presetType,
+      relativePath: [...target.relativePath],
+      entryKind: target.entryKind,
+    });
+    if (response.status === 'error') {
+      showPresetMessage(`Show in Folder failed | ${response.message}`);
+    }
   };
 
   const savePreset = async (
@@ -646,6 +681,7 @@
       onPageSelect={editorSession.commands.setSidebarPage}
       onDeviceAdd={editorSession.commands.addBrowserDevice}
       onBrowserPointerDown={editorSession.commands.handleBrowserPointerDown}
+      onOpenContextMenu={handlePresetBrowserContextMenu}
       onPresetEntryOpen={handlePresetEntryOpen}
       onPresetFilePointerDown={handlePresetFilePointerDown}
     />
@@ -885,6 +921,7 @@
     onDuplicate={editorSession.commands.duplicateFromContextTarget}
     onRename={editorSession.commands.beginRenameFromContextTarget}
     onDelete={editorSession.commands.deleteFromContextTarget}
+    onShowInFolder={handleShowPresetEntryInFolder}
     onGroup={editorSession.commands.groupDeviceIds}
     onUngroupGroup={editorSession.commands.ungroupGroup}
     clipboardAvailable={clipboardAvailable}

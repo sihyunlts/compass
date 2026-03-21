@@ -8,6 +8,9 @@ import type {
   OpenPresetFileResponse,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
+  ShowPresetEntryInFolderRequest,
+  ShowPresetEntryInFolderResponse,
+  ShowPresetsRootInFolderResponse,
 } from './shared/contracts/ipc/presets';
 import type { PreviewWindowState } from './shared/contracts/preview/window-state';
 import type { CompassApi } from './shared/contracts/ipc/api';
@@ -102,6 +105,10 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.savePresetFile, request),
   listPresetBrowserTree: () =>
     ipcRenderer.invoke(IPC_CHANNELS.listPresetBrowserTree) as Promise<ListPresetBrowserTreeResponse>,
+  showPresetEntryInFolder: (request: ShowPresetEntryInFolderRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.showPresetEntryInFolder, request) as Promise<ShowPresetEntryInFolderResponse>,
+  showPresetsRootInFolder: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.showPresetsRootInFolder) as Promise<ShowPresetsRootInFolderResponse>,
   readPresetEntry: <K extends PresetFileKind>(request: ReadPresetEntryRequest<K>) =>
     ipcRenderer.invoke(IPC_CHANNELS.readPresetEntry, request) as Promise<ReadPresetEntryResponse<K>>,
   openPresetFile: <K extends PresetFileKind>(request: OpenPresetFileRequest<K>) =>

@@ -1,3 +1,5 @@
+import type { PresetFileKind } from '../../shared/presets';
+
 export type ContextMenuTarget =
   | {
       kind: 'devices';
@@ -8,4 +10,13 @@ export type ContextMenuTarget =
       kind: 'group';
       groupId: string;
       memberDeviceIds: readonly string[];
+    }
+  | {
+      kind: 'preset-entry';
+      presetType: PresetFileKind;
+      relativePath: readonly string[];
+      entryKind: 'file' | 'directory';
+    }
+  | {
+      kind: 'presets-root';
     };

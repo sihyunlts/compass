@@ -57,6 +57,8 @@ export interface PresetBrowserTreeFolderNode {
   kind: 'folder';
   id: string;
   label: string;
+  presetType: PresetFileKind;
+  relativePath: string[];
   children: PresetBrowserTreeNode[];
 }
 
@@ -78,6 +80,30 @@ export interface ReadPresetEntryRequest<K extends PresetFileKind = PresetFileKin
   presetType: K;
   relativePath: string[];
 }
+
+export interface ShowPresetEntryInFolderRequest<K extends PresetFileKind = PresetFileKind> {
+  presetType: K;
+  relativePath: string[];
+  entryKind: 'file' | 'directory';
+}
+
+export type ShowPresetEntryInFolderResponse =
+  | {
+      status: 'ok';
+    }
+  | {
+      status: 'error';
+      message: string;
+    };
+
+export type ShowPresetsRootInFolderResponse =
+  | {
+      status: 'ok';
+    }
+  | {
+      status: 'error';
+      message: string;
+    };
 
 export type ReadPresetEntryResponse<K extends PresetFileKind = PresetFileKind> =
   | {
