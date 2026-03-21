@@ -46,6 +46,7 @@
     />
     <input
       id="preview-scrub"
+      class="preview-panel-scrub"
       type="range"
       min="0"
       max={SCRUB_MAX}
@@ -109,6 +110,10 @@
       flex-direction: column;
       gap: var(--gap-6);
     }
+  }
+
+  .preview-panel-scrub {
+    margin-block: var(--gap-4);
   }
 
 </style>

@@ -42,6 +42,7 @@ button {
   input,
   select {
     width: 6.6rem;
+    height: 1.75rem;
   }
 }
 
@@ -104,10 +105,6 @@ input {
       cursor: text;
       caret-color: currentColor;
     }
-  }
-
-  &:not([type='checkbox']) {
-    height: 1.75rem;
   }
 
   &[type='range'] {

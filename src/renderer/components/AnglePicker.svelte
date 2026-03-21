@@ -308,6 +308,7 @@
 
     &-number-input {
       width: 4.8rem;
+      height: 1.75rem;
       flex: 0 0 auto;
     }
   }
