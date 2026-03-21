@@ -1,5 +1,5 @@
 import { clampBounds } from '../core/geometry';
-import type { Bounds, Vec2 } from '../core/core-types';
+import type { Bounds, Polyline, Vec2 } from '../core/core-types';
 import {
   MIN_NOTE_DURATION,
   POLYLINE_STEP,
@@ -13,10 +13,10 @@ import {
   evaluatePolylinesAtTime,
   type CompiledPipelineEngine,
 } from '../core/pipeline/engine';
-import type { OriginWindow } from '../core/pipeline/types';
 import {
-  applyColorPrograms,
+  applyColorProgramsDetailed,
   type ClipNoteWithOrigin,
+  type ColorGuideWarp,
 } from '../devices/color/engine';
 import { getLaunchpadRuntimeMap } from './launchpad-model';
 import type { ClipNote, GeneratorChain, LaunchpadModel } from '../shared/model';
@@ -45,6 +45,13 @@ export interface GenerateOverlayFramesInput {
   launchpadModel?: LaunchpadModel;
   sampleStep?: number;
   bounds?: Bounds;
+  loopLengthBeats?: number;
+  colorGuideWarpByOriginId?: ReadonlyMap<string, ColorGuideWarp>;
+}
+
+export interface PreviewNotesData {
+  notes: ClipNote[];
+  colorGuideWarpByOriginId: ReadonlyMap<string, ColorGuideWarp>;
 }
 
 interface OpenNoteState {
@@ -81,6 +88,14 @@ const closeOpenNote = (
   });
 };
 
+const toClipNote = (note: ClipNoteWithOrigin): ClipNote => ({
+  pitch: note.pitch,
+  channel: note.channel,
+  startBeat: note.startBeat,
+  durationBeats: note.durationBeats,
+  velocity: note.velocity,
+});
+
 const buildEngine = (
   chain: GeneratorChain,
   launchpadModel: LaunchpadModel | undefined,
@@ -94,14 +109,11 @@ const buildEngine = (
   });
 };
 
-const buildOverlayFrameStrokesAtBeat = (
-  engine: CompiledPipelineEngine,
-  beat01: number,
-  originWindows: Map<string, OriginWindow> | undefined,
+const buildOverlayFrameStrokes = (
+  polylines: ReadonlyArray<Polyline>,
   stride: number,
   clippedBounds: Bounds | null,
 ): OverlayFrameStroke[] => {
-  const polylines = evaluatePolylinesAtTime(engine, beat01, originWindows);
   const strokes: OverlayFrameStroke[] = [];
 
   for (const polyline of polylines) {
@@ -155,19 +167,27 @@ const buildOverlayFrameStrokesAtBeat = (
   return strokes;
 };
 
-/** Generates clip notes from one chain and one Launchpad model. */
-export const generateNotes = ({
+const buildGeneratedNotesData = ({
   chain,
   loopLengthBeats,
   launchpadModel,
-}: GenerateNotesInput): ClipNote[] => {
+}: GenerateNotesInput): {
+  notes: ClipNoteWithOrigin[];
+  colorGuideWarpByOriginId: ReadonlyMap<string, ColorGuideWarp>;
+} => {
   if (!Number.isFinite(loopLengthBeats) || loopLengthBeats <= 0) {
-    return [];
+    return {
+      notes: [],
+      colorGuideWarpByOriginId: new Map(),
+    };
   }
 
   const steps = Math.round(loopLengthBeats * SAMPLES_PER_BEAT);
   if (!Number.isFinite(steps) || steps <= 0) {
-    return [];
+    return {
+      notes: [],
+      colorGuideWarpByOriginId: new Map(),
+    };
   }
 
   const engine = buildEngine(chain, launchpadModel);
@@ -223,9 +243,58 @@ export const generateNotes = ({
   }
 
   sortClipNotes(notes);
-  const colorizedNotes = applyColorPrograms(chain, notes, MIN_NOTE_DURATION);
-  sortClipNotes(colorizedNotes);
-  return colorizedNotes;
+  const colorized = applyColorProgramsDetailed(chain, notes, MIN_NOTE_DURATION);
+  sortClipNotes(colorized.notes);
+  return colorized;
+};
+
+const resolveGuideBeat = (
+  beat01: number,
+  warp: ColorGuideWarp | undefined,
+): number => {
+  if (!warp || !Number.isFinite(warp.scale) || warp.scale >= 1) {
+    return beat01;
+  }
+
+  const sourceSpan = warp.sourceEndBeat - warp.sourceStartBeat;
+  if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
+    return beat01;
+  }
+
+  const relativeBeat = Math.max(0, beat01 - warp.sourceStartBeat);
+  const advancedBeat = warp.sourceStartBeat + Math.min(relativeBeat / warp.scale, sourceSpan);
+  return Math.min(Math.max(advancedBeat, 0), NORMALIZED_SOURCE_TIMELINE_END_BEAT);
+};
+
+/** Generates clip notes from one chain and one Launchpad model. */
+export const generatePreviewNotesData = ({
+  chain,
+  loopLengthBeats,
+  launchpadModel,
+}: GenerateNotesInput): PreviewNotesData => {
+  const generated = buildGeneratedNotesData({
+    chain,
+    loopLengthBeats,
+    launchpadModel,
+  });
+
+  return {
+    notes: generated.notes.map((note) => toClipNote(note)),
+    colorGuideWarpByOriginId: generated.colorGuideWarpByOriginId,
+  };
+};
+
+/** Generates clip notes from one chain and one Launchpad model. */
+export const generateNotes = ({
+  chain,
+  loopLengthBeats,
+  launchpadModel,
+}: GenerateNotesInput): ClipNote[] => {
+  return generatePreviewNotesData({
+    chain,
+    loopLengthBeats,
+    launchpadModel,
+  }).notes;
 };
 
 /** Counts total notes and unique pitches (deduped by pitch value). */
@@ -248,6 +317,8 @@ export const generateOverlayFrames = ({
   launchpadModel,
   sampleStep = POLYLINE_STEP,
   bounds,
+  loopLengthBeats = 1,
+  colorGuideWarpByOriginId,
 }: GenerateOverlayFramesInput): OverlayFrameStroke[][] => {
   if (beats01.length === 0) {
     return [];
@@ -256,6 +327,12 @@ export const generateOverlayFrames = ({
   const worldBounds = buildWorldBounds();
   const renderEngine = buildEngine(chain, launchpadModel, worldBounds);
   const originWindows = computeOriginWindowsWithEngine(renderEngine, 1);
+  const guideWarpByOriginId = colorGuideWarpByOriginId
+    ?? buildGeneratedNotesData({
+      chain,
+      loopLengthBeats,
+      launchpadModel,
+    }).colorGuideWarpByOriginId;
 
   const clippedBounds = bounds ? clampBounds(bounds) : null;
   const step = Number.isFinite(sampleStep) && sampleStep > 0 ? sampleStep : POLYLINE_STEP;
@@ -268,15 +345,48 @@ export const generateOverlayFrames = ({
       continue;
     }
 
-    frames.push(
-      buildOverlayFrameStrokesAtBeat(
-        renderEngine,
+    const visiblePolylines = evaluatePolylinesAtTime(
+      renderEngine,
+      beat01,
+      originWindows,
+    );
+    const originIdsByGuideBeat = new Map<number, Set<string>>();
+    for (const polyline of visiblePolylines) {
+      const guideBeat = resolveGuideBeat(
         beat01,
+        guideWarpByOriginId.get(polyline.originId),
+      );
+      const originIds = originIdsByGuideBeat.get(guideBeat);
+      if (originIds) {
+        originIds.add(polyline.originId);
+        continue;
+      }
+
+      originIdsByGuideBeat.set(guideBeat, new Set([polyline.originId]));
+    }
+
+    if (originIdsByGuideBeat.size === 1 && originIdsByGuideBeat.has(beat01)) {
+      frames.push(buildOverlayFrameStrokes(visiblePolylines, stride, clippedBounds));
+      continue;
+    }
+
+    const frameStrokes: OverlayFrameStroke[] = [];
+    for (const [guideBeat, originIds] of originIdsByGuideBeat.entries()) {
+      const guidePolylines = guideBeat === beat01
+        ? visiblePolylines
+        : evaluatePolylinesAtTime(
+        renderEngine,
+        guideBeat,
         originWindows,
+      );
+      frameStrokes.push(...buildOverlayFrameStrokes(
+        guidePolylines.filter((polyline) => originIds.has(polyline.originId)),
         stride,
         clippedBounds,
-      ),
-    );
+      ));
+    }
+
+    frames.push(frameStrokes);
   }
 
   return frames;

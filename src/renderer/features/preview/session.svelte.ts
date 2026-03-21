@@ -141,6 +141,8 @@ export class PreviewSession {
       sourceKey,
       sourceChain,
       input.launchpadModel,
+      input.loopLengthBeats,
+      previewResult?.colorGuideWarpByOriginId,
     );
     this.syncPreviewSurface(previewWindowState, overlayCache.framesByIndex, overlayCache.bounds);
     this.state.modulationReadoutById = this.modulationReadoutCache.resolveReadoutById(
@@ -170,6 +172,7 @@ export class PreviewSession {
       `preview-window:${previewState.previewRevision}`,
       previewState.chain,
       previewState.launchpadModel ?? 'mk3',
+      previewState.loopLengthBeats,
     );
     this.syncPreviewSurface(previewState, overlayCache.framesByIndex, overlayCache.bounds);
     this.state.previewRevision = previewState.previewRevision;

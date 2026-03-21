@@ -1,9 +1,10 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 import {
-  generateNotes,
+  generatePreviewNotesData,
   generatePreviewStats,
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+  type ColorGuideWarp,
 } from '../../../domain';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
@@ -22,6 +23,7 @@ export interface PreviewResultCacheEntry {
   preview: GeneratorPreview | null;
   sourceTimelineEndBeat: number;
   ledFramesByIndex: ReadonlyArray<ReadonlyMap<number, number>>;
+  colorGuideWarpByOriginId: ReadonlyMap<string, ColorGuideWarp>;
 }
 
 interface PreviewResultInput {
@@ -46,11 +48,23 @@ class PreviewResultCache {
       return cached;
     }
 
-    const preview = input.preview ?? this.generatePreview(
-      input.sourceChain,
-      input.loopLengthBeats,
-      input.launchpadModel,
-    );
+    const generatedNotes = input.preview
+      ? null
+      : generatePreviewNotesData({
+        chain: input.sourceChain,
+        loopLengthBeats: input.loopLengthBeats,
+        launchpadModel: input.launchpadModel,
+      });
+    const preview = input.preview ?? {
+      ...generatePreviewStats(generatedNotes?.notes ?? []),
+      notes: generatedNotes?.notes ?? [],
+    };
+    const colorGuideWarpByOriginId = generatedNotes?.colorGuideWarpByOriginId
+      ?? this.generateColorGuideWarp(
+        input.sourceChain,
+        input.loopLengthBeats,
+        input.launchpadModel,
+      );
     const entry: PreviewResultCacheEntry = {
       key,
       preview,
@@ -59,6 +73,7 @@ class PreviewResultCache {
         preview,
         NORMALIZED_SOURCE_TIMELINE_END_BEAT,
       ),
+      colorGuideWarpByOriginId,
     };
     this.resultsByKey.set(key, entry);
     return entry;
@@ -84,20 +99,16 @@ class PreviewResultCache {
     return previewResult.ledFramesByIndex[frameIndex] ?? EMPTY_ACTIVE_VELOCITY_BY_PITCH;
   }
 
-  private generatePreview(
+  private generateColorGuideWarp(
     chain: GeneratorChain,
     loopLengthBeats: number,
     launchpadModel: LaunchpadModel,
-  ): GeneratorPreview {
-    const notes = generateNotes({
+  ): ReadonlyMap<string, ColorGuideWarp> {
+    return generatePreviewNotesData({
       chain,
       loopLengthBeats,
       launchpadModel,
-    });
-    return {
-      ...generatePreviewStats(notes),
-      notes,
-    };
+    }).colorGuideWarpByOriginId;
   }
 
   private buildLedFrameCache(

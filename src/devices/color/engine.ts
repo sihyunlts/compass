@@ -8,6 +8,12 @@ export interface ClipNoteWithOrigin extends ClipNote {
   originId?: string;
 }
 
+export interface ColorGuideWarp {
+  sourceStartBeat: number;
+  sourceEndBeat: number;
+  scale: number;
+}
+
 interface ColorOriginConfig {
   velocities: number[];
   noteLengthPercent: number;
@@ -15,7 +21,13 @@ interface ColorOriginConfig {
 }
 
 interface ColorProgram {
-  notes: ClipNote[];
+  notes: ClipNoteWithOrigin[];
+  guideWarp: ColorGuideWarp;
+}
+
+interface AppliedColorProgramsResult {
+  notes: ClipNoteWithOrigin[];
+  colorGuideWarpByOriginId: ReadonlyMap<string, ColorGuideWarp>;
 }
 
 const DEFAULT_COLOR_VELOCITY = DEFAULT_COLOR_PARAMS.velocities[0];
@@ -178,7 +190,7 @@ const buildNominalColorProgram = (
   colorConfig: ColorOriginConfig,
   referenceDuration: number,
   minimumNoteDuration: number,
-): ClipNote[] => {
+): ClipNoteWithOrigin[] => {
   const segmentLength = Math.max(
     referenceDuration * (colorConfig.noteLengthPercent / 100),
     minimumNoteDuration,
@@ -193,7 +205,7 @@ const buildNominalColorProgram = (
     return [];
   }
 
-  const programNotes: ClipNote[] = [];
+  const programNotes: ClipNoteWithOrigin[] = [];
   for (const note of originNotes) {
     if (!Number.isFinite(note.startBeat)) {
       continue;
@@ -211,6 +223,7 @@ const buildNominalColorProgram = (
         startBeat,
         durationBeats: segmentLength,
         velocity: colorConfig.velocities[segmentIndex],
+        originId: note.originId,
       });
     }
   }
@@ -223,10 +236,10 @@ const buildNominalColorProgram = (
 
 const fitColorProgramToOriginSpan = (
   sourceNotes: ReadonlyArray<ClipNoteWithOrigin>,
-  programNotes: ReadonlyArray<ClipNote>,
-): ClipNote[] => {
+  programNotes: ReadonlyArray<ClipNoteWithOrigin>,
+): ColorProgram | null => {
   if (sourceNotes.length === 0 || programNotes.length === 0) {
-    return [];
+    return null;
   }
 
   let sourceStart = Number.POSITIVE_INFINITY;
@@ -241,7 +254,7 @@ const fitColorProgramToOriginSpan = (
   }
 
   if (!Number.isFinite(sourceStart) || !Number.isFinite(sourceEnd) || sourceEnd <= sourceStart) {
-    return [];
+    return null;
   }
 
   let nominalStart = Number.POSITIVE_INFINITY;
@@ -252,7 +265,7 @@ const fitColorProgramToOriginSpan = (
   }
 
   if (!Number.isFinite(nominalStart) || !Number.isFinite(nominalEnd) || nominalEnd <= nominalStart) {
-    return [];
+    return null;
   }
 
   const sourceSpan = sourceEnd - sourceStart;
@@ -261,7 +274,7 @@ const fitColorProgramToOriginSpan = (
     ? sourceSpan / nominalSpan
     : 1;
 
-  const fitted: ClipNote[] = [];
+  const fitted: ClipNoteWithOrigin[] = [];
   for (const note of programNotes) {
     const startBeat = sourceStart + ((note.startBeat - nominalStart) * scale);
     const scaledDurationBeats = note.durationBeats * scale;
@@ -281,10 +294,18 @@ const fitColorProgramToOriginSpan = (
       startBeat: clippedStart,
       durationBeats: clippedEnd - clippedStart,
       velocity: note.velocity,
+      originId: note.originId,
     });
   }
 
-  return fitted;
+  return {
+    notes: fitted,
+    guideWarp: {
+      sourceStartBeat: sourceStart,
+      sourceEndBeat: sourceEnd,
+      scale,
+    },
+  };
 };
 
 const buildColorProgramByOriginId = (
@@ -327,25 +348,26 @@ const buildColorProgramByOriginId = (
     }
 
     const fittedProgram = fitColorProgramToOriginSpan(originNotes, nominalProgram);
-    if (fittedProgram.length === 0) {
+    if (!fittedProgram || fittedProgram.notes.length === 0) {
       continue;
     }
 
-    colorProgramByOriginId.set(originId, {
-      notes: fittedProgram,
-    });
+    colorProgramByOriginId.set(originId, fittedProgram);
   }
 
   return colorProgramByOriginId;
 };
 
-export const applyColorPrograms = (
+export const applyColorProgramsDetailed = (
   chain: GeneratorChain,
   notes: ReadonlyArray<ClipNoteWithOrigin>,
   minimumNoteDuration: number,
-): ClipNote[] => {
+): AppliedColorProgramsResult => {
   if (notes.length === 0) {
-    return [];
+    return {
+      notes: [],
+      colorGuideWarpByOriginId: new Map(),
+    };
   }
 
   const colorProgramByOriginId = buildColorProgramByOriginId(
@@ -354,21 +376,25 @@ export const applyColorPrograms = (
     minimumNoteDuration,
   );
   if (colorProgramByOriginId.size === 0) {
-    return notes.map((note) => toClipNote(note));
+    return {
+      notes: notes.map((note) => ({ ...note })),
+      colorGuideWarpByOriginId: new Map(),
+    };
   }
 
-  const colorized: ClipNote[] = [];
+  const colorized: ClipNoteWithOrigin[] = [];
   const emittedOriginIds = new Set<string>();
+  const colorGuideWarpByOriginId = new Map<string, ColorGuideWarp>();
 
   for (const note of notes) {
     if (!note.originId) {
-      colorized.push(toClipNote(note));
+      colorized.push({ ...note });
       continue;
     }
 
     const colorProgram = colorProgramByOriginId.get(note.originId);
     if (!colorProgram) {
-      colorized.push(toClipNote(note));
+      colorized.push({ ...note });
       continue;
     }
 
@@ -377,8 +403,25 @@ export const applyColorPrograms = (
     }
 
     colorized.push(...colorProgram.notes);
+    colorGuideWarpByOriginId.set(note.originId, colorProgram.guideWarp);
     emittedOriginIds.add(note.originId);
   }
 
-  return colorized;
+  return {
+    notes: colorized,
+    colorGuideWarpByOriginId,
+  };
 };
+
+export const applyColorProgramsWithOrigins = (
+  chain: GeneratorChain,
+  notes: ReadonlyArray<ClipNoteWithOrigin>,
+  minimumNoteDuration: number,
+): ClipNoteWithOrigin[] => applyColorProgramsDetailed(chain, notes, minimumNoteDuration).notes;
+
+export const applyColorPrograms = (
+  chain: GeneratorChain,
+  notes: ReadonlyArray<ClipNoteWithOrigin>,
+  minimumNoteDuration: number,
+): ClipNote[] => applyColorProgramsDetailed(chain, notes, minimumNoteDuration).notes.map((note) =>
+  toClipNote(note));

@@ -2,6 +2,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import {
   generateOverlayFrames,
+  type ColorGuideWarp,
   type OverlayFrameStroke,
 } from '../../../domain';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
@@ -78,8 +79,10 @@ class OverlayFrameCache {
     sourceKey: string,
     chain: GeneratorChain,
     launchpadModel: LaunchpadModel,
+    loopLengthBeats: number,
+    colorGuideWarpByOriginId?: ReadonlyMap<string, ColorGuideWarp>,
   ): OverlayCacheEntry {
-    const key = `${sourceKey}:${launchpadModel}`;
+    const key = `${sourceKey}:${launchpadModel}:${loopLengthBeats}`;
     const cached = this.overlayFramesByKey.get(key);
     if (cached) {
       return cached;
@@ -87,7 +90,13 @@ class OverlayFrameCache {
 
     let nextPadding = OVERLAY_WORLD_BASE_PADDING;
     let nextBounds = resolveOverlayWorldBounds(nextPadding);
-    let nextFramesByIndex = this.buildOverlayFrames(chain, nextBounds, launchpadModel);
+    let nextFramesByIndex = this.buildOverlayFrames(
+      chain,
+      nextBounds,
+      launchpadModel,
+      loopLengthBeats,
+      colorGuideWarpByOriginId,
+    );
 
     while (
       touchesOverlayFrameCacheBoundary(nextFramesByIndex, nextBounds)
@@ -98,7 +107,13 @@ class OverlayFrameCache {
         nextPadding + OVERLAY_WORLD_PADDING_STEP,
       );
       nextBounds = resolveOverlayWorldBounds(nextPadding);
-      nextFramesByIndex = this.buildOverlayFrames(chain, nextBounds, launchpadModel);
+      nextFramesByIndex = this.buildOverlayFrames(
+        chain,
+        nextBounds,
+        launchpadModel,
+        loopLengthBeats,
+        colorGuideWarpByOriginId,
+      );
     }
 
     const entry: OverlayCacheEntry = {
@@ -114,6 +129,8 @@ class OverlayFrameCache {
     chain: GeneratorChain,
     bounds: OverlayWorldBounds,
     launchpadModel: LaunchpadModel,
+    loopLengthBeats: number,
+    colorGuideWarpByOriginId?: ReadonlyMap<string, ColorGuideWarp>,
   ): ReadonlyArray<ReadonlyArray<OverlayFrameStroke>> {
     return generateOverlayFrames({
       chain,
@@ -121,6 +138,8 @@ class OverlayFrameCache {
       sampleStep: OVERLAY_SAMPLE_STEP,
       bounds,
       launchpadModel,
+      loopLengthBeats,
+      colorGuideWarpByOriginId,
     });
   }
 }
