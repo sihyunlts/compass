@@ -36,6 +36,7 @@
   import RackHeaderScrollbar from './components/RackHeaderScrollbar.svelte';
   import PreviewPanel from './components/PreviewPanel.svelte';
   import ContextMenu from './components/ContextMenu.svelte';
+  import ModalDialog from './components/ModalDialog.svelte';
   import { createPaletteController } from './app/palette-controller';
   import { mountBridgeSubscriptions } from './app/bridge-subscriptions';
   import { createHeaderIndicator } from './app/header-indicator.svelte';
@@ -72,6 +73,19 @@
     targetId: null,
     placement: 'after',
   };
+  const PRESET_ROOT_LABELS = {
+    device: 'Devices',
+    group: 'Groups',
+    rack: 'Racks',
+  } as const;
+  type PendingRackPresetLoadTarget =
+    | {
+      kind: 'browser-entry';
+      entry: BrowserTreePresetLeafNode;
+    }
+    | {
+      kind: 'file-picker';
+    };
 
   const toDeviceLeafNode = (
     kind: RendererDeviceKind,
@@ -103,6 +117,10 @@
   let appVersionText = $state('');
   let rackViewApi: RackViewApi | null = $state(null);
   let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
+  let pendingPresetDeleteTarget = $state<Extract<ContextMenuTarget, { kind: 'preset-entry' }> | null>(null);
+  let isPresetDeletePending = $state(false);
+  let pendingRackPresetLoadTarget = $state<PendingRackPresetLoadTarget | null>(null);
+  let isRackPresetLoadPending = $state(false);
 
   const closeContextMenu = (): void => {
     contextMenuComponent?.close();
@@ -245,9 +263,9 @@
     rackViewApi?.setScrollLeft(nextScrollLeft);
   };
 
-  const mapPresetTreeNode = (
+  function mapPresetTreeNode(
     node: PresetBrowserTreeNode,
-  ): BrowserTreePresetFolderNode | BrowserTreePresetLeafNode => {
+  ): BrowserTreePresetFolderNode | BrowserTreePresetLeafNode {
     if (node.kind === 'folder') {
       return {
         kind: 'folder',
@@ -268,7 +286,7 @@
       relativePath: [...node.relativePath],
       savedAtIso: node.savedAtIso,
     };
-  };
+  }
 
   const loadPresetTree = async (): Promise<void> => {
     const requestToken = ++presetListRequestToken;
@@ -284,8 +302,7 @@
         return;
       }
 
-      presetTree = response.tree.map((node) =>
-        mapPresetTreeNode(node));
+      presetTree = response.tree.map((node) => mapPresetTreeNode(node) as BrowserTreePresetFolderNode);
       presetErrorText = null;
     } catch (error) {
       if (requestToken !== presetListRequestToken) {
@@ -397,35 +414,18 @@
   const handlePresetEntryOpen = async (
     entry: BrowserTreePresetLeafNode,
   ): Promise<void> => {
+    if (entry.presetType === 'rack') {
+      if (uiState.chainState.devices.length > 0) {
+        pendingRackPresetLoadTarget = {
+          kind: 'browser-entry',
+          entry,
+        };
+        return;
+      }
+    }
+
     await runPresetAction(async () => {
-      const response = await bridgeClient.readPresetEntry(
-        toReadPresetEntryRequest(entry),
-      );
-      if (response.status === 'error') {
-        showPresetMessage(`Preset load failed | ${response.message}`);
-        return;
-      }
-
-      if (response.payload.presetType === 'device') {
-        const result = editorSession.commands.insertDevicePreset(
-          DEFAULT_PRESET_DROP_ZONE,
-          response.payload,
-        );
-        showPresetActionMessage(result.message, response.warning);
-        return;
-      }
-
-      if (response.payload.presetType === 'group') {
-        const result = editorSession.commands.insertGroupPreset(
-          DEFAULT_PRESET_DROP_ZONE,
-          response.payload,
-        );
-        showPresetActionMessage(result.message, response.warning);
-        return;
-      }
-
-      const result = editorSession.commands.applyRackPreset(response.payload);
-      showPresetActionMessage(result.message, response.warning);
+      await loadPresetFromBrowserEntry(entry);
     }, 'Preset load failed.');
   };
 
@@ -469,20 +469,162 @@
     contextMenuComponent?.open(clientX, clientY, target);
   };
 
-  const handlePresetBrowserDelete = async (
+  const resolvePresetDeleteLabel = (
     target: Extract<ContextMenuTarget, { kind: 'preset-entry' }>,
-  ): Promise<void> => {
-    const response = await bridgeClient.deletePresetEntry({
-      presetType: target.presetType,
-      relativePath: [...target.relativePath],
-      entryKind: target.entryKind,
-    });
-    if (response.status === 'error') {
-      showPresetMessage(`Preset delete failed | ${response.message}`);
+  ): string =>
+    target.relativePath[target.relativePath.length - 1]
+    ?? PRESET_ROOT_LABELS[target.presetType];
+
+  const resolvePresetDeleteTitle = (
+    target: Extract<ContextMenuTarget, { kind: 'preset-entry' }>,
+  ): string =>
+    target.entryKind === 'directory'
+      ? 'Move folder to Trash?'
+      : 'Move preset to Trash?';
+
+  const resolvePresetDeleteDescription = (
+    target: Extract<ContextMenuTarget, { kind: 'preset-entry' }>,
+  ): string => {
+    const label = resolvePresetDeleteLabel(target);
+    return target.entryKind === 'directory'
+      ? `The folder "${label}" and everything inside it will be moved to the trash.`
+      : `The preset "${label}" will be moved to the trash.`;
+  };
+
+  const closePresetDeleteDialog = (): void => {
+    if (isPresetDeletePending) {
       return;
     }
 
-    await loadPresetTree();
+    pendingPresetDeleteTarget = null;
+  };
+
+  const resolveRackPresetLoadDescription = (
+    target: PendingRackPresetLoadTarget,
+  ): string =>
+    target.kind === 'browser-entry'
+      ? `The current rack will be replaced by the rack preset "${target.entry.label}".`
+      : 'The current rack will be replaced by the rack preset you choose.';
+
+  const closeRackPresetLoadDialog = (): void => {
+    if (isRackPresetLoadPending) {
+      return;
+    }
+
+    pendingRackPresetLoadTarget = null;
+  };
+
+  const loadPresetFromBrowserEntry = async (
+    entry: BrowserTreePresetLeafNode,
+  ): Promise<void> => {
+    const response = await bridgeClient.readPresetEntry(
+      toReadPresetEntryRequest(entry),
+    );
+    if (response.status === 'error') {
+      showPresetMessage(`Preset load failed | ${response.message}`);
+      return;
+    }
+
+    if (response.payload.presetType === 'device') {
+      const result = editorSession.commands.insertDevicePreset(
+        DEFAULT_PRESET_DROP_ZONE,
+        response.payload,
+      );
+      showPresetActionMessage(result.message, response.warning);
+      return;
+    }
+
+    if (response.payload.presetType === 'group') {
+      const result = editorSession.commands.insertGroupPreset(
+        DEFAULT_PRESET_DROP_ZONE,
+        response.payload,
+      );
+      showPresetActionMessage(result.message, response.warning);
+      return;
+    }
+
+    const result = editorSession.commands.applyRackPreset(response.payload);
+    showPresetActionMessage(result.message, response.warning);
+  };
+
+  const loadRackPresetFromPicker = async (): Promise<void> => {
+    const response = await bridgeClient.openPresetFile({
+      presetType: 'rack',
+    });
+    if (response.status !== 'opened') {
+      if (response.status === 'error') {
+        showPresetMessage(`Rack preset load failed | ${response.message}`);
+      }
+      return;
+    }
+
+    const result = editorSession.commands.applyRackPreset(response.payload);
+    showPresetActionMessage(result.message, response.warning);
+  };
+
+  const confirmRackPresetLoad = async (): Promise<void> => {
+    const target = pendingRackPresetLoadTarget;
+    if (!target || isRackPresetLoadPending) {
+      return;
+    }
+
+    isRackPresetLoadPending = true;
+    try {
+      await runPresetAction(async () => {
+        if (target.kind === 'browser-entry') {
+          await loadPresetFromBrowserEntry(target.entry);
+        } else {
+          await loadRackPresetFromPicker();
+        }
+        pendingRackPresetLoadTarget = null;
+      }, 'Rack preset load failed.');
+    } finally {
+      isRackPresetLoadPending = false;
+    }
+  };
+
+  const confirmPresetBrowserDelete = async (): Promise<void> => {
+    const target = pendingPresetDeleteTarget;
+    if (!target || isPresetDeletePending) {
+      return;
+    }
+
+    isPresetDeletePending = true;
+    try {
+      const response = await bridgeClient.deletePresetEntry({
+        presetType: target.presetType,
+        relativePath: [...target.relativePath],
+        entryKind: target.entryKind,
+      });
+      if (response.status === 'error') {
+        pendingPresetDeleteTarget = null;
+        showPresetMessage(`Preset delete failed | ${response.message}`);
+        return;
+      }
+
+      await loadPresetTree();
+      pendingPresetDeleteTarget = null;
+    } catch (error) {
+      const message = error instanceof Error && error.message.trim()
+        ? error.message.trim()
+        : 'Preset delete failed.';
+      showPresetMessage(`Preset delete failed | ${message}`);
+    } finally {
+      isPresetDeletePending = false;
+    }
+  };
+
+  const openPresetDeleteDialog = (
+    target: Extract<ContextMenuTarget, { kind: 'preset-entry' }>,
+  ): void => {
+    pendingPresetDeleteTarget = {
+      kind: 'preset-entry',
+      presetType: target.presetType,
+      relativePath: [...target.relativePath],
+      entryKind: target.entryKind,
+    };
+    isPresetDeletePending = false;
+    closeContextMenu();
   };
 
   const handleShowPresetEntryInFolder = async (
@@ -510,7 +652,7 @@
     target: ContextMenuTarget,
   ): void => {
     if (target.kind === 'preset-entry') {
-      void handlePresetBrowserDelete(target);
+      openPresetDeleteDialog(target);
       return;
     }
 
@@ -594,19 +736,15 @@
   };
 
   const handleLoadRackPreset = async (): Promise<void> => {
-    await runPresetAction(async () => {
-      const response = await bridgeClient.openPresetFile({
-        presetType: 'rack',
-      });
-      if (response.status !== 'opened') {
-        if (response.status === 'error') {
-          showPresetMessage(`Rack preset load failed | ${response.message}`);
-        }
-        return;
-      }
+    if (uiState.chainState.devices.length > 0) {
+      pendingRackPresetLoadTarget = {
+        kind: 'file-picker',
+      };
+      return;
+    }
 
-      const result = editorSession.commands.applyRackPreset(response.payload);
-      showPresetActionMessage(result.message, response.warning);
+    await runPresetAction(async () => {
+      await loadRackPresetFromPicker();
     }, 'Rack preset load failed.');
   };
 
@@ -952,4 +1090,26 @@
     onGroup={editorSession.commands.groupDeviceIds}
     onUngroupGroup={editorSession.commands.ungroupGroup}
     clipboardAvailable={clipboardAvailable}
+  />
+
+  <ModalDialog
+    open={pendingPresetDeleteTarget !== null}
+    title={pendingPresetDeleteTarget ? resolvePresetDeleteTitle(pendingPresetDeleteTarget) : ''}
+    description={pendingPresetDeleteTarget ? resolvePresetDeleteDescription(pendingPresetDeleteTarget) : null}
+    confirmLabel="Move to Trash"
+    cancelLabel="Cancel"
+    busy={isPresetDeletePending}
+    onConfirm={confirmPresetBrowserDelete}
+    onCancel={closePresetDeleteDialog}
+  />
+
+  <ModalDialog
+    open={pendingRackPresetLoadTarget !== null}
+    title="Load rack preset?"
+    description={pendingRackPresetLoadTarget ? resolveRackPresetLoadDescription(pendingRackPresetLoadTarget) : null}
+    confirmLabel="Load"
+    cancelLabel="Cancel"
+    busy={isRackPresetLoadPending}
+    onConfirm={confirmRackPresetLoad}
+    onCancel={closeRackPresetLoadDialog}
   />
