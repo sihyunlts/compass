@@ -3,9 +3,13 @@
   import {
     getRendererDeviceLabel,
     RENDERER_DEVICE_GROUPS,
-    isRendererDeviceKind,
     type RendererDeviceKind,
   } from '../../devices';
+  import type {
+    PresetBrowserFileItem,
+    PresetBrowserSection,
+  } from '../../shared/contracts/ipc/presets';
+  import type { BrowserInsertSource } from './device-rack-types';
 
   export type BrowserPanelPage = 'devices' | 'presets';
 
@@ -15,7 +19,8 @@
   }
 
   type BrowserPointerDownPayload = {
-    kind: RendererDeviceKind;
+    source: BrowserInsertSource;
+    badgeLabel: string;
     sourceEvent: PointerEvent;
     itemEl: HTMLElement;
   };
@@ -30,44 +35,66 @@
   const browserGenerators = toBrowserCatalogItems(RENDERER_DEVICE_GROUPS.generator);
   const browserEffects = toBrowserCatalogItems(RENDERER_DEVICE_GROUPS.effect);
 
-  const noopDeviceAdd = (): void => {};
-  const noopBrowserPointerDown = (): void => {};
-
   let {
     activePage = 'devices',
+    presetSections = [] as PresetBrowserSection[],
+    isPresetLoading = false,
+    presetErrorText = null,
     onPageSelect = () => {},
-    onDeviceAdd = noopDeviceAdd,
-    onBrowserPointerDown = noopBrowserPointerDown,
+    onDeviceAdd,
+    onBrowserPointerDown,
+    onPresetEntryOpen,
+    onPresetFilePointerDown,
   } = $props<{
     activePage?: BrowserPanelPage;
+    presetSections?: PresetBrowserSection[];
+    isPresetLoading?: boolean;
+    presetErrorText?: string | null;
     onPageSelect?: (page: BrowserPanelPage) => void;
     onDeviceAdd: (kind: RendererDeviceKind) => void;
     onBrowserPointerDown: (payload: BrowserPointerDownPayload) => void;
+    onPresetEntryOpen: (entry: PresetBrowserFileItem) => void | Promise<void>;
+    onPresetFilePointerDown: (
+      entry: PresetBrowserFileItem,
+      event: PointerEvent,
+      itemEl: HTMLElement,
+    ) => void | Promise<void>;
   }>();
 
-  const handleDoubleClick = (kindRaw: string): void => {
-    if (!isRendererDeviceKind(kindRaw)) {
-      return;
-    }
-
-    onDeviceAdd(kindRaw);
-  };
-
-  const handlePointerDown = (kindRaw: string, event: PointerEvent): void => {
-    if (!isRendererDeviceKind(kindRaw)) {
-      return;
-    }
-
-    const item = event.currentTarget;
-    if (!(item instanceof HTMLElement)) {
+  const handleDevicePointerDown = (
+    item: BrowserCatalogItem,
+    event: PointerEvent,
+  ): void => {
+    const itemEl = event.currentTarget;
+    if (!(itemEl instanceof HTMLElement)) {
       return;
     }
 
     onBrowserPointerDown({
-      kind: kindRaw,
+      source: {
+        kind: 'device-kind',
+        deviceKind: item.kind,
+      },
+      badgeLabel: `+ ${item.label}`,
       sourceEvent: event,
-      itemEl: item,
+      itemEl,
     });
+  };
+
+  const handlePresetPointerDown = (
+    entry: PresetBrowserFileItem,
+    event: PointerEvent,
+  ): void => {
+    if (entry.presetType === 'rack') {
+      return;
+    }
+
+    const itemEl = event.currentTarget;
+    if (!(itemEl instanceof HTMLElement)) {
+      return;
+    }
+
+    void onPresetFilePointerDown(entry, event, itemEl);
   };
 
   const handleDragStart = (event: DragEvent): void => {
@@ -107,8 +134,8 @@
                   class="browser-item"
                   type="button"
                   ondragstart={handleDragStart}
-                  ondblclick={() => handleDoubleClick(item.kind)}
-                  onpointerdown={(event) => handlePointerDown(item.kind, event)}
+                  ondblclick={() => onDeviceAdd(item.kind)}
+                  onpointerdown={(event) => handleDevicePointerDown(item, event)}
                 >
                   <span>{item.label}</span>
                 </button>
@@ -125,8 +152,8 @@
                   class="browser-item"
                   type="button"
                   ondragstart={handleDragStart}
-                  ondblclick={() => handleDoubleClick(item.kind)}
-                  onpointerdown={(event) => handlePointerDown(item.kind, event)}
+                  ondblclick={() => onDeviceAdd(item.kind)}
+                  onpointerdown={(event) => handleDevicePointerDown(item, event)}
                 >
                   <span>{item.label}</span>
                 </button>
@@ -136,7 +163,36 @@
         </section>
       </div>
     {:else}
-      <div class="browser-page-panel"></div>
+      <div class="browser-page-panel">
+        {#if isPresetLoading}
+          <p class="browser-status">Loading presets...</p>
+        {:else if presetErrorText}
+          <p class="browser-status browser-status-error">{presetErrorText}</p>
+        {:else if presetSections.length === 0}
+          <p class="browser-status">No presets yet.</p>
+        {:else}
+          {#each presetSections as section (section.id)}
+            <section class="browser-group">
+              <span class="browser-group-title">{section.title}</span>
+              <ul class="browser-list">
+                {#each section.entries as entry (`${entry.presetType}:${entry.relativePath.join('/')}`)}
+                  <li>
+                    <button
+                      class="browser-item"
+                      type="button"
+                      ondragstart={handleDragStart}
+                      ondblclick={() => onPresetEntryOpen(entry)}
+                      onpointerdown={(event) => handlePresetPointerDown(entry, event)}
+                    >
+                      <span>{entry.name}</span>
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+            </section>
+          {/each}
+        {/if}
+      </div>
     {/if}
   </div>
 </aside>
@@ -186,6 +242,7 @@
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
+    -webkit-app-region: no-drag;
   }
 
   .browser-group {
@@ -223,5 +280,15 @@
     &:global(.is-dragging) {
       opacity: 0.7;
     }
+  }
+
+  .browser-status {
+    margin: 0;
+    font-size: var(--text-12);
+    color: var(--neutral-50);
+  }
+
+  .browser-status-error {
+    color: var(--accent-300);
   }
 </style>

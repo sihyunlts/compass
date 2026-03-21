@@ -1,5 +1,5 @@
-import type { RendererDeviceKind } from '../../../devices';
 import { clamp } from '../../../shared/math';
+import type { BrowserInsertSource } from '../../components/device-rack-types';
 import type {
   ChainDragSourceKind,
   RackDropZone,
@@ -18,7 +18,7 @@ type DragDropPointerUpResult =
     }
   | {
       kind: 'browser';
-      sourceKind: RendererDeviceKind;
+      source: BrowserInsertSource;
       dropZone: RackDropZone | null;
       didMove: boolean;
       shouldCommit: boolean;
@@ -35,7 +35,7 @@ export type ActiveDragInfo =
     }
   | {
       kind: 'browser';
-      sourceKind: RendererDeviceKind;
+      source: BrowserInsertSource;
       didMove: boolean;
       dropZone: RackDropZone | null;
     };
@@ -74,7 +74,7 @@ type ChainDragState = {
 type BrowserDragState = {
   kind: 'browser';
   pointerId: number;
-  sourceKind: RendererDeviceKind;
+  source: BrowserInsertSource;
   itemEl: HTMLElement;
   badgeLabel: string;
   startX: number;
@@ -158,7 +158,7 @@ export class RackDragController {
 
     return {
       kind: 'browser',
-      sourceKind: drag.sourceKind,
+      source: drag.source,
       didMove: drag.didMove,
       dropZone: snapshotDropZone(drag.dropZone),
     };
@@ -196,7 +196,7 @@ export class RackDragController {
 
   startBrowserDrag(
     event: PointerEvent,
-    kind: RendererDeviceKind,
+    source: BrowserInsertSource,
     itemEl: HTMLElement,
     badgeLabel: string,
   ): boolean {
@@ -207,7 +207,7 @@ export class RackDragController {
     this.activeDrag = {
       kind: 'browser',
       pointerId: event.pointerId,
-      sourceKind: kind,
+      source,
       itemEl,
       badgeLabel,
       startX: event.clientX,
@@ -302,7 +302,7 @@ export class RackDragController {
     const dropZone = drag.dropZone;
     return {
       kind: 'browser',
-      sourceKind: drag.sourceKind,
+      source: drag.source,
       dropZone,
       didMove: drag.didMove,
       shouldCommit: drag.didMove && dropZone !== null,

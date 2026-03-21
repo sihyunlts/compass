@@ -8,7 +8,11 @@ import type {
 import type { RendererDeviceKind } from '../../../devices';
 import { isRendererDeviceKind } from '../../../devices';
 import type { ContextMenuTarget } from '../../components/context-menu-types';
-import type { RackInteractionCommit } from '../../components/device-rack-types';
+import type {
+  BrowserInsertSource,
+  BrowserPresetInsertSource,
+  RackInteractionCommit,
+} from '../../components/device-rack-types';
 import type { RackDropZone } from '../rack/drop-ops';
 import type { GroupSelectionContext } from '../rack/selection.svelte';
 import {
@@ -132,8 +136,9 @@ export interface EditorRackBinding {
   startRenamingGroup(groupId: string): boolean;
   handleBrowserPointerDown(
     event: PointerEvent,
-    kind: RendererDeviceKind,
+    source: BrowserInsertSource,
     itemEl: HTMLElement,
+    badgeLabel: string,
   ): void;
 }
 
@@ -223,15 +228,28 @@ export class EditorSession {
       this.selectInsertedDevices(previousChain, nextChain);
     },
     handleBrowserPointerDown: (payload: {
-      kind: RendererDeviceKind;
+      source: BrowserInsertSource;
+      badgeLabel: string;
       sourceEvent: PointerEvent;
       itemEl: HTMLElement;
     }): void => {
       this.rackBinding?.handleBrowserPointerDown(
         payload.sourceEvent,
-        payload.kind,
+        payload.source,
         payload.itemEl,
+        payload.badgeLabel,
       );
+    },
+    handlePresetInsertDrop: (
+      source: BrowserPresetInsertSource,
+      dropZone: RackDropZone,
+    ): void => {
+      if (source.kind === 'device-preset') {
+        this.insertDevicePreset(dropZone, source.preset);
+        return;
+      }
+
+      this.insertGroupPreset(dropZone, source.preset);
     },
     handleRackCommit: (commit: RackInteractionCommit): void => {
       const previousChain = this.state.chainState;
@@ -246,7 +264,7 @@ export class EditorSession {
           ? EDITOR_HISTORY_META.moveDevices
           : EDITOR_HISTORY_META.insertDevice,
       );
-      if (commit.kind === 'insert') {
+      if (commit.kind === 'insert-device') {
         this.selectInsertedDevices(previousChain, nextChain);
       }
     },

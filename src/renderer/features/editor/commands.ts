@@ -177,7 +177,7 @@ export const applyRackCommit = (
     chain,
     applyInsertDeviceByDropZone(
       chain.devices,
-      createDeviceNodeByKind(commit.sourceKind),
+      createDeviceNodeByKind(commit.deviceKind),
       commit.dropZone,
     ),
   );

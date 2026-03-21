@@ -5,13 +5,19 @@ import {
   type OpenDialogOptions,
   type SaveDialogOptions,
 } from 'electron';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { getRendererDeviceLabel } from '../../devices/schema-registry';
 import type {
+  ListPresetBrowserSectionsResponse,
   OpenPresetFileRequest,
   OpenPresetFileResponse,
+  PresetBrowserFileItem,
+  PresetBrowserSection,
+  ReadPresetEntryRequest,
+  ReadPresetEntryResponse,
   SavePresetFileRequest,
   SavePresetFileResponse,
 } from '../../shared/contracts/ipc/presets';
@@ -20,6 +26,7 @@ import {
   parsePresetFile,
   parsePresetFileText,
   PRESET_FILE_EXTENSIONS,
+  type PresetFile,
   type PresetFileKind,
 } from '../../shared/presets';
 
@@ -53,6 +60,12 @@ const PRESET_FILE_SPECS = {
     defaultName: string;
   }
 >;
+
+const PRESET_ROOT_SECTION_LABELS: Record<PresetFileKind, string> = {
+  device: 'Devices',
+  group: 'Groups',
+  rack: 'Racks',
+};
 
 const sanitizeFileStem = (value: string, fallback: string): string => {
   const trimmed = value.trim();
@@ -151,6 +164,63 @@ const parseOpenPresetFileRequest = (
     ? { presetType: (value as { presetType: PresetFileKind }).presetType }
     : null;
 
+const isValidRelativePathSegment = (value: unknown): value is string =>
+  typeof value === 'string'
+  && value.length > 0
+  && value !== '.'
+  && value !== '..'
+  && !value.includes('/')
+  && !value.includes('\\');
+
+const parseRelativePath = (value: unknown): string[] | null => {
+  if (!Array.isArray(value) || !value.every((segment) => isValidRelativePathSegment(segment))) {
+    return null;
+  }
+
+  return [...value];
+};
+
+const parseReadPresetEntryRequest = (
+  value: unknown,
+): ReadPresetEntryRequest | null => {
+  if (
+    typeof value !== 'object'
+    || value === null
+    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
+  ) {
+    return null;
+  }
+
+  const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
+  if (!relativePath || relativePath.length === 0) {
+    return null;
+  }
+
+  return {
+    presetType: (value as { presetType: PresetFileKind }).presetType,
+    relativePath,
+  };
+};
+
+const resolvePresetPath = (
+  rootDirectory: string,
+  relativePath: readonly string[],
+): string | null => {
+  const resolvedRoot = path.resolve(rootDirectory);
+  const resolvedPath = path.resolve(rootDirectory, ...relativePath);
+  if (resolvedPath !== resolvedRoot && !resolvedPath.startsWith(`${resolvedRoot}${path.sep}`)) {
+    return null;
+  }
+
+  return resolvedPath;
+};
+
+const compareEntryNames = (left: string, right: string): number =>
+  left.localeCompare(right, undefined, {
+    numeric: true,
+    sensitivity: 'base',
+  });
+
 /** Handles preset file dialogs and JSON serialization for preset payloads. */
 export class PresetService {
   private async resolvePresetDirectory(
@@ -164,6 +234,158 @@ export class PresetService {
     );
     await mkdir(directory, { recursive: true });
     return directory;
+  }
+
+  private async readPresetFileByType<K extends PresetFileKind>(
+    presetType: K,
+    filePath: string,
+  ): Promise<ReadPresetEntryResponse<K>> {
+    try {
+      const text = await readFile(filePath, 'utf8');
+      const parsed = parsePresetFileText(text, {
+        fileName: filePath,
+        mode: 'recover',
+      });
+      if (parsed.ok === false) {
+        return {
+          status: 'error',
+          message: parsed.message,
+          filePath,
+        };
+      }
+      if (parsed.preset.presetType !== presetType) {
+        return {
+          status: 'error',
+          message: `Expected a ${presetType} preset file.`,
+          filePath,
+        };
+      }
+
+      return {
+        status: 'loaded',
+        filePath,
+        payload: parsed.preset as Extract<PresetFile, { presetType: K }>,
+        warning: parsed.warning,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to read preset file.'),
+        filePath,
+      };
+    }
+  }
+
+  private async readDirectoryEntries(
+    directoryPath: string,
+  ): Promise<Dirent<string>[]> {
+    try {
+      return await readdir(directoryPath, {
+        encoding: 'utf8',
+        withFileTypes: true,
+      }) as Dirent<string>[];
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return [];
+      }
+
+      throw error;
+    }
+  }
+
+  private async collectPresetSectionEntries(
+    presetType: PresetFileKind,
+    rootDirectory: string,
+    relativePath: readonly string[],
+    labelPrefix = '',
+  ): Promise<PresetBrowserFileItem[]> {
+    const directoryPath = resolvePresetPath(rootDirectory, relativePath);
+    if (!directoryPath) {
+      return [];
+    }
+
+    const spec = PRESET_FILE_SPECS[presetType];
+    const directoryEntries = await this.readDirectoryEntries(directoryPath);
+    const entries: PresetBrowserFileItem[] = [];
+
+    const fileEntries = directoryEntries
+      .filter((entry) => entry.isFile() && hasPresetExtension(entry.name, spec.extension))
+      .sort((left, right) => compareEntryNames(left.name, right.name));
+
+    for (const entry of fileEntries) {
+      entries.push({
+        presetType,
+        name: labelPrefix ? `${labelPrefix} / ${path.parse(entry.name).name}` : path.parse(entry.name).name,
+        relativePath: [...relativePath, entry.name],
+      });
+    }
+
+    const childDirectories = directoryEntries
+      .filter((entry) => entry.isDirectory())
+      .sort((left, right) => compareEntryNames(left.name, right.name));
+
+    for (const directory of childDirectories) {
+      const nextPrefix = labelPrefix ? `${labelPrefix} / ${directory.name}` : directory.name;
+      entries.push(
+        ...(await this.collectPresetSectionEntries(
+          presetType,
+          rootDirectory,
+          [...relativePath, directory.name],
+          nextPrefix,
+        )),
+      );
+    }
+
+    return entries;
+  }
+
+  private async listPresetBrowserSectionsByType(
+    presetType: PresetFileKind,
+  ): Promise<PresetBrowserSection[]> {
+    const rootDirectory = await this.resolvePresetDirectory(presetType);
+    const rootEntries = await this.readDirectoryEntries(rootDirectory);
+    const spec = PRESET_FILE_SPECS[presetType];
+    const sections: PresetBrowserSection[] = [];
+
+    const rootFiles = rootEntries
+      .filter((entry) => entry.isFile() && hasPresetExtension(entry.name, spec.extension))
+      .sort((left, right) => compareEntryNames(left.name, right.name))
+      .map<PresetBrowserFileItem>((entry) => ({
+        presetType,
+        name: path.parse(entry.name).name,
+        relativePath: [entry.name],
+      }));
+
+    const rootDirectories = rootEntries
+      .filter((entry) => entry.isDirectory())
+      .sort((left, right) => compareEntryNames(left.name, right.name));
+
+    if (rootFiles.length > 0 || rootDirectories.length === 0) {
+      sections.push({
+        id: `${presetType}:root`,
+        title: PRESET_ROOT_SECTION_LABELS[presetType],
+        entries: rootFiles,
+      });
+    }
+
+    for (const directory of rootDirectories) {
+      const entries = await this.collectPresetSectionEntries(
+        presetType,
+        rootDirectory,
+        [directory.name],
+      );
+      if (entries.length === 0) {
+        continue;
+      }
+
+      sections.push({
+        id: `${presetType}:${directory.name}`,
+        title: directory.name,
+        entries,
+      });
+    }
+
+    return sections;
   }
 
   public async savePresetFile(
@@ -253,31 +475,16 @@ export class PresetService {
         return { status: 'canceled' };
       }
 
-      const text = await readFile(filePath, 'utf8');
-      const parsed = parsePresetFileText(text, {
-        fileName: filePath,
-        mode: 'recover',
-      });
-      if (parsed.ok === false) {
-        return {
-          status: 'error',
-          message: parsed.message,
-          filePath,
-        };
-      }
-      if (parsed.preset.presetType !== parsedRequest.presetType) {
-        return {
-          status: 'error',
-          message: `Expected a ${parsedRequest.presetType} preset file.`,
-          filePath,
-        };
+      const readResult = await this.readPresetFileByType(parsedRequest.presetType, filePath);
+      if (readResult.status === 'error') {
+        return readResult;
       }
 
       return {
         status: 'opened',
-        filePath,
-        payload: parsed.preset,
-        warning: parsed.warning,
+        filePath: readResult.filePath,
+        payload: readResult.payload,
+        warning: readResult.warning,
       };
     } catch (error) {
       return {
@@ -285,5 +492,56 @@ export class PresetService {
         message: toErrorMessage(error, 'Failed to read preset file.'),
       };
     }
+  }
+
+  public async listPresetBrowserSections(): Promise<ListPresetBrowserSectionsResponse> {
+    try {
+      return {
+        status: 'ok',
+        sections: (
+          await Promise.all(
+            (['device', 'group', 'rack'] as const).map((presetType) =>
+              this.listPresetBrowserSectionsByType(presetType)
+            ),
+          )
+        ).flat(),
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to list preset browser sections.'),
+      };
+    }
+  }
+
+  public async readPresetEntry(
+    request: unknown,
+  ): Promise<ReadPresetEntryResponse> {
+    const parsedRequest = parseReadPresetEntryRequest(request);
+    if (!parsedRequest) {
+      return {
+        status: 'error',
+        message: 'Invalid preset read request.',
+      };
+    }
+
+    const rootDirectory = await this.resolvePresetDirectory(parsedRequest.presetType);
+    const filePath = resolvePresetPath(rootDirectory, parsedRequest.relativePath);
+    if (!filePath) {
+      return {
+        status: 'error',
+        message: 'Invalid preset file path.',
+      };
+    }
+
+    if (!hasPresetExtension(filePath, PRESET_FILE_SPECS[parsedRequest.presetType].extension)) {
+      return {
+        status: 'error',
+        message: 'Unsupported preset file extension.',
+        filePath,
+      };
+    }
+
+    return this.readPresetFileByType(parsedRequest.presetType, filePath);
   }
 }

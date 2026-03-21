@@ -5,12 +5,12 @@
    */
   import { onMount, tick } from 'svelte';
 
-  import {
-    getRendererDeviceLabel,
-    type RendererDeviceKind,
-  } from '../devices';
   import type { PaletteFilePayload } from '../shared/model';
   import { parsePresetFileText } from '../shared/presets';
+  import type {
+    PresetBrowserFileItem,
+    PresetBrowserSection,
+  } from '../shared/contracts/ipc/presets';
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
   import { sanitizeSidebarWidth } from './features/editor/persistence-storage';
   import BrowserPanel from './components/BrowserPanel.svelte';
@@ -18,6 +18,7 @@
   import SidebarResizer from './components/SidebarResizer.svelte';
   import DeviceRack from './components/DeviceRack.svelte';
   import type {
+    BrowserInsertSource,
     RackPresetFileDrop,
     RackScrollMetrics,
   } from './components/device-rack-types';
@@ -48,15 +49,18 @@
   } from './features/editor/selectors';
   import { resolveGroupMemberIds } from './features/editor/chain-ops';
   import { createPreviewSession } from './features/preview/session.svelte';
+  import type { RackDropZone } from './features/rack/drop-ops';
   import type { RackViewApi } from './features/rack/api';
 
   const AUTO_PREVIEW_DEBOUNCE_MS = 120;
   const HISTORY_MAX_ENTRIES = 100;
   const DEFAULT_LED_RGB = '255 166 57';
   const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, select, textarea, option';
-
-  const toBrowserDragBadgeLabel = (kind: RendererDeviceKind): string =>
-    `+ ${getRendererDeviceLabel(kind)}`;
+  const DEFAULT_PRESET_DROP_ZONE: RackDropZone = {
+    kind: 'outside',
+    targetId: null,
+    placement: 'after',
+  };
   const bridgeClient = window.compass;
   let appVersionText = $state('');
   let rackViewApi: RackViewApi | null = $state(null);
@@ -123,6 +127,10 @@
     clientWidth: 1,
   });
   let rackMiniMapContentRevision = $state(0);
+  let presetSections = $state<PresetBrowserSection[]>([]);
+  let isPresetLoading = $state(false);
+  let presetErrorText = $state<string | null>(null);
+  let presetListRequestToken = 0;
 
   const createRackBinding = (): EditorRackBinding | null => {
     if (!rackViewApi) {
@@ -154,8 +162,8 @@
         rackViewApi?.startRenamingDevice(deviceId) ?? false,
       startRenamingGroup: (groupId) =>
         rackViewApi?.startRenamingGroup(groupId) ?? false,
-      handleBrowserPointerDown: (event, kind, itemEl) => {
-        rackViewApi?.handleBrowserPointerDown(event, kind, itemEl);
+      handleBrowserPointerDown: (event, source, itemEl, badgeLabel) => {
+        rackViewApi?.handleBrowserPointerDown(event, source, itemEl, badgeLabel);
       },
     };
   };
@@ -167,6 +175,14 @@
   $effect(() => {
     void uiState.headerIndicatorText;
     headerIndicator.syncFromSource();
+  });
+
+  $effect(() => {
+    if (uiState.sidebarPage !== 'presets') {
+      return;
+    }
+
+    void loadPresetSections();
   });
 
   const handleUndoClick = (): void => {
@@ -189,6 +205,38 @@
 
   const handleRackHeaderScrollRequest = (nextScrollLeft: number): void => {
     rackViewApi?.setScrollLeft(nextScrollLeft);
+  };
+
+  const loadPresetSections = async (): Promise<void> => {
+    const requestToken = ++presetListRequestToken;
+    isPresetLoading = true;
+    presetErrorText = null;
+
+    try {
+      const response = await bridgeClient.listPresetBrowserSections();
+      if (response.status === 'error') {
+        throw new Error(response.message);
+      }
+      if (requestToken !== presetListRequestToken) {
+        return;
+      }
+
+      presetSections = response.sections;
+      presetErrorText = null;
+    } catch (error) {
+      if (requestToken !== presetListRequestToken) {
+        return;
+      }
+
+      presetSections = [];
+      presetErrorText = error instanceof Error && error.message.trim()
+        ? error.message.trim()
+        : 'Failed to load presets.';
+    } finally {
+      if (requestToken === presetListRequestToken) {
+        isPresetLoading = false;
+      }
+    }
   };
 
   const handlePaletteFileChange = async (event: Event): Promise<void> => {
@@ -249,6 +297,104 @@
     warning?: string,
   ): void => {
     showPresetMessage(warning ? `${message} | ${warning}` : message);
+  };
+
+  const resolvePresetInsertSource = (
+    sourcePayload: Awaited<ReturnType<typeof bridgeClient.readPresetEntry>>,
+  ): BrowserInsertSource | null => {
+    if (sourcePayload.status !== 'loaded') {
+      return null;
+    }
+
+    if (sourcePayload.payload.presetType === 'device') {
+      return {
+        kind: 'device-preset',
+        preset: sourcePayload.payload,
+      };
+    }
+
+    if (sourcePayload.payload.presetType === 'group') {
+      return {
+        kind: 'group-preset',
+        preset: sourcePayload.payload,
+      };
+    }
+
+    return null;
+  };
+
+  const toReadPresetEntryRequest = (
+    entry: PresetBrowserFileItem,
+  ): Parameters<typeof bridgeClient.readPresetEntry>[0] => ({
+    presetType: entry.presetType,
+    relativePath: [...entry.relativePath],
+  });
+
+  const handlePresetEntryOpen = async (
+    entry: PresetBrowserFileItem,
+  ): Promise<void> => {
+    await runPresetAction(async () => {
+      const response = await bridgeClient.readPresetEntry(
+        toReadPresetEntryRequest(entry),
+      );
+      if (response.status === 'error') {
+        showPresetMessage(`Preset load failed | ${response.message}`);
+        return;
+      }
+
+      if (response.payload.presetType === 'device') {
+        const result = editorSession.commands.insertDevicePreset(
+          DEFAULT_PRESET_DROP_ZONE,
+          response.payload,
+        );
+        showPresetActionMessage(result.message, response.warning);
+        return;
+      }
+
+      if (response.payload.presetType === 'group') {
+        const result = editorSession.commands.insertGroupPreset(
+          DEFAULT_PRESET_DROP_ZONE,
+          response.payload,
+        );
+        showPresetActionMessage(result.message, response.warning);
+        return;
+      }
+
+      const result = editorSession.commands.applyRackPreset(response.payload);
+      showPresetActionMessage(result.message, response.warning);
+    }, 'Preset load failed.');
+  };
+
+  const handlePresetFilePointerDown = async (
+    entry: PresetBrowserFileItem,
+    sourceEvent: PointerEvent,
+    itemEl: HTMLElement,
+  ): Promise<void> => {
+    if (entry.presetType === 'rack' || sourceEvent.button !== 0 || !sourceEvent.isPrimary) {
+      return;
+    }
+
+    await runPresetAction(async () => {
+      const response = await bridgeClient.readPresetEntry(
+        toReadPresetEntryRequest(entry),
+      );
+      if (response.status === 'error') {
+        showPresetMessage(`Preset load failed | ${response.message}`);
+        return;
+      }
+
+      const source = resolvePresetInsertSource(response);
+      if (!source) {
+        return;
+      }
+
+      editorSession.commands.handleBrowserPointerDown({
+        source,
+        badgeLabel: `+ ${entry.name}`,
+        sourceEvent,
+        itemEl,
+      });
+    }, 'Preset load failed.');
   };
 
   const savePreset = async (
@@ -435,9 +581,14 @@
 <section class="live-main" hidden={uiState.isSettingsOpen}>
     <BrowserPanel
       activePage={uiState.sidebarPage}
+      {presetSections}
+      {isPresetLoading}
+      {presetErrorText}
       onPageSelect={editorSession.commands.setSidebarPage}
       onDeviceAdd={editorSession.commands.addBrowserDevice}
       onBrowserPointerDown={editorSession.commands.handleBrowserPointerDown}
+      onPresetEntryOpen={handlePresetEntryOpen}
+      onPresetFilePointerDown={handlePresetFilePointerDown}
     />
 
     <SidebarResizer
@@ -548,8 +699,8 @@
           onScheduleAutoPreview={editorSession.commands.scheduleAutoPreview}
           onOpenContextMenu={(x, y, target) => contextMenuComponent?.open(x, y, target)}
           onCloseContextMenu={closeContextMenu}
-          onGetBrowserDragBadgeLabel={toBrowserDragBadgeLabel}
           onCommit={editorSession.commands.handleRackCommit}
+          onPresetInsertDrop={editorSession.commands.handlePresetInsertDrop}
           onScrollMetricsChange={handleRackScrollMetricsChange}
           onMiniMapContentRevisionChange={handleRackMiniMapContentRevisionChange}
           onPresetFileDrop={handlePresetFileDrop}

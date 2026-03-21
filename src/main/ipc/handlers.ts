@@ -110,4 +110,16 @@ export const registerIpcHandlers = (
     (_event, request) =>
       presetService.openPresetFile(request, resolveDialogParentWindow()),
   );
+
+  ipcMain.handle(
+    IPC_CHANNELS.listPresetBrowserSections,
+    () =>
+      presetService.listPresetBrowserSections(),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.readPresetEntry,
+    (_event, request) =>
+      presetService.readPresetEntry(request),
+  );
 };

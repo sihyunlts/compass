@@ -14,4 +14,6 @@ export const IPC_CHANNELS = {
   openExternal: 'bridge:open-external',
   savePresetFile: 'preset:save-file',
   openPresetFile: 'preset:open-file',
+  listPresetBrowserSections: 'preset:list-browser-sections',
+  readPresetEntry: 'preset:read-entry',
 } as const;

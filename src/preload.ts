@@ -3,8 +3,11 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from './shared/contracts/ipc/channels';
 import type { PresetFileKind } from './shared/presets';
 import type {
+  ListPresetBrowserSectionsResponse,
   OpenPresetFileRequest,
   OpenPresetFileResponse,
+  ReadPresetEntryRequest,
+  ReadPresetEntryResponse,
 } from './shared/contracts/ipc/presets';
 import type { PreviewWindowState } from './shared/contracts/preview/window-state';
 import type { CompassApi } from './shared/contracts/ipc/api';
@@ -97,6 +100,10 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.openExternal, url),
   savePresetFile: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.savePresetFile, request),
+  listPresetBrowserSections: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.listPresetBrowserSections) as Promise<ListPresetBrowserSectionsResponse>,
+  readPresetEntry: <K extends PresetFileKind>(request: ReadPresetEntryRequest<K>) =>
+    ipcRenderer.invoke(IPC_CHANNELS.readPresetEntry, request) as Promise<ReadPresetEntryResponse<K>>,
   openPresetFile: <K extends PresetFileKind>(request: OpenPresetFileRequest<K>) =>
     ipcRenderer.invoke(IPC_CHANNELS.openPresetFile, request) as Promise<OpenPresetFileResponse<K>>,
 };

@@ -1,5 +1,5 @@
-import type { RendererDeviceKind } from '../../../devices';
 import type { GeneratorDeviceNode } from '../../../shared/model';
+import type { BrowserInsertSource } from '../../components/device-rack-types';
 import type { GroupSelectionContext } from './selection.svelte';
 import type { RackSelection } from './selection.svelte';
 
@@ -24,8 +24,9 @@ export interface RackViewApi {
   setScrollLeft(nextScrollLeft: number): void;
   handleBrowserPointerDown(
     sourceEvent: PointerEvent,
-    kind: RendererDeviceKind,
+    source: BrowserInsertSource,
     itemEl: HTMLElement,
+    badgeLabel: string,
   ): boolean;
 }
 
@@ -41,8 +42,9 @@ interface CreateRackViewApiOptions {
   setScrollLeft: (nextScrollLeft: number) => void;
   handleBrowserPointerDown: (
     sourceEvent: PointerEvent,
-    kind: RendererDeviceKind,
+    source: BrowserInsertSource,
     itemEl: HTMLElement,
+    badgeLabel: string,
   ) => boolean;
 }
 

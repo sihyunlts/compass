@@ -6,9 +6,10 @@
   import { onMount, tick } from 'svelte';
   import { clamp } from '../../shared/math';
   import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/model';
-  import type { RendererDeviceKind } from '../../devices';
   import type { ContextMenuTarget } from './context-menu-types';
   import type {
+    BrowserInsertSource,
+    BrowserPresetInsertSource,
     RackInteractionCommit,
     RackPresetFileDrop,
     RackScrollMetrics,
@@ -67,8 +68,8 @@
     onScheduleAutoPreview,
     onOpenContextMenu,
     onCloseContextMenu,
-    onGetBrowserDragBadgeLabel,
     onCommit,
+    onPresetInsertDrop = () => {},
     onScrollMetricsChange = () => {},
     onMiniMapContentRevisionChange = () => {},
     onPresetFileDrop = async () => {},
@@ -93,8 +94,11 @@
     onScheduleAutoPreview: (delayMs?: number) => void;
     onOpenContextMenu: (clientX: number, clientY: number, target: ContextMenuTarget) => void;
     onCloseContextMenu: () => void;
-    onGetBrowserDragBadgeLabel: (kind: RendererDeviceKind) => string;
     onCommit: (commit: RackInteractionCommit) => void;
+    onPresetInsertDrop?: (
+      source: BrowserPresetInsertSource,
+      dropZone: RackDropZone,
+    ) => void;
     onScrollMetricsChange?: (metrics: RackScrollMetrics) => void;
     onMiniMapContentRevisionChange?: (revision: number) => void;
     onPresetFileDrop?: (payload: RackPresetFileDrop) => void | Promise<void>;
@@ -322,16 +326,17 @@
   /** Starts an insert drag from the browser panel into the rack. */
   function handleBrowserPointerDown(
     sourceEvent: PointerEvent,
-    kind: RendererDeviceKind,
+    source: BrowserInsertSource,
     itemEl: HTMLElement,
+    badgeLabel: string,
   ) {
     if (!rackDragController) return false;
 
     const started = rackDragController.startBrowserDrag(
       sourceEvent,
-      kind,
+      source,
       itemEl,
-      onGetBrowserDragBadgeLabel(kind),
+      badgeLabel,
     );
 
     if (started) {
@@ -904,11 +909,16 @@
         });
       }
     } else if (pointerResult.shouldCommit && pointerResult.dropZone) {
-      onCommit({
-        kind: 'insert',
-        sourceKind: pointerResult.sourceKind,
-        dropZone: pointerResult.dropZone,
-      });
+      if (pointerResult.source.kind === 'device-kind') {
+        onCommit({
+          kind: 'insert-device',
+          deviceKind: pointerResult.source.deviceKind,
+          dropZone: pointerResult.dropZone,
+        });
+        return;
+      }
+
+      onPresetInsertDrop(pointerResult.source, pointerResult.dropZone);
     }
   }
 

@@ -43,3 +43,43 @@ export type OpenPresetFileResponse<K extends PresetFileKind = PresetFileKind> =
       message: string;
       filePath?: string;
     };
+
+export interface PresetBrowserFileItem<K extends PresetFileKind = PresetFileKind> {
+  presetType: K;
+  name: string;
+  relativePath: string[];
+}
+
+export interface PresetBrowserSection {
+  id: string;
+  title: string;
+  entries: PresetBrowserFileItem[];
+}
+
+export type ListPresetBrowserSectionsResponse =
+  | {
+      status: 'ok';
+      sections: PresetBrowserSection[];
+    }
+  | {
+      status: 'error';
+      message: string;
+    };
+
+export interface ReadPresetEntryRequest<K extends PresetFileKind = PresetFileKind> {
+  presetType: K;
+  relativePath: string[];
+}
+
+export type ReadPresetEntryResponse<K extends PresetFileKind = PresetFileKind> =
+  | {
+      status: 'loaded';
+      filePath: string;
+      payload: PresetFileByKind<K>;
+      warning?: string;
+    }
+  | {
+      status: 'error';
+      message: string;
+      filePath?: string;
+    };
