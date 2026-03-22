@@ -17,6 +17,7 @@ import {
   collectActiveVelocityByPitch,
   EMPTY_ACTIVE_VELOCITY_BY_PITCH,
 } from './utils';
+import { LatestSourceKeyFamilyCache } from './source-key-cache';
 
 export interface PreviewResultCacheEntry {
   key: string;
@@ -37,10 +38,10 @@ interface PreviewResultInput {
 class PreviewResultCache {
   private readonly resultsByKey = new SvelteMap<string, PreviewResultCacheEntry>();
 
-  private lastRendererSourceRevisionKey: string | null = null;
+  private readonly latestSourceKeyByFamily = new LatestSourceKeyFamilyCache();
 
   public resolve(input: PreviewResultInput): PreviewResultCacheEntry {
-    this.evictStaleRendererRevision(input.sourceKey);
+    this.evictStaleSourceFamilyEntries(input.sourceKey);
     const key = this.toPreviewResultKey(
       input.sourceKey,
       input.loopLengthBeats,
@@ -92,7 +93,7 @@ class PreviewResultCache {
 
   public reset(): void {
     this.resultsByKey.clear();
-    this.lastRendererSourceRevisionKey = null;
+    this.latestSourceKeyByFamily.reset();
   }
 
   public resolveActiveVelocityByPitchAtBeat(
@@ -147,27 +148,15 @@ class PreviewResultCache {
     return `${sourceKey}:${loopLengthBeats}:${launchpadModel}`;
   }
 
-  private evictStaleRendererRevision(sourceKey: string): void {
-    if (!sourceKey.startsWith('chain:')) {
-      return;
-    }
-
-    if (this.lastRendererSourceRevisionKey === sourceKey) {
-      return;
-    }
-
-    const stalePrefix = this.lastRendererSourceRevisionKey
-      ? `${this.lastRendererSourceRevisionKey}:`
-      : null;
-    if (stalePrefix) {
+  private evictStaleSourceFamilyEntries(sourceKey: string): void {
+    this.latestSourceKeyByFamily.evictStaleEntries(sourceKey, (staleSourceKey) => {
+      const stalePrefix = `${staleSourceKey}:`;
       for (const key of this.resultsByKey.keys()) {
         if (key.startsWith(stalePrefix)) {
           this.resultsByKey.delete(key);
         }
       }
-    }
-
-    this.lastRendererSourceRevisionKey = sourceKey;
+    });
   }
 }
 

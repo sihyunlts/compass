@@ -14,6 +14,7 @@ import {
   resolveOverlayWorldBounds,
   type OverlayWorldBounds,
 } from './view-model';
+import { LatestSourceKeyFamilyCache } from './source-key-cache';
 
 const OVERLAY_SAMPLE_STEP = 0.25;
 const OVERLAY_WORLD_BASE_PADDING = 4;
@@ -75,7 +76,7 @@ const touchesOverlayFrameCacheBoundary = (
 class OverlayFrameCache {
   private readonly overlayFramesByKey = new SvelteMap<string, OverlayCacheEntry>();
 
-  private lastRendererSourceRevisionKey: string | null = null;
+  private readonly latestSourceKeyByFamily = new LatestSourceKeyFamilyCache();
 
   public resolve(
     sourceKey: string,
@@ -84,7 +85,7 @@ class OverlayFrameCache {
     loopLengthBeats: number,
     colorGuideWarpByOriginId?: ReadonlyMap<string, ColorGuideWarp>,
   ): OverlayCacheEntry {
-    this.evictStaleRendererRevision(sourceKey);
+    this.evictStaleSourceFamilyEntries(sourceKey);
     const key = `${sourceKey}:${launchpadModel}:${loopLengthBeats}`;
     const cached = this.overlayFramesByKey.get(key);
     if (cached) {
@@ -130,7 +131,7 @@ class OverlayFrameCache {
 
   public reset(): void {
     this.overlayFramesByKey.clear();
-    this.lastRendererSourceRevisionKey = null;
+    this.latestSourceKeyByFamily.reset();
   }
 
   private buildOverlayFrames(
@@ -151,27 +152,15 @@ class OverlayFrameCache {
     });
   }
 
-  private evictStaleRendererRevision(sourceKey: string): void {
-    if (!sourceKey.startsWith('chain:')) {
-      return;
-    }
-
-    if (this.lastRendererSourceRevisionKey === sourceKey) {
-      return;
-    }
-
-    const stalePrefix = this.lastRendererSourceRevisionKey
-      ? `${this.lastRendererSourceRevisionKey}:`
-      : null;
-    if (stalePrefix) {
+  private evictStaleSourceFamilyEntries(sourceKey: string): void {
+    this.latestSourceKeyByFamily.evictStaleEntries(sourceKey, (staleSourceKey) => {
+      const stalePrefix = `${staleSourceKey}:`;
       for (const key of this.overlayFramesByKey.keys()) {
         if (key.startsWith(stalePrefix)) {
           this.overlayFramesByKey.delete(key);
         }
       }
-    }
-
-    this.lastRendererSourceRevisionKey = sourceKey;
+    });
   }
 }
 

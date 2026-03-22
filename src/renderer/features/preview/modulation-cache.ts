@@ -7,6 +7,7 @@ import {
 } from '../../../core/modulation/compiled-program';
 import { clamp } from '../../../shared/math';
 import type { GeneratorChain } from '../../../shared/model';
+import { LatestSourceKeyFamilyCache } from './source-key-cache';
 import { toWrappedLoopBeat01 } from './utils';
 
 const EMPTY_MODULATION_READOUT_BY_ID: Readonly<Record<string, string>> = Object.freeze({});
@@ -21,7 +22,7 @@ interface ModulationCacheEntry {
 class ModulationReadoutCache {
   private readonly modulationCacheByKey = new SvelteMap<string, ModulationCacheEntry>();
 
-  private lastRendererSourceRevisionKey: string | null = null;
+  private readonly latestSourceKeyByFamily = new LatestSourceKeyFamilyCache();
 
   public resolveReadoutById(
     sourceKey: string,
@@ -63,7 +64,7 @@ class ModulationReadoutCache {
     sourceKey: string,
     chain: GeneratorChain,
   ): ModulationCacheEntry {
-    this.evictStaleRendererRevision(sourceKey);
+    this.evictStaleSourceFamilyEntries(sourceKey);
     const cached = this.modulationCacheByKey.get(sourceKey);
     if (cached) {
       return cached;
@@ -89,23 +90,13 @@ class ModulationReadoutCache {
 
   public reset(): void {
     this.modulationCacheByKey.clear();
-    this.lastRendererSourceRevisionKey = null;
+    this.latestSourceKeyByFamily.reset();
   }
 
-  private evictStaleRendererRevision(sourceKey: string): void {
-    if (!sourceKey.startsWith('chain:')) {
-      return;
-    }
-
-    if (this.lastRendererSourceRevisionKey === sourceKey) {
-      return;
-    }
-
-    if (this.lastRendererSourceRevisionKey) {
-      this.modulationCacheByKey.delete(this.lastRendererSourceRevisionKey);
-    }
-
-    this.lastRendererSourceRevisionKey = sourceKey;
+  private evictStaleSourceFamilyEntries(sourceKey: string): void {
+    this.latestSourceKeyByFamily.evictStaleEntries(sourceKey, (staleSourceKey) => {
+      this.modulationCacheByKey.delete(staleSourceKey);
+    });
   }
 }
 
