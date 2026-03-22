@@ -41,7 +41,7 @@ const RENAME_POPOVER_FALLBACK_WIDTH_PX = 164;
 const RENAME_POPOVER_FALLBACK_HEIGHT_PX = 42;
 
 /** Owns rename target state and floating popover positioning for the rack. */
-export class RackRenameController {
+class RackRenameController {
   public target = $state<RackRenameTarget | null>(null);
 
   public draft = $state('');
@@ -311,4 +311,4 @@ export class RackRenameController {
 
 export const createRackRenameController = (
   options: RackRenameControllerOptions,
-): RackRenameController => new RackRenameController(options);
+) => new RackRenameController(options);

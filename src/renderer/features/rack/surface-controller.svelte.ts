@@ -44,7 +44,7 @@ const toScrollMetricsSignature = (metrics: RackScrollMetrics): string => (
 );
 
 /** Owns rack-side interaction controllers and exposes a compact view API. */
-export class RackSurfaceController {
+class RackSurfaceController {
   public activeDragInfo = $state<ActiveDragInfo | null>(null);
 
   public readonly api: RackViewApi;
@@ -462,4 +462,4 @@ export class RackSurfaceController {
 
 export const createRackSurfaceController = (
   options: RackSurfaceControllerOptions,
-): RackSurfaceController => new RackSurfaceController(options);
+) => new RackSurfaceController(options);

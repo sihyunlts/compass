@@ -12,7 +12,7 @@ const isFileDragEvent = (event: DragEvent): boolean =>
   Array.from(event.dataTransfer?.types ?? []).includes('Files');
 
 /** Tracks external file drag depth and maps browser file drops into rack payloads. */
-export class ExternalFileDropController {
+class ExternalFileDropController {
   private readonly options: ExternalFileDropControllerOptions;
 
   private dragDepth = 0;
@@ -91,4 +91,4 @@ export class ExternalFileDropController {
 
 export const createExternalFileDropController = (
   options: ExternalFileDropControllerOptions,
-): ExternalFileDropController => new ExternalFileDropController(options);
+) => new ExternalFileDropController(options);

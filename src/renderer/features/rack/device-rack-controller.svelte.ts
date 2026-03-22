@@ -53,7 +53,7 @@ const isAdditiveSelection = (event: { metaKey: boolean; ctrlKey: boolean }): boo
   event.metaKey || event.ctrlKey;
 
 /** Coordinates DeviceRack selection, context-menu, header interactions, and subcontrollers. */
-export class DeviceRackController {
+class DeviceRackController {
   public readonly rackSelection = createRackSelection();
 
   public readonly rename: ReturnType<typeof createRackRenameController>;
@@ -462,4 +462,4 @@ export class DeviceRackController {
 
 export const createDeviceRackController = (
   options: DeviceRackControllerOptions,
-): DeviceRackController => new DeviceRackController(options);
+) => new DeviceRackController(options);
