@@ -437,6 +437,10 @@
     background: var(--neutral-20);
   }
 
+  .device-group.is-rack.is-selected .group-rail-right {
+    background: var(--neutral-20);
+  }
+
   /* Visual state when group toggle is disabled. */
   .device-group.is-rack.is-disabled {
     .group-rail,
@@ -503,14 +507,14 @@
   }
 
   .group-rail-left {
-    min-width: 2.2rem;
+    min-width: 2rem;
     border-right: 1px solid var(--neutral-20);
     border-top-left-radius: var(--radius-6);
     border-bottom-left-radius: var(--radius-6);
   }
 
   .group-rail-right {
-    min-width: 1rem;
+    min-width: 0.75rem;
     border-left: 1px solid var(--neutral-20);
     border-top-right-radius: var(--radius-6);
     border-bottom-right-radius: var(--radius-6);

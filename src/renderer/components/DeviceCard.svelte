@@ -256,8 +256,8 @@
     }
 
     &.is-collapsed {
-      width: 2.2rem;
-      min-width: 2.2rem;
+      width: 2rem;
+      min-width: 2rem;
 
       :global(.device-controls) {
         display: none;
