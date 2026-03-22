@@ -26,70 +26,96 @@ import type {
 import { waterdropDeviceControls } from './waterdrop/controls';
 import { waterdropDeviceSchema } from './waterdrop/schema';
 
-type RendererDeviceSchemaEntry = {
+export type RendererDeviceEditorModulePath = `./${string}/ui.svelte`;
+
+export type RendererDeviceManifestEntry = {
+  [K in RendererDeviceKind]: RendererDeviceSchema<K> & {
+    controls?: RendererKindControlDefinition;
+    editor: RendererDeviceEditorModulePath;
+  };
+}[RendererDeviceKind];
+
+export const RENDERER_DEVICE_MANIFEST = [
+  {
+    ...waterdropDeviceSchema,
+    controls: waterdropDeviceControls,
+    editor: './waterdrop/ui.svelte',
+  },
+  {
+    ...scannerDeviceSchema,
+    controls: scannerDeviceControls,
+    editor: './scanner/ui.svelte',
+  },
+  {
+    ...spiralDeviceSchema,
+    controls: spiralDeviceControls,
+    editor: './spiral/ui.svelte',
+  },
+  {
+    ...modulatorDeviceSchema,
+    controls: modulatorDeviceControls,
+    editor: './modulator/ui.svelte',
+  },
+  {
+    ...mirrorDeviceSchema,
+    controls: mirrorDeviceControls,
+    editor: './mirror/ui.svelte',
+  },
+  {
+    ...symmetryDeviceSchema,
+    controls: symmetryDeviceControls,
+    editor: './symmetry/ui.svelte',
+  },
+  {
+    ...maskDeviceSchema,
+    controls: maskDeviceControls,
+    editor: './mask/ui.svelte',
+  },
+  {
+    ...rotateDeviceSchema,
+    controls: rotateDeviceControls,
+    editor: './rotate/ui.svelte',
+  },
+  {
+    ...reverseDeviceSchema,
+    editor: './reverse/ui.svelte',
+  },
+  {
+    ...colorDeviceSchema,
+    controls: colorDeviceControls,
+    editor: './color/ui.svelte',
+  },
+] as const satisfies readonly RendererDeviceManifestEntry[];
+
+export type RendererDeviceSchemaEntry = {
   [K in RendererDeviceKind]: RendererDeviceSchema<K> & {
     controls?: RendererKindControlDefinition;
   };
 }[RendererDeviceKind];
 
-const defineRendererDeviceSchema = <K extends RendererDeviceKind>(
-  definition: RendererDeviceSchema<K> & { controls?: RendererKindControlDefinition },
-) => definition;
-
-const rendererDeviceSchemaManifest = [
-  defineRendererDeviceSchema({
-    ...waterdropDeviceSchema,
-    controls: waterdropDeviceControls,
-  }),
-  defineRendererDeviceSchema({
-    ...scannerDeviceSchema,
-    controls: scannerDeviceControls,
-  }),
-  defineRendererDeviceSchema({
-    ...spiralDeviceSchema,
-    controls: spiralDeviceControls,
-  }),
-  defineRendererDeviceSchema({
-    ...modulatorDeviceSchema,
-    controls: modulatorDeviceControls,
-  }),
-  defineRendererDeviceSchema({
-    ...mirrorDeviceSchema,
-    controls: mirrorDeviceControls,
-  }),
-  defineRendererDeviceSchema({
-    ...symmetryDeviceSchema,
-    controls: symmetryDeviceControls,
-  }),
-  defineRendererDeviceSchema({
-    ...maskDeviceSchema,
-    controls: maskDeviceControls,
-  }),
-  defineRendererDeviceSchema({
-    ...rotateDeviceSchema,
-    controls: rotateDeviceControls,
-  }),
-  defineRendererDeviceSchema({
-    ...reverseDeviceSchema,
-  }),
-  defineRendererDeviceSchema({
-    ...colorDeviceSchema,
-    controls: colorDeviceControls,
-  }),
-] as const satisfies readonly RendererDeviceSchemaEntry[];
-
 type RendererDeviceSchemaByKind = {
   [K in RendererDeviceKind]: Extract<RendererDeviceSchemaEntry, { kind: K }>;
 };
 
+const toRendererDeviceSchema = (
+  definition: RendererDeviceManifestEntry,
+): RendererDeviceSchemaEntry => {
+  const { editor, ...schema } = definition;
+  void editor;
+  return schema;
+};
+
 const rendererDeviceSchemas = Object.fromEntries(
-  rendererDeviceSchemaManifest.map((definition) => [definition.kind, definition]),
+  RENDERER_DEVICE_MANIFEST.map((definition) => {
+    const schema = toRendererDeviceSchema(definition);
+    return [schema.kind, schema];
+  }),
 ) as RendererDeviceSchemaByKind;
 
 const collectRendererDeviceKindsByGroup = (
   group: RendererDeviceGroup,
 ): readonly RendererDeviceKind[] => Object.freeze(
-  rendererDeviceSchemaManifest
+  RENDERER_DEVICE_MANIFEST
     .filter((definition) => definition.group === group)
     .map((definition) => definition.kind),
 );
@@ -100,7 +126,7 @@ export const RENDERER_DEVICE_GROUPS = {
 } as const satisfies Record<RendererDeviceGroup, readonly RendererDeviceKind[]>;
 
 export const RENDERER_DEVICE_KINDS = Object.freeze(
-  rendererDeviceSchemaManifest.map((definition) => definition.kind),
+  RENDERER_DEVICE_MANIFEST.map((definition) => definition.kind),
 ) as readonly RendererDeviceKind[];
 
 const RENDERER_DEVICE_KIND_SET = new Set<RendererDeviceKind>(RENDERER_DEVICE_KINDS);
