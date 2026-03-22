@@ -446,7 +446,7 @@
             onPlayClick={() => playbackSession.togglePlayback()}
             onLoopToggle={() => playbackSession.togglePreviewLoop()}
             bind:scrubValue={uiState.previewScrubValue}
-            onScrubInput={() => playbackSession.scrubPreview(uiState.previewScrubValue)}
+            onScrubInput={() => playbackSession.seekPreview(uiState.previewScrubValue)}
           />
         {/if}
       </section>

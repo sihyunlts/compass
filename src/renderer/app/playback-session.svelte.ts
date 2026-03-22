@@ -226,7 +226,7 @@ export class PlaybackSessionController {
     }
   }
 
-  public scrubPreview(scrubValue: number): void {
+  public seekPreview(scrubValue: number): void {
     const scrubProgress = clamp(
       Number(scrubValue) / (this.options.scrubMax ?? DEFAULT_SCRUB_MAX),
       0,
@@ -234,6 +234,9 @@ export class PlaybackSessionController {
     );
     const nextBeat = scrubProgress * this.options.previewSession.state.sourceTimelineEndBeat;
     if (this.playbackScheduler) {
+      if (this.playbackScheduler.isPlaying()) {
+        this.playbackScheduler.stop(false);
+      }
       this.playbackScheduler.setCurrentBeat(nextBeat);
       return;
     }
