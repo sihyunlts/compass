@@ -10,7 +10,6 @@
     RENDERER_DEVICE_GROUPS,
     type RendererDeviceKind,
   } from '../devices';
-  import type { PaletteFilePayload } from '../shared/model';
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
   import { sanitizeSidebarWidth } from './features/editor/persistence-storage';
   import BrowserPanel from './components/BrowserPanel.svelte';
@@ -29,8 +28,8 @@
   import PreviewPanel from './components/PreviewPanel.svelte';
   import ContextMenu from './components/ContextMenu.svelte';
   import ModalDialog from './components/ModalDialog.svelte';
-  import { createPaletteController } from './app/palette-controller';
   import { createPresetController } from './app/preset-controller.svelte';
+  import { createSettingsController } from './app/settings-controller.svelte';
   import { mountBridgeSubscriptions } from './app/bridge-subscriptions';
   import { createHeaderIndicator } from './app/header-indicator.svelte';
   import { mountKeyboardShortcuts } from './app/keyboard-shortcuts';
@@ -80,7 +79,6 @@
   ];
 
   const bridgeClient = window.compass;
-  let appVersionText = $state('');
   let rackViewApi: RackViewApi | null = $state(null);
   let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
 
@@ -106,16 +104,6 @@
   const historyControls = $derived.by(() => selectHistoryControls(uiState));
   const bpmText = $derived.by(() => selectPreviewBpmText(uiState.previewBpm));
   const clipboardAvailable = $derived.by(() => selectClipboardAvailable(uiState));
-
-  let paletteRevision = $state(0);
-  const paletteController = createPaletteController({
-    onPaletteNameChanged: (nameText) => {
-      editorSession.state.paletteNameText = nameText;
-      paletteRevision += 1;
-    },
-  });
-  const resolvePaletteRgb = (velocity: number): string =>
-    paletteController.getLedRgb(velocity, '0 0 0');
   const headerIndicator = createHeaderIndicator({
     getText: () => uiState.headerIndicatorText,
     setText: (text) => {
@@ -132,14 +120,25 @@
       headerIndicator.show(message);
     },
   });
-  const presetState = presetController.state;
+  const settingsController = createSettingsController({
+    bridgeClient,
+    editorSession,
+    showMessage: (message) => {
+      headerIndicator.show(message);
+    },
+  });
+  const settingsState = settingsController.state;
+  const resolvePaletteRgb = (velocity: number): string =>
+    settingsController.resolvePaletteRgb(velocity, '0 0 0');
   const playbackSession = createPlaybackSession({
     bridgeClient,
     editorSession,
     previewSession,
     headerIndicator,
-    resolveLedRgb: (velocity) => paletteController.getLedRgb(velocity, DEFAULT_LED_RGB),
+    resolveLedRgb: (velocity) => settingsController.resolvePaletteRgb(velocity, DEFAULT_LED_RGB),
   });
+  settingsController.attachPlaybackSession(playbackSession);
+  const presetState = presetController.state;
   const sendFlow = createSendFlow({
     bridgeClient,
     editorSession,
@@ -229,41 +228,6 @@
     rackViewApi?.setScrollLeft(nextScrollLeft);
   };
 
-  const handlePaletteFileChange = async (event: Event): Promise<void> => {
-    const input = event.currentTarget instanceof HTMLInputElement ? event.currentTarget : null;
-    const file = input?.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    try {
-      const content = await file.text();
-      const payload: PaletteFilePayload = {
-        name: file.name,
-        content,
-      };
-      paletteController.applyUploadedPalette(payload);
-      playbackSession.renderPreviewFrame();
-    } catch (error) {
-      void error;
-    } finally {
-      if (input) {
-        input.value = '';
-      }
-    }
-  };
-
-  const handlePaletteReset = (): void => {
-    paletteController.resetToDefault();
-    playbackSession.renderPreviewFrame();
-  };
-
-  const handleLaunchpadModelToggle = (nextEnabled: boolean): void => {
-    if (editorSession.commands.setLaunchpadModelEnabled(nextEnabled)) {
-      playbackSession.renderPreviewFrame();
-    }
-  };
-
   const handleContextMenuDelete = (
     target: ContextMenuTarget,
   ): void => {
@@ -286,7 +250,7 @@
       bridgeClient,
       playbackSession,
       onVersionResolved: (version) => {
-        appVersionText = version;
+        settingsController.setAppVersion(version);
       },
     });
     const disposeKeyboardShortcuts = mountKeyboardShortcuts({
@@ -295,7 +259,7 @@
       onBeforeUnload: disposeBridgeSubscriptions,
     });
 
-    paletteController.initialize();
+    settingsController.initialize();
     playbackSession.renderPreviewFrame();
     editorSession.scheduleAutoPreview(0);
 
@@ -437,7 +401,7 @@
           devices={uiState.chainState.devices}
           chainState={uiState.chainState}
           collapsedDeviceIds={uiState.collapsedDeviceIds}
-          {paletteRevision}
+          paletteRevision={settingsState.paletteRevision}
           currentBeat={playbackSession.state.currentBeat}
           modulationReadoutById={previewState.modulationReadoutById}
           {resolvePaletteRgb}
@@ -512,7 +476,7 @@
                 checked={uiState.launchpadModel === 'mk2'}
                 onchange={(event) => {
                   const target = event.currentTarget as HTMLInputElement;
-                  handleLaunchpadModelToggle(target.checked);
+                  settingsController.handleLaunchpadModelToggle(target.checked);
                 }}
               />
             </div>
@@ -526,14 +490,14 @@
                 <Button
                   id="palette-reset"
                   text="Reset to Default"
-                  onClick={handlePaletteReset}
+                  onClick={() => settingsController.handlePaletteReset()}
                 />
                 <div class="file-input-wrapper">
                   <div class="file-button">Upload File</div>
                   <input
                     id="palette-file-input"
                     type="file"
-                    onchange={handlePaletteFileChange}
+                    onchange={(event) => settingsController.handlePaletteFileChange(event)}
                   />
                 </div>
               </div>
@@ -548,18 +512,18 @@
             <div class="settings-row">
               <div class="info">
                 <span class="label">Version</span>
-                <span class="description">{appVersionText ? `v${appVersionText}` : 'Loading...'}</span>
+                <span class="description">{settingsState.appVersionText ? `v${settingsState.appVersionText}` : 'Loading...'}</span>
               </div>
             </div>
             <div class="settings-row">
               <div class="info">
                 <span class="label">sihyunlights</span>
-                <span class="description">https://sihyunlights.com</span>
+                <span class="description">{settingsController.getAboutSiteUrl()}</span>
               </div>
               <Button
                 text="Visit"
                 title="Visit website"
-                onClick={() => bridgeClient.openExternal('https://sihyunlights.com')}
+                onClick={() => settingsController.openAboutSite()}
               />
             </div>
           </div>
