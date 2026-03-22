@@ -4,17 +4,13 @@ import {
 } from '../../assets/palettes/novation-rgb';
 import { clamp } from '../../shared/math';
 import type { PaletteFilePayload } from '../../shared/model';
+import {
+  readPersistedRendererState,
+  writePersistedRendererState,
+} from '../persisted-state';
 
 type PaletteSource = 'default' | 'custom';
 const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
-const STATE_KEY = 'compass.state.v1';
-
-type PersistedPaletteState = Record<string, unknown> & {
-  palette?: {
-    name?: string;
-    content?: string;
-  } | null;
-};
 
 const reportPaletteError = (message: string, error: unknown): void => {
   console.error(`[palette] ${message}`, error);
@@ -23,33 +19,8 @@ const reportPaletteError = (message: string, error: unknown): void => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-const readPersistedState = (): PersistedPaletteState => {
-  try {
-    const raw = window.localStorage.getItem(STATE_KEY);
-    if (!raw) {
-      return {};
-    }
-
-    const parsed = JSON.parse(raw) as unknown;
-    return isRecord(parsed) ? parsed as PersistedPaletteState : {};
-  } catch {
-    return {};
-  }
-};
-
-const writePersistedState = (
-  patch: (previous: PersistedPaletteState) => PersistedPaletteState,
-): void => {
-  try {
-    const next = patch(readPersistedState());
-    window.localStorage.setItem(STATE_KEY, JSON.stringify(next));
-  } catch {
-    // localStorage write failures should not block app interaction.
-  }
-};
-
 const loadCustomPalette = (): PaletteFilePayload | null => {
-  const palette = readPersistedState().palette;
+  const palette = readPersistedRendererState().palette;
   if (!palette || !isRecord(palette)) {
     return null;
   }
@@ -66,20 +37,18 @@ const loadCustomPalette = (): PaletteFilePayload | null => {
 };
 
 const saveCustomPalette = (payload: PaletteFilePayload): void => {
-  writePersistedState((previous) => ({
-    ...previous,
+  writePersistedRendererState({
     palette: {
       name: payload.name,
       content: payload.content,
     },
-  }));
+  });
 };
 
 const clearCustomPalette = (): void => {
-  writePersistedState((previous) => ({
-    ...previous,
+  writePersistedRendererState({
     palette: null,
-  }));
+  });
 };
 
 const normalizePaletteChannel = (value: number, use63Scale: boolean): number => {

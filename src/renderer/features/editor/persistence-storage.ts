@@ -13,13 +13,16 @@ import {
   sanitizeBridgeSettings,
 } from '../../../shared/validation/bridge-settings';
 import {
+  readPersistedRendererState,
+  writePersistedRendererState,
+} from '../../persisted-state';
+import {
   createInitialChainDevices,
   syncDeviceNodeIdSeeds,
 } from './device-node-factory';
 
 /** Editor persistence boundary for renderer localStorage-backed state. */
 
-const STATE_KEY = 'compass.state.v1';
 const DEFAULT_PREVIEW_BPM = 120;
 const MIN_PREVIEW_BPM = 20;
 const MAX_PREVIEW_BPM = 300;
@@ -28,53 +31,10 @@ const MIN_SIDEBAR_WIDTH_PX = 160;
 const MAX_SIDEBAR_WIDTH_PX = 240;
 const DEFAULT_LAUNCHPAD_MODEL: LaunchpadModel = 'mk3';
 
-interface PersistedState {
-  chain?: GeneratorChain;
-  bridge?: BridgeSettings;
-  preview?: {
-    bpm?: number;
-    loopEnabled?: boolean;
-    guideEnabled?: boolean;
-  };
-  ui?: {
-    sidebarWidthPx?: number;
-    collapsedDeviceIds?: string[];
-    launchpadModel?: LaunchpadModel;
-  };
-}
-
 export interface LoadedChainSettingsResult {
   chain: GeneratorChain;
   warning?: string;
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const readPersistedState = (): PersistedState => {
-  try {
-    const raw = window.localStorage.getItem(STATE_KEY);
-    if (!raw) {
-      return {};
-    }
-
-    const parsed = JSON.parse(raw) as unknown;
-    return isRecord(parsed) ? parsed as PersistedState : {};
-  } catch {
-    return {};
-  }
-};
-
-const writePersistedState = (
-  patch: (previous: PersistedState) => PersistedState,
-): void => {
-  try {
-    const next = patch(readPersistedState());
-    window.localStorage.setItem(STATE_KEY, JSON.stringify(next));
-  } catch {
-    // localStorage write failures should not block app interaction.
-  }
-};
 
 const createDefaultChain = (): GeneratorChain => ({
   devices: createInitialChainDevices(),
@@ -124,19 +84,18 @@ export const sanitizeSidebarWidth = (value: unknown): number => {
 
 /** Loads persisted bridge settings and applies schema defaults/sanitization. */
 export const loadBridgeSettings = (): BridgeSettings =>
-  sanitizeBridgeSettings(readPersistedState().bridge ?? DEFAULT_BRIDGE_SETTINGS);
+  sanitizeBridgeSettings(readPersistedRendererState().bridge ?? DEFAULT_BRIDGE_SETTINGS);
 
 /** Persists bridge settings after schema sanitization. */
 export const saveBridgeSettings = (bridge: BridgeSettings): void => {
-  writePersistedState((previous) => ({
-    ...previous,
+  writePersistedRendererState({
     bridge: sanitizeBridgeSettings(bridge),
-  }));
+  });
 };
 
 /** Loads persisted chain state or returns defaults when stored data is malformed. */
 export const loadChainSettings = (): LoadedChainSettingsResult => {
-  const chain = readPersistedState().chain;
+  const chain = readPersistedRendererState().chain;
   const hydrated = hydrateImportedGeneratorChain(chain, {
     mode: 'recover',
   });
@@ -152,10 +111,9 @@ export const loadChainSettings = (): LoadedChainSettingsResult => {
     'restoring the saved rack',
   );
   if (warning) {
-    writePersistedState((previous) => ({
-      ...previous,
+    writePersistedRendererState({
       chain: hydrated.chain,
-    }));
+    });
   }
 
   return {
@@ -166,98 +124,85 @@ export const loadChainSettings = (): LoadedChainSettingsResult => {
 
 /** Persists chain settings as provided by the renderer. */
 export const saveChainSettings = (chain: GeneratorChain): void => {
-  writePersistedState((previous) => ({
-    ...previous,
+  writePersistedRendererState({
     chain,
-  }));
+  });
 };
 
 /** Loads preview BPM and clamps it to the supported renderer range. */
 export const loadPreviewBpm = (): number =>
-  sanitizePreviewBpm(readPersistedState().preview?.bpm ?? DEFAULT_PREVIEW_BPM);
+  sanitizePreviewBpm(readPersistedRendererState().preview?.bpm ?? DEFAULT_PREVIEW_BPM);
 
 /** Persists preview BPM after clamping to the supported renderer range. */
 export const savePreviewBpm = (bpm: number): void => {
-  writePersistedState((previous) => ({
-    ...previous,
+  writePersistedRendererState({
     preview: {
-      ...previous.preview,
       bpm: sanitizePreviewBpm(bpm),
     },
-  }));
+  });
 };
 
 /** Loads preview loop flag with `false` fallback for missing or invalid values. */
 export const loadPreviewLoopEnabled = (): boolean =>
-  toBoolean(readPersistedState().preview?.loopEnabled, false);
+  toBoolean(readPersistedRendererState().preview?.loopEnabled, false);
 
 /** Persists preview loop flag as a strict boolean. */
 export const savePreviewLoopEnabled = (enabled: boolean): void => {
-  writePersistedState((previous) => ({
-    ...previous,
+  writePersistedRendererState({
     preview: {
-      ...previous.preview,
       loopEnabled: enabled === true,
     },
-  }));
+  });
 };
 
 /** Loads preview guide flag with `true` fallback for missing or invalid values. */
 export const loadPreviewGuideEnabled = (): boolean =>
-  toBoolean(readPersistedState().preview?.guideEnabled, true);
+  toBoolean(readPersistedRendererState().preview?.guideEnabled, true);
 
 /** Persists preview guide flag as a strict boolean. */
 export const savePreviewGuideEnabled = (enabled: boolean): void => {
-  writePersistedState((previous) => ({
-    ...previous,
+  writePersistedRendererState({
     preview: {
-      ...previous.preview,
       guideEnabled: enabled === true,
     },
-  }));
+  });
 };
 
 /** Loads sidebar width and clamps it to the supported layout range. */
 export const loadSidebarWidth = (): number =>
-  sanitizeSidebarWidth(readPersistedState().ui?.sidebarWidthPx ?? DEFAULT_SIDEBAR_WIDTH_PX);
+  sanitizeSidebarWidth(readPersistedRendererState().ui?.sidebarWidthPx ?? DEFAULT_SIDEBAR_WIDTH_PX);
 
 /** Persists sidebar width after clamping to the supported layout range. */
 export const saveSidebarWidth = (width: number): void => {
-  writePersistedState((previous) => ({
-    ...previous,
+  writePersistedRendererState({
     ui: {
-      ...previous.ui,
       sidebarWidthPx: sanitizeSidebarWidth(width),
     },
-  }));
+  });
 };
 
 /** Loads collapsed device IDs after trimming, deduplicating, and dropping empties. */
 export const loadCollapsedDeviceIds = (): string[] =>
-  toCollapsedDeviceIds(readPersistedState().ui?.collapsedDeviceIds);
+  toCollapsedDeviceIds(readPersistedRendererState().ui?.collapsedDeviceIds);
 
 /** Persists collapsed device IDs after trimming and deduplicating. */
 export const saveCollapsedDeviceIds = (ids: readonly string[]): void => {
-  writePersistedState((previous) => ({
-    ...previous,
+  writePersistedRendererState({
     ui: {
-      ...previous.ui,
       collapsedDeviceIds: toCollapsedDeviceIds(ids),
     },
-  }));
+  });
 };
 
 /** Loads Launchpad model with MK3 fallback for unsupported persisted values. */
 export const loadLaunchpadModel = (): LaunchpadModel =>
-  toLaunchpadModel(readPersistedState().ui?.launchpadModel);
+  toLaunchpadModel(readPersistedRendererState().ui?.launchpadModel);
 
 /** Persists Launchpad model after coercing unsupported values to MK3. */
 export const saveLaunchpadModel = (model: LaunchpadModel): void => {
-  writePersistedState((previous) => ({
-    ...previous,
+  writePersistedRendererState({
     ui: {
-      ...previous.ui,
       launchpadModel: toLaunchpadModel(model),
     },
-  }));
+  });
 };
