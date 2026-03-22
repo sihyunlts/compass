@@ -72,7 +72,6 @@
 
   .rack-rename-input {
     display: block;
-    box-sizing: border-box;
     width: 100%;
     height: 1.75rem;
     padding: var(--gap-6) var(--gap-8);

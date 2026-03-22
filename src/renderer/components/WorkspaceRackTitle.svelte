@@ -155,7 +155,6 @@
     &-button,
     &-input {
       display: block;
-      box-sizing: border-box;
       min-width: 0;
       height: 1.75rem;
       padding: var(--gap-4) var(--gap-8);

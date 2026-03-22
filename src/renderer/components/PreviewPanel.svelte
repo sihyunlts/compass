@@ -117,9 +117,9 @@
       flex-direction: column;
       gap: var(--gap-6);
     }
-  }
 
-  .preview-panel-scrub {
-    margin-block: var(--gap-4);
+    &-scrub {
+      margin-block: var(--gap-4);
+    }
   }
 </style>

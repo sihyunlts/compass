@@ -245,36 +245,36 @@
     &[aria-disabled='true'] {
       cursor: default;
     }
-  }
 
-  .undo-history-item:hover,
-  .undo-history-item:focus-visible {
-    background: var(--neutral-20);
-    outline: none;
-  }
+    &:hover,
+    &:focus-visible {
+      background: var(--neutral-20);
+      outline: none;
+    }
 
-  .undo-history-item[data-current='true'] {
-    background: color-mix(in srgb, var(--accent-500) 14%, var(--neutral-20));
-  }
+    &[data-current='true'] {
+      background: color-mix(in srgb, var(--accent-500) 14%, var(--neutral-20));
+    }
 
-  .undo-history-item-main {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--gap-8);
-    min-width: 0;
-  }
+    &-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--gap-8);
+      min-width: 0;
+    }
 
-  .undo-history-item-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+    &-label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
-  .undo-history-item-meta {
-    color: var(--neutral-60);
-    font-size: var(--text-12);
-    flex: 0 0 auto;
+    &-meta {
+      color: var(--neutral-60);
+      font-size: var(--text-12);
+      flex: 0 0 auto;
+    }
   }
 </style>

@@ -229,7 +229,6 @@
     border-radius: var(--radius-12);
     background: var(--neutral-10);
     border: 1px solid var(--neutral-20);
-    color: var(--neutral-90);
 
     &-title {
       margin: 0 0 var(--gap-12);

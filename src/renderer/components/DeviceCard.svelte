@@ -208,7 +208,6 @@
 
       &-controls {
         display: flex;
-        flex-direction: row;
         align-items: center;
         gap: var(--gap-6);
         flex: 0 0 auto;

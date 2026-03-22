@@ -124,7 +124,6 @@
     gap: var(--gap-8);
 
     &-title {
-      margin: 0;
       font-size: var(--text-12);
       color: var(--neutral-40);
       padding-left: var(--gap-2);
@@ -158,7 +157,6 @@
   .sidebar-settings-label {
     font-size: var(--text-13);
     font-weight: 500;
-    color: var(--neutral-90);
   }
 
   .sidebar-settings-description {
@@ -204,7 +202,6 @@
     padding: var(--gap-6) var(--gap-8);
     border-radius: var(--radius-6);
     font-size: var(--text-13);
-    color: var(--neutral-90);
     white-space: nowrap;
   }
 </style>

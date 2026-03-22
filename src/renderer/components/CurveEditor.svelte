@@ -310,26 +310,26 @@
 </div>
 
 <style lang="scss">
-  .curve-editor-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap-6);
-    min-width: 0;
-  }
-
-  .curve-editor-toolbar {
-    display: flex;
-    align-items: center;
-    gap: var(--gap-6);
-    flex-wrap: wrap;
-  }
-
-  .curve-editor-readout {
-    color: var(--neutral-50);
-    font-size: var(--text-12);
-  }
-
   .curve-editor {
+    &-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap-6);
+      min-width: 0;
+    }
+
+    &-toolbar {
+      display: flex;
+      align-items: center;
+      gap: var(--gap-6);
+      flex-wrap: wrap;
+    }
+
+    &-readout {
+      color: var(--neutral-50);
+      font-size: var(--text-12);
+    }
+
     position: relative;
     height: 7.5rem;
     border: 1px solid var(--neutral-30);
@@ -389,15 +389,15 @@
         stroke-width: 1;
       }
     }
-  }
 
-  .curve-editor-playhead {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: rgb(var(--rgb-white) / 0.25);
-    pointer-events: none;
-    transform: translateX(-50%);
+    &-playhead {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: rgb(var(--rgb-white) / 0.25);
+      pointer-events: none;
+      transform: translateX(-50%);
+    }
   }
 </style>

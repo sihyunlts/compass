@@ -328,7 +328,6 @@
     }
 
     &-item {
-      display: block;
       width: 100%;
       border: 0;
       border-radius: var(--radius-4);
