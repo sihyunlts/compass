@@ -1,7 +1,7 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { EditorSession } from '../features/editor/session.svelte';
 import type { PlaybackSessionController } from './playback-session.svelte';
-import { createPaletteController } from './palette-controller';
+import { createPaletteController, PaletteParseError } from './palette-controller';
 
 const ABOUT_SITE_URL = 'https://sihyunlights.com';
 
@@ -71,10 +71,24 @@ class SettingsController {
     }
 
     try {
-      this.paletteController.applyUploadedPalette({
-        name: file.name,
-        content: await file.text(),
-      });
+      let content: string;
+      try {
+        content = await file.text();
+      } catch (error) {
+        this.showPaletteError('Failed to read palette file', error);
+        return;
+      }
+
+      try {
+        this.paletteController.applyUploadedPalette({
+          name: file.name,
+          content,
+        });
+      } catch (error) {
+        this.showPaletteError(this.resolvePaletteUploadErrorSummary(error), error);
+        return;
+      }
+
       this.playbackSession?.renderPreviewFrame();
       this.showPaletteDescription(`Palette loaded | ${file.name}`);
     } catch (error) {
@@ -142,10 +156,23 @@ class SettingsController {
     const detail = error instanceof Error && error.message.trim()
       ? error.message.trim()
       : 'Unknown error.';
-    const message = `${summary} | ${detail}`;
+    const message = detail === summary ? summary : `${summary} | ${detail}`;
     this.state.paletteDescriptionOverride = message;
     this.state.paletteDescriptionTone = 'error';
     this.clearPaletteFeedbackTimer();
+  }
+
+  private resolvePaletteUploadErrorSummary(error: unknown): string {
+    if (!(error instanceof PaletteParseError)) {
+      return 'Palette upload failed';
+    }
+
+    switch (error.code) {
+      case 'empty':
+        return 'Palette is empty';
+      case 'format':
+        return 'Palette format is not recognized';
+    }
   }
 
   private showAboutError(summary: string, error: unknown): void {

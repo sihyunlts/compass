@@ -11,6 +11,7 @@ import {
 
 type PaletteSource = 'default' | 'custom';
 const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
+const PALETTE_ROW_PATTERN = /^(\d+)\s*,\s*(\d+)\s+(\d+)\s+(\d+)\s*;?\s*$/;
 
 const reportPaletteError = (message: string, error: unknown): void => {
   console.error(`[palette] ${message}`, error);
@@ -18,6 +19,16 @@ const reportPaletteError = (message: string, error: unknown): void => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
+
+export class PaletteParseError extends Error {
+  public constructor(
+    public readonly code: 'empty' | 'format',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'PaletteParseError';
+  }
+}
 
 const loadCustomPalette = (): PaletteFilePayload | null => {
   const palette = readPersistedRendererState().palette;
@@ -60,6 +71,7 @@ const normalizePaletteChannel = (value: number, use63Scale: boolean): number => 
 
 const parsePaletteColors = (content: string): Map<number, string> => {
   const rows = content.split(/\r?\n/);
+  let meaningfulRowCount = 0;
   const parsedRows: Array<{ index: number; r: number; g: number; b: number }> = [];
 
   for (const rawRow of rows) {
@@ -68,7 +80,8 @@ const parsePaletteColors = (content: string): Map<number, string> => {
       continue;
     }
 
-    const match = row.match(/^(\d+)\s*,\s*(\d+)\s+(\d+)\s+(\d+)\s*;?\s*$/);
+    meaningfulRowCount += 1;
+    const match = row.match(PALETTE_ROW_PATTERN);
     if (!match) {
       continue;
     }
@@ -81,8 +94,12 @@ const parsePaletteColors = (content: string): Map<number, string> => {
     });
   }
 
+  if (meaningfulRowCount === 0) {
+    throw new PaletteParseError('empty', 'Palette file is empty.');
+  }
+
   if (parsedRows.length === 0) {
-    throw new Error('Unrecognized palette format.');
+    throw new PaletteParseError('format', 'Palette format is not recognized.');
   }
 
   const use63Scale = parsedRows.every(
