@@ -119,7 +119,7 @@
     }
 
     &-scrub {
-      margin-block: var(--gap-4);
+      height: 1rem;
     }
   }
 </style>
