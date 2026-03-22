@@ -38,10 +38,12 @@ import {
 } from './commands';
 import {
   createEditorHistory,
+  type EditorHistoryListEntry,
   type EditorHistory,
 } from './editor-history';
 import {
   applyChainMutation as applyEditorChainMutation,
+  checkoutHistory as checkoutEditorHistory,
   initializeHistoryBridge,
   redoHistory,
   saveChainWithHistory,
@@ -263,6 +265,7 @@ export class EditorSession {
     },
     undo: (): boolean => this.undo(),
     redo: (): boolean => this.redo(),
+    checkoutHistory: (targetId: string): boolean => this.checkoutHistory(targetId),
     copySelection: (): boolean => this.copySelectionToClipboard() !== null,
     cutSelection: (): boolean => this.cutSelection(),
     pasteClipboard: (): boolean => this.pasteClipboard(),
@@ -414,6 +417,10 @@ export class EditorSession {
     this.rackBinding?.clearSelection();
   }
 
+  public listUndoHistoryEntries(): EditorHistoryListEntry[] {
+    return this.history.list();
+  }
+
   private setClipboard(nextClipboard: RackClipboard | null): void {
     this.rackClipboard = nextClipboard;
     this.state.clipboardAvailable = nextClipboard !== null;
@@ -450,6 +457,14 @@ export class EditorSession {
 
   private redo(): boolean {
     return redoHistory(this.state, this.history, {
+      bumpChainRevision: () => this.bumpChainRevision(),
+      persistChainState: () => this.persistChainState(),
+      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),
+    });
+  }
+
+  private checkoutHistory(targetId: string): boolean {
+    return checkoutEditorHistory(this.state, this.history, targetId, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
       scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),

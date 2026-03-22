@@ -266,7 +266,7 @@ export class ChainHistory {
       return null;
     }
     if (index === this.cursor) {
-      return cloneChainForIpc(this.entries[this.cursor].chain);
+      return null;
     }
     this.cursor = index;
     return cloneChainForIpc(this.entries[this.cursor].chain);

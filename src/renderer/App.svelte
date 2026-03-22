@@ -21,6 +21,7 @@
   import Button from './components/Button.svelte';
   import SidebarResizer from './components/SidebarResizer.svelte';
   import DeviceRack from './components/DeviceRack.svelte';
+  import UndoHistoryControl from './components/UndoHistoryControl.svelte';
   import type {
     RackScrollMetrics,
   } from './components/device-rack-types';
@@ -104,6 +105,10 @@
   const uiState = editorSession.state;
   const previewState = previewSession.state;
   const historyControls = $derived.by(() => selectHistoryControls(uiState));
+  const historyEntries = $derived.by(() => {
+    void uiState.chainRevision;
+    return editorSession.listUndoHistoryEntries();
+  });
   const bpmText = $derived.by(() => selectPreviewBpmText(uiState.previewBpm));
   const clipboardAvailable = $derived.by(() => selectClipboardAvailable(uiState));
   const headerIndicator = createHeaderIndicator({
@@ -426,13 +431,12 @@
               onClick={() => presetController.handleLoadRackPreset()}
             />
           </div>
-          <Button
-            id="undo-button"
-            text="Undo"
-            disabled={!historyControls.canUndo}
-            title={historyControls.canUndo ? `Undo: ${historyControls.undoActionLabel}` : 'Nothing to undo'}
-            label={historyControls.canUndo ? `Undo: ${historyControls.undoActionLabel}` : 'Undo unavailable'}
-            onClick={handleUndoClick}
+          <UndoHistoryControl
+            canUndo={historyControls.canUndo}
+            undoActionLabel={historyControls.undoActionLabel}
+            {historyEntries}
+            onUndo={handleUndoClick}
+            onCheckout={editorSession.commands.checkoutHistory}
           />
           <Button
             id="redo-button"
