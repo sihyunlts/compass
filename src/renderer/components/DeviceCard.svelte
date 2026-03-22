@@ -105,6 +105,8 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <header
     class="device-head"
+    data-rack-device-header="true"
+    tabindex="-1"
     onpointerdown={isRenaming ? undefined : onHeaderPointerDown}
     onclick={isRenaming ? undefined : onHeaderClick}
     oncontextmenu={isRenaming ? undefined : onHeaderContextMenu}
@@ -196,6 +198,7 @@
       gap: var(--gap-10);
       cursor: grab;
       -webkit-user-drag: none;
+      outline: none;
 
       &-left {
         display: flex;

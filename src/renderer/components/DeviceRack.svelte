@@ -3,7 +3,7 @@
    * Renders the rack surface and translates pointer/drag interactions into commit events.
    * Integrates rack selection, drop indicators, and group rendering state.
    */
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/model';
   import type { ContextMenuTarget } from './context-menu-types';
   import type {
@@ -181,8 +181,27 @@
   const getOrderedSelectedDeviceIdsInRack = (): string[] =>
     rackSelection.getOrderedSelectedDeviceIds(orderedDeviceIds);
 
+  const resolveRackDeviceHeader = (deviceId: string): HTMLElement | null =>
+    chainDevicesEl?.querySelector<HTMLElement>(
+      `.device-card[data-device-id="${deviceId}"] [data-rack-device-header="true"]`,
+    ) ?? null;
+
   const isAdditiveSelection = (event: { metaKey: boolean; ctrlKey: boolean }): boolean =>
     event.metaKey || event.ctrlKey;
+
+  const focusRackDeviceHeader = async (deviceId: string): Promise<void> => {
+    await tick();
+    const headerEl = resolveRackDeviceHeader(deviceId);
+    if (!headerEl) {
+      return;
+    }
+
+    headerEl.focus();
+    headerEl.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+    });
+  };
 
   const blurActiveTextEditingElement = (): void => {
     blurIfTextEditingElement(document.activeElement);
@@ -222,7 +241,102 @@
     rackSurface.handleChainFocusIn(event);
   }
 
+  const resolveKeyboardSelectionTargetId = (): string | null => {
+    if (orderedDeviceIds.length === 0) {
+      return null;
+    }
+
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement) {
+      const activeCard = activeElement.closest<HTMLElement>('.device-card[data-device-id]');
+      const activeDeviceId = activeCard?.dataset.deviceId;
+      if (activeDeviceId && orderedDeviceIds.includes(activeDeviceId)) {
+        return activeDeviceId;
+      }
+    }
+
+    const anchorId = rackSelection.state.lastSelectedDeviceId;
+    if (anchorId && orderedDeviceIds.includes(anchorId)) {
+      return anchorId;
+    }
+
+    return getOrderedSelectedDeviceIdsInRack().at(-1) ?? orderedDeviceIds[0] ?? null;
+  };
+
+  const shouldHandleDeviceNavigationKey = (event: KeyboardEvent): boolean => {
+    if (event.defaultPrevented || event.altKey || event.metaKey || event.ctrlKey) {
+      return false;
+    }
+
+    if (
+      event.key !== 'ArrowLeft'
+      && event.key !== 'ArrowRight'
+      && event.key !== 'Home'
+      && event.key !== 'End'
+    ) {
+      return false;
+    }
+
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return false;
+    }
+
+    if (target.closest(interactiveElementSelector) || target.isContentEditable) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleDeviceNavigationKeyDown = async (event: KeyboardEvent): Promise<boolean> => {
+    if (!shouldHandleDeviceNavigationKey(event) || orderedDeviceIds.length === 0) {
+      return false;
+    }
+
+    const currentDeviceId = resolveKeyboardSelectionTargetId();
+    const currentIndex = currentDeviceId ? orderedDeviceIds.indexOf(currentDeviceId) : -1;
+
+    let nextIndex: number;
+    switch (event.key) {
+      case 'ArrowLeft':
+        nextIndex = currentIndex <= 0 ? 0 : currentIndex - 1;
+        break;
+      case 'ArrowRight':
+        nextIndex = currentIndex < 0
+          ? 0
+          : Math.min(currentIndex + 1, orderedDeviceIds.length - 1);
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = orderedDeviceIds.length - 1;
+        break;
+      default:
+        return false;
+    }
+
+    const nextDeviceId = orderedDeviceIds[nextIndex];
+    if (!nextDeviceId) {
+      return false;
+    }
+
+    event.preventDefault();
+    onCloseContextMenu();
+
+    if (event.shiftKey && currentDeviceId) {
+      rackSelection.applyRangeSelection(nextDeviceId, false, orderedDeviceIds);
+    } else {
+      rackSelection.selectSingleDevice(nextDeviceId, orderedDeviceIds);
+    }
+
+    await focusRackDeviceHeader(nextDeviceId);
+    return true;
+  };
+
   function handleChainKeyDown(event: KeyboardEvent) {
+    void handleDeviceNavigationKeyDown(event);
     rackSurface.handleChainKeyDown(event);
   }
 
@@ -369,10 +483,12 @@
 
     if (additiveSelection) {
       rackSelection.toggleDeviceSelection(deviceId, orderedDeviceIds);
+      void focusRackDeviceHeader(deviceId);
       return;
     }
 
     rackSelection.selectSingleDevice(deviceId, orderedDeviceIds);
+    void focusRackDeviceHeader(deviceId);
   }
 
   function handleDeviceHeaderContextMenu(event: MouseEvent, deviceId: string) {
