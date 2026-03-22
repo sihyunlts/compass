@@ -12,6 +12,7 @@
   const timestampFormatter = new Intl.DateTimeFormat(undefined, {
     hour: 'numeric',
     minute: '2-digit',
+    second: '2-digit',
   });
 
   let {
@@ -222,14 +223,11 @@
     z-index: 44;
     width: min(15rem, calc(100vw - 1rem));
     max-height: min(24rem, calc(100vh - 1rem));
+    overflow-y: auto;
     padding: var(--gap-4);
     border: 1px solid var(--neutral-30);
     border-radius: var(--radius-8);
     background: var(--neutral-10);
-  }
-
-  .undo-history-list {
-    overflow-y: auto;
   }
 
   .undo-history-item {
