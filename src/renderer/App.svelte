@@ -125,9 +125,6 @@
   const settingsController = createSettingsController({
     bridgeClient,
     editorSession,
-    showMessage: (message) => {
-      headerIndicator.show(message);
-    },
   });
   const settingsState = settingsController.state;
   const resolvePaletteRgb = (velocity: number): string =>
@@ -334,6 +331,7 @@
       sendFlow.dispose();
       playbackSession.dispose();
       headerIndicator.dispose();
+      settingsController.dispose();
       editorSession.dispose();
     };
   });
@@ -543,7 +541,14 @@
             <div class="settings-row">
               <div class="info">
                 <span class="label">Color Palette</span>
-                <span class="description">{uiState.paletteNameText || 'Default palette'}</span>
+                <span
+                  class="description"
+                  class:is-error={settingsState.paletteDescriptionTone === 'error'}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {settingsState.paletteDescriptionOverride || uiState.paletteNameText || 'Default palette'}
+                </span>
               </div>
               
               <div class="settings-actions">
@@ -578,7 +583,14 @@
             <div class="settings-row">
               <div class="info">
                 <span class="label">sihyunlights</span>
-                <span class="description">{settingsController.getAboutSiteUrl()}</span>
+                <span
+                  class="description"
+                  class:is-error={settingsState.aboutDescriptionTone === 'error'}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {settingsState.aboutDescriptionOverride || settingsController.getAboutSiteUrl()}
+                </span>
               </div>
               <Button
                 text="Visit"

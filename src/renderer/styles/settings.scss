@@ -90,6 +90,10 @@
     .description {
       font-size: var(--text-13);
       color: var(--neutral-50);
+
+      &.is-error {
+        color: var(--accent-500);
+      }
     }
   }
 }

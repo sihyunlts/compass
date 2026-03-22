@@ -8,12 +8,15 @@ const ABOUT_SITE_URL = 'https://sihyunlights.com';
 interface SettingsControllerState {
   appVersionText: string;
   paletteRevision: number;
+  paletteDescriptionOverride: string;
+  paletteDescriptionTone: 'neutral' | 'error';
+  aboutDescriptionOverride: string;
+  aboutDescriptionTone: 'neutral' | 'error';
 }
 
 interface SettingsControllerOptions {
   bridgeClient: CompassApi;
   editorSession: EditorSession;
-  showMessage: (message: string) => void;
 }
 
 /** Owns settings-screen side effects such as palette IO, model toggles, and about actions. */
@@ -21,11 +24,19 @@ class SettingsController {
   public readonly state: SettingsControllerState = $state({
     appVersionText: '',
     paletteRevision: 0,
+    paletteDescriptionOverride: '',
+    paletteDescriptionTone: 'neutral',
+    aboutDescriptionOverride: '',
+    aboutDescriptionTone: 'neutral',
   });
 
   private readonly paletteController;
 
   private playbackSession: PlaybackSessionController | null = null;
+
+  private paletteFeedbackTimer: number | null = null;
+
+  private aboutFeedbackTimer: number | null = null;
 
   public constructor(private readonly options: SettingsControllerOptions) {
     this.paletteController = createPaletteController({
@@ -40,7 +51,7 @@ class SettingsController {
     try {
       this.paletteController.initialize();
     } catch (error) {
-      this.showError('Palette initialization failed', error);
+      this.showPaletteError('Palette initialization failed', error);
     }
   }
 
@@ -65,9 +76,9 @@ class SettingsController {
         content: await file.text(),
       });
       this.playbackSession?.renderPreviewFrame();
-      this.options.showMessage(`Palette loaded | ${file.name}`);
+      this.showPaletteDescription(`Palette loaded | ${file.name}`);
     } catch (error) {
-      this.showError('Palette upload failed', error);
+      this.showPaletteError('Palette upload failed', error);
     } finally {
       if (input) {
         input.value = '';
@@ -78,7 +89,7 @@ class SettingsController {
   public handlePaletteReset(): void {
     const restoredDefault = this.paletteController.resetToDefault();
     this.playbackSession?.renderPreviewFrame();
-    this.options.showMessage(
+    this.showPaletteDescription(
       restoredDefault
         ? 'Palette reset to default.'
         : 'Palette reset used embedded fallback.',
@@ -99,7 +110,7 @@ class SettingsController {
     try {
       await this.options.bridgeClient.openExternal(ABOUT_SITE_URL);
     } catch (error) {
-      this.showError('Failed to open website', error);
+      this.showAboutError('Failed to open website', error);
     }
   }
 
@@ -107,11 +118,69 @@ class SettingsController {
     return ABOUT_SITE_URL;
   }
 
-  private showError(summary: string, error: unknown): void {
+  public dispose(): void {
+    this.clearPaletteFeedbackTimer();
+    this.clearAboutFeedbackTimer();
+  }
+
+  private showPaletteDescription(
+    message: string,
+  ): void {
+    this.state.paletteDescriptionOverride = message;
+    this.state.paletteDescriptionTone = 'neutral';
+    this.clearPaletteFeedbackTimer();
+    this.paletteFeedbackTimer = window.setTimeout(() => {
+      this.paletteFeedbackTimer = null;
+      if (this.state.paletteDescriptionOverride === message) {
+        this.state.paletteDescriptionOverride = '';
+        this.state.paletteDescriptionTone = 'neutral';
+      }
+    }, 2500);
+  }
+
+  private showPaletteError(summary: string, error: unknown): void {
     const detail = error instanceof Error && error.message.trim()
       ? error.message.trim()
       : 'Unknown error.';
-    this.options.showMessage(`${summary} | ${detail}`);
+    const message = `${summary} | ${detail}`;
+    this.state.paletteDescriptionOverride = message;
+    this.state.paletteDescriptionTone = 'error';
+    this.clearPaletteFeedbackTimer();
+  }
+
+  private showAboutError(summary: string, error: unknown): void {
+    const detail = error instanceof Error && error.message.trim()
+      ? error.message.trim()
+      : 'Unknown error.';
+    const message = `${summary} | ${detail}`;
+    this.state.aboutDescriptionOverride = message;
+    this.state.aboutDescriptionTone = 'error';
+    this.clearAboutFeedbackTimer();
+    this.aboutFeedbackTimer = window.setTimeout(() => {
+      this.aboutFeedbackTimer = null;
+      if (this.state.aboutDescriptionOverride === message) {
+        this.state.aboutDescriptionOverride = '';
+        this.state.aboutDescriptionTone = 'neutral';
+      }
+    }, 2500);
+  }
+
+  private clearPaletteFeedbackTimer(): void {
+    if (this.paletteFeedbackTimer === null) {
+      return;
+    }
+
+    window.clearTimeout(this.paletteFeedbackTimer);
+    this.paletteFeedbackTimer = null;
+  }
+
+  private clearAboutFeedbackTimer(): void {
+    if (this.aboutFeedbackTimer === null) {
+      return;
+    }
+
+    window.clearTimeout(this.aboutFeedbackTimer);
+    this.aboutFeedbackTimer = null;
   }
 }
 
