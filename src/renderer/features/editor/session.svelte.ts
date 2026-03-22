@@ -9,8 +9,8 @@ import type { RendererDeviceKind } from '../../../devices';
 import { isRendererDeviceKind } from '../../../devices';
 import type { ContextMenuTarget } from '../../components/context-menu-types';
 import type {
+  BrowserNonRackPresetInsertSource,
   BrowserInsertSource,
-  BrowserPresetInsertSource,
   RackInteractionCommit,
 } from '../../components/device-rack-types';
 import type { RackDropZone } from '../rack/drop-ops';
@@ -230,7 +230,7 @@ export class EditorSession {
       );
     },
     handlePresetInsertDrop: (
-      source: BrowserPresetInsertSource,
+      source: BrowserNonRackPresetInsertSource,
       dropZone: RackDropZone,
     ): void => {
       if (source.kind === 'device-preset') {

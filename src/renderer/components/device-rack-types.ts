@@ -2,6 +2,7 @@ import type { RendererDeviceKind } from '../../devices';
 import type {
   DevicePresetFile,
   GroupPresetFile,
+  RackPresetFile,
 } from '../../shared/presets';
 import type {
   ChainDragSourceKind,
@@ -32,9 +33,18 @@ export type BrowserInsertSource =
   | {
       kind: 'group-preset';
       preset: GroupPresetFile;
+    }
+  | {
+      kind: 'rack-preset';
+      preset: RackPresetFile;
+      label: string;
     };
 
 export type BrowserPresetInsertSource = Exclude<BrowserInsertSource, { kind: 'device-kind' }>;
+export type BrowserNonRackPresetInsertSource = Exclude<
+  BrowserPresetInsertSource,
+  { kind: 'rack-preset' }
+>;
 
 export type RackInteractionCommit =
   | {

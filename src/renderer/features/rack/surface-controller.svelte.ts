@@ -3,6 +3,7 @@ import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/model'
 import type {
   BrowserInsertSource,
   BrowserPresetInsertSource,
+  BrowserNonRackPresetInsertSource,
   RackInteractionCommit,
   RackScrollMetrics,
 } from '../../components/device-rack-types';
@@ -26,7 +27,11 @@ interface RackSurfaceControllerOptions {
   saveChain: (chain: GeneratorChain, meta: ChainMutationMeta) => void;
   scheduleAutoPreview: (delayMs?: number) => void;
   commitRackInteraction: (commit: RackInteractionCommit) => void;
-  commitPresetInsertDrop: (source: BrowserPresetInsertSource, dropZone: RackDropZone) => void;
+  commitPresetInsertDrop: (
+    source: BrowserNonRackPresetInsertSource,
+    dropZone: RackDropZone,
+  ) => void;
+  commitRackPresetDrop: (source: Extract<BrowserPresetInsertSource, { kind: 'rack-preset' }>) => void;
   onScrollMetricsChange: (metrics: RackScrollMetrics) => void;
   onMiniMapContentRevisionChange: (revision: number) => void;
   startRenamingDevice: (deviceId: string) => boolean;
@@ -375,6 +380,11 @@ class RackSurfaceController {
         deviceKind: pointerResult.source.deviceKind,
         dropZone: pointerResult.dropZone,
       });
+      return;
+    }
+
+    if (pointerResult.source.kind === 'rack-preset') {
+      this.options.commitRackPresetDrop(pointerResult.source);
       return;
     }
 

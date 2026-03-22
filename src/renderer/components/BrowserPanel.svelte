@@ -216,10 +216,6 @@
       return;
     }
 
-    if (node.presetType === 'rack') {
-      return;
-    }
-
     void onPresetFilePointerDown(node, event, itemEl);
   };
 

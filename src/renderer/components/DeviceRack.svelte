@@ -7,6 +7,7 @@
   import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/model';
   import type { ContextMenuTarget } from './context-menu-types';
   import type {
+    BrowserNonRackPresetInsertSource,
     BrowserPresetInsertSource,
     RackInteractionCommit,
     RackPresetFileDrop,
@@ -49,6 +50,7 @@
     onCloseContextMenu,
     onCommit,
     onPresetInsertDrop = () => {},
+    onRackPresetDrop = () => {},
     onScrollMetricsChange = () => {},
     onMiniMapContentRevisionChange = () => {},
     onPresetFileDrop = async () => {},
@@ -75,9 +77,10 @@
     onCloseContextMenu: () => void;
     onCommit: (commit: RackInteractionCommit) => void;
     onPresetInsertDrop?: (
-      source: BrowserPresetInsertSource,
+      source: BrowserNonRackPresetInsertSource,
       dropZone: RackDropZone,
     ) => void;
+    onRackPresetDrop?: (source: Extract<BrowserPresetInsertSource, { kind: 'rack-preset' }>) => void;
     onScrollMetricsChange?: (metrics: RackScrollMetrics) => void;
     onMiniMapContentRevisionChange?: (revision: number) => void;
     onPresetFileDrop?: (payload: RackPresetFileDrop) => void | Promise<void>;
@@ -142,6 +145,7 @@
     scheduleAutoPreview: (delayMs) => onScheduleAutoPreview(delayMs),
     commitRackInteraction: (commit) => onCommit(commit),
     commitPresetInsertDrop: (source, dropZone) => onPresetInsertDrop(source, dropZone),
+    commitRackPresetDrop: (source) => onRackPresetDrop(source),
     onScrollMetricsChange: (metrics) => onScrollMetricsChange(metrics),
     onMiniMapContentRevisionChange: (revision) => onMiniMapContentRevisionChange(revision),
     onPresetFileDrop: (payload) => onPresetFileDrop(payload),

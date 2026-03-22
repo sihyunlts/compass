@@ -4,6 +4,7 @@ import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/model'
 import type { ContextMenuTarget } from '../../components/context-menu-types';
 import type {
   BrowserPresetInsertSource,
+  BrowserNonRackPresetInsertSource,
   RackInteractionCommit,
   RackPresetFileDrop,
   RackScrollMetrics,
@@ -35,9 +36,10 @@ interface DeviceRackControllerOptions {
   scheduleAutoPreview: (delayMs?: number) => void;
   commitRackInteraction: (commit: RackInteractionCommit) => void;
   commitPresetInsertDrop: (
-    source: BrowserPresetInsertSource,
+    source: BrowserNonRackPresetInsertSource,
     dropZone: RackDropZone,
   ) => void;
+  commitRackPresetDrop: (source: Extract<BrowserPresetInsertSource, { kind: 'rack-preset' }>) => void;
   onScrollMetricsChange: (metrics: RackScrollMetrics) => void;
   onMiniMapContentRevisionChange: (revision: number) => void;
   onPresetFileDrop: (payload: RackPresetFileDrop) => void | Promise<void>;
@@ -90,6 +92,7 @@ class DeviceRackController {
       commitRackInteraction: (commit) => this.options.commitRackInteraction(commit),
       commitPresetInsertDrop: (source, dropZone) =>
         this.options.commitPresetInsertDrop(source, dropZone),
+      commitRackPresetDrop: (source) => this.options.commitRackPresetDrop(source),
       onScrollMetricsChange: (metrics) => this.options.onScrollMetricsChange(metrics),
       onMiniMapContentRevisionChange: (revision) =>
         this.options.onMiniMapContentRevisionChange(revision),

@@ -12,6 +12,7 @@ import type {
 import type { ContextMenuTarget } from '../components/context-menu-types';
 import type {
   BrowserInsertSource,
+  BrowserPresetInsertSource,
   RackPresetFileDrop,
 } from '../components/device-rack-types';
 import {
@@ -42,8 +43,8 @@ type PresetEntryTarget = Extract<ContextMenuTarget, { kind: 'preset-entry' }>;
 type PresetsRootTarget = Extract<ContextMenuTarget, { kind: 'presets-root' }>;
 type ShowInFolderTarget = PresetEntryTarget | PresetsRootTarget;
 type PendingRackPresetLoadTarget = {
-  kind: 'browser-entry';
-  entry: BrowserTreePresetLeafNode;
+  label: string;
+  load: () => Promise<void>;
 };
 
 interface PresetControllerState {
@@ -139,10 +140,7 @@ class PresetController {
 
   public async handlePresetEntryOpen(entry: BrowserTreePresetLeafNode): Promise<void> {
     if (entry.presetType === 'rack' && this.hasExistingRack()) {
-      this.state.pendingRackPresetLoadTarget = {
-        kind: 'browser-entry',
-        entry,
-      };
+      this.openRackPresetEntryDialog(entry);
       return;
     }
 
@@ -156,7 +154,7 @@ class PresetController {
     sourceEvent: PointerEvent,
     itemEl: HTMLElement,
   ): Promise<void> {
-    if (entry.presetType === 'rack' || sourceEvent.button !== 0 || !sourceEvent.isPrimary) {
+    if (sourceEvent.button !== 0 || !sourceEvent.isPrimary) {
       return;
     }
 
@@ -169,7 +167,7 @@ class PresetController {
         return;
       }
 
-      const source = this.resolvePresetInsertSource(response);
+      const source = this.resolvePresetInsertSource(response, entry.label);
       if (!source) {
         return;
       }
@@ -181,6 +179,33 @@ class PresetController {
         itemEl,
       });
     }, 'Preset load failed.');
+  }
+
+  public openRackPresetDropDialog(source: Extract<BrowserPresetInsertSource, { kind: 'rack-preset' }>): void {
+    if (!this.hasExistingRack()) {
+      const result = this.options.editorSession.commands.applyRackPreset(source.preset);
+      this.showPresetActionMessage(result.message);
+      return;
+    }
+
+    this.state.pendingRackPresetLoadTarget = {
+      label: source.label,
+      load: async () => {
+        const result = this.options.editorSession.commands.applyRackPreset(source.preset);
+        this.showPresetActionMessage(result.message);
+      },
+    };
+    this.state.isRackPresetLoadPending = false;
+  }
+
+  public openRackPresetEntryDialog(entry: BrowserTreePresetLeafNode): void {
+    this.state.pendingRackPresetLoadTarget = {
+      label: entry.label,
+      load: async () => {
+        await this.loadPresetFromBrowserEntry(entry);
+      },
+    };
+    this.state.isRackPresetLoadPending = false;
   }
 
   public openPresetDeleteDialog(target: PresetEntryTarget): void {
@@ -334,7 +359,7 @@ class PresetController {
     this.state.isRackPresetLoadPending = true;
     try {
       await this.runPresetAction(async () => {
-        await this.loadPresetFromBrowserEntry(target.entry);
+        await target.load();
         this.state.pendingRackPresetLoadTarget = null;
       }, 'Rack preset load failed.');
     } finally {
@@ -343,7 +368,7 @@ class PresetController {
   }
 
   public getRackPresetLoadDescription(target: PendingRackPresetLoadTarget): string {
-    return `The current rack will be replaced by the rack preset "${target.entry.label}".`;
+    return `The current rack will be replaced by the rack preset "${target.label}".`;
   }
 
   public async handlePresetFileDrop(payload: RackPresetFileDrop): Promise<void> {
@@ -419,6 +444,7 @@ class PresetController {
 
   private resolvePresetInsertSource(
     response: ReadPresetEntryResponse,
+    entryLabel?: string,
   ): BrowserInsertSource | null {
     if (response.status !== 'loaded') {
       return null;
@@ -438,7 +464,13 @@ class PresetController {
       };
     }
 
-    return null;
+    return entryLabel
+      ? {
+          kind: 'rack-preset',
+          preset: response.payload,
+          label: entryLabel,
+        }
+      : null;
   }
 
   private toReadPresetEntryRequest(

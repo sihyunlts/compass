@@ -422,6 +422,7 @@
           onCloseContextMenu={closeContextMenu}
           onCommit={editorSession.commands.handleRackCommit}
           onPresetInsertDrop={editorSession.commands.handlePresetInsertDrop}
+          onRackPresetDrop={(source) => presetController.openRackPresetDropDialog(source)}
           onScrollMetricsChange={handleRackScrollMetricsChange}
           onMiniMapContentRevisionChange={handleRackMiniMapContentRevisionChange}
           onPresetFileDrop={(payload) => presetController.handlePresetFileDrop(payload)}
