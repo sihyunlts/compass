@@ -197,6 +197,8 @@
       align-items: flex-start;
       gap: var(--gap-10);
       cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
       -webkit-user-drag: none;
       outline: none;
 
@@ -302,6 +304,8 @@
       color: inherit;
       caret-color: currentColor;
       cursor: text;
+      user-select: text;
+      -webkit-user-select: text;
     }
 
     :global(.device-controls) {

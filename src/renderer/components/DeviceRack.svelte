@@ -909,6 +909,8 @@
     padding: var(--gap-10) var(--gap-6);
     gap: var(--gap-12);
     background: var(--neutral-10);
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .group-rail-controls {
