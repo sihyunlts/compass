@@ -11,6 +11,30 @@ import {
 } from '../../../shared/presets';
 import { PRESET_FILE_SPECS, PRESET_ROOT_DIR_NAME } from './preset-config';
 
+const serializePresetFile = (payload: PresetFile): unknown => {
+  if (payload.presetType === 'device') {
+    return {
+      ...payload,
+      device: {
+        ...payload.device,
+        name: undefined,
+      },
+    };
+  }
+
+  if (payload.presetType === 'group') {
+    return {
+      ...payload,
+      group: {
+        ...payload.group,
+        name: undefined,
+      },
+    };
+  }
+
+  return payload;
+};
+
 /** Reads and writes preset files under the app's preset root. */
 export class PresetStorage {
   public async resolvePresetsRootDirectory(): Promise<string> {
@@ -32,7 +56,7 @@ export class PresetStorage {
 
   public async writePresetFile(filePath: string, payload: PresetFile): Promise<void> {
     await mkdir(path.dirname(filePath), { recursive: true });
-    await writeFile(filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+    await writeFile(filePath, `${JSON.stringify(serializePresetFile(payload), null, 2)}\n`, 'utf8');
   }
 
   public async ensureAccessible(filePath: string): Promise<void> {

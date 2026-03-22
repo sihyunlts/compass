@@ -59,20 +59,31 @@ export type ParsedPresetFileResult =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
+const extractBaseName = (fileName: string): string => {
+  const separatorIndex = Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\'));
+  return separatorIndex === -1 ? fileName : fileName.slice(separatorIndex + 1);
+};
+
 export const isPresetFileKind = (value: unknown): value is PresetFileKind =>
   value === 'device' || value === 'group' || value === 'rack';
 
-const isPresetFileHeader = (
+const parsePresetFileHeader = (
   value: unknown,
-): value is {
+): {
   schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
   presetType: PresetFileKind;
   savedAtIso: string;
-} =>
+} | null =>
   isRecord(value)
   && value.schemaVersion === PRESET_FILE_SCHEMA_VERSION
   && isPresetFileKind(value.presetType)
-  && typeof value.savedAtIso === 'string';
+  && typeof value.savedAtIso === 'string'
+    ? {
+        schemaVersion: value.schemaVersion,
+        presetType: value.presetType,
+        savedAtIso: value.savedAtIso,
+      }
+    : null;
 
 interface ParsedPresetPayload {
   preset: PresetFile;
@@ -87,43 +98,61 @@ export const toStandaloneDevicePresetDevice = (
   return next;
 };
 
-const parseDevicePresetFile = (
-  value: unknown,
+const parseDevicePresetPayload = (
+  rawDevice: unknown,
+  header: {
+    schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
+    savedAtIso: string;
+  },
+  options: {
+    allowStoredName: boolean;
+  } = {
+    allowStoredName: true,
+  },
 ): ParsedPresetPayload | null => {
-  if (!isPresetFileHeader(value) || value.presetType !== 'device') {
+  if (
+    !options.allowStoredName
+    && isRecord(rawDevice)
+    && Object.hasOwn(rawDevice, 'name')
+  ) {
     return null;
   }
 
-  const device = hydrateImportedGeneratorDevice((value as { device?: unknown }).device);
+  const device = hydrateImportedGeneratorDevice(rawDevice);
   if (!device) {
     return null;
   }
 
   return {
     preset: {
-      schemaVersion: value.schemaVersion,
-      presetType: value.presetType,
-      savedAtIso: value.savedAtIso,
+      schemaVersion: header.schemaVersion,
+      presetType: 'device',
+      savedAtIso: header.savedAtIso,
       device: toStandaloneDevicePresetDevice(device),
     },
   };
 };
 
-const parseGroupPresetFile = (
-  value: unknown,
+const parseGroupPresetPayload = (
+  rawGroup: unknown,
+  header: {
+    schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
+    savedAtIso: string;
+  },
   options: {
     mode?: ImportedDataMode;
+    allowStoredName?: boolean;
   } = {},
 ): ParsedPresetPayload | null => {
-  if (!isPresetFileHeader(value) || value.presetType !== 'group') {
-    return null;
-  }
-
-  const group = (value as { group?: unknown }).group;
+  const group = rawGroup;
   if (
     !isRecord(group)
     || typeof group.enabled !== 'boolean'
-    || (group.name !== null && typeof group.name !== 'string')
+    || (
+      (options.allowStoredName ?? true)
+        ? group.name !== undefined && group.name !== null && typeof group.name !== 'string'
+        : Object.hasOwn(group, 'name')
+    )
     || !Array.isArray(group.devices)
     || group.devices.length === 0
   ) {
@@ -131,24 +160,18 @@ const parseGroupPresetFile = (
   }
 
   const hydratedDevices = hydrateImportedGeneratorDevices(group.devices, options);
-  if (!hydratedDevices) {
+  if (!hydratedDevices || hydratedDevices.devices.length === 0) {
     return null;
   }
-  if (hydratedDevices.devices.length === 0) {
-    return null;
-  }
-
-  const groupEnabled = group.enabled as boolean;
-  const groupName = group.name as string | null;
 
   return {
     preset: {
-      schemaVersion: value.schemaVersion,
-      presetType: value.presetType,
-      savedAtIso: value.savedAtIso,
+      schemaVersion: header.schemaVersion,
+      presetType: 'group',
+      savedAtIso: header.savedAtIso,
       group: {
-        enabled: groupEnabled,
-        name: groupName,
+        enabled: group.enabled,
+        name: typeof group.name === 'string' ? group.name : null,
         devices: hydratedDevices.devices,
       },
     },
@@ -159,23 +182,18 @@ const parseGroupPresetFile = (
   };
 };
 
-const parseRackPresetFile = (
-  value: unknown,
+const parseRackPresetPayload = (
+  rawChain: unknown,
+  header: {
+    schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
+    savedAtIso: string;
+  },
   options: {
     mode?: ImportedDataMode;
   } = {},
 ): ParsedPresetPayload | null => {
-  if (!isPresetFileHeader(value) || value.presetType !== 'rack') {
-    return null;
-  }
-
-  const hydratedChain = hydrateImportedGeneratorChain(
-    (value as { chain?: unknown }).chain,
-    options,
-  );
-  const sourceDevices = (value as {
-    chain?: { devices?: unknown };
-  }).chain?.devices;
+  const hydratedChain = hydrateImportedGeneratorChain(rawChain, options);
+  const sourceDevices = (rawChain as { devices?: unknown } | undefined)?.devices;
   if (
     !hydratedChain
     || (Array.isArray(sourceDevices) && sourceDevices.length > 0 && hydratedChain.chain.devices.length === 0)
@@ -185,9 +203,9 @@ const parseRackPresetFile = (
 
   return {
     preset: {
-      schemaVersion: value.schemaVersion,
-      presetType: value.presetType,
-      savedAtIso: value.savedAtIso,
+      schemaVersion: header.schemaVersion,
+      presetType: 'rack',
+      savedAtIso: header.savedAtIso,
       chain: hydratedChain.chain,
     },
     warning: formatInvalidHydratedDeviceWarning(
@@ -202,15 +220,61 @@ export const parsePresetFile = (
   options: {
     mode?: ImportedDataMode;
   } = {},
-): ParsedPresetPayload | null =>
-  parseDevicePresetFile(value)
-  ?? parseGroupPresetFile(value, options)
-  ?? parseRackPresetFile(value, options);
+): ParsedPresetPayload | null => {
+  const header = parsePresetFileHeader(value);
+  if (!header) {
+    return null;
+  }
+
+  if (header.presetType === 'device') {
+    return parseDevicePresetPayload((value as { device?: unknown }).device, header);
+  }
+
+  if (header.presetType === 'group') {
+    return parseGroupPresetPayload((value as { group?: unknown }).group, header, {
+      mode: options.mode,
+      allowStoredName: true,
+    });
+  }
+
+  return parseRackPresetPayload((value as { chain?: unknown }).chain, header, {
+    mode: options.mode,
+  });
+};
+
+const parseStoredPresetFile = (
+  value: unknown,
+  options: {
+    mode?: ImportedDataMode;
+  } = {},
+): ParsedPresetPayload | null => {
+  const header = parsePresetFileHeader(value);
+  if (!header) {
+    return null;
+  }
+
+  if (header.presetType === 'device') {
+    return parseDevicePresetPayload((value as { device?: unknown }).device, header, {
+      allowStoredName: false,
+    });
+  }
+
+  if (header.presetType === 'group') {
+    return parseGroupPresetPayload((value as { group?: unknown }).group, header, {
+      mode: options.mode,
+      allowStoredName: false,
+    });
+  }
+
+  return parseRackPresetPayload((value as { chain?: unknown }).chain, header, {
+    mode: options.mode,
+  });
+};
 
 export const resolvePresetFileKindFromName = (
   fileName: string,
 ): PresetFileKind | null => {
-  const normalized = fileName.trim().toLowerCase();
+  const normalized = extractBaseName(fileName).trim().toLowerCase();
   if (!normalized) {
     return null;
   }
@@ -224,19 +288,63 @@ export const resolvePresetFileKindFromName = (
   return null;
 };
 
+const resolvePresetNameFromFileName = (
+  fileName: string,
+  presetType: Exclude<PresetFileKind, 'rack'>,
+): string | null => {
+  const baseName = extractBaseName(fileName).trim();
+  const extension = PRESET_FILE_EXTENSIONS[presetType];
+  if (!baseName.toLowerCase().endsWith(extension)) {
+    return null;
+  }
+
+  const stem = baseName.slice(0, -extension.length).trim();
+  return stem || null;
+};
+
+const applyPresetNameFromFileName = (
+  preset: PresetFile,
+  fileName: string,
+): PresetFile => {
+  if (preset.presetType === 'rack') {
+    return preset;
+  }
+
+  const presetName = resolvePresetNameFromFileName(fileName, preset.presetType);
+  if (!presetName) {
+    return preset;
+  }
+
+  if (preset.presetType === 'device') {
+    return {
+      ...preset,
+      device: {
+        ...preset.device,
+        name: presetName,
+      },
+    };
+  }
+
+  return {
+    ...preset,
+    group: {
+      ...preset.group,
+      name: presetName,
+    },
+  };
+};
+
 interface ParsePresetFileTextOptions {
-  fileName?: string;
+  fileName: string;
   mode?: ImportedDataMode;
 }
 
 export const parsePresetFileText = (
   text: string,
-  options: ParsePresetFileTextOptions = {},
+  options: ParsePresetFileTextOptions,
 ): ParsedPresetFileResult => {
-  const extensionType = options.fileName
-    ? resolvePresetFileKindFromName(options.fileName)
-    : null;
-  if (options.fileName && !extensionType) {
+  const extensionType = resolvePresetFileKindFromName(options.fileName);
+  if (!extensionType) {
     return {
       ok: false,
       message: 'Unsupported preset file extension.',
@@ -253,7 +361,7 @@ export const parsePresetFileText = (
     };
   }
 
-  const parsedPreset = parsePresetFile(parsed, {
+  const parsedPreset = parseStoredPresetFile(parsed, {
     mode: options.mode,
   });
   if (!parsedPreset) {
@@ -264,7 +372,7 @@ export const parsePresetFileText = (
   }
 
   const { preset, warning } = parsedPreset;
-  if (extensionType && preset.presetType !== extensionType) {
+  if (preset.presetType !== extensionType) {
     return {
       ok: false,
       message: 'Preset file extension does not match the preset payload.',
@@ -273,7 +381,7 @@ export const parsePresetFileText = (
 
   return {
     ok: true,
-    preset,
+    preset: applyPresetNameFromFileName(preset, options.fileName),
     warning,
   };
 };
