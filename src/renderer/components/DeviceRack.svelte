@@ -3,7 +3,7 @@
    * Renders the rack surface and translates pointer/drag interactions into commit events.
    * Integrates rack selection, drop indicators, and group rendering state.
    */
-  import { onMount, tick } from 'svelte';
+  import { onMount } from 'svelte';
   import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/model';
   import type { ContextMenuTarget } from './context-menu-types';
   import type {
@@ -12,10 +12,7 @@
     RackPresetFileDrop,
     RackScrollMetrics,
   } from './device-rack-types';
-  import { canCreateGroupFromSelection } from '../features/editor/chain-ops';
   import type { ChainMutationMeta } from '../features/editor/history-core';
-  import { blurIfTextEditingElement } from '../features/rack/text-editing';
-  import { createRackSelection } from '../features/rack/selection.svelte';
   import {
     buildGroupColumns,
     buildGroupMemberIdsByGroupId,
@@ -32,9 +29,7 @@
     resolveDeviceDisplayName,
     resolveGroupDisplayName,
   } from '../features/rack/rename';
-  import { createExternalFileDropController } from '../features/rack/external-file-drop-controller';
-  import { createRackRenameController } from '../features/rack/rename-controller.svelte';
-  import { createRackSurfaceController } from '../features/rack/surface-controller.svelte';
+  import { createDeviceRackController } from '../features/rack/device-rack-controller.svelte';
   import RackRenamePopover from './RackRenamePopover.svelte';
   import DeviceCard from './DeviceCard.svelte';
 
@@ -100,8 +95,6 @@
   let browserDragBadgeEl = $state<HTMLElement | null>(null);
   let renamePopover = $state<ReturnType<typeof RackRenamePopover> | null>(null);
 
-  const rackSelection = createRackSelection();
-
   const resolveGroupEnabled = (groupId: string): boolean =>
     chainState.groupStateById[groupId]?.enabled !== false;
 
@@ -113,8 +106,6 @@
   const orderedDeviceIds = $derived.by(() =>
     devices.map((device: GeneratorDeviceNode) => device.id));
   const orderedGroupIds = $derived.by(() => buildOrderedGroupIds(devices));
-  const selectedDeviceIds = $derived.by(() => rackSelection.state.selectedDeviceIds);
-  const selectedGroupIds = $derived.by(() => rackSelection.state.selectedGroupIds);
   const collapsedSet = $derived.by(() => new Set<string>(collapsedDeviceIds));
   const deviceDisplayNameById = $derived.by(() => buildDeviceDisplayNameById(devices));
   const groupDisplayNameById = $derived.by(() =>
@@ -133,27 +124,19 @@
     return `${rackOrderSignature}::collapsed:${collapsedSignature}`;
   });
 
-  const renameController = createRackRenameController({
-    getChainDevices: () => chainDevicesEl,
-    getDevices: () => devices,
-    getGroupStateById: () => chainState.groupStateById,
-    getOrderedGroupIds: () => orderedGroupIds,
-    getCollapsedSet: () => collapsedSet,
-    getDeviceDisplayNameById: () => deviceDisplayNameById,
-    getGroupDisplayNameById: () => groupDisplayNameById,
-    closeContextMenu: () => onCloseContextMenu(),
-    renameDevice: (deviceId, rawName) => onRenameDevice(deviceId, rawName),
-    renameGroup: (groupId, rawName) => onRenameGroup(groupId, rawName),
-  });
-
-  const rackSurface = createRackSurfaceController({
-    rackSelection,
+  const controller = createDeviceRackController({
     getDevices: () => devices,
     getChainState: () => chainState,
+    getCollapsedSet: () => collapsedSet,
     getOrderedDeviceIds: () => orderedDeviceIds,
     getOrderedGroupIds: () => orderedGroupIds,
+    getGroupMemberIds: (groupId) => getGroupMemberIds(groupId),
+    getDeviceDisplayNameById: () => deviceDisplayNameById,
+    getGroupDisplayNameById: () => groupDisplayNameById,
     getInteractiveElementSelector: () => interactiveElementSelector,
+    getChainDevices: () => chainDevicesEl,
     resolveMiniMapLayoutSignature: () => miniMapLayoutSignature,
+    openContextMenu: (clientX, clientY, target) => onOpenContextMenu(clientX, clientY, target),
     closeContextMenu: () => onCloseContextMenu(),
     saveChain: (chain, meta) => onSaveChain(chain, meta),
     scheduleAutoPreview: (delayMs) => onScheduleAutoPreview(delayMs),
@@ -161,451 +144,51 @@
     commitPresetInsertDrop: (source, dropZone) => onPresetInsertDrop(source, dropZone),
     onScrollMetricsChange: (metrics) => onScrollMetricsChange(metrics),
     onMiniMapContentRevisionChange: (revision) => onMiniMapContentRevisionChange(revision),
-    startRenamingDevice: (deviceId) => renameController.startRenamingDevice(deviceId),
-    startRenamingGroup: (groupId) => renameController.startRenamingGroup(groupId),
-  });
-
-  const externalFileDropController = createExternalFileDropController({
-    closeContextMenu: () => onCloseContextMenu(),
-    clearDropIndicator: () => rackSurface.clearDropIndicator(),
-    syncDropIndicator: (clientX, clientY) =>
-      rackSurface.syncExternalFileDropIndicator(clientX, clientY),
     onPresetFileDrop: (payload) => onPresetFileDrop(payload),
+    saveDevicePreset: (deviceId) => onSaveDevicePreset(deviceId),
+    saveGroupPreset: (groupId) => onSaveGroupPreset(groupId),
+    toggleGroupEnabled: (groupId, nextEnabled) => onToggleGroupEnabled(groupId, nextEnabled),
+    toggleCollapse: (id) => onToggleCollapse(id),
+    renameDevice: (deviceId, rawName) => onRenameDevice(deviceId, rawName),
+    renameGroup: (groupId, rawName) => onRenameGroup(groupId, rawName),
   });
 
-  const draggingDeviceIds = $derived.by(() =>
-    rackSurface.activeDragInfo?.kind === 'chain' && rackSurface.activeDragInfo.didMove
-      ? rackSurface.activeDragInfo.sourceIds
-      : []);
-
-  const getOrderedSelectedDeviceIdsInRack = (): string[] =>
-    rackSelection.getOrderedSelectedDeviceIds(orderedDeviceIds);
-
-  const resolveRackDeviceHeader = (deviceId: string): HTMLElement | null =>
-    chainDevicesEl?.querySelector<HTMLElement>(
-      `.device-card[data-device-id="${deviceId}"] [data-rack-device-header="true"]`,
-    ) ?? null;
-
-  const isAdditiveSelection = (event: { metaKey: boolean; ctrlKey: boolean }): boolean =>
-    event.metaKey || event.ctrlKey;
-
-  const focusRackDeviceHeader = async (deviceId: string): Promise<void> => {
-    await tick();
-    const headerEl = resolveRackDeviceHeader(deviceId);
-    if (!headerEl) {
-      return;
-    }
-
-    headerEl.focus();
-    headerEl.scrollIntoView({
-      block: 'nearest',
-      inline: 'nearest',
-    });
-  };
-
-  const blurActiveTextEditingElement = (): void => {
-    blurIfTextEditingElement(document.activeElement);
-  };
-
-  const consumeSuppressedDeviceSelectionClick = (): boolean =>
-    rackSurface.consumeSuppressedSelectionClick();
-
-  const handleDeviceSavePreset = (deviceId: string): void => {
-    consumeSuppressedDeviceSelectionClick();
-    onSaveDevicePreset(deviceId);
-  };
-
-  const selectDeviceForContextMenu = (deviceId: string): void => {
-    if (selectedDeviceIds.includes(deviceId)) {
-      return;
-    }
-
-    rackSelection.clear();
-    rackSelection.selectDeviceIds([deviceId], deviceId, orderedDeviceIds);
-  };
-
-  const selectGroupForContextMenu = (groupId: string): void => {
-    if (selectedGroupIds.includes(groupId)) {
-      return;
-    }
-
-    rackSelection.clear();
-    rackSelection.setSelectedGroupIds([groupId], orderedGroupIds);
-  };
-
-  function handleChainControlInputOrChange(event: Event) {
-    rackSurface.handleChainControlInputOrChange(event);
-  }
-
-  function handleChainFocusIn(event: FocusEvent) {
-    rackSurface.handleChainFocusIn(event);
-  }
-
-  const resolveKeyboardSelectionTargetId = (): string | null => {
-    if (orderedDeviceIds.length === 0) {
-      return null;
-    }
-
-    const activeElement = document.activeElement;
-    if (activeElement instanceof HTMLElement) {
-      const activeCard = activeElement.closest<HTMLElement>('.device-card[data-device-id]');
-      const activeDeviceId = activeCard?.dataset.deviceId;
-      if (activeDeviceId && orderedDeviceIds.includes(activeDeviceId)) {
-        return activeDeviceId;
-      }
-    }
-
-    const anchorId = rackSelection.state.lastSelectedDeviceId;
-    if (anchorId && orderedDeviceIds.includes(anchorId)) {
-      return anchorId;
-    }
-
-    return getOrderedSelectedDeviceIdsInRack().at(-1) ?? orderedDeviceIds[0] ?? null;
-  };
-
-  const shouldHandleDeviceNavigationKey = (event: KeyboardEvent): boolean => {
-    if (event.defaultPrevented || event.altKey || event.metaKey || event.ctrlKey) {
-      return false;
-    }
-
-    if (
-      event.key !== 'ArrowLeft'
-      && event.key !== 'ArrowRight'
-      && event.key !== 'Home'
-      && event.key !== 'End'
-    ) {
-      return false;
-    }
-
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
-      return false;
-    }
-
-    if (target.closest(interactiveElementSelector) || target.isContentEditable) {
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleDeviceNavigationKeyDown = async (event: KeyboardEvent): Promise<boolean> => {
-    if (!shouldHandleDeviceNavigationKey(event) || orderedDeviceIds.length === 0) {
-      return false;
-    }
-
-    const currentDeviceId = resolveKeyboardSelectionTargetId();
-    const currentIndex = currentDeviceId ? orderedDeviceIds.indexOf(currentDeviceId) : -1;
-
-    let nextIndex: number;
-    switch (event.key) {
-      case 'ArrowLeft':
-        nextIndex = currentIndex <= 0 ? 0 : currentIndex - 1;
-        break;
-      case 'ArrowRight':
-        nextIndex = currentIndex < 0
-          ? 0
-          : Math.min(currentIndex + 1, orderedDeviceIds.length - 1);
-        break;
-      case 'Home':
-        nextIndex = 0;
-        break;
-      case 'End':
-        nextIndex = orderedDeviceIds.length - 1;
-        break;
-      default:
-        return false;
-    }
-
-    const nextDeviceId = orderedDeviceIds[nextIndex];
-    if (!nextDeviceId) {
-      return false;
-    }
-
-    event.preventDefault();
-    onCloseContextMenu();
-
-    if (event.shiftKey && currentDeviceId) {
-      rackSelection.applyRangeSelection(nextDeviceId, false, orderedDeviceIds);
-    } else {
-      rackSelection.selectSingleDevice(nextDeviceId, orderedDeviceIds);
-    }
-
-    await focusRackDeviceHeader(nextDeviceId);
-    return true;
-  };
-
-  function handleChainKeyDown(event: KeyboardEvent) {
-    void handleDeviceNavigationKeyDown(event);
-    rackSurface.handleChainKeyDown(event);
-  }
-
-  function handleGroupEnabledChange(event: Event, groupId: string) {
-    event.stopPropagation();
-    const target = event.currentTarget;
-    if (!(target instanceof HTMLInputElement)) {
-      return;
-    }
-    onToggleGroupEnabled(groupId, target.checked);
-  }
-
-  function handleGroupTogglePointerDown(event: PointerEvent) {
-    event.stopPropagation();
-  }
-
-  function handleGroupToggleClick(event: MouseEvent) {
-    event.stopPropagation();
-    consumeSuppressedDeviceSelectionClick();
-  }
-
-  function handleGroupSavePointerDown(event: PointerEvent) {
-    event.stopPropagation();
-  }
-
-  function handleGroupSaveClick(event: MouseEvent, groupId: string) {
-    event.stopPropagation();
-    consumeSuppressedDeviceSelectionClick();
-    onSaveGroupPreset(groupId);
-  }
-
-  function handleGroupSaveContextMenu(event: MouseEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-  }
-
-  function handleGroupRailPointerDown(event: PointerEvent, groupId: string) {
-    event.stopPropagation();
-    if (event.button !== 0 || !event.isPrimary) {
-      return;
-    }
-
-    blurActiveTextEditingElement();
-    onCloseContextMenu();
-
-    if (isAdditiveSelection(event)) {
-      rackSelection.toggleSelectedGroupId(groupId, orderedGroupIds);
-    } else {
-      rackSelection.clear();
-      rackSelection.setSelectedGroupIds([groupId], orderedGroupIds);
-    }
-
-    const sourceIds = getGroupMemberIds(groupId);
-    if (sourceIds.length === 0) {
-      return;
-    }
-
-    if (rackSurface.startChainDrag(event, sourceIds, 'group')) {
-      event.preventDefault();
-    }
-  }
-
-  function handleGroupRailClick(event: MouseEvent) {
-    event.stopPropagation();
-
-    if (consumeSuppressedDeviceSelectionClick()) {
-      return;
-    }
-
-    onCloseContextMenu();
-  }
-
-  function handleGroupRailContextMenu(event: MouseEvent, groupId: string) {
-    const memberDeviceIds = getGroupMemberIds(groupId);
-    if (memberDeviceIds.length === 0) {
-      return;
-    }
-
-    event.stopPropagation();
-    event.preventDefault();
-    selectGroupForContextMenu(groupId);
-    onOpenContextMenu(event.clientX, event.clientY, {
-      kind: 'group',
-      groupId,
-      memberDeviceIds,
-    });
-  }
-
-  function handleGroupRailDoubleClick(event: MouseEvent, groupId: string) {
-    event.stopPropagation();
-    if (event.button !== 0) {
-      return;
-    }
-
-    const memberDeviceIds = getGroupMemberIds(groupId);
-    if (memberDeviceIds.length === 0) {
-      return;
-    }
-
-    const shouldCollapseGroup = memberDeviceIds.some((deviceId) => !collapsedSet.has(deviceId));
-    for (const deviceId of memberDeviceIds) {
-      if (collapsedSet.has(deviceId) === shouldCollapseGroup) {
-        continue;
-      }
-
-      onToggleCollapse(deviceId);
-    }
-  }
-
-  function handleDeviceHeaderPointerDown(event: PointerEvent, deviceId: string) {
-    event.stopPropagation();
-    if (event.button !== 0 || !event.isPrimary) {
-      return;
-    }
-
-    blurActiveTextEditingElement();
-    const additiveSelection = isAdditiveSelection(event);
-    if (!event.shiftKey && !additiveSelection && !selectedDeviceIds.includes(deviceId)) {
-      onCloseContextMenu();
-      rackSelection.selectSingleDevice(deviceId, orderedDeviceIds);
-    }
-
-    const orderedSelectedIds = getOrderedSelectedDeviceIdsInRack();
-    const shouldDragSelection = orderedSelectedIds.includes(deviceId) && orderedSelectedIds.length > 1;
-    const sourceIds = shouldDragSelection ? orderedSelectedIds : [deviceId];
-    if (rackSurface.startChainDrag(event, sourceIds, 'devices')) {
-      event.preventDefault();
-    }
-  }
-
-  function handleDeviceHeaderClick(event: MouseEvent, deviceId: string) {
-    event.stopPropagation();
-
-    if (consumeSuppressedDeviceSelectionClick()) {
-      return;
-    }
-
-    onCloseContextMenu();
-    const additiveSelection = isAdditiveSelection(event);
-    if (event.shiftKey) {
-      rackSelection.applyRangeSelection(deviceId, additiveSelection, orderedDeviceIds);
-      return;
-    }
-
-    if (additiveSelection) {
-      rackSelection.toggleDeviceSelection(deviceId, orderedDeviceIds);
-      void focusRackDeviceHeader(deviceId);
-      return;
-    }
-
-    rackSelection.selectSingleDevice(deviceId, orderedDeviceIds);
-    void focusRackDeviceHeader(deviceId);
-  }
-
-  function handleDeviceHeaderContextMenu(event: MouseEvent, deviceId: string) {
-    event.stopPropagation();
-    event.preventDefault();
-    selectDeviceForContextMenu(deviceId);
-
-    const deviceIds = getOrderedSelectedDeviceIdsInRack();
-    onOpenContextMenu(event.clientX, event.clientY, {
-      kind: 'devices',
-      deviceIds,
-      canGroup: canCreateGroupFromSelection(chainState.devices, deviceIds),
-    });
-  }
-
-  function handleDeviceHeaderDoubleClick(event: MouseEvent, deviceId: string) {
-    event.stopPropagation();
-    if (event.button !== 0) {
-      return;
-    }
-    onToggleCollapse(deviceId);
-  }
-
-  function handleChainPointerDown(event: PointerEvent) {
-    rackSurface.handleChainPointerDown(event);
-  }
-
-  function handleChainContextMenu(event: MouseEvent) {
-    rackSurface.handleChainContextMenu(event);
-  }
-
-  function handleChainClick(event: MouseEvent) {
-    rackSurface.handleChainClick(event);
-  }
-
-  function handleChainDoubleClick(event: MouseEvent) {
-    rackSurface.handleChainDoubleClick(event);
-  }
-
-  function handleChainScroll() {
-    rackSurface.handleChainScroll();
-    renameController.handleRackScroll();
-  }
-
-  function handleDragStart(event: DragEvent) {
-    externalFileDropController.handleDragStart(event);
-  }
-
-  function handleChainDragEnter(event: DragEvent) {
-    externalFileDropController.handleDragEnter(event);
-  }
-
-  function handleChainDragOver(event: DragEvent) {
-    externalFileDropController.handleDragOver(event);
-  }
-
-  function handleChainDragLeave(event: DragEvent) {
-    externalFileDropController.handleDragLeave(event);
-  }
-
-  async function handleChainDrop(event: DragEvent) {
-    await externalFileDropController.handleDrop(event);
-  }
-
-  function handleWindowPointerMove(event: PointerEvent) {
-    rackSurface.handleWindowPointerMove(event, isSidebarResizing);
-  }
-
-  function handleWindowPointerUp(event: PointerEvent) {
-    rackSurface.handleWindowPointerUp(event);
-  }
-
-  function handleWindowPointerCancel(event: PointerEvent) {
-    rackSurface.handleWindowPointerCancel(event);
-  }
-
-  function handleWindowBlur() {
-    rackSurface.handleWindowBlur();
-  }
-
-  function handleWindowMouseUp(event: MouseEvent) {
-    rackSurface.handleWindowMouseUp(event);
-  }
-
-  function handleLockedMouseMove(event: MouseEvent) {
-    rackSurface.handleLockedMouseMove(event);
-  }
+  const selectedDeviceIds = $derived.by(() => controller.rackSelection.state.selectedDeviceIds);
+  const selectedGroupIds = $derived.by(() => controller.rackSelection.state.selectedGroupIds);
+  const draggingDeviceIds = $derived.by(() => controller.draggingDeviceIds);
+  const renamePopoverTarget = $derived.by(() => controller.rename.getPopoverTarget());
+  const renamePopoverPosition = $derived.by(() => controller.rename.popoverPosition);
+  const renameDraft = $derived.by(() => controller.rename.draft);
 
   $effect(() => {
     void devices;
     void orderedGroupIds;
-    void renameController.target;
-    renameController.reconcileTarget();
+    void renamePopoverTarget;
+    controller.rename.reconcileTarget();
   });
 
   $effect(() => {
     void collapsedSet;
-    void renameController.target;
-    renameController.syncPopoverTarget();
+    void renamePopoverTarget;
+    controller.rename.syncPopoverTarget();
   });
 
   $effect(() => {
-    onRackApiReady(rackSurface.api);
+    onRackApiReady(controller.surface.api);
 
     return () => {
       onRackApiReady(null);
     };
   });
 
-  onMount(() => renameController.mount());
+  onMount(() => controller.rename.mount());
 
   onMount(() => {
     if (!chainDevicesEl || !dropIndicatorEl || !browserDragBadgeEl) {
       return undefined;
     }
 
-    return rackSurface.mount({
+    return controller.surface.mount({
       chainDevices: chainDevicesEl,
       dropIndicator: dropIndicatorEl,
       browserDragBadge: browserDragBadgeEl,
@@ -614,30 +197,30 @@
 
   $effect(() => {
     void devices;
-    rackSurface.reconcileSelection();
+    controller.surface.reconcileSelection();
   });
 
   $effect(() => {
     void chainDevicesEl;
     void miniMapLayoutSignature;
-    rackSurface.syncLayout();
+    controller.surface.syncLayout();
   });
 
   $effect(() => {
-    renameController.setPopover(renamePopover);
+    controller.rename.setPopover(renamePopover);
   });
 </script>
 
 <svelte:window
-  onpointermove={handleWindowPointerMove}
-  onpointerup={handleWindowPointerUp}
-  onpointercancel={handleWindowPointerCancel}
-  onmouseup={handleWindowMouseUp}
-  onblur={handleWindowBlur}
+  onpointermove={(event) => controller.surface.handleWindowPointerMove(event, isSidebarResizing)}
+  onpointerup={(event) => controller.surface.handleWindowPointerUp(event)}
+  onpointercancel={(event) => controller.surface.handleWindowPointerCancel(event)}
+  onmouseup={(event) => controller.surface.handleWindowMouseUp(event)}
+  onblur={() => controller.surface.handleWindowBlur()}
 />
 
 <svelte:document
-  onmousemove={handleLockedMouseMove}
+  onmousemove={(event) => controller.surface.handleLockedMouseMove(event)}
 />
 
 <section class="device-rack">
@@ -647,20 +230,20 @@
     bind:this={chainDevicesEl}
     id="chain-devices"
     class="chain-devices"
-    oninput={handleChainControlInputOrChange}
-    onchange={handleChainControlInputOrChange}
-    onfocusin={handleChainFocusIn}
-    onkeydown={handleChainKeyDown}
-    onpointerdown={handleChainPointerDown}
-    oncontextmenu={handleChainContextMenu}
-    onclick={handleChainClick}
-    ondblclick={handleChainDoubleClick}
-    onscroll={handleChainScroll}
-    ondragstart={handleDragStart}
-    ondragenter={handleChainDragEnter}
-    ondragover={handleChainDragOver}
-    ondragleave={handleChainDragLeave}
-    ondrop={handleChainDrop}
+    oninput={(event) => controller.surface.handleChainControlInputOrChange(event)}
+    onchange={(event) => controller.surface.handleChainControlInputOrChange(event)}
+    onfocusin={(event) => controller.surface.handleChainFocusIn(event)}
+    onkeydown={(event) => controller.handleChainKeyDown(event)}
+    onpointerdown={(event) => controller.surface.handleChainPointerDown(event)}
+    oncontextmenu={(event) => controller.surface.handleChainContextMenu(event)}
+    onclick={(event) => controller.surface.handleChainClick(event)}
+    ondblclick={(event) => controller.surface.handleChainDoubleClick(event)}
+    onscroll={() => controller.handleChainScroll()}
+    ondragstart={(event) => controller.externalFileDrop.handleDragStart(event)}
+    ondragenter={(event) => controller.externalFileDrop.handleDragEnter(event)}
+    ondragover={(event) => controller.externalFileDrop.handleDragOver(event)}
+    ondragleave={(event) => controller.externalFileDrop.handleDragLeave(event)}
+    ondrop={(event) => void controller.externalFileDrop.handleDrop(event)}
   >
     {#each rackContentItems as item (item.key)}
       <div
@@ -686,16 +269,16 @@
             isDisabledByGroup={false}
             isSelected={selectedDeviceIds.includes(item.device.id)}
             isDragging={draggingDeviceIds.includes(item.device.id)}
-            isRenaming={renameController.isRenamingDevice(item.device.id)}
-            renameValue={renameController.resolveDeviceRenameValue(item.device.id)}
-            onRenameInput={(event) => renameController.handleInput(event)}
-            onRenameBlur={() => renameController.handleInputBlur()}
-            onRenameKeyDown={(event) => renameController.handleInputKeyDown(event)}
-            onSavePreset={handleDeviceSavePreset}
-            onHeaderPointerDown={(event) => handleDeviceHeaderPointerDown(event, item.device.id)}
-            onHeaderClick={(event) => handleDeviceHeaderClick(event, item.device.id)}
-            onHeaderContextMenu={(event) => handleDeviceHeaderContextMenu(event, item.device.id)}
-            onHeaderDoubleClick={(event) => handleDeviceHeaderDoubleClick(event, item.device.id)}
+            isRenaming={controller.rename.isRenamingDevice(item.device.id)}
+            renameValue={controller.rename.resolveDeviceRenameValue(item.device.id)}
+            onRenameInput={(event) => controller.rename.handleInput(event)}
+            onRenameBlur={() => controller.rename.handleInputBlur()}
+            onRenameKeyDown={(event) => controller.rename.handleInputKeyDown(event)}
+            onSavePreset={(deviceId) => controller.handleDeviceSavePreset(deviceId)}
+            onHeaderPointerDown={(event) => controller.handleDeviceHeaderPointerDown(event, item.device.id)}
+            onHeaderClick={(event) => controller.handleDeviceHeaderClick(event, item.device.id)}
+            onHeaderContextMenu={(event) => controller.handleDeviceHeaderContextMenu(event, item.device.id)}
+            onHeaderDoubleClick={(event) => controller.handleDeviceHeaderDoubleClick(event, item.device.id)}
           />
         {:else if item.kind === 'group'}
           <div class="device-group-body">
@@ -707,27 +290,27 @@
                   : col.kind === 'left-rail'
                       ? 'group-rail group-rail-left'
                       : 'group-rail group-rail-right'}
-                class:is-renaming={col.kind === 'left-rail' && renameController.isRenamingGroup(col.groupId)}
+                class:is-renaming={col.kind === 'left-rail' && controller.rename.isRenamingGroup(col.groupId)}
                 onpointerdown={col.kind === 'device'
                   ? undefined
-                  : renameController.isRenamingGroup(col.groupId)
+                  : controller.rename.isRenamingGroup(col.groupId)
                     ? undefined
-                  : (event) => handleGroupRailPointerDown(event, col.groupId)}
+                  : (event) => controller.handleGroupRailPointerDown(event, col.groupId)}
                 onclick={col.kind === 'device'
                   ? undefined
-                  : renameController.isRenamingGroup(col.groupId)
+                  : controller.rename.isRenamingGroup(col.groupId)
                     ? undefined
-                  : handleGroupRailClick}
+                  : (event) => controller.handleGroupRailClick(event)}
                 oncontextmenu={col.kind === 'device'
                   ? undefined
-                  : renameController.isRenamingGroup(col.groupId)
+                  : controller.rename.isRenamingGroup(col.groupId)
                     ? undefined
-                  : (event) => handleGroupRailContextMenu(event, col.groupId)}
+                  : (event) => controller.handleGroupRailContextMenu(event, col.groupId)}
                 ondblclick={col.kind === 'device'
                   ? undefined
-                  : renameController.isRenamingGroup(col.groupId)
+                  : controller.rename.isRenamingGroup(col.groupId)
                     ? undefined
-                  : (event) => handleGroupRailDoubleClick(event, col.groupId)}
+                  : (event) => controller.handleGroupRailDoubleClick(event, col.groupId)}
               >
                 {#if col.kind === 'device'}
                   <DeviceCard
@@ -744,16 +327,16 @@
                     isDisabledByGroup={!item.enabled}
                     isSelected={selectedDeviceIds.includes(col.device.id)}
                     isDragging={draggingDeviceIds.includes(col.device.id)}
-                    isRenaming={renameController.isRenamingDevice(col.device.id)}
-                    renameValue={renameController.resolveDeviceRenameValue(col.device.id)}
-                    onRenameInput={(event) => renameController.handleInput(event)}
-                    onRenameBlur={() => renameController.handleInputBlur()}
-                    onRenameKeyDown={(event) => renameController.handleInputKeyDown(event)}
-                    onSavePreset={handleDeviceSavePreset}
-                    onHeaderPointerDown={(event) => handleDeviceHeaderPointerDown(event, col.device.id)}
-                    onHeaderClick={(event) => handleDeviceHeaderClick(event, col.device.id)}
-                    onHeaderContextMenu={(event) => handleDeviceHeaderContextMenu(event, col.device.id)}
-                    onHeaderDoubleClick={(event) => handleDeviceHeaderDoubleClick(event, col.device.id)}
+                    isRenaming={controller.rename.isRenamingDevice(col.device.id)}
+                    renameValue={controller.rename.resolveDeviceRenameValue(col.device.id)}
+                    onRenameInput={(event) => controller.rename.handleInput(event)}
+                    onRenameBlur={() => controller.rename.handleInputBlur()}
+                    onRenameKeyDown={(event) => controller.rename.handleInputKeyDown(event)}
+                    onSavePreset={(deviceId) => controller.handleDeviceSavePreset(deviceId)}
+                    onHeaderPointerDown={(event) => controller.handleDeviceHeaderPointerDown(event, col.device.id)}
+                    onHeaderClick={(event) => controller.handleDeviceHeaderClick(event, col.device.id)}
+                    onHeaderContextMenu={(event) => controller.handleDeviceHeaderContextMenu(event, col.device.id)}
+                    onHeaderDoubleClick={(event) => controller.handleDeviceHeaderDoubleClick(event, col.device.id)}
                   />
                 {:else if col.kind === 'left-rail'}
                   <div class="group-rail-controls">
@@ -762,18 +345,18 @@
                       type="checkbox"
                       checked={col.enabled}
                       aria-label={`${resolveGroupDisplayName(groupDisplayNameById, col.groupId)} enabled`}
-                      onpointerdown={handleGroupTogglePointerDown}
-                      onclick={handleGroupToggleClick}
-                      onchange={(event) => handleGroupEnabledChange(event, col.groupId)}
+                      onpointerdown={(event) => controller.handleGroupTogglePointerDown(event)}
+                      onclick={(event) => controller.handleGroupToggleClick(event)}
+                      onchange={(event) => controller.handleGroupEnabledChange(event, col.groupId)}
                     />
                     <button
                       class="preset-save-button"
                       type="button"
                       aria-label={`Save preset for ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
                       title={`Save preset for ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
-                      onpointerdown={handleGroupSavePointerDown}
-                      onclick={(event) => handleGroupSaveClick(event, col.groupId)}
-                      oncontextmenu={handleGroupSaveContextMenu}
+                      onpointerdown={(event) => controller.handleGroupSavePointerDown(event)}
+                      onclick={(event) => controller.handleGroupSaveClick(event, col.groupId)}
+                      oncontextmenu={(event) => controller.handleGroupSaveContextMenu(event)}
                     >
                       <span class="material-symbols-rounded" aria-hidden="true">save</span>
                     </button>
@@ -795,16 +378,16 @@
   </div>
 </section>
 
-{#if renameController.getPopoverTarget() && renameController.popoverPosition}
+{#if renamePopoverTarget && renamePopoverPosition}
   <RackRenamePopover
     bind:this={renamePopover}
-    x={renameController.popoverPosition.x}
-    y={renameController.popoverPosition.y}
-    value={renameController.draft}
-    ariaLabel={renameController.resolvePopoverAriaLabel()}
-    onInput={(event) => renameController.handleInput(event)}
-    onBlur={() => renameController.handleInputBlur()}
-    onKeyDown={(event) => renameController.handleInputKeyDown(event)}
+    x={renamePopoverPosition.x}
+    y={renamePopoverPosition.y}
+    value={renameDraft}
+    ariaLabel={controller.rename.resolvePopoverAriaLabel()}
+    onInput={(event) => controller.rename.handleInput(event)}
+    onBlur={() => controller.rename.handleInputBlur()}
+    onKeyDown={(event) => controller.rename.handleInputKeyDown(event)}
   />
 {/if}
 
