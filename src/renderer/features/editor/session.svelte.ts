@@ -92,7 +92,7 @@ const DEFAULT_AUTO_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_HISTORY_MAX_ENTRIES = 100;
 
 export interface EditorSessionState {
-  sidebarPage: 'devices' | 'presets';
+  sidebarPage: 'devices' | 'presets' | 'settings';
   chainState: GeneratorChain;
   chainRevision: number;
   launchpadModel: LaunchpadModel;

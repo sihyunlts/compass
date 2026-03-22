@@ -52,8 +52,6 @@
   const HISTORY_MAX_ENTRIES = 100;
   const DEFAULT_LED_RGB = '255 166 57';
   const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, select, textarea, option';
-  const SETTINGS_BUTTON_ID = 'settings-button';
-  const SETTINGS_CLOSE_BUTTON_ID = 'settings-close';
 
   const toDeviceLeafNode = (
     kind: RendererDeviceKind,
@@ -156,9 +154,6 @@
     clientWidth: 1,
   });
   let rackMiniMapContentRevision = $state(0);
-  let previouslyFocusedSettingsElement: HTMLElement | null = null;
-  let settingsWasOpen = false;
-  let settingsFocusToken = 0;
 
   const createRackBinding = (): EditorRackBinding | null => {
     if (!rackViewApi) {
@@ -213,18 +208,6 @@
     void presetController.loadTree();
   });
 
-  $effect(() => {
-    if (uiState.isSettingsOpen && !settingsWasOpen) {
-      void focusSettingsCloseButton();
-    }
-
-    if (!uiState.isSettingsOpen && settingsWasOpen) {
-      void restoreSettingsFocus();
-    }
-
-    settingsWasOpen = uiState.isSettingsOpen;
-  });
-
   const handleUndoClick = (): void => {
     closeContextMenu();
     editorSession.commands.undo();
@@ -233,54 +216,6 @@
   const handleRedoClick = (): void => {
     closeContextMenu();
     editorSession.commands.redo();
-  };
-
-  const getSettingsButton = (): HTMLButtonElement | null => {
-    const element = document.getElementById(SETTINGS_BUTTON_ID);
-    return element instanceof HTMLButtonElement ? element : null;
-  };
-
-  const getSettingsCloseButton = (): HTMLButtonElement | null => {
-    const element = document.getElementById(SETTINGS_CLOSE_BUTTON_ID);
-    return element instanceof HTMLButtonElement ? element : null;
-  };
-
-  const focusSettingsCloseButton = async (): Promise<void> => {
-    const focusToken = ++settingsFocusToken;
-    await tick();
-    if (!uiState.isSettingsOpen || focusToken !== settingsFocusToken) {
-      return;
-    }
-
-    getSettingsCloseButton()?.focus();
-  };
-
-  const restoreSettingsFocus = async (): Promise<void> => {
-    const focusToken = ++settingsFocusToken;
-    await tick();
-    if (uiState.isSettingsOpen || focusToken !== settingsFocusToken) {
-      return;
-    }
-
-    if (previouslyFocusedSettingsElement?.isConnected) {
-      previouslyFocusedSettingsElement.focus();
-      previouslyFocusedSettingsElement = null;
-      return;
-    }
-
-    previouslyFocusedSettingsElement = null;
-    getSettingsButton()?.focus();
-  };
-
-  const openSettings = (): void => {
-    previouslyFocusedSettingsElement = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    uiState.isSettingsOpen = true;
-  };
-
-  const closeSettings = (): void => {
-    uiState.isSettingsOpen = false;
   };
 
   const handleRackScrollMetricsChange = (metrics: RackScrollMetrics): void => {
@@ -351,31 +286,43 @@
   });
 </script>
 
-<section class="live-main" hidden={uiState.isSettingsOpen}>
+<section class="live-main">
     <BrowserPanel
       activePage={uiState.sidebarPage}
       deviceTree={DEVICE_BROWSER_TREE}
       presetTree={presetState.presetTree}
       isPresetLoading={presetState.isPresetLoading}
       presetErrorText={presetState.presetErrorText}
+      launchpadMk2Enabled={uiState.launchpadModel === 'mk2'}
+      paletteDescription={settingsState.paletteDescriptionOverride || uiState.paletteNameText || 'Default palette'}
+      paletteDescriptionTone={settingsState.paletteDescriptionTone}
+      appVersionText={settingsState.appVersionText}
+      aboutDescription={settingsState.aboutDescriptionOverride || settingsController.getAboutSiteUrl()}
+      aboutDescriptionTone={settingsState.aboutDescriptionTone}
       onPageSelect={(nextPage) => {
         uiState.sidebarPage = nextPage;
       }}
       onDeviceAdd={editorSession.commands.addBrowserDevice}
       onBrowserPointerDown={editorSession.commands.handleBrowserPointerDown}
       onOpenContextMenu={(x, y, target) => contextMenuComponent?.open(x, y, target)}
+      onLaunchpadModelToggle={(enabled) => settingsController.handleLaunchpadModelToggle(enabled)}
+      onPaletteReset={() => settingsController.handlePaletteReset()}
+      onPaletteFileChange={(event) => settingsController.handlePaletteFileChange(event)}
+      onOpenAboutSite={() => settingsController.openAboutSite()}
       onPresetEntryOpen={(entry) => presetController.handlePresetEntryOpen(entry)}
       onPresetFilePointerDown={(entry, sourceEvent, itemEl) =>
         presetController.handlePresetFilePointerDown(entry, sourceEvent, itemEl)}
     />
 
-    <SidebarResizer
-      bind:width={uiState.sidebarWidthPx}
-      bind:isResizing={uiState.isSidebarResizing}
-      isBlocked={rackViewApi?.hasPointerInteraction() ?? false}
-      sanitizeWidth={sanitizeSidebarWidth}
-      onSave={editorSession.commands.persistSidebarWidth}
-    />
+    {#if uiState.sidebarPage !== 'settings'}
+      <SidebarResizer
+        bind:width={uiState.sidebarWidthPx}
+        bind:isResizing={uiState.isSidebarResizing}
+        isBlocked={rackViewApi?.hasPointerInteraction() ?? false}
+        sanitizeWidth={sanitizeSidebarWidth}
+        onSave={editorSession.commands.persistSidebarWidth}
+      />
+    {/if}
 
     <section class="workspace">
       <header class="workspace-head">
@@ -447,11 +394,6 @@
             onClick={handleRedoClick}
           />
           <Button
-            id="settings-button"
-            text="Settings"
-            onClick={openSettings}
-          />
-          <Button
             id="send-button"
             variant="primary"
             text={uiState.sendButtonLabel}
@@ -507,107 +449,6 @@
       </section>
     </section>
   </section>
-
-  <section
-    id="settings-screen"
-    class="settings-screen"
-    hidden={!uiState.isSettingsOpen}
-  >
-    <header class="settings-screen-head">
-      <Button
-        id="settings-close"
-        text="Close"
-        onClick={closeSettings}
-      />
-    </header>
-
-    <div class="settings-screen-body">
-      <div class="settings-container">
-        <!-- Settings -->
-        <section class="settings-section">
-          <h2 class="settings-section-title">Settings</h2>
-          <div class="settings-card">
-            <div class="settings-row">
-              <div class="info">
-                <span class="label">Pro MK2 Mode</span>
-                <span class="description">Enable mapping for Launchpad Pro MK2</span>
-              </div>
-              <input
-                id="launchpad-model-mk2"
-                type="checkbox"
-                checked={uiState.launchpadModel === 'mk2'}
-                onchange={(event) => {
-                  const target = event.currentTarget as HTMLInputElement;
-                  settingsController.handleLaunchpadModelToggle(target.checked);
-                }}
-              />
-            </div>
-            <div class="settings-row">
-              <div class="info">
-                <span class="label">Color Palette</span>
-                <span
-                  class="description"
-                  class:is-error={settingsState.paletteDescriptionTone === 'error'}
-                  role="status"
-                  aria-live="polite"
-                >
-                  {settingsState.paletteDescriptionOverride || uiState.paletteNameText || 'Default palette'}
-                </span>
-              </div>
-              
-              <div class="settings-actions">
-                <Button
-                  id="palette-reset"
-                  text="Reset to Default"
-                  onClick={() => settingsController.handlePaletteReset()}
-                />
-                <div class="file-input-wrapper">
-                  <div class="file-button">Upload File</div>
-                  <input
-                    id="palette-file-input"
-                    type="file"
-                    onchange={(event) => settingsController.handlePaletteFileChange(event)}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- About -->
-        <section class="settings-section">
-          <h2 class="settings-section-title">About</h2>
-          <div class="settings-card">
-            <div class="settings-row">
-              <div class="info">
-                <span class="label">Version</span>
-                <span class="description">{settingsState.appVersionText ? `v${settingsState.appVersionText}` : 'Loading...'}</span>
-              </div>
-            </div>
-            <div class="settings-row">
-              <div class="info">
-                <span class="label">sihyunlights</span>
-                <span
-                  class="description"
-                  class:is-error={settingsState.aboutDescriptionTone === 'error'}
-                  role="status"
-                  aria-live="polite"
-                >
-                  {settingsState.aboutDescriptionOverride || settingsController.getAboutSiteUrl()}
-                </span>
-              </div>
-              <Button
-                text="Visit"
-                title="Visit website"
-                onClick={() => settingsController.openAboutSite()}
-              />
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-  </section>
-
   <ContextMenu
     bind:this={contextMenuComponent}
     onCopy={editorSession.commands.copyFromContextTarget}

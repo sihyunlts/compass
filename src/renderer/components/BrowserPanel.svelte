@@ -3,6 +3,7 @@
 
   import type { RendererDeviceKind } from '../../devices';
   import Button from './Button.svelte';
+  import SidebarSettingsPage from './SidebarSettingsPage.svelte';
   import type {
     BrowserTreeDeviceLeafNode,
     BrowserTreeDeviceFolderNode,
@@ -13,7 +14,7 @@
   import type { ContextMenuTarget } from './context-menu-types';
   import type { BrowserInsertSource } from './device-rack-types';
 
-  export type BrowserPanelPage = 'devices' | 'presets';
+  export type BrowserPanelPage = 'devices' | 'presets' | 'settings';
 
   interface VisibleTreeRow {
     node: BrowserTreeNode;
@@ -85,10 +86,20 @@
     presetTree = [] as BrowserTreePresetFolderNode[],
     isPresetLoading = false,
     presetErrorText = null,
+    launchpadMk2Enabled = false,
+    paletteDescription = 'Default palette',
+    paletteDescriptionTone = 'neutral',
+    appVersionText = '',
+    aboutDescription = '',
+    aboutDescriptionTone = 'neutral',
     onPageSelect = () => {},
     onDeviceAdd,
     onBrowserPointerDown,
     onOpenContextMenu = () => {},
+    onLaunchpadModelToggle = () => {},
+    onPaletteReset = () => {},
+    onPaletteFileChange = () => {},
+    onOpenAboutSite = () => {},
     onPresetEntryOpen,
     onPresetFilePointerDown,
   } = $props<{
@@ -97,6 +108,12 @@
     presetTree: BrowserTreePresetFolderNode[];
     isPresetLoading?: boolean;
     presetErrorText?: string | null;
+    launchpadMk2Enabled?: boolean;
+    paletteDescription?: string;
+    paletteDescriptionTone?: 'neutral' | 'error';
+    appVersionText?: string;
+    aboutDescription?: string;
+    aboutDescriptionTone?: 'neutral' | 'error';
     onPageSelect?: (page: BrowserPanelPage) => void;
     onDeviceAdd: (kind: RendererDeviceKind) => void;
     onBrowserPointerDown: (payload: BrowserPointerDownPayload) => void;
@@ -105,6 +122,10 @@
       clientY: number,
       target: ContextMenuTarget,
     ) => void;
+    onLaunchpadModelToggle?: (enabled: boolean) => void;
+    onPaletteReset?: () => void;
+    onPaletteFileChange?: (event: Event) => void | Promise<void>;
+    onOpenAboutSite?: () => void | Promise<void>;
     onPresetEntryOpen: (entry: BrowserTreePresetLeafNode) => void | Promise<void>;
     onPresetFilePointerDown: (
       entry: BrowserTreePresetLeafNode,
@@ -117,9 +138,17 @@
   let initializedRootFolderIds = $state<string[]>([]);
   let selectedRowId = $state<string | null>(null);
 
-  const activeTreeRoots = $derived(
-    activePage === 'devices' ? deviceTree : presetTree,
-  );
+  const activeTreeRoots = $derived.by(() => {
+    if (activePage === 'devices') {
+      return deviceTree;
+    }
+
+    if (activePage === 'presets') {
+      return presetTree;
+    }
+
+    return [];
+  });
   const expandedFolderIdSet = $derived.by(() => new Set(expandedFolderIds));
   const visibleRows = $derived.by(() =>
     collectVisibleRows(activeTreeRoots, expandedFolderIdSet));
@@ -345,32 +374,57 @@
 <aside class="browser-panel">
   <div class="browser-view">
     <div class="browser-page-switch">
-      <Button
-        class="browser-page-switch-button"
-        variant="icon"
-        label="Devices"
-        icon="widgets"
-        pressed={activePage === 'devices'}
-        onClick={() => onPageSelect('devices')}
-      />
-      <Button
-        class="browser-page-switch-button"
-        variant="icon"
-        label="Presets"
-        icon="inventory_2"
-        pressed={activePage === 'presets'}
-        onClick={() => onPageSelect('presets')}
-        oncontextmenu={(event: MouseEvent) => {
-          event.preventDefault();
-          onOpenContextMenu(event.clientX, event.clientY, {
-            kind: 'presets-root',
-          });
-        }}
-      />
+      <div class="browser-page-switch-group">
+        <Button
+          class="browser-page-switch-button"
+          variant="icon"
+          label="Devices"
+          icon="widgets"
+          pressed={activePage === 'devices'}
+          onClick={() => onPageSelect('devices')}
+        />
+        <Button
+          class="browser-page-switch-button"
+          variant="icon"
+          label="Presets"
+          icon="inventory_2"
+          pressed={activePage === 'presets'}
+          onClick={() => onPageSelect('presets')}
+          oncontextmenu={(event: MouseEvent) => {
+            event.preventDefault();
+            onOpenContextMenu(event.clientX, event.clientY, {
+              kind: 'presets-root',
+            });
+          }}
+        />
+      </div>
+      <div class="browser-page-switch-group">
+        <Button
+          class="browser-page-switch-button"
+          variant="icon"
+          label="Settings"
+          icon="settings"
+          pressed={activePage === 'settings'}
+          onClick={() => onPageSelect('settings')}
+        />
+      </div>
     </div>
 
     <div class="browser-page-panel">
-      {#if activePage === 'presets' && isPresetLoading}
+      {#if activePage === 'settings'}
+        <SidebarSettingsPage
+          {launchpadMk2Enabled}
+          {paletteDescription}
+          {paletteDescriptionTone}
+          {appVersionText}
+          {aboutDescription}
+          {aboutDescriptionTone}
+          onLaunchpadModelToggle={onLaunchpadModelToggle}
+          onPaletteReset={onPaletteReset}
+          onPaletteFileChange={onPaletteFileChange}
+          onOpenAboutSite={onOpenAboutSite}
+        />
+      {:else if activePage === 'presets' && isPresetLoading}
         <p class="browser-status">Loading presets...</p>
       {:else if activePage === 'presets' && presetErrorText}
         <p class="browser-status browser-status-error">{presetErrorText}</p>
@@ -451,8 +505,10 @@
 <style lang="scss">
   .browser-panel {
     display: flex;
-    flex: 0 0 var(--sidebar-width);
+    flex-direction: column;
+    flex: 0 0 var(--browser-panel-width, var(--sidebar-width));
     min-width: 0;
+    min-height: 0;
     padding: var(--gap-10);
     background: var(--neutral-10);
 
@@ -461,7 +517,7 @@
       position: absolute;
       left: 0;
       top: 0;
-      width: var(--sidebar-width);
+      width: var(--browser-panel-width, var(--sidebar-width));
       height: var(--gap-48);
       -webkit-app-region: drag;
       z-index: -1;
@@ -469,7 +525,7 @@
   }
 
   .browser-view {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
     margin-top: var(--gap-32);
@@ -480,9 +536,16 @@
   .browser-page-switch {
     display: flex;
     flex-direction: column;
-    align-self: flex-start;
-    gap: var(--gap-6);
+    align-self: stretch;
+    min-height: 0;
+    justify-content: space-between;
     -webkit-app-region: no-drag;
+
+    &-group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--gap-6);
+    }
 
     &-button {
       color: var(--neutral-50);
