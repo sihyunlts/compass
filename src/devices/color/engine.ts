@@ -35,14 +35,6 @@ const DEFAULT_COLOR_NOTE_LENGTH_PERCENT = DEFAULT_COLOR_PARAMS.noteLengthPercent
 
 const sortNumbersAscending = (left: number, right: number): number => left - right;
 
-const toClipNote = (note: ClipNoteWithOrigin): ClipNote => ({
-  pitch: note.pitch,
-  channel: note.channel,
-  startBeat: note.startBeat,
-  durationBeats: note.durationBeats,
-  velocity: note.velocity,
-});
-
 const sanitizeColorVelocities = (velocities: readonly number[]): number[] => {
   const sanitized = velocities
     .map((slotVelocity) => Number(slotVelocity))
@@ -412,16 +404,3 @@ export const applyColorProgramsDetailed = (
     colorGuideWarpByOriginId,
   };
 };
-
-export const applyColorProgramsWithOrigins = (
-  chain: GeneratorChain,
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-  minimumNoteDuration: number,
-): ClipNoteWithOrigin[] => applyColorProgramsDetailed(chain, notes, minimumNoteDuration).notes;
-
-export const applyColorPrograms = (
-  chain: GeneratorChain,
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-  minimumNoteDuration: number,
-): ClipNote[] => applyColorProgramsDetailed(chain, notes, minimumNoteDuration).notes.map((note) =>
-  toClipNote(note));
