@@ -19,113 +19,153 @@ import { rotateDeviceSchema } from './rotate/schema';
 import ScannerDeviceUi from './scanner/ui.svelte';
 import { scannerDeviceControls } from './scanner/controls';
 import { scannerDeviceSchema } from './scanner/schema';
-import SpiralDeviceUi from './spiral/ui.svelte';
 import { spiralDeviceControls } from './spiral/controls';
 import { spiralDeviceSchema } from './spiral/schema';
+import SpiralDeviceUi from './spiral/ui.svelte';
 import SymmetryDeviceUi from './symmetry/ui.svelte';
 import { symmetryDeviceControls } from './symmetry/controls';
 import { symmetryDeviceSchema } from './symmetry/schema';
 import type {
   RendererDeviceDefinition,
+  RendererDeviceGroup,
   RendererDeviceKind,
+  RendererDeviceNodeOfKind,
+  RendererModulationParamDefinition,
 } from './types';
 import WaterdropDeviceUi from './waterdrop/ui.svelte';
 import { waterdropDeviceControls } from './waterdrop/controls';
 import { waterdropDeviceSchema } from './waterdrop/schema';
 
-const waterdropDeviceDefinition = {
-  ...waterdropDeviceSchema,
-  editor: WaterdropDeviceUi,
-  controls: waterdropDeviceControls,
-} as const;
+type RendererDeviceManifestEntry = {
+  [K in RendererDeviceKind]: RendererDeviceDefinition<K>;
+}[RendererDeviceKind];
 
-const scannerDeviceDefinition = {
-  ...scannerDeviceSchema,
-  editor: ScannerDeviceUi,
-  controls: scannerDeviceControls,
-} as const;
+const defineRendererDevice = <K extends RendererDeviceKind>(
+  definition: RendererDeviceDefinition<K>,
+): RendererDeviceDefinition<K> => definition;
 
-const spiralDeviceDefinition = {
-  ...spiralDeviceSchema,
-  editor: SpiralDeviceUi,
-  controls: spiralDeviceControls,
-} as const;
+const rendererDeviceManifest = [
+  defineRendererDevice({
+    ...waterdropDeviceSchema,
+    editor: WaterdropDeviceUi,
+    controls: waterdropDeviceControls,
+  }),
+  defineRendererDevice({
+    ...scannerDeviceSchema,
+    editor: ScannerDeviceUi,
+    controls: scannerDeviceControls,
+  }),
+  defineRendererDevice({
+    ...spiralDeviceSchema,
+    editor: SpiralDeviceUi,
+    controls: spiralDeviceControls,
+  }),
+  defineRendererDevice({
+    ...modulatorDeviceSchema,
+    editor: ModulatorDeviceUi,
+    controls: modulatorDeviceControls,
+  }),
+  defineRendererDevice({
+    ...mirrorDeviceSchema,
+    editor: MirrorDeviceUi,
+    controls: mirrorDeviceControls,
+  }),
+  defineRendererDevice({
+    ...symmetryDeviceSchema,
+    editor: SymmetryDeviceUi,
+    controls: symmetryDeviceControls,
+  }),
+  defineRendererDevice({
+    ...maskDeviceSchema,
+    editor: MaskDeviceUi,
+    controls: maskDeviceControls,
+  }),
+  defineRendererDevice({
+    ...rotateDeviceSchema,
+    editor: RotateDeviceUi,
+    controls: rotateDeviceControls,
+  }),
+  defineRendererDevice({
+    ...reverseDeviceSchema,
+    editor: ReverseDeviceUi,
+  }),
+  defineRendererDevice({
+    ...colorDeviceSchema,
+    editor: ColorDeviceUi,
+    controls: colorDeviceControls,
+  }),
+] as const satisfies readonly RendererDeviceManifestEntry[];
 
-const modulatorDeviceDefinition = {
-  ...modulatorDeviceSchema,
-  editor: ModulatorDeviceUi,
-  controls: modulatorDeviceControls,
-} as const;
+type RendererDeviceDefinitionByKind = {
+  [K in RendererDeviceKind]: Extract<RendererDeviceManifestEntry, { kind: K }>;
+};
 
-const mirrorDeviceDefinition = {
-  ...mirrorDeviceSchema,
-  editor: MirrorDeviceUi,
-  controls: mirrorDeviceControls,
-} as const;
+const rendererDeviceDefinitions = Object.fromEntries(
+  rendererDeviceManifest.map((definition) => [definition.kind, definition]),
+) as RendererDeviceDefinitionByKind;
 
-const symmetryDeviceDefinition = {
-  ...symmetryDeviceSchema,
-  editor: SymmetryDeviceUi,
-  controls: symmetryDeviceControls,
-} as const;
+const collectRendererDeviceKindsByGroup = (
+  group: RendererDeviceGroup,
+): readonly RendererDeviceKind[] => Object.freeze(
+  rendererDeviceManifest
+    .filter((definition) => definition.group === group)
+    .map((definition) => definition.kind),
+);
 
-const maskDeviceDefinition = {
-  ...maskDeviceSchema,
-  editor: MaskDeviceUi,
-  controls: maskDeviceControls,
-} as const;
+export const RENDERER_DEVICE_GROUPS = {
+  generator: collectRendererDeviceKindsByGroup('generator'),
+  effect: collectRendererDeviceKindsByGroup('effect'),
+} as const satisfies Record<RendererDeviceGroup, readonly RendererDeviceKind[]>;
 
-const rotateDeviceDefinition = {
-  ...rotateDeviceSchema,
-  editor: RotateDeviceUi,
-  controls: rotateDeviceControls,
-} as const;
+export const RENDERER_DEVICE_KINDS = Object.freeze(
+  rendererDeviceManifest.map((definition) => definition.kind),
+) as readonly RendererDeviceKind[];
 
-const reverseDeviceDefinition = {
-  ...reverseDeviceSchema,
-  editor: ReverseDeviceUi,
-} as const;
+const RENDERER_DEVICE_KIND_SET = new Set<RendererDeviceKind>(RENDERER_DEVICE_KINDS);
 
-const colorDeviceDefinition = {
-  ...colorDeviceSchema,
-  editor: ColorDeviceUi,
-  controls: colorDeviceControls,
-} as const;
-
-const rendererDeviceDefinitions = {
-  waterdrop: waterdropDeviceDefinition,
-  scanner: scannerDeviceDefinition,
-  spiral: spiralDeviceDefinition,
-  modulator: modulatorDeviceDefinition,
-  mirror: mirrorDeviceDefinition,
-  symmetry: symmetryDeviceDefinition,
-  mask: maskDeviceDefinition,
-  rotate: rotateDeviceDefinition,
-  reverse: reverseDeviceDefinition,
-  color: colorDeviceDefinition,
-} as const satisfies Record<RendererDeviceKind, RendererDeviceDefinition>;
+const getRendererDeviceSchema = <K extends RendererDeviceKind>(
+  kind: K,
+): RendererDeviceDefinitionByKind[K] => rendererDeviceDefinitions[kind];
 
 export type {
   RendererDeviceKind,
 } from './types';
 
-export {
-  createRendererDeviceNode,
-  getRendererDeviceGroup,
-  getRendererDeviceLabel,
-  getRendererModulationTargetParamDefinitions,
-  isRendererDeviceKind,
-  RENDERER_DEVICE_GROUPS,
-  RENDERER_DEVICE_KINDS,
-} from './schema-registry';
+export const isRendererDeviceKind = (
+  value: string | undefined,
+): value is RendererDeviceKind => (
+  !!value && RENDERER_DEVICE_KIND_SET.has(value as RendererDeviceKind)
+);
 
 export const getRendererDeviceDefinition = <K extends RendererDeviceKind>(
   kind: K,
-): (typeof rendererDeviceDefinitions)[K] => rendererDeviceDefinitions[kind];
+): RendererDeviceDefinitionByKind[K] => rendererDeviceDefinitions[kind];
 
 export const getRendererDeviceControlDefinition = <K extends RendererDeviceKind>(
   kind: K,
-): RendererKindControlDefinition | null => {
-  const definition = rendererDeviceDefinitions[kind];
-  return 'controls' in definition ? definition.controls ?? null : null;
-};
+): RendererKindControlDefinition | null =>
+  getRendererDeviceDefinition(kind).controls ?? null;
+
+export const getRendererDeviceLabel = (kind: RendererDeviceKind): string =>
+  getRendererDeviceSchema(kind).label;
+
+export const getRendererDeviceGroup = (kind: RendererDeviceKind): RendererDeviceGroup =>
+  getRendererDeviceSchema(kind).group;
+
+export const getRendererModulationTargetParamDefinitions = (
+  kind: RendererDeviceKind,
+): readonly RendererModulationParamDefinition[] =>
+  getRendererDeviceSchema(kind).modulationTargetParams ?? [];
+
+export const createRendererDeviceNode = <K extends RendererDeviceKind>(
+  kind: K,
+  id: string,
+  enabled = true,
+): RendererDeviceNodeOfKind<K> =>
+  getRendererDeviceSchema(kind).createDefaultNode(id, enabled) as RendererDeviceNodeOfKind<K>;
+
+export const hydrateImportedRendererDeviceNode = <K extends RendererDeviceKind>(
+  kind: K,
+  source: Record<string, unknown>,
+): RendererDeviceNodeOfKind<K> | null =>
+  getRendererDeviceSchema(kind).hydrateImportedNode(source) as RendererDeviceNodeOfKind<K> | null;
