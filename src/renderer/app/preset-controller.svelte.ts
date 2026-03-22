@@ -20,6 +20,7 @@ import {
   buildRackPresetFile,
   resolveDevicePresetSuggestedName,
   resolveGroupPresetSuggestedName,
+  resolveRackPresetSuggestedName,
 } from '../features/editor/presets';
 import type { EditorSession } from '../features/editor/session.svelte';
 import { resolveGroupMemberIds } from '../features/editor/chain-ops';
@@ -40,14 +41,10 @@ const PRESET_ROOT_LABELS = {
 type PresetEntryTarget = Extract<ContextMenuTarget, { kind: 'preset-entry' }>;
 type PresetsRootTarget = Extract<ContextMenuTarget, { kind: 'presets-root' }>;
 type ShowInFolderTarget = PresetEntryTarget | PresetsRootTarget;
-type PendingRackPresetLoadTarget =
-  | {
-      kind: 'browser-entry';
-      entry: BrowserTreePresetLeafNode;
-    }
-  | {
-      kind: 'file-picker';
-    };
+type PendingRackPresetLoadTarget = {
+  kind: 'browser-entry';
+  entry: BrowserTreePresetLeafNode;
+};
 
 interface PresetControllerState {
   presetTree: BrowserTreePresetFolderNode[];
@@ -308,7 +305,9 @@ class PresetController {
   public async handleSaveRackPreset(): Promise<void> {
     await this.savePreset(
       {
-        suggestedName: 'Rack Preset',
+        suggestedName: resolveRackPresetSuggestedName(
+          this.options.editorSession.state.chainState,
+        ),
         payload: buildRackPresetFile(this.options.editorSession.state.chainState),
       },
       {
@@ -316,19 +315,6 @@ class PresetController {
         errorSummary: 'Rack preset save failed',
       },
     );
-  }
-
-  public async handleLoadRackPreset(): Promise<void> {
-    if (this.hasExistingRack()) {
-      this.state.pendingRackPresetLoadTarget = {
-        kind: 'file-picker',
-      };
-      return;
-    }
-
-    await this.runPresetAction(async () => {
-      await this.loadRackPresetFromPicker();
-    }, 'Rack preset load failed.');
   }
 
   public closeRackPresetLoadDialog(): void {
@@ -348,11 +334,7 @@ class PresetController {
     this.state.isRackPresetLoadPending = true;
     try {
       await this.runPresetAction(async () => {
-        if (target.kind === 'browser-entry') {
-          await this.loadPresetFromBrowserEntry(target.entry);
-        } else {
-          await this.loadRackPresetFromPicker();
-        }
+        await this.loadPresetFromBrowserEntry(target.entry);
         this.state.pendingRackPresetLoadTarget = null;
       }, 'Rack preset load failed.');
     } finally {
@@ -361,9 +343,7 @@ class PresetController {
   }
 
   public getRackPresetLoadDescription(target: PendingRackPresetLoadTarget): string {
-    return target.kind === 'browser-entry'
-      ? `The current rack will be replaced by the rack preset "${target.entry.label}".`
-      : 'The current rack will be replaced by the rack preset you choose.';
+    return `The current rack will be replaced by the rack preset "${target.entry.label}".`;
   }
 
   public async handlePresetFileDrop(payload: RackPresetFileDrop): Promise<void> {
@@ -496,21 +476,6 @@ class PresetController {
         response.payload,
       );
       this.showPresetActionMessage(result.message, response.warning);
-      return;
-    }
-
-    const result = this.options.editorSession.commands.applyRackPreset(response.payload);
-    this.showPresetActionMessage(result.message, response.warning);
-  }
-
-  private async loadRackPresetFromPicker(): Promise<void> {
-    const response = await this.options.bridgeClient.openPresetFile({
-      presetType: 'rack',
-    });
-    if (response.status !== 'opened') {
-      if (response.status === 'error') {
-        this.showMessage(`Rack preset load failed | ${response.message}`);
-      }
       return;
     }
 

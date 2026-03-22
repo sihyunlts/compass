@@ -12,6 +12,7 @@ export const cloneChainForIpc = (chain: GeneratorChain): GeneratorChain => {
   }
 
   return {
+    name: chain.name ?? null,
     devices: chain.devices.map((device) => cloneDeviceNode(device)),
     groupStateById,
   };

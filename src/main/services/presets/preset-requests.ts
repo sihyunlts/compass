@@ -1,5 +1,4 @@
 import type {
-  OpenPresetFileRequest,
   ReadPresetEntryRequest,
   SavePresetFileRequest,
   ShowPresetEntryInFolderRequest,
@@ -33,15 +32,6 @@ export const parseSavePresetFileRequest = (
     payload: payload.preset,
   };
 };
-
-export const parseOpenPresetFileRequest = (
-  value: unknown,
-): OpenPresetFileRequest | null =>
-  typeof value === 'object'
-  && value !== null
-  && isPresetFileKind((value as { presetType?: unknown }).presetType)
-    ? { presetType: (value as { presetType: PresetFileKind }).presetType }
-    : null;
 
 const isValidRelativePathSegment = (value: unknown): value is string =>
   typeof value === 'string'

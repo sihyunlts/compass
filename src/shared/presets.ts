@@ -290,7 +290,7 @@ export const resolvePresetFileKindFromName = (
 
 const resolvePresetNameFromFileName = (
   fileName: string,
-  presetType: Exclude<PresetFileKind, 'rack'>,
+  presetType: PresetFileKind,
 ): string | null => {
   const baseName = extractBaseName(fileName).trim();
   const extension = PRESET_FILE_EXTENSIONS[presetType];
@@ -306,10 +306,6 @@ const applyPresetNameFromFileName = (
   preset: PresetFile,
   fileName: string,
 ): PresetFile => {
-  if (preset.presetType === 'rack') {
-    return preset;
-  }
-
   const presetName = resolvePresetNameFromFileName(fileName, preset.presetType);
   if (!presetName) {
     return preset;
@@ -320,6 +316,16 @@ const applyPresetNameFromFileName = (
       ...preset,
       device: {
         ...preset.device,
+        name: presetName,
+      },
+    };
+  }
+
+  if (preset.presetType === 'rack') {
+    return {
+      ...preset,
+      chain: {
+        ...preset.chain,
         name: presetName,
       },
     };

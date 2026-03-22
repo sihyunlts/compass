@@ -26,7 +26,6 @@ export const createInitialEditorState = (): EditorSessionState => {
     launchpadModel: loadLaunchpadModel(),
     headerIndicatorText: loadedChain.warning ?? '',
     paletteNameText: 'Default palette: loading...',
-    isSettingsOpen: false,
     previewBpm: loadPreviewBpm(),
     previewLoopLengthBeats: bridge.autoCreateLengthBeats,
     isPreviewLoopEnabled: loadPreviewLoopEnabled(),

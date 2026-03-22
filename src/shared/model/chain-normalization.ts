@@ -10,7 +10,7 @@ import type {
   GeneratorDeviceNode,
 } from './chain';
 import { cloneChainForIpc } from './chain-clone';
-import { normalizeCustomName } from './naming';
+import { normalizeCustomName, normalizeRackName } from './naming';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -217,6 +217,7 @@ export const sanitizeGeneratorChain = (
   chain: GeneratorChain,
 ): GeneratorChain => {
   const sanitized = cloneChainForIpc(chain);
+  sanitized.name = normalizeRackName((chain as { name?: unknown }).name);
   reconcileColorDeviceParams(sanitized);
   reconcileStoredNames(sanitized);
   reconcileMaskSourceIds(sanitized);
@@ -251,6 +252,7 @@ export const hydrateImportedGeneratorChain = (
 
   return {
     chain: sanitizeGeneratorChain({
+      name: normalizeRackName(value.name),
       devices: hydratedDevices.devices,
       groupStateById: hydrateImportedGroupStateById(value.groupStateById),
     }),

@@ -71,6 +71,7 @@ import {
   allocateDeviceNodeId,
 } from './device-node-factory';
 import {
+  renameRack,
   renameDeviceById,
   renameGroupById,
 } from './naming';
@@ -98,7 +99,6 @@ export interface EditorSessionState {
   launchpadModel: LaunchpadModel;
   headerIndicatorText: string;
   paletteNameText: string;
-  isSettingsOpen: boolean;
   previewBpm: number;
   previewLoopLengthBeats: number;
   isPreviewLoopEnabled: boolean;
@@ -340,6 +340,7 @@ export class EditorSession {
       this.renameDevice(deviceId, rawName),
     renameGroup: (groupId: string, rawName: string): boolean =>
       this.renameGroup(groupId, rawName),
+    renameRack: (rawName: string): boolean => this.renameRack(rawName),
     insertDevicePreset: (
       dropZone: RackDropZone,
       preset: DevicePresetFile,
@@ -348,9 +349,7 @@ export class EditorSession {
       dropZone: RackDropZone,
       preset: GroupPresetFile,
     ): GroupPresetApplyResult => this.insertGroupPreset(dropZone, preset),
-    applyRackPreset: (
-      preset: RackPresetFile,
-    ): PresetApplyResult => this.applyRackPreset(preset),
+    applyRackPreset: (preset: RackPresetFile): PresetApplyResult => this.applyRackPreset(preset),
     setLaunchpadModelEnabled: (nextEnabled: boolean): boolean =>
       setLaunchpadModelEnabled(this.state, nextEnabled, (delayMs) => this.scheduleAutoPreview(delayMs)),
     togglePreviewLoopEnabled: (): boolean => togglePreviewLoopEnabled(this.state),
@@ -600,6 +599,16 @@ export class EditorSession {
     return true;
   }
 
+  private renameRack(rawName: string): boolean {
+    const nextChain = renameRack(this.state.chainState, rawName);
+    if (!nextChain) {
+      return false;
+    }
+
+    this.persistChainMutation(nextChain, EDITOR_HISTORY_META.renameRack);
+    return true;
+  }
+
   private selectInsertedDevices(
     previousChain: GeneratorChain,
     nextChain: GeneratorChain,
@@ -682,9 +691,7 @@ export class EditorSession {
     return result;
   }
 
-  private applyRackPreset(
-    preset: RackPresetFile,
-  ): PresetApplyResult {
+  private applyRackPreset(preset: RackPresetFile): PresetApplyResult {
     const result = applyRackPresetFile(preset);
     if (!result.ok) {
       return result;

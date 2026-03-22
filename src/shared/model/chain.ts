@@ -158,6 +158,7 @@ export interface GroupStateEntry {
 }
 
 export interface GeneratorChain {
+  name?: string | null;
   devices: GeneratorDeviceNode[];
   groupStateById: Record<string, GroupStateEntry>;
 }

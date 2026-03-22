@@ -3,7 +3,6 @@ import { shell, type BaseWindow } from 'electron';
 import type {
   DeletePresetEntryResponse,
   ListPresetBrowserTreeResponse,
-  OpenPresetFileResponse,
   ReadPresetEntryResponse,
   SavePresetFileResponse,
   ShowPresetEntryInFolderResponse,
@@ -17,7 +16,6 @@ import {
   resolvePresetPath,
 } from './presets/preset-paths';
 import {
-  parseOpenPresetFileRequest,
   parsePresetEntryRequest,
   parseReadPresetEntryRequest,
   parseSavePresetFileRequest,
@@ -74,51 +72,6 @@ export class PresetService {
       return {
         status: 'error',
         message: toErrorMessage(error, 'Failed to save preset file.'),
-      };
-    }
-  }
-
-  public async openPresetFile(
-    request: unknown,
-    parentWindow?: BaseWindow,
-  ): Promise<OpenPresetFileResponse> {
-    const parsedRequest = parseOpenPresetFileRequest(request);
-    if (!parsedRequest) {
-      return {
-        status: 'error',
-        message: 'Invalid preset open request.',
-      };
-    }
-
-    try {
-      const directory = await this.storage.resolvePresetDirectory(parsedRequest.presetType);
-      const dialogResult = await this.dialogs.showOpenPresetFileDialog(
-        parsedRequest,
-        directory,
-        parentWindow,
-      );
-      if (dialogResult.status === 'canceled') {
-        return { status: 'canceled' };
-      }
-
-      const readResult = await this.storage.readPresetFileByType(
-        parsedRequest.presetType,
-        dialogResult.filePath,
-      );
-      if (readResult.status === 'error') {
-        return readResult;
-      }
-
-      return {
-        status: 'opened',
-        filePath: readResult.filePath,
-        payload: readResult.payload,
-        warning: readResult.warning,
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: toErrorMessage(error, 'Failed to read preset file.'),
       };
     }
   }

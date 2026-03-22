@@ -30,9 +30,11 @@ export { cloneChainForIpc } from './chain-clone';
 export { cloneDeviceNode } from './device-clone';
 export {
   DEFAULT_GROUP_NAME_TEMPLATE,
+  DEFAULT_RACK_NAME,
   applyNameIndex,
   hasNameIndexToken,
   normalizeCustomName,
+  normalizeRackName,
 } from './naming';
 export type {
   LaunchpadButton,

@@ -13,7 +13,6 @@ export const IPC_CHANNELS = {
   previewGuideEnabledUpdate: 'preview:guide-enabled-update',
   openExternal: 'bridge:open-external',
   savePresetFile: 'preset:save-file',
-  openPresetFile: 'preset:open-file',
   listPresetBrowserTree: 'preset:list-browser-tree',
   showPresetEntryInFolder: 'preset:show-entry-in-folder',
   showPresetsRootInFolder: 'preset:show-root-in-folder',

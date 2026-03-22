@@ -4,8 +4,6 @@ import type {
   DeletePresetEntryRequest,
   DeletePresetEntryResponse,
   ListPresetBrowserTreeResponse,
-  OpenPresetFileRequest,
-  OpenPresetFileResponse,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
   SavePresetFileRequest,
@@ -59,7 +57,4 @@ export interface CompassApi {
   readPresetEntry: <K extends PresetFileKind>(
     request: ReadPresetEntryRequest<K>,
   ) => Promise<ReadPresetEntryResponse<K>>;
-  openPresetFile: <K extends PresetFileKind>(
-    request: OpenPresetFileRequest<K>,
-  ) => Promise<OpenPresetFileResponse<K>>;
 }

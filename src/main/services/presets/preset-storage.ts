@@ -32,7 +32,13 @@ const serializePresetFile = (payload: PresetFile): unknown => {
     };
   }
 
-  return payload;
+  return {
+    ...payload,
+    chain: {
+      ...payload.chain,
+      name: undefined,
+    },
+  };
 };
 
 /** Reads and writes preset files under the app's preset root. */

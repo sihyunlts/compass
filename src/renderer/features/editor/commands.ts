@@ -36,6 +36,7 @@ export const EDITOR_HISTORY_META = {
   groupToggleEnabled: { kind: 'group-toggle-enabled', label: 'Toggle group enabled' },
   renameDevice: { kind: 'rename-device', label: 'Rename device' },
   renameGroup: { kind: 'rename-group', label: 'Rename group' },
+  renameRack: { kind: 'rename-rack', label: 'Rename rack' },
   clipboardCut: { kind: 'clipboard-cut', label: 'Cut selection' },
   clipboardPaste: { kind: 'clipboard-paste', label: 'Paste selection' },
   duplicate: { kind: 'duplicate', label: 'Duplicate selection' },

@@ -19,7 +19,7 @@ interface SettingsControllerOptions {
   editorSession: EditorSession;
 }
 
-/** Owns settings-screen side effects such as palette IO, model toggles, and about actions. */
+/** Owns settings UI side effects such as palette IO, model toggles, and about actions. */
 class SettingsController {
   public readonly state: SettingsControllerState = $state({
     appVersionText: '',

@@ -6,8 +6,6 @@ import type {
   DeletePresetEntryRequest,
   DeletePresetEntryResponse,
   ListPresetBrowserTreeResponse,
-  OpenPresetFileRequest,
-  OpenPresetFileResponse,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
   ShowPresetEntryInFolderRequest,
@@ -115,8 +113,6 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.deletePresetEntry, request) as Promise<DeletePresetEntryResponse>,
   readPresetEntry: <K extends PresetFileKind>(request: ReadPresetEntryRequest<K>) =>
     ipcRenderer.invoke(IPC_CHANNELS.readPresetEntry, request) as Promise<ReadPresetEntryResponse<K>>,
-  openPresetFile: <K extends PresetFileKind>(request: OpenPresetFileRequest<K>) =>
-    ipcRenderer.invoke(IPC_CHANNELS.openPresetFile, request) as Promise<OpenPresetFileResponse<K>>,
 };
 
 contextBridge.exposeInMainWorld('compass', api);

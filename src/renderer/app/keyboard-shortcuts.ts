@@ -9,6 +9,10 @@ interface KeyboardShortcutOptions {
 
 const RACK_DEVICES_ELEMENT_ID = 'chain-devices';
 
+const shouldPreserveRackSelection = (element: Element | null): boolean =>
+  element instanceof HTMLElement
+  && element.closest('[data-preserve-rack-selection="true"]') !== null;
+
 const closeContextMenuIfHandled = (
   handled: boolean,
   closeContextMenu: () => void,
@@ -30,7 +34,6 @@ export const mountKeyboardShortcuts = (
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') {
       options.closeContextMenu();
-      options.editorSession.state.isSettingsOpen = false;
       return;
     }
 
@@ -146,7 +149,7 @@ export const mountKeyboardShortcuts = (
       return;
     }
 
-    if (target instanceof HTMLElement && target.dataset.preserveRackSelection === 'true') {
+    if (shouldPreserveRackSelection(target)) {
       return;
     }
 
@@ -161,6 +164,10 @@ export const mountKeyboardShortcuts = (
 
     const rackEl = document.getElementById(RACK_DEVICES_ELEMENT_ID);
     if (rackEl && rackEl.contains(target)) {
+      return;
+    }
+
+    if (shouldPreserveRackSelection(target)) {
       return;
     }
 

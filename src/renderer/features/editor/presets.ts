@@ -17,6 +17,7 @@ import { sanitizeGeneratorChain } from '../../../shared/model/chain-normalizatio
 import {
   buildDeviceDisplayNameById,
   buildGroupDisplayNameById,
+  resolveRackDisplayName,
 } from '../rack/display-names';
 import {
   applyInsertDevicesByDropZone,
@@ -153,6 +154,10 @@ export const resolveGroupPresetSuggestedName = (
   );
   return displayNameById[groupId] ?? groupId;
 };
+
+export const resolveRackPresetSuggestedName = (
+  chain: GeneratorChain,
+): string => resolveRackDisplayName(chain);
 
 export const buildDevicePresetFile = (
   chain: GeneratorChain,

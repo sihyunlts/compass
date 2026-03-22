@@ -1,13 +1,11 @@
 import {
   dialog,
   type BaseWindow,
-  type OpenDialogOptions,
   type SaveDialogOptions,
 } from 'electron';
 import path from 'node:path';
 
 import type {
-  OpenPresetFileRequest,
   SavePresetFileRequest,
 } from '../../../shared/contracts/ipc/presets';
 import { type PresetFileKind } from '../../../shared/presets';
@@ -70,33 +68,6 @@ export class PresetDialogs {
     return {
       status: 'selected',
       filePath: ensurePresetExtension(result.filePath, spec.extension),
-    };
-  }
-
-  public async showOpenPresetFileDialog(
-    request: OpenPresetFileRequest,
-    directory: string,
-    parentWindow?: BaseWindow,
-  ): Promise<SelectedFilePath> {
-    const spec = PRESET_FILE_SPECS[request.presetType];
-    const dialogOptions: OpenDialogOptions = {
-      ...resolveDialogOptions(request.presetType, directory),
-      buttonLabel: 'Open',
-      properties: ['openFile'],
-      title: `Open ${spec.defaultName}`,
-    };
-
-    const result = parentWindow
-      ? await dialog.showOpenDialog(parentWindow, dialogOptions)
-      : await dialog.showOpenDialog(dialogOptions);
-    const filePath = result.filePaths[0] ?? '';
-    if (result.canceled || !filePath) {
-      return { status: 'canceled' };
-    }
-
-    return {
-      status: 'selected',
-      filePath,
     };
   }
 }

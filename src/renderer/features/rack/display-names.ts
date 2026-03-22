@@ -1,9 +1,11 @@
 import { getRendererDeviceLabel } from '../../../devices';
 import {
   DEFAULT_GROUP_NAME_TEMPLATE,
+  DEFAULT_RACK_NAME,
   applyNameIndex,
   hasNameIndexToken,
   normalizeCustomName,
+  normalizeRackName,
   type GeneratorChain,
   type GeneratorDeviceNode,
 } from '../../../shared/model';
@@ -67,6 +69,14 @@ export const resolveStoredGroupName = (
   groupStateById: GeneratorChain['groupStateById'],
   groupId: string,
 ): string | null => normalizeCustomName(groupStateById[groupId]?.name);
+
+export const resolveStoredRackName = (
+  chain: Pick<GeneratorChain, 'name'>,
+): string | null => normalizeRackName(chain.name);
+
+export const resolveRackDisplayName = (
+  chain: Pick<GeneratorChain, 'name'>,
+): string => resolveStoredRackName(chain) ?? DEFAULT_RACK_NAME;
 
 export const buildDeviceDisplayNameById = (
   devices: readonly GeneratorDeviceNode[],

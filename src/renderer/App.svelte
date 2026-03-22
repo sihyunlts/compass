@@ -29,6 +29,7 @@
   import PreviewPanel from './components/PreviewPanel.svelte';
   import ContextMenu from './components/ContextMenu.svelte';
   import ModalDialog from './components/ModalDialog.svelte';
+  import WorkspaceRackTitle from './components/WorkspaceRackTitle.svelte';
   import { createPresetController } from './app/preset-controller.svelte';
   import { createSettingsController } from './app/settings-controller.svelte';
   import { mountBridgeSubscriptions } from './app/bridge-subscriptions';
@@ -51,6 +52,7 @@
   const AUTO_PREVIEW_DEBOUNCE_MS = 120;
   const HISTORY_MAX_ENTRIES = 100;
   const DEFAULT_LED_RGB = '255 166 57';
+  const SETTINGS_SIDEBAR_WIDTH_PX = 320;
   const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, select, textarea, option';
 
   const toDeviceLeafNode = (
@@ -283,6 +285,12 @@
 
     appEl.classList.toggle('is-sidebar-resizing', uiState.isSidebarResizing);
     appEl.style.setProperty('--sidebar-width', `${uiState.sidebarWidthPx}px`);
+    appEl.style.setProperty(
+      '--browser-panel-width',
+      `${uiState.sidebarPage === 'settings'
+        ? SETTINGS_SIDEBAR_WIDTH_PX
+        : uiState.sidebarWidthPx}px`,
+    );
   });
 </script>
 
@@ -334,7 +342,17 @@
             onScrollRequest={handleRackHeaderScrollRequest}
           />
 
-          <span id="preview-bpm-text" class="header-bpm-text">{bpmText}</span>
+          <WorkspaceRackTitle
+            name={uiState.chainState.name ?? null}
+            onCommit={(rawName) => editorSession.commands.renameRack(rawName)}
+          />
+          <Button
+            id="rack-preset-save"
+            text="Save"
+            title="Save the current rack state."
+            label="Save rack preset"
+            onClick={() => presetController.handleSaveRackPreset()}
+          />
 
           <span
             id="preview-meta"
@@ -348,36 +366,6 @@
         </div>
 
         <div class="workspace-actions">
-          <div class="header-length-select">
-            <span class="field-label">Length</span>
-            <select
-              id="auto-create-length-select"
-              name="autoCreateLength"
-              bind:value={uiState.autoCreateLengthLabel}
-              onchange={editorSession.commands.handleAutoCreateLengthChange}
-            >
-              {#each AUTO_CREATE_LENGTH_OPTIONS as option (option.label)}
-                <option value={option.label}>{option.label}</option>
-              {/each}
-            </select>
-          </div>
-          <div class="header-preset-group">
-            <span class="field-label">Rack</span>
-            <Button
-              id="rack-preset-save"
-              text="Save"
-              title="Save the current rack state."
-              label="Save rack preset"
-              onClick={() => presetController.handleSaveRackPreset()}
-            />
-            <Button
-              id="rack-preset-load"
-              text="Load"
-              title="Replace the current rack with a saved rack preset."
-              label="Load rack preset"
-              onClick={() => presetController.handleLoadRackPreset()}
-            />
-          </div>
           <UndoHistoryControl
             canUndo={historyControls.canUndo}
             undoActionLabel={historyControls.undoActionLabel}
@@ -393,6 +381,20 @@
             label={historyControls.canRedo ? `Redo: ${historyControls.redoActionLabel}` : 'Redo unavailable'}
             onClick={handleRedoClick}
           />
+          <div class="header-length-select">
+            <span id="preview-bpm-text" class="header-bpm-text">{bpmText}</span>
+            <select
+              id="auto-create-length-select"
+              name="autoCreateLength"
+              aria-label="Preview length"
+              bind:value={uiState.autoCreateLengthLabel}
+              onchange={editorSession.commands.handleAutoCreateLengthChange}
+            >
+              {#each AUTO_CREATE_LENGTH_OPTIONS as option (option.label)}
+                <option value={option.label}>{option.label}</option>
+              {/each}
+            </select>
+          </div>
           <Button
             id="send-button"
             variant="primary"

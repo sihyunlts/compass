@@ -37,6 +37,7 @@ export interface LoadedChainSettingsResult {
 }
 
 const createDefaultChain = (): GeneratorChain => ({
+  name: null,
   devices: createInitialChainDevices(),
   groupStateById: {},
 });

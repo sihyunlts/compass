@@ -13,6 +13,7 @@ export type ChainHistoryKind =
   | 'group-toggle-enabled'
   | 'rename-device'
   | 'rename-group'
+  | 'rename-rack'
   | 'clipboard-cut'
   | 'clipboard-paste'
   | 'duplicate'

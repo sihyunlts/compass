@@ -24,26 +24,6 @@ export type SavePresetFileResponse =
       filePath?: string;
     };
 
-export interface OpenPresetFileRequest<K extends PresetFileKind = PresetFileKind> {
-  presetType: K;
-}
-
-export type OpenPresetFileResponse<K extends PresetFileKind = PresetFileKind> =
-  | {
-      status: 'opened';
-      filePath: string;
-      payload: PresetFileByKind<K>;
-      warning?: string;
-    }
-  | {
-      status: 'canceled';
-    }
-    | {
-        status: 'error';
-        message: string;
-        filePath?: string;
-      };
-
 export interface PresetBrowserTreeLeafNode<K extends PresetFileKind = PresetFileKind> {
   kind: 'preset';
   id: string;
