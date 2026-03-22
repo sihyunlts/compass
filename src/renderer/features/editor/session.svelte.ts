@@ -42,7 +42,6 @@ import {
 } from './editor-history';
 import {
   applyChainMutation as applyEditorChainMutation,
-  checkoutHistory as checkoutEditorHistory,
   initializeHistoryBridge,
   redoHistory,
   saveChainWithHistory,
@@ -177,34 +176,22 @@ export class EditorSession {
     syncHistoryState(this.state, this.history);
   }
 
+  public initialize(): void {
+    initializeHistoryBridge(this.state, this.history, {
+      requestSyncAfterRender: () => this.requestSyncAfterRender(),
+    });
+  }
+
+  public dispose(): void {
+    this.cancelAutoPreview();
+    this.history.flushPendingMerge();
+  }
+
+  public attachRackBinding(binding: EditorRackBinding | null): void {
+    this.rackBinding = binding;
+  }
+
   public readonly commands = {
-    initialize: (): void => {
-      initializeHistoryBridge(this.state, this.history, {
-        requestSyncAfterRender: () => this.requestSyncAfterRender(),
-      });
-    },
-    dispose: (): void => {
-      this.cancelAutoPreview();
-      this.history.flushPendingMerge();
-    },
-    attachRackBinding: (binding: EditorRackBinding | null): void => {
-      this.rackBinding = binding;
-    },
-    scheduleAutoPreview: (delayMs?: number): void => {
-      this.scheduleAutoPreview(delayMs);
-    },
-    cancelAutoPreview: (): void => {
-      this.cancelAutoPreview();
-    },
-    openSettings: (): void => {
-      this.state.isSettingsOpen = true;
-    },
-    closeSettings: (): void => {
-      this.state.isSettingsOpen = false;
-    },
-    setSidebarPage: (nextPage: EditorSessionState['sidebarPage']): void => {
-      this.state.sidebarPage = nextPage;
-    },
     persistSidebarWidth: (nextWidth?: number): void => {
       persistSidebarWidth(this.state, nextWidth);
     },
@@ -276,7 +263,6 @@ export class EditorSession {
     },
     undo: (): boolean => this.undo(),
     redo: (): boolean => this.redo(),
-    checkoutHistory: (target: string | number): boolean => this.checkoutHistory(target),
     copySelection: (): boolean => this.copySelectionToClipboard() !== null,
     cutSelection: (): boolean => this.cutSelection(),
     pasteClipboard: (): boolean => this.pasteClipboard(),
@@ -362,46 +348,15 @@ export class EditorSession {
     applyRackPreset: (
       preset: RackPresetFile,
     ): PresetApplyResult => this.applyRackPreset(preset),
-    clearSelection: (): void => {
-      this.rackBinding?.clearSelection();
-    },
     setLaunchpadModelEnabled: (nextEnabled: boolean): boolean =>
       setLaunchpadModelEnabled(this.state, nextEnabled, (delayMs) => this.scheduleAutoPreview(delayMs)),
     togglePreviewLoopEnabled: (): boolean => togglePreviewLoopEnabled(this.state),
     setPreviewGuideEnabled: (nextEnabled: boolean): boolean =>
       setPreviewGuideEnabled(this.state, nextEnabled),
-    setPreviewPopoutOpen: (nextEnabled: boolean): void => {
-      this.state.isPreviewPopoutOpen = nextEnabled;
-    },
     syncPreviewBpm: (nextBpm: number): boolean => syncPreviewBpm(this.state, nextBpm),
-    setPreviewLoopLengthBeats: (nextBeats: number): void => {
-      this.state.previewLoopLengthBeats = nextBeats;
-    },
-    setPaletteNameText: (nameText: string): void => {
-      this.state.paletteNameText = nameText;
-    },
-    setHeaderIndicatorText: (text: string): void => {
-      this.state.headerIndicatorText = text;
-    },
-    clearHeaderIndicatorText: (): void => {
-      this.state.headerIndicatorText = '';
-    },
-    setSendButtonState: (label: string, disabled: boolean): void => {
-      this.state.sendButtonLabel = label;
-      this.state.sendButtonDisabled = disabled;
-    },
-    readBridgeSettings: (): BridgeSettings => this.readBridgeSettings(),
-    applyBridgeSettings: (
-      bridge: BridgeSettings,
-      options: {
-        persist?: boolean;
-      } = {},
-    ): void => {
-      applyEditorBridgeSettings(this.state, bridge, options);
-    },
   };
 
-  private scheduleAutoPreview(delayMs = this.autoPreviewDebounceMs): void {
+  public scheduleAutoPreview(delayMs = this.autoPreviewDebounceMs): void {
     this.cancelAutoPreview();
     this.autoPreviewTimer = window.setTimeout(() => {
       this.autoPreviewTimer = null;
@@ -415,7 +370,7 @@ export class EditorSession {
     }, delayMs);
   }
 
-  private cancelAutoPreview(): void {
+  public cancelAutoPreview(): void {
     if (this.autoPreviewTimer === null) {
       return;
     }
@@ -442,8 +397,21 @@ export class EditorSession {
     persistEditorChainState(this.state, () => this.requestSyncAfterRender());
   }
 
-  private readBridgeSettings(): BridgeSettings {
+  public readBridgeSettings(): BridgeSettings {
     return readBridgeSettingsFromLabel(this.state.autoCreateLengthLabel);
+  }
+
+  public applyBridgeSettings(
+    bridge: BridgeSettings,
+    options: {
+      persist?: boolean;
+    } = {},
+  ): void {
+    applyEditorBridgeSettings(this.state, bridge, options);
+  }
+
+  public clearSelection(): void {
+    this.rackBinding?.clearSelection();
   }
 
   private setClipboard(nextClipboard: RackClipboard | null): void {
@@ -482,14 +450,6 @@ export class EditorSession {
 
   private redo(): boolean {
     return redoHistory(this.state, this.history, {
-      bumpChainRevision: () => this.bumpChainRevision(),
-      persistChainState: () => this.persistChainState(),
-      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),
-    });
-  }
-
-  private checkoutHistory(target: string | number): boolean {
-    return checkoutEditorHistory(this.state, this.history, target, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
       scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),

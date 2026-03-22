@@ -23,14 +23,15 @@ class SendFlowController {
     const { bridgeClient, editorSession, headerIndicator, playbackSession } = this.options;
     const uiState = editorSession.state;
 
-    editorSession.commands.cancelAutoPreview();
+    editorSession.cancelAutoPreview();
     this.clearSendDoneTimer();
-    editorSession.commands.setSendButtonState('Sending...', true);
+    uiState.sendButtonLabel = 'Sending...';
+    uiState.sendButtonDisabled = true;
     headerIndicator.show('Sending...', { autoClear: false });
 
     try {
-      const bridge = editorSession.commands.readBridgeSettings();
-      editorSession.commands.applyBridgeSettings(bridge, { persist: true });
+      const bridge = editorSession.readBridgeSettings();
+      editorSession.applyBridgeSettings(bridge, { persist: true });
       const sourceKey = `chain:${uiState.chainRevision}`;
       const launchpadModel = uiState.launchpadModel;
       const sourceChain = cloneChainForIpc(uiState.chainState);
@@ -50,16 +51,19 @@ class SendFlowController {
         launchpadModel,
       });
 
-      editorSession.commands.setSendButtonState('Done!', false);
+      uiState.sendButtonLabel = 'Done!';
+      uiState.sendButtonDisabled = false;
       this.sendDoneTimer = window.setTimeout(() => {
         this.sendDoneTimer = null;
-        editorSession.commands.setSendButtonState('Send', false);
+        uiState.sendButtonLabel = 'Send';
+        uiState.sendButtonDisabled = false;
       }, this.options.sendDoneMs ?? DEFAULT_SEND_DONE_MS);
     } catch (error) {
       playbackSession.stopPlayback();
       const errorText = error instanceof Error ? error.message : 'Unknown send error';
       headerIndicator.show(`Send failed | ${errorText}`);
-      editorSession.commands.setSendButtonState('Send', false);
+      uiState.sendButtonLabel = 'Send';
+      uiState.sendButtonDisabled = false;
     }
   }
 

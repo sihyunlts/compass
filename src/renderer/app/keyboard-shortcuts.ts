@@ -30,7 +30,7 @@ export const mountKeyboardShortcuts = (
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') {
       options.closeContextMenu();
-      options.editorSession.commands.closeSettings();
+      options.editorSession.state.isSettingsOpen = false;
       return;
     }
 
@@ -150,7 +150,7 @@ export const mountKeyboardShortcuts = (
       return;
     }
 
-    options.editorSession.commands.clearSelection();
+    options.editorSession.clearSelection();
   };
 
   const handlePointerDown = (event: PointerEvent): void => {
@@ -164,7 +164,7 @@ export const mountKeyboardShortcuts = (
       return;
     }
 
-    options.editorSession.commands.clearSelection();
+    options.editorSession.clearSelection();
   };
 
   const handleBeforeUnload = (): void => {

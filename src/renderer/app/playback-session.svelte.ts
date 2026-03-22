@@ -146,7 +146,7 @@ export class PlaybackSessionController {
     const { editorSession, previewSession } = this.options;
     const nextLoopLengthBeats =
       input.bridge?.autoCreateLengthBeats
-      ?? editorSession.commands.readBridgeSettings().autoCreateLengthBeats;
+      ?? editorSession.readBridgeSettings().autoCreateLengthBeats;
 
     previewSession.commands.applyPreviewResult({
       preview: input.preview,
@@ -155,7 +155,7 @@ export class PlaybackSessionController {
       loopLengthBeats: nextLoopLengthBeats,
       launchpadModel: input.launchpadModel,
     });
-    editorSession.commands.setPreviewLoopLengthBeats(nextLoopLengthBeats);
+    editorSession.state.previewLoopLengthBeats = nextLoopLengthBeats;
 
     if (this.playbackScheduler) {
       this.playbackScheduler.setCurrentBeat(0);
@@ -218,7 +218,7 @@ export class PlaybackSessionController {
   public async openPreviewPopout(): Promise<void> {
     try {
       await this.options.bridgeClient.openPreviewWindow();
-      this.options.editorSession.commands.setPreviewPopoutOpen(true);
+      this.options.editorSession.state.isPreviewPopoutOpen = true;
       this.renderPreviewFrame();
     } catch {
       this.options.headerIndicator.show('Failed to open preview popout');
@@ -248,7 +248,7 @@ export class PlaybackSessionController {
   }
 
   public setPreviewPopoutOpen(nextEnabled: boolean): void {
-    this.options.editorSession.commands.setPreviewPopoutOpen(nextEnabled);
+    this.options.editorSession.state.isPreviewPopoutOpen = nextEnabled;
   }
 
   public async requestLiveTempoSync(): Promise<void> {

@@ -148,7 +148,7 @@
   let paletteRevision = $state(0);
   const paletteController = createPaletteController({
     onPaletteNameChanged: (nameText) => {
-      editorSession.commands.setPaletteNameText(nameText);
+      editorSession.state.paletteNameText = nameText;
       paletteRevision += 1;
     },
   });
@@ -157,10 +157,10 @@
   const headerIndicator = createHeaderIndicator({
     getText: () => uiState.headerIndicatorText,
     setText: (text) => {
-      editorSession.commands.setHeaderIndicatorText(text);
+      uiState.headerIndicatorText = text;
     },
     clearText: () => {
-      editorSession.commands.clearHeaderIndicatorText();
+      uiState.headerIndicatorText = '';
     },
   });
   const playbackSession = createPlaybackSession({
@@ -225,7 +225,7 @@
   };
 
   $effect(() => {
-    editorSession.commands.attachRackBinding(createRackBinding());
+    editorSession.attachRackBinding(createRackBinding());
   });
 
   $effect(() => {
@@ -794,7 +794,7 @@
   };
 
   onMount(() => {
-    editorSession.commands.initialize();
+    editorSession.initialize();
     playbackSession.initialize();
     if (uiState.headerIndicatorText.trim()) {
       headerIndicator.show(uiState.headerIndicatorText);
@@ -814,7 +814,7 @@
 
     paletteController.initialize();
     playbackSession.renderPreviewFrame();
-    editorSession.commands.scheduleAutoPreview(0);
+    editorSession.scheduleAutoPreview(0);
 
     return () => {
       disposeKeyboardShortcuts();
@@ -822,7 +822,7 @@
       sendFlow.dispose();
       playbackSession.dispose();
       headerIndicator.dispose();
-      editorSession.commands.dispose();
+      editorSession.dispose();
     };
   });
 
@@ -843,7 +843,9 @@
       {presetTree}
       {isPresetLoading}
       {presetErrorText}
-      onPageSelect={editorSession.commands.setSidebarPage}
+      onPageSelect={(nextPage) => {
+        uiState.sidebarPage = nextPage;
+      }}
       onDeviceAdd={editorSession.commands.addBrowserDevice}
       onBrowserPointerDown={editorSession.commands.handleBrowserPointerDown}
       onOpenContextMenu={handlePresetBrowserContextMenu}
@@ -932,7 +934,9 @@
           <Button
             id="settings-button"
             text="Settings"
-            onClick={editorSession.commands.openSettings}
+            onClick={() => {
+              uiState.isSettingsOpen = true;
+            }}
           />
           <Button
             id="send-button"
@@ -956,7 +960,7 @@
           isSidebarResizing={uiState.isSidebarResizing}
           interactiveElementSelector={INTERACTIVE_ELEMENT_SELECTOR}
           onSaveChain={editorSession.commands.saveChain}
-          onScheduleAutoPreview={editorSession.commands.scheduleAutoPreview}
+          onScheduleAutoPreview={(delayMs) => editorSession.scheduleAutoPreview(delayMs)}
           onOpenContextMenu={(x, y, target) => contextMenuComponent?.open(x, y, target)}
           onCloseContextMenu={closeContextMenu}
           onCommit={editorSession.commands.handleRackCommit}
@@ -1001,7 +1005,9 @@
       <Button
         id="settings-close"
         text="Close"
-        onClick={editorSession.commands.closeSettings}
+        onClick={() => {
+          uiState.isSettingsOpen = false;
+        }}
       />
     </header>
 
