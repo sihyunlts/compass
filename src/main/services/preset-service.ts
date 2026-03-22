@@ -1,117 +1,28 @@
-import {
-  app,
-  dialog,
-  shell,
-  type BaseWindow,
-  type OpenDialogOptions,
-  type SaveDialogOptions,
-} from 'electron';
-import type { Dirent } from 'node:fs';
-import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { shell, type BaseWindow } from 'electron';
 
-import { getRendererDeviceLabel } from '../../devices/schema-registry';
 import type {
   DeletePresetEntryResponse,
   ListPresetBrowserTreeResponse,
-  OpenPresetFileRequest,
   OpenPresetFileResponse,
-  PresetBrowserTreeFolderNode,
-  PresetBrowserTreeNode,
-  ReadPresetEntryRequest,
   ReadPresetEntryResponse,
-  SavePresetFileRequest,
   SavePresetFileResponse,
-  ShowPresetEntryInFolderRequest,
   ShowPresetEntryInFolderResponse,
   ShowPresetsRootInFolderResponse,
 } from '../../shared/contracts/ipc/presets';
+import { PRESET_FILE_SPECS } from './presets/preset-config';
+import { PresetBrowserTreeBuilder } from './presets/preset-browser-tree';
+import { PresetDialogs } from './presets/preset-dialogs';
 import {
-  isPresetFileKind,
-  parsePresetFile,
-  parsePresetFileText,
-  PRESET_FILE_EXTENSIONS,
-  type PresetFile,
-  type PresetFileKind,
-} from '../../shared/presets';
-
-const PRESET_ROOT_DIR_NAME = 'Presets';
-
-const PRESET_FILE_SPECS = {
-  device: {
-    directory: 'Devices',
-    extension: PRESET_FILE_EXTENSIONS.device,
-    filterName: 'Compass Device Presets',
-    defaultName: 'Device Preset',
-  },
-  group: {
-    directory: 'Groups',
-    extension: PRESET_FILE_EXTENSIONS.group,
-    filterName: 'Compass Group Presets',
-    defaultName: 'Group Preset',
-  },
-  rack: {
-    directory: 'Racks',
-    extension: PRESET_FILE_EXTENSIONS.rack,
-    filterName: 'Compass Rack Presets',
-    defaultName: 'Rack Preset',
-  },
-} as const satisfies Record<
-  PresetFileKind,
-  {
-    directory: string;
-    extension: string;
-    filterName: string;
-    defaultName: string;
-  }
->;
-
-const PRESET_ROOT_SECTION_LABELS: Record<PresetFileKind, string> = {
-  device: 'Devices',
-  group: 'Groups',
-  rack: 'Racks',
-};
-
-const sanitizeFileStem = (value: string, fallback: string): string => {
-  const trimmed = value.trim();
-  const sanitized = trimmed
-    .replace(/[\\/:*?"<>|]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return sanitized || fallback;
-};
-
-const resolvePresetSaveDirectory = (
-  baseDirectory: string,
-  request: SavePresetFileRequest,
-): string => {
-  if (request.payload.presetType !== 'device') {
-    return baseDirectory;
-  }
-
-  const deviceDirectoryName = sanitizeFileStem(
-    getRendererDeviceLabel(request.payload.device.kind),
-    'Device',
-  );
-  return path.join(baseDirectory, deviceDirectoryName);
-};
-
-const hasPresetExtension = (
-  filePath: string,
-  extension: string,
-): boolean => filePath.toLowerCase().endsWith(extension);
-
-const ensurePresetExtension = (
-  filePath: string,
-  extension: string,
-): string => {
-  if (hasPresetExtension(filePath, extension)) {
-    return filePath;
-  }
-
-  const parsed = path.parse(filePath);
-  return path.join(parsed.dir, `${parsed.name}${extension}`);
-};
+  hasPresetExtension,
+  resolvePresetPath,
+} from './presets/preset-paths';
+import {
+  parseOpenPresetFileRequest,
+  parsePresetEntryRequest,
+  parseReadPresetEntryRequest,
+  parseSavePresetFileRequest,
+} from './presets/preset-requests';
+import { PresetStorage } from './presets/preset-storage';
 
 const toErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof Error && error.message.trim()) {
@@ -121,300 +32,13 @@ const toErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
-const resolveDialogOptions = (
-  presetType: PresetFileKind,
-  defaultPath: string,
-) => {
-  const spec = PRESET_FILE_SPECS[presetType];
-  const extension = spec.extension.slice(1);
-  return {
-    defaultPath,
-    filters: [
-      { name: spec.filterName, extensions: [extension] },
-      { name: 'All Files', extensions: ['*'] },
-    ],
-  };
-};
-
-const parseSavePresetFileRequest = (
-  value: unknown,
-): SavePresetFileRequest | null => {
-  if (
-    typeof value !== 'object'
-    || value === null
-    || typeof (value as { suggestedName?: unknown }).suggestedName !== 'string'
-  ) {
-    return null;
-  }
-
-  const payload = parsePresetFile((value as { payload?: unknown }).payload, {
-    mode: 'strict',
-  });
-  if (!payload) {
-    return null;
-  }
-
-  return {
-    suggestedName: (value as { suggestedName: string }).suggestedName,
-    payload: payload.preset,
-  };
-};
-
-const parseOpenPresetFileRequest = (
-  value: unknown,
-): OpenPresetFileRequest | null =>
-  typeof value === 'object'
-  && value !== null
-  && isPresetFileKind((value as { presetType?: unknown }).presetType)
-    ? { presetType: (value as { presetType: PresetFileKind }).presetType }
-    : null;
-
-const isValidRelativePathSegment = (value: unknown): value is string =>
-  typeof value === 'string'
-  && value.length > 0
-  && value !== '.'
-  && value !== '..'
-  && !value.includes('/')
-  && !value.includes('\\');
-
-const parseRelativePath = (value: unknown): string[] | null => {
-  if (!Array.isArray(value) || !value.every((segment) => isValidRelativePathSegment(segment))) {
-    return null;
-  }
-
-  return [...value];
-};
-
-const parseReadPresetEntryRequest = (
-  value: unknown,
-): ReadPresetEntryRequest | null => {
-  if (
-    typeof value !== 'object'
-    || value === null
-    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
-  ) {
-    return null;
-  }
-
-  const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
-  if (!relativePath || relativePath.length === 0) {
-    return null;
-  }
-
-  return {
-    presetType: (value as { presetType: PresetFileKind }).presetType,
-    relativePath,
-  };
-};
-
-const parseShowPresetEntryInFolderRequest = (
-  value: unknown,
-): ShowPresetEntryInFolderRequest | null => {
-  if (
-    typeof value !== 'object'
-    || value === null
-    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
-  ) {
-    return null;
-  }
-
-  const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
-  const entryKind = (value as { entryKind?: unknown }).entryKind;
-  if (!relativePath || (entryKind !== 'file' && entryKind !== 'directory')) {
-    return null;
-  }
-
-  return {
-    presetType: (value as { presetType: PresetFileKind }).presetType,
-    relativePath,
-    entryKind,
-  };
-};
-
-const resolvePresetPath = (
-  rootDirectory: string,
-  relativePath: readonly string[],
-): string | null => {
-  const resolvedRoot = path.resolve(rootDirectory);
-  const resolvedPath = path.resolve(rootDirectory, ...relativePath);
-  if (resolvedPath !== resolvedRoot && !resolvedPath.startsWith(`${resolvedRoot}${path.sep}`)) {
-    return null;
-  }
-
-  return resolvedPath;
-};
-
-const compareEntryNames = (left: string, right: string): number =>
-  left.localeCompare(right, undefined, {
-    numeric: true,
-    sensitivity: 'base',
-  });
-
-/** Handles preset file dialogs and JSON serialization for preset payloads. */
+/** Orchestrates preset validation, dialogs, storage, and shell actions. */
 export class PresetService {
-  private async resolvePresetsRootDirectory(): Promise<string> {
-    const directory = path.join(
-      app.getPath('userData'),
-      PRESET_ROOT_DIR_NAME,
-    );
-    await mkdir(directory, { recursive: true });
-    return directory;
-  }
+  private readonly storage = new PresetStorage();
 
-  private async resolvePresetDirectory(
-    presetType: PresetFileKind,
-  ): Promise<string> {
-    const spec = PRESET_FILE_SPECS[presetType];
-    const directory = path.join(
-      await this.resolvePresetsRootDirectory(),
-      spec.directory,
-    );
-    await mkdir(directory, { recursive: true });
-    return directory;
-  }
+  private readonly dialogs = new PresetDialogs();
 
-  private async readPresetFileByType<K extends PresetFileKind>(
-    presetType: K,
-    filePath: string,
-  ): Promise<ReadPresetEntryResponse<K>> {
-    try {
-      const text = await readFile(filePath, 'utf8');
-      const parsed = parsePresetFileText(text, {
-        fileName: filePath,
-        mode: 'recover',
-      });
-      if (parsed.ok === false) {
-        return {
-          status: 'error',
-          message: parsed.message,
-          filePath,
-        };
-      }
-      if (parsed.preset.presetType !== presetType) {
-        return {
-          status: 'error',
-          message: `Expected a ${presetType} preset file.`,
-          filePath,
-        };
-      }
-
-      return {
-        status: 'loaded',
-        filePath,
-        payload: parsed.preset as Extract<PresetFile, { presetType: K }>,
-        warning: parsed.warning,
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: toErrorMessage(error, 'Failed to read preset file.'),
-        filePath,
-      };
-    }
-  }
-
-  private async readDirectoryEntries(
-    directoryPath: string,
-  ): Promise<Dirent<string>[]> {
-    try {
-      return await readdir(directoryPath, {
-        encoding: 'utf8',
-        withFileTypes: true,
-      }) as Dirent<string>[];
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return [];
-      }
-
-      throw error;
-    }
-  }
-
-  private async buildPresetBrowserTreeChildren(
-    presetType: PresetFileKind,
-    rootDirectory: string,
-    relativePath: readonly string[],
-  ): Promise<PresetBrowserTreeNode[]> {
-    const directoryPath = resolvePresetPath(rootDirectory, relativePath);
-    if (!directoryPath) {
-      return [];
-    }
-
-    const spec = PRESET_FILE_SPECS[presetType];
-    const directoryEntries = await this.readDirectoryEntries(directoryPath);
-    const entries: PresetBrowserTreeNode[] = [];
-
-    const childDirectories = directoryEntries
-      .filter((entry) => entry.isDirectory())
-      .sort((left, right) => compareEntryNames(left.name, right.name));
-
-    for (const directory of childDirectories) {
-      const nextRelativePath = [...relativePath, directory.name];
-      const children = await this.buildPresetBrowserTreeChildren(
-        presetType,
-        rootDirectory,
-        nextRelativePath,
-      );
-      if (children.length === 0) {
-        continue;
-      }
-
-      entries.push({
-        kind: 'folder',
-        id: `preset:${presetType}:${nextRelativePath.join('/')}`,
-        label: directory.name,
-        presetType,
-        relativePath: nextRelativePath,
-        children,
-      });
-    }
-
-    const fileEntries = directoryEntries
-      .filter((entry) => entry.isFile() && hasPresetExtension(entry.name, spec.extension))
-      .sort((left, right) => compareEntryNames(left.name, right.name));
-
-    for (const entry of fileEntries) {
-      const nextRelativePath = [...relativePath, entry.name];
-      const filePath = resolvePresetPath(rootDirectory, nextRelativePath);
-      if (!filePath) {
-        continue;
-      }
-
-      const readResult = await this.readPresetFileByType(presetType, filePath);
-      if (readResult.status === 'error') {
-        continue;
-      }
-
-      entries.push({
-        kind: 'preset',
-        id: `preset:${presetType}:${nextRelativePath.join('/')}`,
-        presetType,
-        label: path.parse(entry.name).name,
-        relativePath: nextRelativePath,
-        savedAtIso: readResult.payload.savedAtIso,
-      });
-    }
-
-    return entries;
-  }
-
-  private async buildPresetBrowserRootNode(
-    presetType: PresetFileKind,
-  ): Promise<PresetBrowserTreeFolderNode> {
-    const rootDirectory = await this.resolvePresetDirectory(presetType);
-    return {
-      kind: 'folder',
-      id: `preset-root:${presetType}`,
-      label: PRESET_ROOT_SECTION_LABELS[presetType],
-      presetType,
-      relativePath: [],
-      children: await this.buildPresetBrowserTreeChildren(
-        presetType,
-        rootDirectory,
-        [],
-      ),
-    };
-  }
+  private readonly browserTreeBuilder = new PresetBrowserTreeBuilder(this.storage);
 
   public async savePresetFile(
     request: unknown,
@@ -429,41 +53,22 @@ export class PresetService {
     }
 
     try {
-      const presetType = parsedRequest.payload.presetType;
-      const spec = PRESET_FILE_SPECS[presetType];
-      const baseDirectory = await this.resolvePresetDirectory(presetType);
-      const directory = resolvePresetSaveDirectory(baseDirectory, parsedRequest);
-      await mkdir(directory, { recursive: true });
-      const suggestedFileName = `${sanitizeFileStem(
-        parsedRequest.suggestedName,
-        spec.defaultName,
-      )}${spec.extension}`;
-      const dialogOptions: SaveDialogOptions = {
-        ...resolveDialogOptions(
-          presetType,
-          path.join(directory, suggestedFileName),
-        ),
-        buttonLabel: 'Save',
-        properties: ['createDirectory'],
-        title: `Save ${spec.defaultName}`,
-      };
-
-      const result = parentWindow
-        ? await dialog.showSaveDialog(parentWindow, dialogOptions)
-        : await dialog.showSaveDialog(dialogOptions);
-      if (result.canceled || !result.filePath) {
+      const baseDirectory = await this.storage.resolvePresetDirectory(
+        parsedRequest.payload.presetType,
+      );
+      const dialogResult = await this.dialogs.showSavePresetFileDialog(
+        parsedRequest,
+        baseDirectory,
+        parentWindow,
+      );
+      if (dialogResult.status === 'canceled') {
         return { status: 'canceled' };
       }
 
-      const filePath = ensurePresetExtension(result.filePath, spec.extension);
-      await writeFile(
-        filePath,
-        `${JSON.stringify(parsedRequest.payload, null, 2)}\n`,
-        'utf8',
-      );
+      await this.storage.writePresetFile(dialogResult.filePath, parsedRequest.payload);
       return {
         status: 'saved',
-        filePath,
+        filePath: dialogResult.filePath,
       };
     } catch (error) {
       return {
@@ -486,24 +91,20 @@ export class PresetService {
     }
 
     try {
-      const spec = PRESET_FILE_SPECS[parsedRequest.presetType];
-      const directory = await this.resolvePresetDirectory(parsedRequest.presetType);
-      const dialogOptions: OpenDialogOptions = {
-        ...resolveDialogOptions(parsedRequest.presetType, directory),
-        buttonLabel: 'Open',
-        properties: ['openFile'],
-        title: `Open ${spec.defaultName}`,
-      };
-
-      const result = parentWindow
-        ? await dialog.showOpenDialog(parentWindow, dialogOptions)
-        : await dialog.showOpenDialog(dialogOptions);
-      const filePath = result.filePaths[0] ?? '';
-      if (result.canceled || !filePath) {
+      const directory = await this.storage.resolvePresetDirectory(parsedRequest.presetType);
+      const dialogResult = await this.dialogs.showOpenPresetFileDialog(
+        parsedRequest,
+        directory,
+        parentWindow,
+      );
+      if (dialogResult.status === 'canceled') {
         return { status: 'canceled' };
       }
 
-      const readResult = await this.readPresetFileByType(parsedRequest.presetType, filePath);
+      const readResult = await this.storage.readPresetFileByType(
+        parsedRequest.presetType,
+        dialogResult.filePath,
+      );
       if (readResult.status === 'error') {
         return readResult;
       }
@@ -526,13 +127,7 @@ export class PresetService {
     try {
       return {
         status: 'ok',
-        tree: (
-          await Promise.all(
-            (['device', 'group', 'rack'] as const).map((presetType) =>
-              this.buildPresetBrowserRootNode(presetType)
-            ),
-          )
-        ).filter((node) => node.children.length > 0),
+        tree: await this.browserTreeBuilder.listTree(),
       };
     } catch (error) {
       return {
@@ -553,7 +148,7 @@ export class PresetService {
       };
     }
 
-    const rootDirectory = await this.resolvePresetDirectory(parsedRequest.presetType);
+    const rootDirectory = await this.storage.resolvePresetDirectory(parsedRequest.presetType);
     const filePath = resolvePresetPath(rootDirectory, parsedRequest.relativePath);
     if (!filePath) {
       return {
@@ -570,13 +165,13 @@ export class PresetService {
       };
     }
 
-    return this.readPresetFileByType(parsedRequest.presetType, filePath);
+    return this.storage.readPresetFileByType(parsedRequest.presetType, filePath);
   }
 
   public async showPresetEntryInFolder(
     request: unknown,
   ): Promise<ShowPresetEntryInFolderResponse> {
-    const parsedRequest = parseShowPresetEntryInFolderRequest(request);
+    const parsedRequest = parsePresetEntryRequest(request);
     if (!parsedRequest) {
       return {
         status: 'error',
@@ -585,7 +180,7 @@ export class PresetService {
     }
 
     try {
-      const rootDirectory = await this.resolvePresetDirectory(parsedRequest.presetType);
+      const rootDirectory = await this.storage.resolvePresetDirectory(parsedRequest.presetType);
       const filePath = resolvePresetPath(rootDirectory, parsedRequest.relativePath);
       if (!filePath) {
         return {
@@ -604,7 +199,7 @@ export class PresetService {
         };
       }
 
-      await access(filePath);
+      await this.storage.ensureAccessible(filePath);
       if (parsedRequest.entryKind === 'directory') {
         const openError = await shell.openPath(filePath);
         if (openError) {
@@ -628,7 +223,7 @@ export class PresetService {
 
   public async showPresetsRootInFolder(): Promise<ShowPresetsRootInFolderResponse> {
     try {
-      const directory = await this.resolvePresetsRootDirectory();
+      const directory = await this.storage.resolvePresetsRootDirectory();
       const openError = await shell.openPath(directory);
       if (openError) {
         return {
@@ -649,7 +244,7 @@ export class PresetService {
   public async deletePresetEntry(
     request: unknown,
   ): Promise<DeletePresetEntryResponse> {
-    const parsedRequest = parseShowPresetEntryInFolderRequest(request);
+    const parsedRequest = parsePresetEntryRequest(request);
     if (!parsedRequest) {
       return {
         status: 'error',
@@ -658,7 +253,7 @@ export class PresetService {
     }
 
     try {
-      const rootDirectory = await this.resolvePresetDirectory(parsedRequest.presetType);
+      const rootDirectory = await this.storage.resolvePresetDirectory(parsedRequest.presetType);
       const filePath = resolvePresetPath(rootDirectory, parsedRequest.relativePath);
       if (!filePath) {
         return {
@@ -677,7 +272,7 @@ export class PresetService {
         };
       }
 
-      await access(filePath);
+      await this.storage.ensureAccessible(filePath);
       await shell.trashItem(filePath);
       return { status: 'ok' };
     } catch (error) {
