@@ -84,6 +84,7 @@ export class PlaybackSessionController {
     this.playbackScheduler?.teardown();
     this.playbackScheduler = null;
     this.previewWindowStatePusher.reset();
+    this.options.previewSession.commands.resetCaches();
   }
 
   public renderPreviewFrame(): void {

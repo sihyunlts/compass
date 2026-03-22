@@ -37,7 +37,10 @@ interface PreviewResultInput {
 class PreviewResultCache {
   private readonly resultsByKey = new SvelteMap<string, PreviewResultCacheEntry>();
 
+  private lastRendererSourceRevisionKey: string | null = null;
+
   public resolve(input: PreviewResultInput): PreviewResultCacheEntry {
+    this.evictStaleRendererRevision(input.sourceKey);
     const key = this.toPreviewResultKey(
       input.sourceKey,
       input.loopLengthBeats,
@@ -85,6 +88,11 @@ class PreviewResultCache {
       throw new Error(`Missing preview result cache for ${key}`);
     }
     return previewResult;
+  }
+
+  public reset(): void {
+    this.resultsByKey.clear();
+    this.lastRendererSourceRevisionKey = null;
   }
 
   public resolveActiveVelocityByPitchAtBeat(
@@ -137,6 +145,29 @@ class PreviewResultCache {
     launchpadModel: LaunchpadModel,
   ): string {
     return `${sourceKey}:${loopLengthBeats}:${launchpadModel}`;
+  }
+
+  private evictStaleRendererRevision(sourceKey: string): void {
+    if (!sourceKey.startsWith('chain:')) {
+      return;
+    }
+
+    if (this.lastRendererSourceRevisionKey === sourceKey) {
+      return;
+    }
+
+    const stalePrefix = this.lastRendererSourceRevisionKey
+      ? `${this.lastRendererSourceRevisionKey}:`
+      : null;
+    if (stalePrefix) {
+      for (const key of this.resultsByKey.keys()) {
+        if (key.startsWith(stalePrefix)) {
+          this.resultsByKey.delete(key);
+        }
+      }
+    }
+
+    this.lastRendererSourceRevisionKey = sourceKey;
   }
 }
 

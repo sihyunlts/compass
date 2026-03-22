@@ -75,6 +75,8 @@ const touchesOverlayFrameCacheBoundary = (
 class OverlayFrameCache {
   private readonly overlayFramesByKey = new SvelteMap<string, OverlayCacheEntry>();
 
+  private lastRendererSourceRevisionKey: string | null = null;
+
   public resolve(
     sourceKey: string,
     chain: GeneratorChain,
@@ -82,6 +84,7 @@ class OverlayFrameCache {
     loopLengthBeats: number,
     colorGuideWarpByOriginId?: ReadonlyMap<string, ColorGuideWarp>,
   ): OverlayCacheEntry {
+    this.evictStaleRendererRevision(sourceKey);
     const key = `${sourceKey}:${launchpadModel}:${loopLengthBeats}`;
     const cached = this.overlayFramesByKey.get(key);
     if (cached) {
@@ -125,6 +128,11 @@ class OverlayFrameCache {
     return entry;
   }
 
+  public reset(): void {
+    this.overlayFramesByKey.clear();
+    this.lastRendererSourceRevisionKey = null;
+  }
+
   private buildOverlayFrames(
     chain: GeneratorChain,
     bounds: OverlayWorldBounds,
@@ -141,6 +149,29 @@ class OverlayFrameCache {
       loopLengthBeats,
       colorGuideWarpByOriginId,
     });
+  }
+
+  private evictStaleRendererRevision(sourceKey: string): void {
+    if (!sourceKey.startsWith('chain:')) {
+      return;
+    }
+
+    if (this.lastRendererSourceRevisionKey === sourceKey) {
+      return;
+    }
+
+    const stalePrefix = this.lastRendererSourceRevisionKey
+      ? `${this.lastRendererSourceRevisionKey}:`
+      : null;
+    if (stalePrefix) {
+      for (const key of this.overlayFramesByKey.keys()) {
+        if (key.startsWith(stalePrefix)) {
+          this.overlayFramesByKey.delete(key);
+        }
+      }
+    }
+
+    this.lastRendererSourceRevisionKey = sourceKey;
   }
 }
 

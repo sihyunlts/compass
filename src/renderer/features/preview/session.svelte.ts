@@ -95,6 +95,9 @@ export class PreviewSession {
     clearAppliedPreview: (): void => {
       this.resetAppliedPreview();
     },
+    resetCaches: (): void => {
+      this.resetCaches();
+    },
   };
 
   private applyPreviewResult(input: PreviewApplyInput): void {
@@ -190,6 +193,12 @@ export class PreviewSession {
     this.state.sourceTimelineEndBeat = 1;
     this.state.noteCount = 0;
     this.state.uniquePitchCount = 0;
+  }
+
+  private resetCaches(): void {
+    this.previewResultCache.reset();
+    this.overlayFrameCache.reset();
+    this.modulationReadoutCache.reset();
   }
 
   private syncPreviewMetrics(

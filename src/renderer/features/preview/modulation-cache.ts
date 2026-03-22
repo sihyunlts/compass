@@ -21,6 +21,8 @@ interface ModulationCacheEntry {
 class ModulationReadoutCache {
   private readonly modulationCacheByKey = new SvelteMap<string, ModulationCacheEntry>();
 
+  private lastRendererSourceRevisionKey: string | null = null;
+
   public resolveReadoutById(
     sourceKey: string,
     chain: GeneratorChain,
@@ -61,6 +63,7 @@ class ModulationReadoutCache {
     sourceKey: string,
     chain: GeneratorChain,
   ): ModulationCacheEntry {
+    this.evictStaleRendererRevision(sourceKey);
     const cached = this.modulationCacheByKey.get(sourceKey);
     if (cached) {
       return cached;
@@ -82,6 +85,27 @@ class ModulationReadoutCache {
     };
     this.modulationCacheByKey.set(sourceKey, entry);
     return entry;
+  }
+
+  public reset(): void {
+    this.modulationCacheByKey.clear();
+    this.lastRendererSourceRevisionKey = null;
+  }
+
+  private evictStaleRendererRevision(sourceKey: string): void {
+    if (!sourceKey.startsWith('chain:')) {
+      return;
+    }
+
+    if (this.lastRendererSourceRevisionKey === sourceKey) {
+      return;
+    }
+
+    if (this.lastRendererSourceRevisionKey) {
+      this.modulationCacheByKey.delete(this.lastRendererSourceRevisionKey);
+    }
+
+    this.lastRendererSourceRevisionKey = sourceKey;
   }
 }
 
