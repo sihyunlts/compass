@@ -1,5 +1,6 @@
 export {
   createRendererDeviceNode,
+  getRendererDeviceControlDefinition,
   getRendererDeviceGroup,
   getRendererDeviceLabel,
   getRendererModulationTargetParamDefinitions,
@@ -7,4 +8,4 @@ export {
   isRendererDeviceKind,
   RENDERER_DEVICE_GROUPS,
   RENDERER_DEVICE_KINDS,
-} from './index';
+} from './registry-core';
