@@ -51,6 +51,8 @@
   const HISTORY_MAX_ENTRIES = 100;
   const DEFAULT_LED_RGB = '255 166 57';
   const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, select, textarea, option';
+  const SETTINGS_BUTTON_ID = 'settings-button';
+  const SETTINGS_CLOSE_BUTTON_ID = 'settings-close';
 
   const toDeviceLeafNode = (
     kind: RendererDeviceKind,
@@ -152,6 +154,9 @@
     clientWidth: 1,
   });
   let rackMiniMapContentRevision = $state(0);
+  let previouslyFocusedSettingsElement: HTMLElement | null = null;
+  let settingsWasOpen = false;
+  let settingsFocusToken = 0;
 
   const createRackBinding = (): EditorRackBinding | null => {
     if (!rackViewApi) {
@@ -206,6 +211,18 @@
     void presetController.loadTree();
   });
 
+  $effect(() => {
+    if (uiState.isSettingsOpen && !settingsWasOpen) {
+      void focusSettingsCloseButton();
+    }
+
+    if (!uiState.isSettingsOpen && settingsWasOpen) {
+      void restoreSettingsFocus();
+    }
+
+    settingsWasOpen = uiState.isSettingsOpen;
+  });
+
   const handleUndoClick = (): void => {
     closeContextMenu();
     editorSession.commands.undo();
@@ -214,6 +231,54 @@
   const handleRedoClick = (): void => {
     closeContextMenu();
     editorSession.commands.redo();
+  };
+
+  const getSettingsButton = (): HTMLButtonElement | null => {
+    const element = document.getElementById(SETTINGS_BUTTON_ID);
+    return element instanceof HTMLButtonElement ? element : null;
+  };
+
+  const getSettingsCloseButton = (): HTMLButtonElement | null => {
+    const element = document.getElementById(SETTINGS_CLOSE_BUTTON_ID);
+    return element instanceof HTMLButtonElement ? element : null;
+  };
+
+  const focusSettingsCloseButton = async (): Promise<void> => {
+    const focusToken = ++settingsFocusToken;
+    await tick();
+    if (!uiState.isSettingsOpen || focusToken !== settingsFocusToken) {
+      return;
+    }
+
+    getSettingsCloseButton()?.focus();
+  };
+
+  const restoreSettingsFocus = async (): Promise<void> => {
+    const focusToken = ++settingsFocusToken;
+    await tick();
+    if (uiState.isSettingsOpen || focusToken !== settingsFocusToken) {
+      return;
+    }
+
+    if (previouslyFocusedSettingsElement?.isConnected) {
+      previouslyFocusedSettingsElement.focus();
+      previouslyFocusedSettingsElement = null;
+      return;
+    }
+
+    previouslyFocusedSettingsElement = null;
+    getSettingsButton()?.focus();
+  };
+
+  const openSettings = (): void => {
+    previouslyFocusedSettingsElement = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    uiState.isSettingsOpen = true;
+  };
+
+  const closeSettings = (): void => {
+    uiState.isSettingsOpen = false;
   };
 
   const handleRackScrollMetricsChange = (metrics: RackScrollMetrics): void => {
@@ -382,9 +447,7 @@
           <Button
             id="settings-button"
             text="Settings"
-            onClick={() => {
-              uiState.isSettingsOpen = true;
-            }}
+            onClick={openSettings}
           />
           <Button
             id="send-button"
@@ -446,16 +509,13 @@
   <section
     id="settings-screen"
     class="settings-screen"
-    aria-hidden={uiState.isSettingsOpen ? 'false' : 'true'}
     hidden={!uiState.isSettingsOpen}
   >
     <header class="settings-screen-head">
       <Button
         id="settings-close"
         text="Close"
-        onClick={() => {
-          uiState.isSettingsOpen = false;
-        }}
+        onClick={closeSettings}
       />
     </header>
 
