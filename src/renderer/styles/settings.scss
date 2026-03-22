@@ -62,10 +62,8 @@
   background: var(--neutral-10);
   border: 1px solid var(--neutral-20);
   border-radius: var(--radius-8);
-  padding: var(--gap-24);
   display: flex;
   flex-direction: column;
-  gap: var(--gap-24);
 }
 
 .settings-row {
@@ -73,7 +71,6 @@
   align-items: center;
   justify-content: space-between;
   padding: var(--gap-12) var(--gap-12);
-  gap: var(--gap-24);
 
   .info {
     display: flex;

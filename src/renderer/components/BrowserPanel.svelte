@@ -578,6 +578,6 @@
   }
 
   .browser-status-error {
-    color: var(--accent-300);
+    color: var(--accent-500);
   }
 </style>
