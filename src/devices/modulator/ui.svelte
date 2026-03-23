@@ -32,70 +32,78 @@
     selectedTargetDevice
       ? getRendererModulationTargetParamDefinitions(selectedTargetDevice.kind)
       : []);
-  const modulationReadoutText = $derived(
-    modulationReadoutById[device.id] ?? 'No active modulation value',
-  );
+  const modulationReadoutText = $derived.by(() => {
+    const rawText = modulationReadoutById[device.id] ?? 'No active modulation value';
+    const separatorIndex = rawText.indexOf('|');
+    return separatorIndex >= 0 ? rawText.slice(separatorIndex + 1).trim() : rawText;
+  });
 </script>
 
-<div class="device-controls">
-  <div class="modulation-control-grid">
-    <div class="control-field">
-      <span class="field-label">Target Device</span>
-      <select data-action="set-modulation-target-device" data-id={device.id}>
-        <option value="" selected={!device.params.target?.deviceId}>None</option>
-        {#each targetableDevices as targetDevice (targetDevice.id)}
-          <option
-            value={targetDevice.id}
-            selected={device.params.target?.deviceId === targetDevice.id}
-          >
-            {deviceDisplayNameById[targetDevice.id] ?? getRendererDeviceLabel(targetDevice.kind)}
-          </option>
-        {/each}
-      </select>
-    </div>
-    <div class="control-field">
-      <span class="field-label">Target Parameter</span>
-      <select
-        data-action="set-modulation-target-param"
-        data-id={device.id}
-        disabled={!selectedTargetDevice}
-      >
-        <option value="" selected={!device.params.target?.paramKey}>None</option>
-        {#each targetParamOptions as option (option.key)}
-          <option
-            value={option.key}
-            selected={device.params.target?.paramKey === option.key}
-          >
-            {option.label}
-          </option>
-        {/each}
-      </select>
-    </div>
-    <div class="control-field">
-      <span class="field-label">Amount</span>
-      <input
-        type="number"
-        step="0.1"
-        value={device.params.amount}
-        data-action="set-modulation-amount"
-        data-id={device.id}
-      />
-    </div>
-    <div class="control-field">
-      <span class="field-label">Divisions</span>
-      <select data-action="set-modulation-divisions" data-id={device.id}>
-        {#each [4, 8, 16, 32, 64] as divisions (divisions)}
-          <option value={divisions} selected={device.params.curve.divisions === divisions}>
-            {divisions}
-          </option>
-        {/each}
-      </select>
+<div class="device-controls modulation-layout">
+  <div class="modulation-sidebar">
+    <div class="modulation-control-grid">
+      <div class="control-field">
+        <span class="field-label">Target Device</span>
+        <select data-action="set-modulation-target-device" data-id={device.id}>
+          <option value="" selected={!device.params.target?.deviceId}>None</option>
+          {#each targetableDevices as targetDevice (targetDevice.id)}
+            <option
+              value={targetDevice.id}
+              selected={device.params.target?.deviceId === targetDevice.id}
+            >
+              {deviceDisplayNameById[targetDevice.id] ?? getRendererDeviceLabel(targetDevice.kind)}
+            </option>
+          {/each}
+        </select>
+      </div>
+      <div class="control-field modulation-control-field-wide">
+        <span class="field-label">Target Parameter</span>
+        <select
+          data-action="set-modulation-target-param"
+          data-id={device.id}
+          disabled={!selectedTargetDevice}
+        >
+          <option value="" selected={!device.params.target?.paramKey}>None</option>
+          {#each targetParamOptions as option (option.key)}
+            <option
+              value={option.key}
+              selected={device.params.target?.paramKey === option.key}
+            >
+              {option.label}
+            </option>
+          {/each}
+        </select>
+      </div>
+      <div class="modulation-compact-row">
+        <div class="control-field">
+          <span class="field-label">Amount</span>
+          <input
+            type="number"
+            step="0.1"
+            value={device.params.amount}
+            data-action="set-modulation-amount"
+            data-id={device.id}
+          />
+        </div>
+        <div class="control-field">
+          <span class="field-label">Divisions</span>
+          <select data-action="set-modulation-divisions" data-id={device.id}>
+            {#each [4, 8, 16, 32, 64] as divisions (divisions)}
+              <option value={divisions} selected={device.params.curve.divisions === divisions}>
+                {divisions}
+              </option>
+            {/each}
+          </select>
+        </div>
+      </div>
     </div>
   </div>
-  <CurveEditor
-    deviceId={device.id}
-    curve={device.params.curve}
-    currentBeat={currentBeat}
-  />
-  <span class="modulation-readout">{modulationReadoutText}</span>
+  <div class="modulation-main">
+    <span class="modulation-readout">{modulationReadoutText}</span>
+    <CurveEditor
+      deviceId={device.id}
+      curve={device.params.curve}
+      currentBeat={currentBeat}
+    />
+  </div>
 </div>

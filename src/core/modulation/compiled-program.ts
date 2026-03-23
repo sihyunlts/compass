@@ -1,12 +1,16 @@
 import { doesDeviceToggleTimelineParity } from '../../devices/engine';
 import { readNumericDeviceParam, writeNumericDeviceParam } from '../../devices/modulation';
-import type { CurveNode, GeneratorChain, GeneratorDeviceNode } from '../../shared/model';
+import type { GeneratorChain, GeneratorDeviceNode, ModulationCurve } from '../../shared/model';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
-import { clamp } from '../../shared/math';
-import { toLoopProgress01 } from './curve';
+import {
+  buildCurveSegments,
+  evaluateCurveSegments,
+  toLoopProgress01,
+  type CurveSegment,
+} from './curve';
 import { collectValidatedModulationRoutes } from './routing';
 
-type CompiledModulationCurve = { nodes: ReadonlyArray<CurveNode> };
+type CompiledModulationCurve = { segments: ReadonlyArray<CurveSegment> };
 
 interface CompiledModulationRoute {
   modulatorId: string;
@@ -76,8 +80,8 @@ const reverseLoopProgress01 = (t01: number): number => {
   return 1 - t01;
 };
 
-const toCompiledCurve = (nodes: ReadonlyArray<CurveNode>): CompiledModulationCurve => ({
-  nodes: nodes.map((node) => ({ ...node })),
+const toCompiledCurve = (curve: ModulationCurve): CompiledModulationCurve => ({
+  segments: buildCurveSegments(curve.nodes),
 });
 
 export const compileModulationProgram = (
@@ -99,7 +103,7 @@ export const compileModulationProgram = (
       targetParamKey: route.targetParamKey,
       amount: route.modulator.params.amount,
       baseValue,
-      curve: toCompiledCurve(route.modulator.params.curve.nodes),
+      curve: toCompiledCurve(route.modulator.params.curve),
       isTimelineReversed: reversedTimelineByDeviceId.get(route.targetDevice.id) === true,
     });
   }
@@ -107,39 +111,6 @@ export const compileModulationProgram = (
   return {
     routes: compiled,
   };
-};
-
-const evaluateCompiledCurveLinear = (
-  curve: CompiledModulationCurve,
-  t01: number,
-): number => {
-  const nodes = curve.nodes;
-  if (nodes.length === 0) {
-    return 0;
-  }
-
-  const t = clamp(Number.isFinite(t01) ? t01 : 0, 0, 1);
-  if (t <= nodes[0].t) {
-    return nodes[0].v;
-  }
-
-  const last = nodes[nodes.length - 1];
-  if (t >= last.t) {
-    return last.v;
-  }
-
-  for (let index = 1; index < nodes.length; index += 1) {
-    const right = nodes[index];
-    if (t > right.t) {
-      continue;
-    }
-    const left = nodes[index - 1];
-    const span = Math.max(right.t - left.t, 1e-9);
-    const ratio = (t - left.t) / span;
-    return left.v + (right.v - left.v) * ratio;
-  }
-
-  return last.v;
 };
 
 export const evaluateModulationProgramReadouts = (
@@ -161,7 +132,7 @@ export const evaluateModulationProgramReadouts = (
     const timelineT = route.isTimelineReversed
       ? reverseLoopProgress01(baseTimelineT)
       : baseTimelineT;
-    const curveValue = evaluateCompiledCurveLinear(route.curve, timelineT);
+    const curveValue = evaluateCurveSegments(route.curve.segments, timelineT);
     const modulatedValue = route.baseValue + curveValue * route.amount;
 
     readouts.push({
@@ -207,7 +178,7 @@ export const applyModulationProgramToChain = (
     const timelineT = route.isTimelineReversed
       ? reverseLoopProgress01(baseTimelineT)
       : baseTimelineT;
-    const curveValue = evaluateCompiledCurveLinear(route.curve, timelineT);
+    const curveValue = evaluateCurveSegments(route.curve.segments, timelineT);
     const modulatedValue = route.baseValue + curveValue * route.amount;
     writeNumericDeviceParam(targetDevice, route.targetParamKey, modulatedValue);
   }

@@ -3,7 +3,16 @@ import type { GeneratorDeviceNode, ModulationCurve } from './chain';
 const cloneCurve = (curve: ModulationCurve): ModulationCurve => ({
   domain: curve.domain,
   divisions: curve.divisions,
-  nodes: curve.nodes.map((node) => ({ ...node })),
+  nodes: curve.nodes.map((node) => ({
+    id: node.id,
+    t: node.t,
+    v: node.v,
+    ...(typeof node.nextCurveBend === 'number'
+      ? {
+        nextCurveBend: node.nextCurveBend,
+      }
+      : {}),
+  })),
 });
 
 const assertUnsupportedDeviceKind = (device: never): never => {

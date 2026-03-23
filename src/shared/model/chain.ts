@@ -115,6 +115,7 @@ export interface CurveNode {
   id: string;
   t: number;
   v: number;
+  nextCurveBend?: number | null;
 }
 
 export interface ModulationCurve {

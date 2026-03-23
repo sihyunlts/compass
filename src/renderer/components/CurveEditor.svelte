@@ -3,11 +3,42 @@
 <script lang="ts">
   /**
    * Interactive modulation-curve editor used by modulator device cards.
-   * Owns node editing, snapping, and hidden-input synchronization for form events.
+   * Owns node editing, segment control editing, and hidden-input synchronization for form events.
    */
+  import {
+    buildCurveSegments,
+    canSegmentCurveBendAffectShape,
+    evaluateNormalizedCurveAt,
+    resolveSegmentCurvePoint,
+    sanitizeCurveNodes,
+    toSegmentCurveBend,
+    toSegmentCurvePoint,
+    type CurvePoint,
+  } from '../../core/modulation/curve';
   import { clamp } from '../../shared/math';
-  import Button from './Button.svelte';
   import type { CurveNode, ModulationCurve } from '../../shared/model';
+
+  type DragTarget =
+    | { kind: 'node'; nodeId: string }
+    | { kind: 'segment-control'; startNodeId: string }
+    | null;
+
+  type PlottedNode = {
+    id: string;
+    t: number;
+    v: number;
+    x: number;
+    y: number;
+  };
+
+  type PlottedSegmentControl = {
+    key: string;
+    startNodeId: string;
+    endNodeId: string;
+    x: number;
+    y: number;
+    isStub: boolean;
+  };
 
   let {
     deviceId,
@@ -19,80 +50,171 @@
     currentBeat?: number;
   }>();
 
-  let editorEl = $state<HTMLElement | null>(null);
+  let editorEl = $state<HTMLDivElement | null>(null);
   let hiddenInputEl = $state<HTMLInputElement | null>(null);
-  let pointerId = $state<number | null>(null);
   let selectedNodeId = $state<string | null>(null);
-  let draggingNodeId = $state<string | null>(null);
+  let dragTarget = $state<DragTarget>(null);
+  let activePointerNodeId = $state<string | null>(null);
+  let isDragging = $state(false);
+  let pointerDownClientX = $state(0);
+  let pointerDownClientY = $state(0);
+  let pointerDidMove = $state(false);
+  let lastClickedNodeId = $state<string | null>(null);
+  let lastClickedAt = $state(0);
   let localNodes = $state<CurveNode[]>([]);
+  let isKeyboardDeleteEnabled = $state(false);
+
+  const NODE_DOUBLE_CLICK_WINDOW_MS = 300;
+  const NODE_CLICK_MOVE_THRESHOLD_PX = 4;
+  const CURVE_SOFT_SNAP_DISTANCE_PX = 10;
+
+  const roundCurveNumber = (value: number): number =>
+    Number(value.toFixed(6));
+
+  const smoothstep = (value: number): number => {
+    const clamped = clamp(value, 0, 1);
+    return clamped * clamped * (3 - 2 * clamped);
+  };
+
+  const toResponsiveCurveValue = (
+    startNode: CurveNode,
+    endNode: CurveNode,
+    value: number,
+  ): number => {
+    const lowPoint = toSegmentCurvePoint(startNode, endNode, -1);
+    const highPoint = toSegmentCurvePoint(startNode, endNode, 1);
+    const minValue = Math.min(lowPoint.v, highPoint.v);
+    const maxValue = Math.max(lowPoint.v, highPoint.v);
+    const span = maxValue - minValue;
+    if (span <= 0.000001) {
+      return roundCurveNumber(clamp(value, minValue, maxValue));
+    }
+
+    const normalized = clamp((value - minValue) / span, 0, 1);
+    const eased = smoothstep(smoothstep(normalized));
+    return roundCurveNumber(minValue + span * eased);
+  };
 
   const divisions = $derived(Math.max(2, Math.round(curve.divisions)));
   const clampedBeat = $derived(clamp(Number.isFinite(currentBeat) ? currentBeat : 0, 0, 1));
   const sortedNodes = $derived.by(() =>
     [...localNodes].sort((a, b) => a.t - b.t || a.id.localeCompare(b.id)));
-  const selectedNode = $derived.by(() =>
-    sortedNodes.find((node) => node.id === selectedNodeId) ?? null);
-  const plottedNodes = $derived.by(() => sortedNodes.map((node) => ({
+  const curveSegments = $derived.by(() => buildCurveSegments(sortedNodes));
+
+  const toPlotY = (value: number): number =>
+    (1 - ((value + 1) * 0.5)) * 100;
+
+  const toPlotPoint = (point: CurvePoint): { x: number; y: number } => ({
+    x: point.t * 100,
+    y: toPlotY(point.v),
+  });
+
+  const plottedNodes = $derived.by<PlottedNode[]>(() => sortedNodes.map((node) => ({
     id: node.id,
     t: node.t,
     v: node.v,
     x: node.t * 100,
-    y: (1 - ((node.v + 1) * 0.5)) * 100,
+    y: toPlotY(node.v),
   })));
-  const curveLinePoints = $derived.by(() =>
-    plottedNodes.map((node) => `${node.x},${node.y}`).join(' '));
-  const curveFillPoints = $derived.by(() => {
-    if (plottedNodes.length < 2) {
+
+  const plottedSegmentControls = $derived.by<PlottedSegmentControl[]>(() =>
+    sortedNodes.slice(0, -1).flatMap((node, index) => {
+      const nextNode = sortedNodes[index + 1];
+      if (!nextNode || !canSegmentCurveBendAffectShape(node, nextNode)) {
+        return [];
+      }
+
+      const resolved = resolveSegmentCurvePoint(sortedNodes, index);
+      const point = resolved.point ?? {
+        t: (node.t + nextNode.t) * 0.5,
+        v: (node.v + nextNode.v) * 0.5,
+      };
+      return [{
+        key: `${node.id}:${nextNode.id}`,
+        startNodeId: node.id,
+        endNodeId: nextNode.id,
+        ...toPlotPoint(point),
+        isStub: resolved.isStub,
+      }];
+    }));
+
+  const SAMPLE_STEPS_PER_SEGMENT = 24;
+
+  const curveLinePath = $derived.by(() => {
+    const firstNode = plottedNodes[0];
+    if (!firstNode) {
       return '';
     }
-    const first = plottedNodes[0];
-    const last = plottedNodes[plottedNodes.length - 1];
-    const body = plottedNodes.map((node) => `${node.x},${node.y}`).join(' ');
-    return `${body} ${last.x},100 ${first.x},100`;
+
+    let path = `M ${firstNode.x} ${firstNode.y}`;
+    for (let index = 0; index < curveSegments.length; index += 1) {
+      const segment = curveSegments[index];
+      const spanT = segment.end.t - segment.start.t;
+      for (let step = 1; step <= SAMPLE_STEPS_PER_SEGMENT; step += 1) {
+        const progress = step / SAMPLE_STEPS_PER_SEGMENT;
+        const curveProgress = evaluateNormalizedCurveAt(progress, segment.bend);
+        const point = toPlotPoint({
+          t: segment.start.t + spanT * progress,
+          v: segment.start.v + (segment.end.v - segment.start.v) * curveProgress,
+        });
+        path += ` L ${point.x} ${point.y}`;
+      }
+    }
+    return path;
+  });
+
+  const curveFillPath = $derived.by(() => {
+    const firstNode = plottedNodes[0];
+    const lastNode = plottedNodes[plottedNodes.length - 1];
+    if (!firstNode || !lastNode || !curveLinePath) {
+      return '';
+    }
+
+    return `${curveLinePath} L ${lastNode.x} 100 L ${firstNode.x} 100 Z`;
   });
 
   const createNodeId = (): string =>
     `curve-node-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
 
-  const sanitizeNodes = (source: ReadonlyArray<CurveNode>): CurveNode[] => {
-    const normalized: CurveNode[] = [];
-    for (const raw of source) {
-      const t = clamp(Number(raw.t), 0, 1);
-      const v = clamp(Number(raw.v), -1, 1);
-      if (!Number.isFinite(t) || !Number.isFinite(v)) {
-        continue;
+  const toSoftSnappedRatio = (
+    value: number,
+    snapPoints: ReadonlyArray<number>,
+    spanPx: number,
+  ): number => {
+    if (snapPoints.length === 0 || spanPx <= 0) {
+      return value;
+    }
+
+    const threshold = CURVE_SOFT_SNAP_DISTANCE_PX / spanPx;
+    let nearest = value;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const snapPoint of snapPoints) {
+      const distance = Math.abs(value - snapPoint);
+      if (distance < nearestDistance) {
+        nearest = snapPoint;
+        nearestDistance = distance;
       }
-
-      normalized.push({
-        id: raw.id,
-        t: Number(t.toFixed(6)),
-        v: Number(v.toFixed(6)),
-      });
     }
 
-    const seenTimes: string[] = [];
-    const nodes: CurveNode[] = [];
-    for (const node of normalized.sort((a, b) => a.t - b.t)) {
-      const key = node.t.toFixed(6);
-      if (seenTimes.includes(key)) {
-        continue;
-      }
-      seenTimes.push(key);
-      nodes.push(node);
-    }
-
-    if (nodes.length >= 2) {
-      return nodes;
-    }
-
-    return [
-      { id: 'curve-node-start', t: 0, v: 0 },
-      { id: 'curve-node-end', t: 1, v: 0 },
-    ];
+    return nearestDistance <= threshold ? nearest : value;
   };
 
+  const isEndpointNode = (nodeId: string | null): boolean => {
+    if (nodeId === null || sortedNodes.length < 2) {
+      return false;
+    }
+
+    return nodeId === sortedNodes[0]?.id || nodeId === sortedNodes[sortedNodes.length - 1]?.id;
+  };
+
+  const canDeleteNode = (nodeId: string | null): boolean =>
+    nodeId !== null
+    && sortedNodes.length > 2
+    && !isEndpointNode(nodeId)
+    && sortedNodes.some((node) => node.id === nodeId);
+
   const emitNodes = (nodes: CurveNode[]): void => {
-    localNodes = sanitizeNodes(nodes);
+    localNodes = sanitizeCurveNodes(nodes);
     if (!hiddenInputEl) {
       return;
     }
@@ -101,7 +223,14 @@
     hiddenInputEl.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
-  const resolvePoint = (clientX: number, clientY: number): { t: number; v: number } | null => {
+  const resolvePoint = (
+    clientX: number,
+    clientY: number,
+    options?: {
+      snapToDivisions?: boolean;
+      snapToCenterLine?: boolean;
+    },
+  ): { t: number; v: number } | null => {
     if (!editorEl) {
       return null;
     }
@@ -113,190 +242,340 @@
 
     const ratioX = clamp((clientX - rect.left) / rect.width, 0, 1);
     const ratioY = clamp((clientY - rect.top) / rect.height, 0, 1);
-    const snappedT = Math.round((ratioX * divisions)) / divisions;
-    const v = clamp(1 - ratioY * 2, -1, 1);
+    const divisionRatio = Math.round((ratioX * divisions)) / divisions;
+    const snappedRatioX = options?.snapToDivisions === false
+      ? ratioX
+      : toSoftSnappedRatio(ratioX, [divisionRatio], rect.width);
+    const snappedRatioY = options?.snapToCenterLine === false
+      ? ratioY
+      : toSoftSnappedRatio(ratioY, [0.5], rect.height);
+    const v = clamp(1 - snappedRatioY * 2, -1, 1);
 
     return {
-      t: Number(snappedT.toFixed(6)),
-      v: Number(v.toFixed(6)),
+      t: roundCurveNumber(snappedRatioX),
+      v: roundCurveNumber(v),
     };
   };
 
-  const resolveAvailableSnapT = (): number | null => {
-    const used = new Set(sortedNodes.map((node) => node.t.toFixed(6)));
-    const preferred = Math.round(divisions / 2);
-    const candidates: number[] = [];
-    for (let i = 0; i <= divisions; i += 1) {
-      candidates.push(i);
-    }
-    candidates.sort((a, b) => Math.abs(a - preferred) - Math.abs(b - preferred));
-
-    for (const index of candidates) {
-      const t = Number((index / divisions).toFixed(6));
-      if (!used.has(t.toFixed(6))) {
-        return t;
-      }
-    }
-
-    return null;
-  };
-
-  const handleAddNode = (): void => {
-    const t = resolveAvailableSnapT();
-    if (t === null) {
+  const insertNodeAtPoint = (point: { t: number; v: number }): void => {
+    const existingNode = sortedNodes.find((node) => node.t.toFixed(6) === point.t.toFixed(6));
+    if (existingNode) {
+      selectedNodeId = existingNode.id;
       return;
     }
 
     const nextNode: CurveNode = {
       id: createNodeId(),
-      t,
-      v: 0,
+      t: point.t,
+      v: point.v,
     };
     emitNodes([...sortedNodes, nextNode]);
     selectedNodeId = nextNode.id;
   };
 
-  const handleDeleteNode = (): void => {
-    if (!selectedNodeId || sortedNodes.length <= 2) {
+  const deleteNode = (nodeId: string | null = selectedNodeId): void => {
+    if (!canDeleteNode(nodeId)) {
       return;
     }
 
-    const next = sortedNodes.filter((node) => node.id !== selectedNodeId);
+    const next = sortedNodes.filter((node) => node.id !== nodeId);
     if (next.length < 2) {
       return;
     }
+
     emitNodes(next);
     selectedNodeId = next[0]?.id ?? null;
   };
 
-  const handleNodePointerDown = (event: PointerEvent, nodeId: string): void => {
-    if (!event.isPrimary || event.button !== 0) {
-      return;
-    }
-
-    pointerId = event.pointerId;
-    draggingNodeId = nodeId;
-    selectedNodeId = nodeId;
-    editorEl?.setPointerCapture(event.pointerId);
+  const beginDrag = (event: MouseEvent, nextTarget: DragTarget): void => {
+    isDragging = true;
+    dragTarget = nextTarget;
+    pointerDownClientX = event.clientX;
+    pointerDownClientY = event.clientY;
+    pointerDidMove = false;
     event.preventDefault();
   };
 
-  const updateDraggingNode = (clientX: number, clientY: number): void => {
-    if (!draggingNodeId) {
+  const handleNodeMouseDown = (event: MouseEvent, nodeId: string): void => {
+    if (event.button !== 0) {
       return;
     }
+
+    isKeyboardDeleteEnabled = true;
+    activePointerNodeId = nodeId;
+    selectedNodeId = nodeId;
+    beginDrag(event, { kind: 'node', nodeId });
+  };
+
+  const handleSegmentControlMouseDown = (event: MouseEvent, startNodeId: string): void => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    isKeyboardDeleteEnabled = true;
+    activePointerNodeId = null;
+    beginDrag(event, { kind: 'segment-control', startNodeId });
+  };
+
+  const markPointerMovedIfNeeded = (clientX: number, clientY: number): void => {
+    if (
+      !pointerDidMove
+      && (
+        Math.abs(clientX - pointerDownClientX) > NODE_CLICK_MOVE_THRESHOLD_PX
+        || Math.abs(clientY - pointerDownClientY) > NODE_CLICK_MOVE_THRESHOLD_PX
+      )
+    ) {
+      pointerDidMove = true;
+    }
+  };
+
+  const updateDraggingNode = (nodeId: string, clientX: number, clientY: number): void => {
+    markPointerMovedIfNeeded(clientX, clientY);
 
     const point = resolvePoint(clientX, clientY);
     if (!point) {
       return;
     }
 
-    const current = sortedNodes.find((node) => node.id === draggingNodeId);
-    if (!current) {
+    const currentIndex = sortedNodes.findIndex((node) => node.id === nodeId);
+    if (currentIndex === -1) {
       return;
     }
 
-    const occupied = new Set(
-      sortedNodes
-        .filter((node) => node.id !== draggingNodeId)
-        .map((node) => node.t.toFixed(6)),
-    );
-    const safeT = occupied.has(point.t.toFixed(6)) ? current.t : point.t;
-    const next = sortedNodes.map((node) => node.id === draggingNodeId
-      ? { ...node, t: safeT, v: point.v }
+    const current = sortedNodes[currentIndex];
+    const previousNode = sortedNodes[currentIndex - 1] ?? null;
+    const nextNode = sortedNodes[currentIndex + 1] ?? null;
+    const isEndpoint = previousNode === null || nextNode === null;
+    const nextT = isEndpoint
+      ? current.t
+      : roundCurveNumber(clamp(
+        point.t,
+        previousNode.t + 0.000001,
+        nextNode.t - 0.000001,
+      ));
+
+    const next = sortedNodes.map((node) => node.id === nodeId
+      ? { ...node, t: nextT, v: point.v }
       : node);
     emitNodes(next);
   };
 
+  const updateDraggingSegmentControl = (
+    startNodeId: string,
+    clientX: number,
+    clientY: number,
+  ): void => {
+    markPointerMovedIfNeeded(clientX, clientY);
+
+    const point = resolvePoint(clientX, clientY, { snapToDivisions: false });
+    if (!point) {
+      return;
+    }
+
+    const startIndex = sortedNodes.findIndex((node) => node.id === startNodeId);
+    if (startIndex === -1 || startIndex >= sortedNodes.length - 1) {
+      return;
+    }
+
+    const startNode = sortedNodes[startIndex];
+    const endNode = sortedNodes[startIndex + 1];
+    const nextCurveBend = toSegmentCurveBend(startNode, endNode, {
+      t: (startNode.t + endNode.t) * 0.5,
+      v: toResponsiveCurveValue(startNode, endNode, point.v),
+    });
+
+    const next = sortedNodes.map((node, index) => {
+      if (index !== startIndex) {
+        return node;
+      }
+
+      return {
+        id: node.id,
+        t: node.t,
+        v: node.v,
+        ...(Math.abs(nextCurveBend) > 0.0001 ? { nextCurveBend } : {}),
+      };
+    });
+    emitNodes(next);
+  };
+
   const clearPointerState = (): void => {
-    if (
-      editorEl
-      && pointerId !== null
-      && editorEl.hasPointerCapture(pointerId)
-    ) {
-      editorEl.releasePointerCapture(pointerId);
-    }
-    pointerId = null;
-    draggingNodeId = null;
+    isDragging = false;
+    dragTarget = null;
+    activePointerNodeId = null;
+    pointerDidMove = false;
   };
 
-  const handleEditorPointerMove = (event: PointerEvent): void => {
-    if (pointerId !== event.pointerId) {
+  const handleEditorDoubleClick = (event: MouseEvent): void => {
+    if (event.button !== 0) {
       return;
     }
-    updateDraggingNode(event.clientX, event.clientY);
-  };
 
-  const handleEditorPointerUp = (event: PointerEvent): void => {
-    if (pointerId !== event.pointerId) {
+    isKeyboardDeleteEnabled = true;
+    const target = event.target;
+    const interactiveHit = target instanceof Element
+      ? target.closest('[data-curve-node-id], [data-curve-segment-control-id]')
+      : null;
+    if (interactiveHit) {
       return;
     }
-    clearPointerState();
-  };
 
-  const handleEditorPointerCancel = (event: PointerEvent): void => {
-    if (pointerId !== event.pointerId) {
+    const point = resolvePoint(event.clientX, event.clientY);
+    if (!point) {
       return;
     }
-    clearPointerState();
+
+    insertNodeAtPoint(point);
   };
 
   $effect(() => {
-    if (draggingNodeId !== null) {
+    if (isDragging) {
       return;
     }
-    localNodes = sanitizeNodes(curve.nodes);
-    if (!selectedNodeId && localNodes.length > 0) {
-      selectedNodeId = localNodes[0].id;
+
+    const nextNodes = sanitizeCurveNodes(curve.nodes);
+    localNodes = nextNodes;
+    if (!nextNodes.some((node) => node.id === selectedNodeId)) {
+      selectedNodeId = nextNodes[0]?.id ?? null;
     }
+  });
+
+  $effect(() => {
+    const handlePointerMove = (event: MouseEvent): void => {
+      if (!isDragging || !dragTarget) {
+        return;
+      }
+
+      if (dragTarget.kind === 'node') {
+        updateDraggingNode(dragTarget.nodeId, event.clientX, event.clientY);
+        return;
+      }
+
+      updateDraggingSegmentControl(
+        dragTarget.startNodeId,
+        event.clientX,
+        event.clientY,
+      );
+    };
+
+    const handlePointerUp = (event: MouseEvent): void => {
+      if (!isDragging) {
+        return;
+      }
+
+      if (activePointerNodeId && !pointerDidMove) {
+        if (
+          lastClickedNodeId === activePointerNodeId
+          && event.timeStamp - lastClickedAt <= NODE_DOUBLE_CLICK_WINDOW_MS
+        ) {
+          deleteNode(activePointerNodeId);
+          lastClickedNodeId = null;
+          lastClickedAt = 0;
+        } else {
+          lastClickedNodeId = activePointerNodeId;
+          lastClickedAt = event.timeStamp;
+        }
+      } else if (pointerDidMove) {
+        lastClickedNodeId = null;
+        lastClickedAt = 0;
+      }
+
+      clearPointerState();
+    };
+
+    const handlePointerCancel = (): void => {
+      if (!isDragging) {
+        return;
+      }
+      clearPointerState();
+    };
+
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+    window.addEventListener('mouseleave', handlePointerCancel);
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handlePointerUp);
+      window.removeEventListener('mouseleave', handlePointerCancel);
+    };
+  });
+
+  $effect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (!isKeyboardDeleteEnabled || !canDeleteNode(selectedNodeId)) {
+        return;
+      }
+      if (event.defaultPrevented || (event.key !== 'Backspace' && event.key !== 'Delete')) {
+        return;
+      }
+
+      const target = event.target;
+      if (
+        target instanceof HTMLElement
+        && (
+          target.isContentEditable
+          || target.tagName === 'INPUT'
+          || target.tagName === 'SELECT'
+          || target.tagName === 'TEXTAREA'
+        )
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      deleteNode(selectedNodeId);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   });
 </script>
 
 <div class="curve-editor-wrap modulation-curve-control">
-  <div class="curve-editor-toolbar">
-    <Button text="Add Node" onClick={handleAddNode} />
-    <Button
-      text="Delete Selected Node"
-      disabled={!selectedNodeId || sortedNodes.length <= 2}
-      onClick={handleDeleteNode}
-    />
-    <span class="curve-editor-readout">
-      {#if selectedNode}
-        T {selectedNode.t.toFixed(3)} | V {selectedNode.v.toFixed(3)}
-      {:else}
-        No Node Selected
-      {/if}
-    </span>
-  </div>
-
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="curve-editor"
     bind:this={editorEl}
     style={`--curve-divisions:${divisions};`}
-    onpointermove={handleEditorPointerMove}
-    onpointerup={handleEditorPointerUp}
-    onpointercancel={handleEditorPointerCancel}
+    ondblclick={handleEditorDoubleClick}
   >
     <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-      {#if curveFillPoints}
-        <polygon class="curve-fill" points={curveFillPoints} />
+      {#if curveFillPath}
+        <path class="curve-fill" d={curveFillPath} />
       {/if}
-      {#if curveLinePoints}
-        <polyline class="curve-line-halo" points={curveLinePoints} />
-        <polyline class="curve-line" points={curveLinePoints} />
+      {#if curveLinePath}
+        <path class="curve-line-halo" d={curveLinePath} />
+        <path class="curve-line" d={curveLinePath} />
       {/if}
-      {#each plottedNodes as node (node.id)}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <circle
-          class:selected={node.id === selectedNodeId}
-          cx={node.x}
-          cy={node.y}
-          r="2.2"
-          onpointerdown={(event) => handleNodePointerDown(event, node.id)}
-        />
-      {/each}
     </svg>
+    <div class="curve-editor-segment-controls">
+      {#each plottedSegmentControls as control (control.key)}
+        <button
+          type="button"
+          class="curve-editor-segment-control"
+          class:is-stub={control.isStub}
+          data-curve-segment-control-id={control.key}
+          style={`left:${control.x}%;top:${control.y}%;`}
+          onmousedown={(event) => handleSegmentControlMouseDown(event, control.startNodeId)}
+          aria-label={`Curve point between ${control.startNodeId} and ${control.endNodeId}`}
+        ></button>
+      {/each}
+    </div>
+    <div class="curve-editor-nodes">
+      {#each plottedNodes as node (node.id)}
+        <button
+          type="button"
+          class="curve-editor-node"
+          class:selected={node.id === selectedNodeId}
+          data-curve-node-id={node.id}
+          style={`left:${node.x}%;top:${node.y}%;`}
+          onmousedown={(event) => handleNodeMouseDown(event, node.id)}
+          aria-label={`Curve node at ${node.t.toFixed(3)}, ${node.v.toFixed(3)}`}
+        ></button>
+      {/each}
+    </div>
     <div class="curve-editor-playhead" style={`left:${(clampedBeat * 100).toFixed(3)}%;`}></div>
   </div>
 
@@ -314,24 +593,11 @@
     &-wrap {
       display: flex;
       flex-direction: column;
-      gap: var(--gap-6);
       min-width: 0;
     }
 
-    &-toolbar {
-      display: flex;
-      align-items: center;
-      gap: var(--gap-6);
-      flex-wrap: wrap;
-    }
-
-    &-readout {
-      color: var(--neutral-50);
-      font-size: var(--text-12);
-    }
-
     position: relative;
-    height: 7.5rem;
+    height: 8rem;
     border: 1px solid var(--neutral-30);
     border-radius: var(--radius-6);
     background:
@@ -378,15 +644,59 @@
       vector-effect: non-scaling-stroke;
     }
 
-    circle {
-      fill: var(--neutral-90);
-      stroke: var(--neutral-10);
-      stroke-width: 0.6;
+    &-segment-controls,
+    &-nodes {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    &-segment-control,
+    &-node {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      padding: 0;
       cursor: pointer;
+      pointer-events: auto;
+    }
+
+    &-segment-control {
+      z-index: 1;
+      width: 0.75rem;
+      height: 0.75rem;
+      border: 1px solid rgb(var(--rgb-white) / 0.4);
+      border-radius: var(--radius-round);
+      background: rgb(var(--rgb-white) / 0.2);
+
+      &::before {
+        content: '';
+        position: absolute;
+        inset: -0.3rem;
+      }
+
+      &.is-stub {
+        background: rgb(var(--rgb-white) / 0.1);
+        border-color: rgb(var(--rgb-white) / 0.25);
+      }
+    }
+
+    &-node {
+      z-index: 2;
+      width: 0.75rem;
+      height: 0.75rem;
+      border: 1px solid var(--neutral-10);
+      border-radius: var(--radius-round);
+      background: var(--neutral-90);
+
+      &::before {
+        content: '';
+        position: absolute;
+        inset: -0.28rem;
+      }
 
       &.selected {
-        fill: var(--accent-500);
-        stroke-width: 1;
+        background: var(--accent-500);
+        border-width: 1.5px;
       }
     }
 

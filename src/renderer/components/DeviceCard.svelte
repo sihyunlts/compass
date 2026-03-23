@@ -319,14 +319,23 @@
 
     &[data-device-kind='modulator'] {
       :global(.device-controls) {
-        overflow-y: auto;
-        overscroll-behavior: contain;
+        display: grid;
+        grid-template-columns: minmax(9rem, 10rem) minmax(12rem, 1fr);
+        align-items: stretch;
+        overflow: visible;
       }
 
       :global(.modulation-control-grid) {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-        gap: var(--gap-8);
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--gap-5);
+        min-width: 0;
+      }
+
+      :global(.modulation-compact-row) {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--gap-6);
         min-width: 0;
       }
 
@@ -340,9 +349,31 @@
         width: 100%;
       }
 
-      :global(.modulation-curve-control),
+      :global(.modulation-sidebar),
+      :global(.modulation-main) {
+        min-width: 0;
+      }
+
+      :global(.modulation-main) {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap-4);
+        min-width: 16rem;
+      }
+
+      :global(.modulation-curve-control) {
+        flex: 1 1 auto;
+        min-width: 12rem;
+      }
+
+      :global(.modulation-curve-control .curve-editor) {
+        height: 8rem;
+      }
+
       :global(.modulation-readout) {
-        flex-shrink: 0;
+        min-width: 0;
+        line-height: 1.25;
+        font-size: var(--text-11);
       }
     }
 
