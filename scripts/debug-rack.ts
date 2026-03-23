@@ -1,0 +1,332 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
+import {
+  NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+  getLaunchpadRuntimeMap,
+  generateOverlayFrames,
+  generatePreviewNotesData,
+  resolveLaunchpadModel,
+} from '../src/domain';
+import type { OverlayFrameStroke } from '../src/domain';
+import { resolveActiveTilesFromPolylines } from '../src/core/pipeline/active';
+import {
+  compilePipelineEngine,
+  computeOriginWindowsWithEngine,
+  evaluateActiveByPitchAtTime,
+  evaluatePolylinesAtTime,
+} from '../src/core/pipeline/engine';
+import {
+  TILE_COUNT,
+  buildWorldBounds,
+} from '../src/core/pipeline/constants';
+import type { Polyline } from '../src/core/core-types';
+import type { LaunchpadModel } from '../src/shared/model';
+import { parsePresetFileText } from '../src/shared/presets';
+
+interface CliOptions {
+  rackPath: string;
+  outputDirectory: string;
+  beats: number[];
+  loopLengthBeats: number;
+  launchpadModel: LaunchpadModel;
+}
+
+interface SerializablePolyline {
+  originId: string;
+  velocity: number;
+  closed: boolean;
+  hasMask: boolean;
+  points: Array<{ x: number; y: number }>;
+}
+
+const DEFAULT_BEATS = [0, 0.25, 0.5, 0.75];
+
+const printUsage = (): void => {
+  process.stdout.write(
+    [
+      'Usage: npm run debug:rack -- <rack-path> [--out <dir>] [--beats 0,0.25,0.5,0.75] [--loop-length 1] [--model mk3|mk2]',
+      '',
+      'Outputs notes, beat snapshots, and overlay SVGs for one rack preset.',
+      '',
+    ].join('\n'),
+  );
+};
+
+const sanitizeFileSegment = (value: string): string =>
+  value.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'rack';
+
+const buildDefaultOutputDirectory = (rackPath: string): string => {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const rackName = sanitizeFileSegment(path.basename(rackPath, path.extname(rackPath)));
+  return path.join('/tmp', 'compass-debug', `${rackName}-${stamp}`);
+};
+
+const parseBeatList = (value: string): number[] => {
+  const beats = value
+    .split(',')
+    .map((part) => Number(part.trim()))
+    .filter((beat) => Number.isFinite(beat) && beat >= 0 && beat <= 1);
+  if (beats.length === 0) {
+    throw new Error('Expected --beats to contain numbers between 0 and 1.');
+  }
+  return Array.from(new Set(beats)).sort((left, right) => left - right);
+};
+
+const parseCliOptions = (argv: string[]): CliOptions | null => {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    printUsage();
+    return null;
+  }
+
+  let rackPath: string | null = null;
+  let outputDirectory: string | null = null;
+  let beats = DEFAULT_BEATS;
+  let loopLengthBeats = 1;
+  let launchpadModel: LaunchpadModel = 'mk3';
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (!token.startsWith('--')) {
+      rackPath ??= token;
+      continue;
+    }
+
+    const nextValue = argv[index + 1];
+    if ((token === '--out' || token === '--beats' || token === '--loop-length' || token === '--model') && !nextValue) {
+      throw new Error(`Missing value for ${token}.`);
+    }
+
+    if (token === '--out') {
+      outputDirectory = path.resolve(nextValue);
+      index += 1;
+      continue;
+    }
+
+    if (token === '--beats') {
+      beats = parseBeatList(nextValue);
+      index += 1;
+      continue;
+    }
+
+    if (token === '--loop-length') {
+      loopLengthBeats = Number(nextValue);
+      if (!Number.isFinite(loopLengthBeats) || loopLengthBeats <= 0) {
+        throw new Error('Expected --loop-length to be a positive number.');
+      }
+      index += 1;
+      continue;
+    }
+
+    if (token === '--model') {
+      launchpadModel = resolveLaunchpadModel(nextValue as LaunchpadModel);
+      index += 1;
+      continue;
+    }
+
+    throw new Error(`Unknown argument: ${token}`);
+  }
+
+  if (!rackPath) {
+    throw new Error('Missing rack preset path.');
+  }
+
+  return {
+    rackPath: path.resolve(rackPath),
+    outputDirectory: outputDirectory ?? buildDefaultOutputDirectory(rackPath),
+    beats,
+    loopLengthBeats,
+    launchpadModel,
+  };
+};
+
+const round = (value: number, digits = 4): number => Number(value.toFixed(digits));
+
+const serializePolylines = (
+  polylines: ReadonlyArray<Polyline>,
+): SerializablePolyline[] => polylines.map((polyline) => ({
+  originId: polyline.originId,
+  velocity: polyline.velocity,
+  closed: polyline.closed,
+  hasMask: polyline.mask !== undefined,
+  points: polyline.points.map((point) => ({
+    x: round(point.x, 3),
+    y: round(point.y, 3),
+  })),
+}));
+
+const serializeMap = <T>(
+  map: ReadonlyMap<string, T>,
+): Record<string, T> => Object.fromEntries(map.entries());
+
+const toTileCoordinates = (tileId: number): { tileId: number; x: number; y: number } => ({
+  tileId,
+  x: tileId % TILE_COUNT,
+  y: Math.floor(tileId / TILE_COUNT),
+});
+
+const toSvgPath = (stroke: OverlayFrameStroke): string => {
+  const [first, ...rest] = stroke.points;
+  if (!first) {
+    return '';
+  }
+
+  const commands = [`M ${round(first.x, 3)} ${round(first.y, 3)}`];
+  for (const point of rest) {
+    commands.push(`L ${round(point.x, 3)} ${round(point.y, 3)}`);
+  }
+  if (stroke.closed) {
+    commands.push('Z');
+  }
+  return commands.join(' ');
+};
+
+const buildOverlaySvg = (
+  strokes: ReadonlyArray<OverlayFrameStroke>,
+  activeTiles: ReadonlyArray<{ tileId: number; x: number; y: number }>,
+): string => {
+  const bounds = buildWorldBounds();
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
+  const tileRects = activeTiles
+    .map((tile) =>
+      `<rect x="${tile.x - 0.5}" y="${tile.y - 0.5}" width="1" height="1" fill="#ffd54a" fill-opacity="0.28" stroke="#d89b00" stroke-width="0.04" />`)
+    .join('\n');
+  const paths = strokes
+    .map((stroke) => toSvgPath(stroke))
+    .filter((pathValue) => pathValue.length > 0)
+    .map((pathValue) => `<path d="${pathValue}" fill="none" stroke="#0f172a" stroke-width="0.08" stroke-linecap="round" stroke-linejoin="round" />`)
+    .join('\n');
+
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${bounds.minX} ${bounds.minY} ${width} ${height}">`,
+    '<rect width="100%" height="100%" fill="#fcfcf7" />',
+    '<g opacity="0.22" stroke="#94a3b8" stroke-width="0.03">',
+    Array.from({ length: TILE_COUNT + 1 }, (_, index) =>
+      `<line x1="${index - 0.5}" y1="-0.5" x2="${index - 0.5}" y2="${TILE_COUNT - 0.5}" />`).join('\n'),
+    Array.from({ length: TILE_COUNT + 1 }, (_, index) =>
+      `<line x1="-0.5" y1="${index - 0.5}" x2="${TILE_COUNT - 0.5}" y2="${index - 0.5}" />`).join('\n'),
+    '</g>',
+    tileRects,
+    paths,
+    '</svg>',
+    '',
+  ].join('\n');
+};
+
+const writeJson = async (
+  filePath: string,
+  value: unknown,
+): Promise<void> => {
+  await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+};
+
+const main = async (): Promise<void> => {
+  const options = parseCliOptions(process.argv.slice(2));
+  if (!options) {
+    return;
+  }
+
+  const text = await readFile(options.rackPath, 'utf8');
+  const parsed = parsePresetFileText(text, {
+    fileName: options.rackPath,
+    mode: 'recover',
+  });
+  if (parsed.ok === false) {
+    throw new Error(parsed.message);
+  }
+  if (parsed.preset.presetType !== 'rack') {
+    throw new Error('Expected a rack preset file.');
+  }
+
+  const outputDirectory = options.outputDirectory;
+  await mkdir(outputDirectory, { recursive: true });
+
+  const chain = parsed.preset.chain;
+  const runtimeMap = getLaunchpadRuntimeMap(options.launchpadModel);
+  const preview = generatePreviewNotesData({
+    chain,
+    loopLengthBeats: options.loopLengthBeats,
+    launchpadModel: options.launchpadModel,
+  });
+  const overlayFrames = generateOverlayFrames({
+    chain,
+    beats01: options.beats,
+    loopLengthBeats: options.loopLengthBeats,
+    launchpadModel: options.launchpadModel,
+  });
+
+  const engine = compilePipelineEngine(chain, {
+    buttons: runtimeMap.buttons,
+    buttonIndex: runtimeMap.buttonIndex,
+  });
+  const originWindows = computeOriginWindowsWithEngine(
+    engine,
+    NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+  );
+
+  await writeJson(path.join(outputDirectory, 'notes.json'), {
+    notes: preview.notes,
+    colorGuideWarpByOriginId: serializeMap(preview.colorGuideWarpByOriginId),
+  });
+
+  const framesDirectory = path.join(outputDirectory, 'frames');
+  await mkdir(framesDirectory, { recursive: true });
+
+  for (let index = 0; index < options.beats.length; index += 1) {
+    const beat = options.beats[index];
+    const beatKey = beat.toFixed(3);
+    const frameDirectory = path.join(framesDirectory, `beat-${beatKey}`);
+    await mkdir(frameDirectory, { recursive: true });
+
+    const polylines = evaluatePolylinesAtTime(engine, beat, originWindows);
+    const activeTiles = Array.from(resolveActiveTilesFromPolylines(polylines))
+      .sort((left, right) => left - right)
+      .map((tileId) => toTileCoordinates(tileId));
+    const activePitches = Array.from(evaluateActiveByPitchAtTime(engine, beat, originWindows).entries())
+      .map(([pitch, info]) => ({
+        pitch,
+        velocity: info.velocity,
+        channel: info.channel,
+        originId: info.originId ?? null,
+      }))
+      .sort((left, right) => left.pitch - right.pitch || left.channel - right.channel);
+
+    await writeJson(path.join(frameDirectory, 'active-tiles.json'), activeTiles);
+    await writeJson(path.join(frameDirectory, 'active-pitches.json'), activePitches);
+    await writeJson(path.join(frameDirectory, 'polylines.json'), serializePolylines(polylines));
+    await writeFile(
+      path.join(frameDirectory, 'overlay.svg'),
+      buildOverlaySvg(overlayFrames[index] ?? [], activeTiles),
+      'utf8',
+    );
+  }
+
+  await writeJson(path.join(outputDirectory, 'summary.json'), {
+    rackPath: options.rackPath,
+    presetName: parsed.preset.chain.name ?? null,
+    launchpadModel: options.launchpadModel,
+    loopLengthBeats: options.loopLengthBeats,
+    beats: options.beats,
+    warning: parsed.warning ?? null,
+    noteCount: preview.notes.length,
+    deviceCount: chain.devices.length,
+    groupCount: new Set(chain.devices.map((device) => device.groupId ?? null)).size,
+    outputDirectory,
+    deviceOrder: chain.devices.map((device, deviceIndex) => ({
+      index: deviceIndex,
+      id: device.id,
+      kind: device.kind,
+      groupId: device.groupId ?? null,
+      enabled: device.enabled,
+    })),
+  });
+
+  process.stdout.write(`${outputDirectory}\n`);
+};
+
+void main().catch((error: unknown) => {
+  const message = error instanceof Error && error.message ? error.message : String(error);
+  process.stderr.write(`${message}\n`);
+  process.exitCode = 1;
+});
