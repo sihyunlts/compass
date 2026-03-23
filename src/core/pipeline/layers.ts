@@ -2,6 +2,7 @@ import {
   applyPipelineEffect,
   createGeneratorLayer,
   doesDeviceToggleTimelineParity,
+  type EffectApplicationContext,
   type PipelineEffectNode,
 } from '../../devices/engine';
 import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode } from '../../shared/model';
@@ -9,10 +10,10 @@ import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import type { Bounds, GeneratorLayer } from '../core-types';
 import { isEffectNode, isGeneratorNode } from './groups';
 
-type MaskTileResolver = (
+type EffectContextResolver = (
   effect: PipelineEffectNode,
   deviceIndex: number,
-) => Iterable<number> | null;
+) => Omit<EffectApplicationContext, 'worldBounds'> | null;
 
 export const createLayerFromGenerator = (
   device: GeneratorNode,
@@ -22,7 +23,7 @@ export const createLayerFromGenerator = (
 export const buildLayers = (
   chain: GeneratorChain,
   worldBounds: Bounds,
-  resolveMaskTiles?: MaskTileResolver,
+  resolveEffectContext?: EffectContextResolver,
 ): GeneratorLayer[] => {
   let layers: GeneratorLayer[] = [];
 
@@ -44,9 +45,10 @@ export const buildLayers = (
       continue;
     }
 
+    const effectContext = resolveEffectContext?.(device, index);
     layers = applyPipelineEffect(layers, device, {
       worldBounds,
-      tilesOverride: resolveMaskTiles ? resolveMaskTiles(device, index) : null,
+      tilesOverride: effectContext?.tilesOverride ?? null,
     });
   }
 

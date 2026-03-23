@@ -1,5 +1,6 @@
 import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode, LaunchpadButton } from '../../shared/model';
 import type { Bounds, GeneratorLayer, Polyline, Vec2 } from '../core-types';
+import type { ColorGuideWarp } from '../../devices/color/engine';
 
 export interface OriginWindow {
   min: number;
@@ -18,20 +19,16 @@ interface GroupEvaluationCache {
   layersByGroup: Map<GroupId, GeneratorLayer[]>;
   sourcePolylinesByGroup: Map<GroupId, Polyline[]>;
   sourcePolylinesByGroupReversed: Map<GroupId, Polyline[]>;
+  resolvingSourcePolylinesByGroup: Set<GroupId>;
+  resolvingSourcePolylinesByGroupReversed: Set<GroupId>;
+  sourceColorGuideWarpByGroup: Map<GroupId, ReadonlyMap<string, ColorGuideWarp>>;
   outputPolylinesByGroup: Map<GroupId, Polyline[]>;
-  activeTilesByGroup: Map<GroupId, Set<number>>;
-  activeTilesByGroupReversed: Map<GroupId, Set<number>>;
-  activeTilesByGenerator: Map<string, Set<number>>;
-  activeTilesByGeneratorReversed: Map<string, Set<number>>;
-  resolvingGroupTiles: Set<GroupId>;
-  resolvingGroupTilesReversed: Set<GroupId>;
-  resolvingGeneratorTiles: Set<string>;
-  resolvingGeneratorTilesReversed: Set<string>;
 }
 
 export interface GroupEvaluationContext {
   time: number;
   timeReversed: number;
+  buttonIndex: ButtonIndex;
   chain: GeneratorChain;
   groupStateById: GeneratorChain['groupStateById'];
   worldBounds: Bounds;
@@ -65,4 +62,5 @@ export interface OpenNoteState {
   startBeat: number;
   velocity: number;
   channel: number;
+  originId?: string;
 }

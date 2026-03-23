@@ -21,7 +21,7 @@ import {
   splitChainByGroup,
 } from './groups';
 import { distanceToPolylineSquared } from '../geometry';
-import { buildPolylinesForAllGroups } from './polylines';
+import { buildPolylinesForAllGroups, evaluateMaskDebugSnapshot, type MaskDebugSnapshot } from './polylines';
 import type {
   ActivePitchInfo,
   ButtonIndex,
@@ -44,6 +44,8 @@ export interface CompiledPipelineEngine {
   mutedGeneratorIds: Set<string>;
   modulation: CompiledModulationProgram;
 }
+
+export type { MaskDebugSnapshot } from './polylines';
 
 interface CompilePipelineEngineOptions {
   buttons?: ReadonlyArray<LaunchpadButton>;
@@ -127,6 +129,7 @@ const createEvaluationContext = (
 ): GroupEvaluationContext => ({
   time,
   timeReversed: 1 - time,
+  buttonIndex: engine.buttonIndex,
   chain: engine.chainWithoutModulators,
   groupStateById: engine.chainWithoutModulators.groupStateById,
   worldBounds: engine.worldBounds,
@@ -140,15 +143,10 @@ const createEvaluationContext = (
     layersByGroup: new Map(),
     sourcePolylinesByGroup: new Map(),
     sourcePolylinesByGroupReversed: new Map(),
+    resolvingSourcePolylinesByGroup: new Set(),
+    resolvingSourcePolylinesByGroupReversed: new Set(),
+    sourceColorGuideWarpByGroup: new Map(),
     outputPolylinesByGroup: new Map(),
-    activeTilesByGroup: new Map(),
-    activeTilesByGroupReversed: new Map(),
-    activeTilesByGenerator: new Map(),
-    activeTilesByGeneratorReversed: new Map(),
-    resolvingGroupTiles: new Set(),
-    resolvingGroupTilesReversed: new Set(),
-    resolvingGeneratorTiles: new Set(),
-    resolvingGeneratorTilesReversed: new Set(),
   },
 });
 
@@ -177,6 +175,25 @@ export const evaluateActiveByPitchAtTime = (
 ): Map<number, ActivePitchInfo> => {
   const polylines = evaluatePolylinesAtTime(engine, time01, originWindows);
   return resolveActiveByPitch(polylines, engine.buttonIndex);
+};
+
+export const evaluateMaskDebugAtTime = (
+  engine: CompiledPipelineEngine,
+  maskDeviceId: string,
+  time01: number,
+  originWindows?: Map<string, OriginWindow>,
+): MaskDebugSnapshot | null => {
+  applyModulationProgramToChain(
+    engine.modulation,
+    engine.chainWithoutModulators,
+    engine.deviceById,
+    time01,
+    1,
+    { wrap: true },
+  );
+
+  const context = createEvaluationContext(engine, time01, originWindows);
+  return evaluateMaskDebugSnapshot(maskDeviceId, context);
 };
 
 export const computeOriginWindowsWithEngine = (

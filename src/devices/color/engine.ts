@@ -1,6 +1,6 @@
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { normalizeOptionalId } from '../../shared/normalize-id';
-import type { ClipNote, GeneratorChain } from '../../shared/model';
+import type { ClipNote, ColorEffectNode, GeneratorChain } from '../../shared/model';
 import { isGeneratorEngineNode } from '../engine';
 import { DEFAULT_COLOR_PARAMS, sanitizeColorGapPercent } from './schema';
 
@@ -20,7 +20,7 @@ interface ColorOriginConfig {
   gapPercent: number;
 }
 
-interface ColorProgram {
+export interface ColorProgram {
   notes: ClipNoteWithOrigin[];
   guideWarp: ColorGuideWarp;
 }
@@ -298,6 +298,77 @@ const fitColorProgramToOriginSpan = (
       scale,
     },
   };
+};
+
+export const resolveColorGuideBeat = (
+  beat01: number,
+  warp: ColorGuideWarp | undefined,
+): number => {
+  if (!warp || !Number.isFinite(warp.scale) || warp.scale >= 1) {
+    return beat01;
+  }
+
+  const sourceSpan = warp.sourceEndBeat - warp.sourceStartBeat;
+  if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
+    return beat01;
+  }
+
+  const relativeBeat = Math.max(0, beat01 - warp.sourceStartBeat);
+  const advancedBeat = warp.sourceStartBeat + Math.min(relativeBeat / warp.scale, sourceSpan);
+  return Math.min(Math.max(advancedBeat, 0), 1);
+};
+
+export const composeColorGuideWarp = (
+  previous: ColorGuideWarp | undefined,
+  current: ColorGuideWarp,
+): ColorGuideWarp => {
+  if (!previous) {
+    return current;
+  }
+
+  return {
+    sourceStartBeat: resolveColorGuideBeat(current.sourceStartBeat, previous),
+    sourceEndBeat: resolveColorGuideBeat(current.sourceEndBeat, previous),
+    scale: previous.scale * current.scale,
+  };
+};
+
+export const applyColorDeviceToNotes = (
+  notes: ReadonlyArray<ClipNoteWithOrigin>,
+  device: ColorEffectNode,
+  minimumNoteDuration: number,
+): ColorProgram | null => {
+  if (notes.length === 0) {
+    return null;
+  }
+
+  const referenceDuration = resolveMedianDuration(
+    notes
+      .map((note) => note.durationBeats)
+      .filter((duration) => Number.isFinite(duration) && duration > 0),
+  );
+  if (referenceDuration === null) {
+    return null;
+  }
+
+  if (!notes.some((note) => note.originId)) {
+    return null;
+  }
+
+  const fittedProgram = fitColorProgramToOriginSpan(
+    notes,
+    buildNominalColorProgram(
+      notes,
+      {
+        velocities: sanitizeColorVelocities(device.params.velocities),
+        noteLengthPercent: sanitizeColorNoteLengthPercent(device.params.noteLengthPercent),
+        gapPercent: sanitizeColorGapPercent(device.params.gapPercent),
+      },
+      referenceDuration,
+      minimumNoteDuration,
+    ),
+  );
+  return fittedProgram && fittedProgram.notes.length > 0 ? fittedProgram : null;
 };
 
 const buildColorProgramByOriginId = (
