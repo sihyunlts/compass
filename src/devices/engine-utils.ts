@@ -15,7 +15,10 @@ export const createSceneInstanceBase = (
     spatial: IDENTITY_AFFINE,
     inverseSpatial,
     sourceBounds: mapBoundsThroughAffine(worldBounds, inverseSpatial),
-    temporal: { alpha: 1, beta: 0 },
+    temporal: {
+      remap: { alpha: 1, beta: 0 },
+      visibilityWindow: { start: 0, end: 1 },
+    },
     clipStack: [],
   };
 };
@@ -28,7 +31,12 @@ export const resolveSceneLocalTime = (
     return null;
   }
 
-  const localT = sceneInstance.temporal.alpha * t01 + sceneInstance.temporal.beta;
+  const { visibilityWindow, remap } = sceneInstance.temporal;
+  if (t01 < visibilityWindow.start || t01 > visibilityWindow.end) {
+    return null;
+  }
+
+  const localT = remap.alpha * t01 + remap.beta;
   if (!Number.isFinite(localT) || localT < 0 || localT > 1) {
     return null;
   }

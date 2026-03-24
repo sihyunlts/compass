@@ -26,9 +26,19 @@ export interface AffineTransform {
   ty: number;
 }
 
-export interface TemporalMapping {
+export interface TemporalAffineRemap {
   alpha: number;
   beta: number;
+}
+
+export interface TemporalVisibilityWindow {
+  start: number;
+  end: number;
+}
+
+export interface SceneTemporalState {
+  remap: TemporalAffineRemap;
+  visibilityWindow: TemporalVisibilityWindow;
 }
 
 export interface TileUnionClipShape {
@@ -68,7 +78,7 @@ export interface SceneInstanceBase {
   spatial: AffineTransform;
   inverseSpatial: AffineTransform;
   sourceBounds: Bounds;
-  temporal: TemporalMapping;
+  temporal: SceneTemporalState;
   clipStack: SceneClip[];
   velocity: number;
 }
