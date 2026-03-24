@@ -26,6 +26,7 @@ export type {
   SpiralGeneratorNode,
   SpiralParams,
   SymmetryEffectNode,
+  TranslateEffectNode,
   WaterdropGeneratorNode,
   WaterdropParams,
 } from './chain';

@@ -8,6 +8,7 @@ import { scannerEngineHandler } from './scanner/engine';
 import { spiralEngineHandler } from './spiral/engine';
 import { symmetryEngineHandler } from './symmetry/engine';
 import { pathEngineHandler } from './path/engine';
+import { translateEngineHandler } from './translate/engine';
 import type {
   EffectApplicationContext,
   EffectDeviceEngineHandler,
@@ -31,6 +32,7 @@ const pipelineEffectEngineHandlers = {
   mask: maskEngineHandler,
   symmetry: symmetryEngineHandler,
   rotate: rotateEngineHandler,
+  translate: translateEngineHandler,
   reverse: reverseEngineHandler,
 } as const satisfies Record<PipelineEffectKind, EffectDeviceEngineHandler>;
 

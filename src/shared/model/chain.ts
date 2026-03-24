@@ -120,6 +120,16 @@ export interface RotateEffectNode extends GroupedDeviceNode {
   };
 }
 
+export interface TranslateEffectNode extends GroupedDeviceNode {
+  id: string;
+  kind: 'translate';
+  enabled: boolean;
+  params: {
+    offsetX: number;
+    offsetY: number;
+  };
+}
+
 export interface ColorEffectNode extends GroupedDeviceNode {
   id: string;
   kind: 'color';
@@ -166,6 +176,7 @@ export type GeneratorEffectNode =
   | SymmetryEffectNode
   | ReverseEffectNode
   | RotateEffectNode
+  | TranslateEffectNode
   | ColorEffectNode;
 
 export type GeneratorDeviceNode =

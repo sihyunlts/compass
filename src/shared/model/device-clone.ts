@@ -169,5 +169,16 @@ export const cloneDeviceNode = (
     };
   }
 
+  if (device.kind === 'translate') {
+    return {
+      id: device.id,
+      kind: 'translate',
+      enabled: device.enabled,
+      groupId: device.groupId ?? null,
+      name: device.name ?? null,
+      params: { ...device.params },
+    };
+  }
+
   return assertUnsupportedDeviceKind(device);
 };

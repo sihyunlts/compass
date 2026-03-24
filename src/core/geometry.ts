@@ -177,6 +177,18 @@ export const toRotateTransformAt = (angleDeg: number, center: Vec2): AffineTrans
   };
 };
 
+export const toTranslationTransform = (
+  offsetX: number,
+  offsetY: number,
+): AffineTransform => ({
+  a: 1,
+  b: 0,
+  c: 0,
+  d: 1,
+  tx: offsetX,
+  ty: offsetY,
+});
+
 export const createTileUnionClip = (
   tiles: Iterable<number>,
 ): TileUnionClipShape => ({

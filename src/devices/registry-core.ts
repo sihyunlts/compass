@@ -18,6 +18,8 @@ import { spiralDeviceControls } from './spiral/controls';
 import { spiralDeviceSchema } from './spiral/schema';
 import { symmetryDeviceControls } from './symmetry/controls';
 import { symmetryDeviceSchema } from './symmetry/schema';
+import { translateDeviceControls } from './translate/controls';
+import { translateDeviceSchema } from './translate/schema';
 import type {
   RendererDeviceGroup,
   RendererDeviceKind,
@@ -82,6 +84,11 @@ export const RENDERER_DEVICE_MANIFEST = [
     ...rotateDeviceSchema,
     controls: rotateDeviceControls,
     editor: './rotate/ui.svelte',
+  },
+  {
+    ...translateDeviceSchema,
+    controls: translateDeviceControls,
+    editor: './translate/ui.svelte',
   },
   {
     ...reverseDeviceSchema,

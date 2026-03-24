@@ -99,6 +99,20 @@ const NUMERIC_PARAM_ACCESSORS: Record<
       },
     },
   },
+  translate: {
+    offsetX: {
+      read: (device) => (device as DeviceNodeOfKind<'translate'>).params.offsetX,
+      write: (device, value) => {
+        (device as DeviceNodeOfKind<'translate'>).params.offsetX = value;
+      },
+    },
+    offsetY: {
+      read: (device) => (device as DeviceNodeOfKind<'translate'>).params.offsetY,
+      write: (device, value) => {
+        (device as DeviceNodeOfKind<'translate'>).params.offsetY = value;
+      },
+    },
+  },
 };
 
 const MODULATION_TARGET_DEVICE_KINDS = Object.freeze(
