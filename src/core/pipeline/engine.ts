@@ -152,6 +152,8 @@ const createEvaluationContext = (
   mutedGeneratorIds: engine.mutedGeneratorIds,
   cache: {
     sceneInstancesByGroup: new Map(),
+    checkpointSceneInstancesByIndex: new Map(),
+    finalSceneInstances: null,
     outputPolylinesByGroup: new Map(),
     maskSourceOutputNotesByKey: engine.maskSourceOutputNotesByKey,
   },

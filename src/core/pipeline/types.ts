@@ -20,6 +20,8 @@ export interface TimedOutputNote {
 
 interface GroupEvaluationCache {
   sceneInstancesByGroup: Map<GroupId, SceneInstance[]>;
+  checkpointSceneInstancesByIndex: Map<number, SceneInstance[]>;
+  finalSceneInstances: SceneInstance[] | null;
   outputPolylinesByGroup: Map<GroupId, Polyline[]>;
   maskSourceOutputNotesByKey: Map<string, ReadonlyArray<TimedOutputNote>>;
 }

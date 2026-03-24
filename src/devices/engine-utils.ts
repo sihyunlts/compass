@@ -1,14 +1,17 @@
 import type { Bounds, SceneInstanceBase } from '../core/core-types';
 import { IDENTITY_AFFINE, mapBoundsThroughAffine } from '../core/geometry';
+import { normalizeOptionalId } from '../shared/normalize-id';
 
 export const createSceneInstanceBase = (
   originId: string,
+  originGroupId: string | null | undefined,
   worldBounds: Bounds,
 ): Omit<SceneInstanceBase, 'primitive' | 'velocity'> => {
   const inverseSpatial = IDENTITY_AFFINE;
 
   return {
     originId,
+    originGroupId: normalizeOptionalId(originGroupId),
     spatial: IDENTITY_AFFINE,
     inverseSpatial,
     sourceBounds: mapBoundsThroughAffine(worldBounds, inverseSpatial),

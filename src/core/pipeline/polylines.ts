@@ -1,4 +1,4 @@
-import { buildGeneratorPolyline } from '../../devices/engine';
+import { buildGeneratorPolyline, doesDeviceToggleTimelineParity } from '../../devices/engine';
 import { applyNoteStageColorPrograms } from '../../devices/color/engine';
 import type { GeneratorChain, MaskEffectNode } from '../../shared/model';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
@@ -19,8 +19,6 @@ import { fitNotesToTimeline } from './timeline-fit';
 import { isGeneratorNode, resolveMaskTime, resolveMutedSources, splitChainByGroup } from './groups';
 import {
   buildSceneInstances,
-  createSceneInstanceFromNode,
-  resolveReverseParityAfter,
 } from './layers';
 import type {
   GroupEvaluationContext,
@@ -74,6 +72,30 @@ const projectPolylinesAtTime = (
   return polylines;
 };
 
+const resolveScopedReverseParityAfter = (
+  chain: GeneratorChain,
+  targetGroupId: GroupId,
+): boolean[] => {
+  const parityAfter: boolean[] = new Array(chain.devices.length).fill(false);
+  let parity = false;
+
+  for (let index = chain.devices.length - 1; index >= 0; index -= 1) {
+    parityAfter[index] = parity;
+    const device = chain.devices[index];
+    const deviceGroupId = normalizeOptionalId(device.groupId);
+    const affectsTarget = deviceGroupId === null || deviceGroupId === targetGroupId;
+    if (
+      affectsTarget
+      && doesDeviceToggleTimelineParity(device)
+      && isDeviceEffectivelyEnabled(chain, device)
+    ) {
+      parity = !parity;
+    }
+  }
+
+  return parityAfter;
+};
+
 const buildGroupById = (
   groupChains: ReadonlyArray<{ id: GroupId; devices: GeneratorChain['devices'] }>,
 ): Map<GroupId, { id: GroupId; devices: GeneratorChain['devices'] }> => {
@@ -107,21 +129,13 @@ const createBaseChainForMaskSource = (
   consumingGroupId: GroupId | undefined,
   consumingDeviceIndex: number | undefined,
 ): GeneratorChain => {
-  if (consumingGroupId === undefined || consumingDeviceIndex === undefined) {
+  void consumingGroupId;
+  if (consumingDeviceIndex === undefined) {
     return context.baseChain;
   }
 
-  let groupDeviceCount = 0;
   return {
-    devices: context.baseChain.devices.filter((device) => {
-      if (normalizeOptionalId(device.groupId) !== consumingGroupId) {
-        return true;
-      }
-
-      const keep = groupDeviceCount < consumingDeviceIndex;
-      groupDeviceCount += 1;
-      return keep;
-    }),
+    devices: context.baseChain.devices.slice(0, consumingDeviceIndex),
     groupStateById: context.baseChain.groupStateById,
   };
 };
@@ -163,6 +177,8 @@ const createSourceEvaluationContext = (
     mutedGeneratorIds,
     cache: {
       sceneInstancesByGroup: new Map(),
+      checkpointSceneInstancesByIndex: new Map(),
+      finalSceneInstances: null,
       outputPolylinesByGroup: new Map(),
       maskSourceOutputNotesByKey: new Map(),
     },
@@ -309,31 +325,92 @@ const resolveGroupSourceOutputActiveTiles = (
   return activeTiles;
 };
 
-const buildCheckpointSceneInstances = (
+const buildOriginIdsForGroup = (
   groupId: GroupId,
+  context: GroupEvaluationContext,
+): Set<string> => {
+  const group = context.groupById.get(groupId);
+  if (!group) {
+    return new Set();
+  }
+
+  return new Set(
+    group.devices
+      .filter((device) => isGeneratorNode(device))
+      .map((device) => device.id),
+  );
+};
+
+const filterSceneInstancesByOriginIds = (
+  sceneInstances: ReadonlyArray<SceneInstance>,
+  originIds: ReadonlySet<string>,
+): SceneInstance[] => sceneInstances.filter((sceneInstance) => originIds.has(sceneInstance.originId));
+
+const buildFinalSceneInstances = (
+  context: GroupEvaluationContext,
+): SceneInstance[] => {
+  if (context.cache.finalSceneInstances) {
+    return context.cache.finalSceneInstances;
+  }
+
+  const sceneInstances = buildSceneInstances(
+    context.chain,
+    context.worldBounds,
+    (effect, deviceIndex) => {
+      if (effect.kind !== 'mask') {
+        return null;
+      }
+
+      const targetGroupId = normalizeOptionalId(effect.groupId);
+      const reverseParityAfter = resolveScopedReverseParityAfter(context.chain, targetGroupId);
+      const reverseAfter = reverseParityAfter[deviceIndex] === true;
+      const timeKind: MaskTimeKind = reverseAfter ? 'reversed' : 'forward';
+      return resolveMaskEffectContext(
+        effect,
+        context,
+        timeKind,
+        targetGroupId,
+        deviceIndex,
+      );
+    },
+  );
+  context.cache.finalSceneInstances = sceneInstances;
+  return sceneInstances;
+};
+
+const buildCheckpointSceneInstances = (
   context: GroupEvaluationContext,
   endExclusive: number,
 ): SceneInstance[] => {
-  const group = context.groupById.get(groupId);
-  if (!group) {
-    return [];
+  const cached = context.cache.checkpointSceneInstancesByIndex.get(endExclusive);
+  if (cached) {
+    return cached;
   }
 
   const slicedChain: GeneratorChain = {
-    devices: group.devices.slice(0, endExclusive),
+    devices: context.chain.devices.slice(0, endExclusive),
     groupStateById: context.groupStateById,
   };
 
-  return buildSceneInstances(slicedChain, context.worldBounds, (effect, deviceIndex) => {
+  const sceneInstances = buildSceneInstances(slicedChain, context.worldBounds, (effect, deviceIndex) => {
     if (effect.kind !== 'mask') {
       return null;
     }
 
-    const reverseParityAfter = resolveReverseParityAfter(slicedChain, slicedChain.devices);
+    const targetGroupId = normalizeOptionalId(effect.groupId);
+    const reverseParityAfter = resolveScopedReverseParityAfter(slicedChain, targetGroupId);
     const reverseAfter = reverseParityAfter[deviceIndex] === true;
     const timeKind: MaskTimeKind = reverseAfter ? 'reversed' : 'forward';
-    return resolveMaskEffectContext(effect, context, timeKind, groupId, deviceIndex);
+    return resolveMaskEffectContext(
+      effect,
+      context,
+      timeKind,
+      targetGroupId,
+      deviceIndex,
+    );
   });
+  context.cache.checkpointSceneInstancesByIndex.set(endExclusive, sceneInstances);
+  return sceneInstances;
 };
 
 const resolveGroupSourceSceneInstances = (
@@ -342,15 +419,16 @@ const resolveGroupSourceSceneInstances = (
   consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
 ): SceneInstance[] => {
-  if (groupId === null) {
+  void consumingGroupId;
+  const originIds = buildOriginIdsForGroup(groupId, context);
+  if (originIds.size === 0) {
     return [];
   }
 
-  if (consumingDeviceIndex !== undefined && groupId === consumingGroupId) {
-    return buildCheckpointSceneInstances(groupId, context, consumingDeviceIndex);
-  }
-
-  return buildGroupSceneInstances(groupId, context);
+  const sceneInstances = consumingDeviceIndex !== undefined
+    ? buildCheckpointSceneInstances(context, consumingDeviceIndex)
+    : buildFinalSceneInstances(context);
+  return filterSceneInstancesByOriginIds(sceneInstances, originIds);
 };
 
 const resolveGeneratorSourceSceneInstances = (
@@ -364,19 +442,11 @@ const resolveGeneratorSourceSceneInstances = (
     return [];
   }
 
-  if (
-    consumingDeviceIndex !== undefined
-    && normalizeOptionalId(generator.groupId) === consumingGroupId
-  ) {
-    const group = context.groupById.get(consumingGroupId);
-    const generatorIndex = group?.devices.findIndex((device) => device.id === generator.id) ?? -1;
-    if (generatorIndex === -1 || generatorIndex >= consumingDeviceIndex) {
-      return [];
-    }
-  }
-
-  const sceneInstance = createSceneInstanceFromNode(generator, context.worldBounds);
-  return sceneInstance ? [sceneInstance] : [];
+  void consumingGroupId;
+  const sceneInstances = consumingDeviceIndex !== undefined
+    ? buildCheckpointSceneInstances(context, consumingDeviceIndex)
+    : buildFinalSceneInstances(context);
+  return sceneInstances.filter((sceneInstance) => sceneInstance.originId === generatorId);
 };
 
 const resolveGroupSourcePolylines = (
@@ -569,23 +639,9 @@ const buildGroupSceneInstances = (
     return empty;
   }
 
-  const groupChain: GeneratorChain = {
-    devices: group.devices,
-    groupStateById: context.groupStateById,
-  };
-  const reverseParityAfter = resolveReverseParityAfter(groupChain, group.devices);
-  const sceneInstances = buildSceneInstances(
-    groupChain,
-    context.worldBounds,
-    (effect, deviceIndex) => {
-      if (effect.kind !== 'mask') {
-        return null;
-      }
-
-      const reverseAfter = reverseParityAfter[deviceIndex] === true;
-      const timeKind: MaskTimeKind = reverseAfter ? 'reversed' : 'forward';
-      return resolveMaskEffectContext(effect, context, timeKind, groupId, deviceIndex);
-    },
+  const sceneInstances = filterSceneInstancesByOriginIds(
+    buildFinalSceneInstances(context),
+    buildOriginIdsForGroup(groupId, context),
   );
 
   context.cache.sceneInstancesByGroup.set(groupId, sceneInstances);
@@ -663,14 +719,13 @@ export const evaluateMaskDebugSnapshot = (
       return null;
     }
 
-    const reverseParityAfter = resolveReverseParityAfter(
-      {
-        devices: group.devices,
-        groupStateById: context.groupStateById,
-      },
-      group.devices,
-    );
-    const timeKind: MaskTimeKind = reverseParityAfter[maskIndex] === true ? 'reversed' : 'forward';
+    const globalMaskIndex = context.chain.devices.findIndex((device) => device.id === maskDeviceId);
+    if (globalMaskIndex < 0) {
+      return null;
+    }
+
+    const reverseParityAfter = resolveScopedReverseParityAfter(context.chain, group.id);
+    const timeKind: MaskTimeKind = reverseParityAfter[globalMaskIndex] === true ? 'reversed' : 'forward';
 
     let sourcePolylines: Polyline[] = [];
     const sourceId = normalizeOptionalId(maskDevice.params.sourceId);
@@ -680,7 +735,7 @@ export const evaluateMaskDebugSnapshot = (
         context,
         timeKind,
         group.id,
-        maskIndex,
+        globalMaskIndex,
       );
     } else if (maskDevice.params.sourceKind === 'generator' && sourceId) {
       sourcePolylines = resolveGeneratorSourcePolylines(
@@ -688,7 +743,7 @@ export const evaluateMaskDebugSnapshot = (
         context,
         timeKind,
         group.id,
-        maskIndex,
+        globalMaskIndex,
       );
     }
 
@@ -707,7 +762,7 @@ export const evaluateMaskDebugSnapshot = (
           context,
           timeKind,
           group.id,
-          maskIndex,
+          globalMaskIndex,
         )
         : (maskDevice.params.sourceKind === 'generator' && sourceId
           ? resolveGeneratorSourceTiles(
@@ -716,11 +771,14 @@ export const evaluateMaskDebugSnapshot = (
             context,
             timeKind,
             group.id,
-            maskIndex,
+            globalMaskIndex,
           )
           : new Set()),
       consumerPolylinesBeforeMask: projectPolylinesAtTime(
-        buildCheckpointSceneInstances(group.id, context, maskIndex),
+        filterSceneInstancesByOriginIds(
+          buildCheckpointSceneInstances(context, globalMaskIndex),
+          buildOriginIdsForGroup(group.id, context),
+        ),
         context.time,
       ),
       consumerPolylinesAfterMask: buildOutputGroupPolylinesAtTime(group.id, context),

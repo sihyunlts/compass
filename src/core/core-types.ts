@@ -59,6 +59,7 @@ export interface Polyline {
 
 export interface SceneInstanceBase {
   originId: string;
+  originGroupId: string | null;
   spatial: AffineTransform;
   inverseSpatial: AffineTransform;
   sourceBounds: Bounds;

@@ -10,15 +10,15 @@ import {
 import type { ButtonIndex } from '../core/pipeline/types';
 import {
   resolveMutedSources,
-  splitChainByGroup,
 } from '../core/pipeline/groups';
 import {
   applyColorDeviceToNotes,
-  applyNoteStageColorPrograms,
   type ClipNoteWithOrigin,
 } from '../devices/color/engine';
 import { fitNotesToTimeline } from '../core/pipeline/timeline-fit';
 import { getLaunchpadRuntimeMap } from './launchpad-model';
+import { isDeviceEffectivelyEnabled } from '../shared/group-state';
+import { normalizeOptionalId } from '../shared/normalize-id';
 import type {
   ClipNote,
   GeneratorChain,
@@ -72,8 +72,9 @@ interface GeneratedNotesContext {
   loopLengthBeats: number;
   launchpadModel: LaunchpadModel | undefined;
   runtimeMap: RuntimeMapData;
-  groupOutputNotesCache: Map<string, ClipNoteWithOrigin[]>;
-  fittedGroupOutputNotesCache: Map<string, ClipNoteWithOrigin[]>;
+  checkpointNotesCache: Map<number, ClipNoteWithOrigin[]>;
+  fittedCheckpointNotesCache: Map<string, ClipNoteWithOrigin[]>;
+  originGroupIdByGeneratorId: Map<string, string | null>;
 }
 
 export const NORMALIZED_SOURCE_TIMELINE_END_BEAT = 1;
@@ -234,35 +235,6 @@ const cloneNotes = (
   notes: ReadonlyArray<ClipNoteWithOrigin>,
 ): ClipNoteWithOrigin[] => notes.map((note) => ({ ...note }));
 
-const supportsNoteStageTail = (
-  devices: ReadonlyArray<GeneratorDeviceNode>,
-): boolean => {
-  let sawColor = false;
-
-  for (const device of devices) {
-    if (device.enabled === false) {
-      continue;
-    }
-
-    if (device.kind === 'color') {
-      sawColor = true;
-      continue;
-    }
-
-    if (!sawColor) {
-      continue;
-    }
-
-    if (device.kind === 'mask') {
-      continue;
-    }
-
-    return false;
-  }
-
-  return sawColor;
-};
-
 const applyColorToCurrentNotes = (
   notes: ReadonlyArray<ClipNoteWithOrigin>,
   device: Extract<GeneratorDeviceNode, { kind: 'color' }>,
@@ -416,21 +388,106 @@ const filterNotesByMask = (
   return filtered;
 };
 
-const buildGroupSliceChain = (
-  groupDevices: ReadonlyArray<GeneratorDeviceNode>,
-  groupStateById: GeneratorChain['groupStateById'],
+const isGeneratorNode = (
+  device: GeneratorDeviceNode,
+): boolean => (
+  device.kind === 'waterdrop'
+  || device.kind === 'scanner'
+  || device.kind === 'spiral'
+);
+
+const buildGeometryOnlyCheckpointChain = (
+  chain: GeneratorChain,
   endExclusive: number,
 ): GeneratorChain => ({
-  devices: groupDevices.slice(0, endExclusive).map((device) => ({ ...device })),
-  groupStateById,
+  devices: chain.devices
+    .slice(0, endExclusive)
+    .filter((device) => device.kind !== 'color')
+    .filter((device) => device.kind !== 'mask' || device.params.sourceKind === 'tiles'),
+  groupStateById: chain.groupStateById,
 });
 
-const buildGroupOutputCacheKey = (
-  groupId: string | null,
-  endExclusive: number,
-): string => `${groupId ?? 'root'}:${endExclusive}`;
+const buildOriginGroupIdByGeneratorId = (
+  chain: GeneratorChain,
+): Map<string, string | null> => {
+  const byGeneratorId = new Map<string, string | null>();
 
-const fitCachedNotesToTimeline = (
+  for (const device of chain.devices) {
+    if (isGeneratorNode(device)) {
+      byGeneratorId.set(device.id, normalizeOptionalId(device.groupId));
+    }
+  }
+
+  return byGeneratorId;
+};
+
+const groupNotesByOriginId = (
+  notes: ReadonlyArray<ClipNoteWithOrigin>,
+): Map<string, ClipNoteWithOrigin[]> => {
+  const notesByOriginId = new Map<string, ClipNoteWithOrigin[]>();
+
+  for (const note of notes) {
+    if (!note.originId) {
+      continue;
+    }
+
+    const existing = notesByOriginId.get(note.originId);
+    if (existing) {
+      existing.push({ ...note });
+      continue;
+    }
+
+    notesByOriginId.set(note.originId, [{ ...note }]);
+  }
+
+  return notesByOriginId;
+};
+
+const resolveScopedOriginIds = (
+  originGroupIdByGeneratorId: ReadonlyMap<string, string | null>,
+  upstreamOriginIds: ReadonlyArray<string>,
+  effectGroupId: string | null | undefined,
+): string[] => {
+  const targetGroupId = normalizeOptionalId(effectGroupId);
+  if (!targetGroupId) {
+    return [...upstreamOriginIds];
+  }
+
+  return upstreamOriginIds.filter((originId) =>
+    originGroupIdByGeneratorId.get(originId) === targetGroupId);
+};
+
+const filterNotesByOriginIds = (
+  notes: ReadonlyArray<ClipNoteWithOrigin>,
+  originIds: ReadonlySet<string>,
+): ClipNoteWithOrigin[] => notes.filter((note) =>
+  note.originId ? originIds.has(note.originId) : false).map((note) => ({ ...note }));
+
+const resolveSourceOriginIds = (
+  context: GeneratedNotesContext,
+  sourceKind: 'group' | 'generator',
+  sourceId: string,
+): Set<string> => {
+  if (sourceKind === 'generator') {
+    return new Set([sourceId]);
+  }
+
+  const originIds = new Set<string>();
+  for (const [originId, groupId] of context.originGroupIdByGeneratorId.entries()) {
+    if (groupId === sourceId) {
+      originIds.add(originId);
+    }
+  }
+  return originIds;
+};
+
+const buildFittedCheckpointCacheKey = (
+  endExclusive: number,
+  sourceKind: 'group' | 'generator',
+  sourceId: string,
+): string => `${endExclusive}:${sourceKind}:${sourceId}`;
+
+const fitCheckpointNotes = (
   notes: ReadonlyArray<ClipNoteWithOrigin>,
   cache: Map<string, ClipNoteWithOrigin[]>,
   cacheKey: string,
@@ -445,161 +502,117 @@ const fitCachedNotesToTimeline = (
   return cloneNotes(fitted);
 };
 
-const buildGroupOutputNotes = (
+const evaluateCheckpointNotes = (
   context: GeneratedNotesContext,
-  groupId: string | null,
-  endExclusive?: number,
+  endExclusive: number,
 ): ClipNoteWithOrigin[] => {
-  const group = splitChainByGroup(context.chain).find((entry) => entry.id === groupId);
-  if (!group) {
-    return [];
-  }
-
-  const sliceEndExclusive = endExclusive ?? group.devices.length;
-  const cacheKey = buildGroupOutputCacheKey(groupId, sliceEndExclusive);
-  const cached = context.groupOutputNotesCache.get(cacheKey);
+  const cached = context.checkpointNotesCache.get(endExclusive);
   if (cached) {
     return cloneNotes(cached);
   }
 
-  const sliceChain = buildGroupSliceChain(
-    group.devices,
-    context.chain.groupStateById,
-    sliceEndExclusive,
-  );
-  const colorStartIndex = sliceChain.devices.findIndex((device) =>
-    device.enabled !== false && device.kind === 'color');
-  const needsNoteStageTail =
-    colorStartIndex >= 0 && supportsNoteStageTail(sliceChain.devices.slice(colorStartIndex));
+  const geometryOnlyChain = buildGeometryOnlyCheckpointChain(context.chain, endExclusive);
+  const rawNotes = collectRawNotesData(createInputForChain(geometryOnlyChain, context)).notes;
+  const notesByOriginId = groupNotesByOriginId(rawNotes);
+  const upstreamOriginIds: string[] = [];
+  const prefixDevices = context.chain.devices.slice(0, endExclusive);
 
-  let result: ClipNoteWithOrigin[];
-  if (!needsNoteStageTail) {
-    result = applyNoteStageColorPrograms(
-      sliceChain,
-      collectRawNotesData(createInputForChain(sliceChain, context)).notes,
-      MIN_NOTE_DURATION,
-    );
-  } else {
-    const prefixChain = buildGroupSliceChain(
-      sliceChain.devices,
-      sliceChain.groupStateById,
-      colorStartIndex,
-    );
-    let currentNotes = collectRawNotesData(createInputForChain(prefixChain, context)).notes;
-
-    for (let index = colorStartIndex; index < sliceChain.devices.length; index += 1) {
-      const device = sliceChain.devices[index];
-      if (device.enabled === false) {
-        continue;
-      }
-
-      if (device.kind === 'color') {
-        currentNotes = applyColorToCurrentNotes(currentNotes, device);
-        continue;
-      }
-
-      if (device.kind !== 'mask') {
-        currentNotes = applyNoteStageColorPrograms(
-          sliceChain,
-          collectRawNotesData(createInputForChain(sliceChain, context)).notes,
-          MIN_NOTE_DURATION,
-        );
-        break;
-      }
-
-      const fittedCurrentNotes = fitNotesToTimeline(currentNotes).fittedNotes;
-      let maskSourceNotes: ReadonlyArray<ClipNoteWithOrigin> | null = null;
-      if (device.params.sourceKind === 'generator') {
-        const generatorChain: GeneratorChain = {
-          devices: context.chain.devices.filter((entry) => entry.id === device.params.sourceId),
-          groupStateById: context.chain.groupStateById,
-        };
-        maskSourceNotes = fitNotesToTimeline(
-          applyNoteStageColorPrograms(
-            generatorChain,
-            collectRawNotesData(createInputForChain(generatorChain, context)).notes,
-            MIN_NOTE_DURATION,
-          ),
-        ).fittedNotes;
-      } else if (device.params.sourceKind === 'group') {
-        const sourceGroupId = device.params.sourceId ?? null;
-        maskSourceNotes = sourceGroupId === groupId
-          ? fittedCurrentNotes
-          : buildFittedGroupOutputNotes(context, sourceGroupId);
-      }
-
-      const resolveMaskTilesAtBeat = (beat: number): ReadonlySet<number> => {
-        if (device.params.sourceKind === 'tiles') {
-          return new Set(device.params.tiles);
-        }
-
-        if (maskSourceNotes) {
-          return resolveActiveTileIdsAtBeat(
-            maskSourceNotes,
-            beat,
-            context.runtimeMap,
-          );
-        }
-
-        return new Set();
-      };
-
-      currentNotes = filterNotesByMask(
-        currentNotes,
-        device,
-        context.runtimeMap,
-        (beat) => resolveMaskTilesAtBeat(beat),
-      );
+  for (let index = 0; index < prefixDevices.length; index += 1) {
+    const device = prefixDevices[index];
+    if (!isDeviceEffectivelyEnabled(context.chain, device)) {
+      continue;
     }
 
-    result = currentNotes;
+    if (isGeneratorNode(device)) {
+      upstreamOriginIds.push(device.id);
+      if (!notesByOriginId.has(device.id)) {
+        notesByOriginId.set(device.id, []);
+      }
+      continue;
+    }
+
+    const targetOriginIds = resolveScopedOriginIds(
+      context.originGroupIdByGeneratorId,
+      upstreamOriginIds,
+      device.groupId,
+    );
+    if (targetOriginIds.length === 0) {
+      continue;
+    }
+
+    if (device.kind === 'color') {
+      for (const originId of targetOriginIds) {
+        const colorized = applyColorToCurrentNotes(
+          notesByOriginId.get(originId) ?? [],
+          device,
+        );
+        notesByOriginId.set(originId, colorized);
+      }
+      continue;
+    }
+
+    if (device.kind !== 'mask' || device.params.sourceKind === 'tiles') {
+      continue;
+    }
+
+    const sourceId = normalizeOptionalId(device.params.sourceId);
+    if (!sourceId) {
+      for (const originId of targetOriginIds) {
+        notesByOriginId.set(originId, []);
+      }
+      continue;
+    }
+
+    const sourceNotes = fitCheckpointNotes(
+      filterNotesByOriginIds(
+        evaluateCheckpointNotes(context, index),
+        resolveSourceOriginIds(context, device.params.sourceKind, sourceId),
+      ),
+      context.fittedCheckpointNotesCache,
+      buildFittedCheckpointCacheKey(index, device.params.sourceKind, sourceId),
+    );
+
+    for (const originId of targetOriginIds) {
+      notesByOriginId.set(
+        originId,
+        filterNotesByMask(
+          notesByOriginId.get(originId) ?? [],
+          device,
+          context.runtimeMap,
+          (beat) => resolveActiveTileIdsAtBeat(sourceNotes, beat, context.runtimeMap),
+        ),
+      );
+    }
   }
 
-  context.groupOutputNotesCache.set(cacheKey, result);
-  return cloneNotes(result);
-};
-
-const buildFittedGroupOutputNotes = (
-  context: GeneratedNotesContext,
-  groupId: string | null,
-  endExclusive?: number,
-): ClipNoteWithOrigin[] => {
-  const group = splitChainByGroup(context.chain).find((entry) => entry.id === groupId);
-  if (!group) {
-    return [];
+  const notes: ClipNoteWithOrigin[] = [];
+  for (const originId of upstreamOriginIds) {
+    notes.push(...cloneNotes(notesByOriginId.get(originId) ?? []));
   }
-
-  const sliceEndExclusive = endExclusive ?? group.devices.length;
-  const cacheKey = buildGroupOutputCacheKey(groupId, sliceEndExclusive);
-  return fitCachedNotesToTimeline(
-    buildGroupOutputNotes(context, groupId, sliceEndExclusive),
-    context.fittedGroupOutputNotesCache,
-    cacheKey,
-  );
+  sortClipNotes(notes);
+  context.checkpointNotesCache.set(endExclusive, notes);
+  return cloneNotes(notes);
 };
 
 const buildFinalOutputNotes = (
   context: GeneratedNotesContext,
 ): ClipNoteWithOrigin[] => {
   const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(context.chain);
-  const outputNotes: ClipNoteWithOrigin[] = [];
-
-  for (const group of splitChainByGroup(context.chain)) {
-    if (group.id && mutedGroupIds.has(group.id)) {
-      continue;
-    }
-
-    const groupNotes = buildGroupOutputNotes(context, group.id);
-    for (const note of groupNotes) {
-      if (note.originId && mutedGeneratorIds.has(note.originId)) {
-        continue;
+  const notes = evaluateCheckpointNotes(context, context.chain.devices.length)
+    .filter((note) => {
+      if (!note.originId) {
+        return true;
       }
-      outputNotes.push(note);
-    }
-  }
 
-  sortClipNotes(outputNotes);
-  return outputNotes;
+      if (mutedGeneratorIds.has(note.originId)) {
+        return false;
+      }
+
+      const groupId = context.originGroupIdByGeneratorId.get(note.originId);
+      return !groupId || !mutedGroupIds.has(groupId);
+    });
+  sortClipNotes(notes);
+  return notes;
 };
 
 const buildGeneratedNotes = ({
@@ -631,8 +644,9 @@ const buildGeneratedNotes = ({
     loopLengthBeats,
     launchpadModel,
     runtimeMap,
-    groupOutputNotesCache: new Map(),
-    fittedGroupOutputNotesCache: new Map(),
+    checkpointNotesCache: new Map(),
+    fittedCheckpointNotesCache: new Map(),
+    originGroupIdByGeneratorId: buildOriginGroupIdByGeneratorId(chain),
   };
   const outputNotes = buildFinalOutputNotes(generatedNotesContext);
   const fitted = fitNotesToTimeline(outputNotes);

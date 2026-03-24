@@ -15,7 +15,7 @@ export const spiralEngineHandler = {
     }
 
     return {
-      ...createSceneInstanceBase(device.id, worldBounds),
+      ...createSceneInstanceBase(device.id, device.groupId, worldBounds),
       primitive: {
         kind: 'spiral',
         params,

@@ -7,6 +7,7 @@ import {
 } from '../../devices/engine';
 import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode } from '../../shared/model';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
+import { normalizeOptionalId } from '../../shared/normalize-id';
 import type { Bounds, SceneInstance } from '../core-types';
 import { isEffectNode, isGeneratorNode } from './groups';
 
@@ -46,10 +47,24 @@ export const buildSceneInstances = (
     }
 
     const effectContext = resolveEffectContext?.(device, index);
-    sceneInstances = applyPipelineEffect(sceneInstances, device, {
+    const targetGroupId = normalizeOptionalId(device.groupId);
+    if (!targetGroupId) {
+      sceneInstances = applyPipelineEffect(sceneInstances, device, {
+        worldBounds,
+        tilesOverride: effectContext?.tilesOverride ?? null,
+      });
+      continue;
+    }
+
+    const scopedInstances = sceneInstances.filter((sceneInstance) =>
+      sceneInstance.originGroupId === targetGroupId);
+    const unscopedInstances = sceneInstances.filter((sceneInstance) =>
+      sceneInstance.originGroupId !== targetGroupId);
+    const transformedInstances = applyPipelineEffect(scopedInstances, device, {
       worldBounds,
       tilesOverride: effectContext?.tilesOverride ?? null,
     });
+    sceneInstances = [...unscopedInstances, ...transformedInstances];
   }
 
   return sceneInstances;

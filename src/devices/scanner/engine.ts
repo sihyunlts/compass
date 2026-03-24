@@ -12,7 +12,7 @@ export const scannerEngineHandler = {
     }
 
     return {
-      ...createSceneInstanceBase(device.id, worldBounds),
+      ...createSceneInstanceBase(device.id, device.groupId, worldBounds),
       primitive: {
         kind: 'scanner',
         params,
