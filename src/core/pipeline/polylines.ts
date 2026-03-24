@@ -19,7 +19,6 @@ import type {
   GroupEvaluationContext,
   GroupId,
   MaskTimeKind,
-  OriginWindow,
 } from './types';
 
 export interface MaskDebugSnapshot {
@@ -34,25 +33,6 @@ export interface MaskDebugSnapshot {
   consumerPolylinesBeforeMask: Polyline[];
   consumerPolylinesAfterMask: Polyline[];
 }
-
-const getOriginFitTime = (
-  t: number,
-  window: OriginWindow | undefined,
-): number | null => {
-  if (!window) {
-    return t;
-  }
-  if (!Number.isFinite(window.min) || !Number.isFinite(window.max)) {
-    return t;
-  }
-
-  const span = window.max - window.min;
-  if (!Number.isFinite(span) || span <= 0) {
-    return t;
-  }
-
-  return window.min + t * span;
-};
 
 const projectSceneInstancePolyline = (
   sceneInstance: SceneInstance,
@@ -72,17 +52,11 @@ const projectSceneInstancePolyline = (
 const projectPolylinesAtTime = (
   sceneInstances: ReadonlyArray<SceneInstance>,
   time: number,
-  originWindows?: Map<string, OriginWindow>,
 ): Polyline[] => {
   const polylines: Polyline[] = [];
 
   for (const sceneInstance of sceneInstances) {
-    const fitTime = getOriginFitTime(time, originWindows?.get(sceneInstance.originId));
-    if (fitTime === null) {
-      continue;
-    }
-
-    const polyline = projectSceneInstancePolyline(sceneInstance, fitTime);
+    const polyline = projectSceneInstancePolyline(sceneInstance, time);
     if (polyline) {
       polylines.push(polyline);
     }
@@ -244,7 +218,6 @@ const resolveGroupSourceTiles = (
         consumingGroupId,
         consumingDeviceIndex,
       ),
-      context.buttonIndex,
     );
   }
 
@@ -274,7 +247,6 @@ const resolveGeneratorSourceTiles = (
         consumingGroupId,
         consumingDeviceIndex,
       ),
-      context.buttonIndex,
     );
   }
 
@@ -390,7 +362,6 @@ const buildOutputGroupSceneInstances = (
 const buildOutputGroupPolylinesAtTime = (
   groupId: GroupId,
   context: GroupEvaluationContext,
-  originWindows?: Map<string, OriginWindow>,
 ): Polyline[] => {
   const cached = context.cache.outputPolylinesByGroup.get(groupId);
   if (cached) {
@@ -399,7 +370,7 @@ const buildOutputGroupPolylinesAtTime = (
 
   const sceneInstances = buildOutputGroupSceneInstances(groupId, context);
   const polylines = sceneInstances.length > 0
-    ? projectPolylinesAtTime(sceneInstances, context.time, originWindows)
+    ? projectPolylinesAtTime(sceneInstances, context.time)
     : [];
   context.cache.outputPolylinesByGroup.set(groupId, polylines);
   return polylines;
@@ -419,12 +390,11 @@ export const buildSceneInstancesForAllGroups = (
 
 export const buildPolylinesForAllGroups = (
   context: GroupEvaluationContext,
-  originWindows?: Map<string, OriginWindow>,
 ): Polyline[] => {
   const polylines: Polyline[] = [];
 
   for (const group of context.groupChains) {
-    polylines.push(...buildOutputGroupPolylinesAtTime(group.id, context, originWindows));
+    polylines.push(...buildOutputGroupPolylinesAtTime(group.id, context));
   }
 
   return polylines;
@@ -433,7 +403,6 @@ export const buildPolylinesForAllGroups = (
 export const evaluateMaskDebugSnapshot = (
   maskDeviceId: string,
   context: GroupEvaluationContext,
-  originWindows?: Map<string, OriginWindow>,
 ): MaskDebugSnapshot | null => {
   for (const group of context.groupChains) {
     const maskIndex = group.devices.findIndex((device) =>
@@ -506,9 +475,8 @@ export const evaluateMaskDebugSnapshot = (
       consumerPolylinesBeforeMask: projectPolylinesAtTime(
         buildCheckpointSceneInstances(group.id, context, maskIndex),
         context.time,
-        originWindows,
       ),
-      consumerPolylinesAfterMask: buildOutputGroupPolylinesAtTime(group.id, context, originWindows),
+      consumerPolylinesAfterMask: buildOutputGroupPolylinesAtTime(group.id, context),
     };
   }
 

@@ -1,11 +1,14 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 import {
-  generatePreviewActiveVelocityFrames,
+  compilePipelineEngine,
+  evaluateExactOutputFramesAtTimes,
+} from '../../../core/pipeline/engine';
+import {
   generatePreviewNotesData,
   generatePreviewStats,
+  getLaunchpadRuntimeMap,
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-  type OverlayTimingAdapter,
 } from '../../../domain';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
@@ -16,13 +19,19 @@ import {
 } from './frame-index';
 import { EMPTY_ACTIVE_VELOCITY_BY_PITCH } from './utils';
 import { LatestSourceKeyFamilyCache } from './source-key-cache';
+import {
+  DEFAULT_OVERLAY_WORLD_BOUNDS,
+  type OverlayWorldBounds,
+  type PreviewSurfaceViewModel,
+} from './view-model';
 
 export interface PreviewResultCacheEntry {
   key: string;
   preview: GeneratorPreview | null;
   sourceTimelineEndBeat: number;
   ledFramesByIndex: ReadonlyArray<ReadonlyMap<number, number>>;
-  overlayTimingByOriginId: ReadonlyMap<string, OverlayTimingAdapter>;
+  overlayFramesByIndex: ReadonlyArray<PreviewSurfaceViewModel['overlayStrokes']>;
+  overlayWorldBounds: OverlayWorldBounds;
 }
 
 interface PreviewResultInput {
@@ -61,21 +70,19 @@ class PreviewResultCache {
       ...generatePreviewStats(generatedNotes?.notes ?? []),
       notes: generatedNotes?.notes ?? [],
     };
-    const overlayTimingByOriginId = generatedNotes?.overlayTimingByOriginId
-      ?? this.generateOverlayTimingByOriginId(
-        input.sourceChain,
-        input.loopLengthBeats,
-        input.launchpadModel,
-      );
+    const exactFrames = this.buildExactOutputFrames(
+      input.sourceChain,
+      input.launchpadModel,
+    );
     const entry: PreviewResultCacheEntry = {
       key,
       preview,
       sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-      ledFramesByIndex: this.buildLedFrameCache(
-        input.sourceChain,
-        input.launchpadModel,
-      ),
-      overlayTimingByOriginId,
+      ledFramesByIndex: exactFrames.map((frame) => new Map(
+        Array.from(frame.activationFrame.activeByPitch.entries(), ([pitch, info]) => [pitch, info.velocity]),
+      )),
+      overlayFramesByIndex: exactFrames.map((frame) => frame.overlayStrokes),
+      overlayWorldBounds: DEFAULT_OVERLAY_WORLD_BOUNDS,
     };
     this.resultsByKey.set(key, entry);
     return entry;
@@ -106,30 +113,24 @@ class PreviewResultCache {
     return previewResult.ledFramesByIndex[frameIndex] ?? EMPTY_ACTIVE_VELOCITY_BY_PITCH;
   }
 
-  private generateOverlayTimingByOriginId(
+  private buildExactOutputFrames(
     chain: GeneratorChain,
-    loopLengthBeats: number,
     launchpadModel: LaunchpadModel,
-  ): ReadonlyMap<string, OverlayTimingAdapter> {
-    return generatePreviewNotesData({
-      chain,
-      loopLengthBeats,
-      launchpadModel,
-    }).overlayTimingByOriginId;
-  }
+  ) {
+    const runtimeMap = getLaunchpadRuntimeMap(launchpadModel);
+    const engine = compilePipelineEngine(chain, {
+      buttons: runtimeMap.buttons,
+      buttonIndex: runtimeMap.buttonIndex,
+    });
 
-  private buildLedFrameCache(
-    chain: GeneratorChain,
-    launchpadModel: LaunchpadModel,
-  ): ReadonlyArray<ReadonlyMap<number, number>> {
-    return generatePreviewActiveVelocityFrames({
-      chain,
-      beats01: Array.from(
+    return evaluateExactOutputFramesAtTimes(
+      engine,
+      Array.from(
         { length: PREVIEW_FRAME_COUNT },
         (_, index) => toPreviewFrameBeat(index, NORMALIZED_SOURCE_TIMELINE_END_BEAT),
       ),
-      launchpadModel,
-    });
+      DEFAULT_OVERLAY_WORLD_BOUNDS,
+    );
   }
 
   private toPreviewResultKey(

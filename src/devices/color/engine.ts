@@ -8,20 +8,8 @@ export interface ClipNoteWithOrigin extends ClipNote {
   originId?: string;
 }
 
-export interface OverlayTimingAdapter {
-  sourceStartBeat: number;
-  sourceEndBeat: number;
-  scale: number;
-}
-
 interface ColorProgram {
   notes: ClipNoteWithOrigin[];
-  overlayTimingAdapter: OverlayTimingAdapter;
-}
-
-export interface NoteStageColorResult {
-  notes: ClipNoteWithOrigin[];
-  overlayTimingByOriginId: ReadonlyMap<string, OverlayTimingAdapter>;
 }
 
 interface ColorDeviceConfig {
@@ -212,49 +200,7 @@ const fitColorProgramToOriginSpan = (
     });
   }
 
-  return fitted.length === 0
-    ? null
-    : {
-      notes: fitted,
-      overlayTimingAdapter: {
-        sourceStartBeat: sourceStart,
-        sourceEndBeat: sourceEnd,
-        scale,
-      },
-    };
-};
-
-export const resolveOverlaySourceBeat = (
-  beat01: number,
-  adapter: OverlayTimingAdapter | undefined,
-): number => {
-  if (!adapter || !Number.isFinite(adapter.scale) || adapter.scale >= 1) {
-    return beat01;
-  }
-
-  const sourceSpan = adapter.sourceEndBeat - adapter.sourceStartBeat;
-  if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
-    return beat01;
-  }
-
-  const relativeBeat = Math.max(0, beat01 - adapter.sourceStartBeat);
-  const advancedBeat = adapter.sourceStartBeat + Math.min(relativeBeat / adapter.scale, sourceSpan);
-  return Math.min(Math.max(advancedBeat, 0), 1);
-};
-
-const composeOverlayTimingAdapter = (
-  previous: OverlayTimingAdapter | undefined,
-  current: OverlayTimingAdapter,
-): OverlayTimingAdapter => {
-  if (!previous) {
-    return current;
-  }
-
-  return {
-    sourceStartBeat: resolveOverlaySourceBeat(current.sourceStartBeat, previous),
-    sourceEndBeat: resolveOverlaySourceBeat(current.sourceEndBeat, previous),
-    scale: previous.scale * current.scale,
-  };
+  return fitted.length === 0 ? null : { notes: fitted };
 };
 
 const applyColorDeviceToNotes = (
@@ -298,19 +244,15 @@ export const applyNoteStageColorPrograms = (
   chain: GeneratorChain,
   notes: ReadonlyArray<ClipNoteWithOrigin>,
   minimumNoteDuration: number,
-): NoteStageColorResult => {
+): ClipNoteWithOrigin[] => {
   if (notes.length === 0) {
-    return {
-      notes: [],
-      overlayTimingByOriginId: new Map(),
-    };
+    return [];
   }
 
   const passthroughNotes = notes
     .filter((note) => !note.originId)
     .map((note) => ({ ...note }));
   const notesByOriginId = groupNotesByOriginId(notes);
-  const overlayTimingByOriginId = new Map<string, OverlayTimingAdapter>();
 
   for (const group of splitChainByGroup(chain)) {
     const groupChain: GeneratorChain = {
@@ -347,13 +289,6 @@ export const applyNoteStageColorPrograms = (
         }
 
         notesByOriginId.set(originId, colorProgram.notes);
-        overlayTimingByOriginId.set(
-          originId,
-          composeOverlayTimingAdapter(
-            overlayTimingByOriginId.get(originId),
-            colorProgram.overlayTimingAdapter,
-          ),
-        );
       }
     }
   }
@@ -363,9 +298,5 @@ export const applyNoteStageColorPrograms = (
     colorized.push(...cloneNotes(originNotes));
   }
   sortClipNotes(colorized);
-
-  return {
-    notes: colorized,
-    overlayTimingByOriginId,
-  };
+  return colorized;
 };

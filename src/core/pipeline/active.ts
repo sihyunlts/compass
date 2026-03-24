@@ -1,5 +1,5 @@
+import type { Bounds, Polyline, SceneInstance, Vec2 } from '../core-types';
 import { buildGeneratorPolyline } from '../../devices/engine';
-import type { Polyline, SceneInstance } from '../core-types';
 import {
   applyTransformToPolyline,
   distanceToPolylineSquared,
@@ -19,6 +19,38 @@ export interface ActivationFrame {
   activeTiles: Set<number>;
   activeByPitch: Map<number, ActivePitchInfo>;
 }
+
+export interface OverlayFrameStroke {
+  points: Vec2[];
+  closed: boolean;
+}
+
+export interface ExactOutputFrame {
+  time: number;
+  activationFrame: ActivationFrame;
+  overlayStrokes: ReadonlyArray<OverlayFrameStroke>;
+}
+
+const buildOverlayCellStroke = (x: number, y: number): OverlayFrameStroke => ({
+  points: [
+    { x: x - 0.5, y: y - 0.5 },
+    { x: x + 0.5, y: y - 0.5 },
+    { x: x + 0.5, y: y + 0.5 },
+    { x: x - 0.5, y: y + 0.5 },
+  ],
+  closed: true,
+});
+
+const doesOverlayCellIntersectBounds = (
+  x: number,
+  y: number,
+  bounds: Bounds,
+): boolean => (
+  x + 0.5 >= bounds.minX
+  && x - 0.5 <= bounds.maxX
+  && y + 0.5 >= bounds.minY
+  && y - 0.5 <= bounds.maxY
+);
 
 export const projectSceneToPolylinesAtTime = (
   scene: ReadonlyArray<SceneInstance>,
@@ -126,5 +158,46 @@ export const projectSceneToActivationFrame = (
     time,
     activeTiles: resolveActiveTilesFromPolylines(polylines),
     activeByPitch: resolveActiveByPitch(polylines, launchpadMap),
+  };
+};
+
+export const projectActivationFrameToOverlayStrokes = (
+  activationFrame: ActivationFrame,
+  launchpadMap: ButtonIndex,
+  bounds?: Bounds,
+): OverlayFrameStroke[] => {
+  const strokes: OverlayFrameStroke[] = [];
+
+  for (const group of launchpadMap.groups) {
+    const isActive = group.buttons.some((button) =>
+      activationFrame.activeByPitch.has(button.output.number));
+    if (!isActive) {
+      continue;
+    }
+    if (bounds && !doesOverlayCellIntersectBounds(group.x, group.y, bounds)) {
+      continue;
+    }
+    strokes.push(buildOverlayCellStroke(group.x, group.y));
+  }
+
+  return strokes;
+};
+
+export const projectSceneToExactOutputFrame = (
+  scene: ReadonlyArray<SceneInstance>,
+  time: number,
+  launchpadMap: ButtonIndex,
+  bounds?: Bounds,
+): ExactOutputFrame => {
+  const activationFrame = projectSceneToActivationFrame(scene, time, launchpadMap);
+
+  return {
+    time,
+    activationFrame,
+    overlayStrokes: projectActivationFrameToOverlayStrokes(
+      activationFrame,
+      launchpadMap,
+      bounds,
+    ),
   };
 };

@@ -1,10 +1,5 @@
 import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode, LaunchpadButton } from '../../shared/model';
-import type { Bounds, Polyline, SceneInstance, Vec2 } from '../core-types';
-
-export interface OriginWindow {
-  min: number;
-  max: number;
-}
+import type { Bounds, Polyline, SceneInstance } from '../core-types';
 
 export type GroupId = string | null;
 export type MaskTimeKind = 'forward' | 'reversed';
@@ -42,7 +37,6 @@ export interface ButtonIndexGroup {
 
 export interface ButtonIndex {
   groups: ReadonlyArray<ButtonIndexGroup>;
-  coordinates: ReadonlyArray<Vec2>;
 }
 
 export interface ActivePitchInfo {

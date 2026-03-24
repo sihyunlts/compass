@@ -1,8 +1,8 @@
 import {
   getLaunchpadRuntimeMap,
   resolveLaunchpadModel,
-  type OverlayFrameStroke,
 } from '../../../domain';
+import type { OverlayFrameStroke } from '../../../core/pipeline/active';
 import { clamp } from '../../../shared/math';
 import type { LaunchpadButton, LaunchpadModel } from '../../../shared/model';
 import type { PreviewWindowState } from '../../../shared/contracts/preview/window-state';

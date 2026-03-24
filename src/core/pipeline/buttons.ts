@@ -1,5 +1,4 @@
 import type { LaunchpadButton } from '../../shared/model';
-import type { Vec2 } from '../core-types';
 import type { ButtonIndex, ButtonIndexGroup } from './types';
 
 export const buildButtonIndex = (buttons: ReadonlyArray<LaunchpadButton>): ButtonIndex => {
@@ -24,7 +23,5 @@ export const buildButtonIndex = (buttons: ReadonlyArray<LaunchpadButton>): Butto
   }
 
   const groups = [...groupsByCoordinate.values()];
-  const coordinates: Vec2[] = groups.map((group) => ({ x: group.x, y: group.y }));
-
-  return { groups, coordinates };
+  return { groups };
 };

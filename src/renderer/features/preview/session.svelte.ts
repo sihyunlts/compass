@@ -3,13 +3,13 @@ import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
 import type { PreviewWindowState } from '../../../shared/contracts/preview/window-state';
 import { createModulationReadoutCache } from './modulation-cache';
-import { createOverlayFrameCache } from './overlay-cache';
 import {
   createPreviewResultCache,
   type PreviewResultCacheEntry,
 } from './result-cache';
 import { toActiveCells } from './utils';
 import {
+  DEFAULT_OVERLAY_WORLD_BOUNDS,
   buildPreviewSurfaceViewModel,
   createEmptyPreviewSurfaceViewModel,
   type PreviewSurfaceViewModel,
@@ -72,8 +72,6 @@ export class PreviewSession {
   private nextPreviewRevision = 1;
 
   private readonly previewResultCache = createPreviewResultCache();
-
-  private readonly overlayFrameCache = createOverlayFrameCache();
 
   private readonly modulationReadoutCache = createModulationReadoutCache();
 
@@ -140,14 +138,11 @@ export class PreviewSession {
       isGuideEnabled: input.isGuideEnabled,
     };
 
-    const overlayCache = this.overlayFrameCache.resolve(
-      sourceKey,
-      sourceChain,
-      input.launchpadModel,
-      input.loopLengthBeats,
-      previewResult?.overlayTimingByOriginId,
+    this.syncPreviewSurface(
+      previewWindowState,
+      previewResult?.overlayFramesByIndex ?? [],
+      previewResult?.overlayWorldBounds ?? DEFAULT_OVERLAY_WORLD_BOUNDS,
     );
-    this.syncPreviewSurface(previewWindowState, overlayCache.framesByIndex, overlayCache.bounds);
     this.state.modulationReadoutById = this.modulationReadoutCache.resolveReadoutById(
       sourceKey,
       sourceChain,
@@ -171,13 +166,17 @@ export class PreviewSession {
       return;
     }
 
-    const overlayCache = this.overlayFrameCache.resolve(
-      `preview-window:${previewState.previewRevision}`,
-      previewState.chain,
-      previewState.launchpadModel ?? 'mk3',
-      previewState.loopLengthBeats,
+    const previewResult = this.previewResultCache.resolve({
+      sourceChain: previewState.chain,
+      sourceKey: `preview-window:${previewState.previewRevision}`,
+      loopLengthBeats: previewState.loopLengthBeats,
+      launchpadModel: previewState.launchpadModel ?? 'mk3',
+    });
+    this.syncPreviewSurface(
+      previewState,
+      previewResult.overlayFramesByIndex,
+      previewResult.overlayWorldBounds,
     );
-    this.syncPreviewSurface(previewState, overlayCache.framesByIndex, overlayCache.bounds);
     this.state.previewRevision = previewState.previewRevision;
     this.state.sourceTimelineEndBeat = previewState.sourceTimelineEndBeat;
     this.state.noteCount = previewState.noteCount;
@@ -197,7 +196,6 @@ export class PreviewSession {
 
   private resetCaches(): void {
     this.previewResultCache.reset();
-    this.overlayFrameCache.reset();
     this.modulationReadoutCache.reset();
   }
 

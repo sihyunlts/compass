@@ -2,16 +2,14 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
-  NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   getLaunchpadRuntimeMap,
-  generateOverlayFrames,
   generatePreviewNotesData,
   resolveLaunchpadModel,
 } from '../src/domain';
-import type { OverlayFrameStroke } from '../src/domain';
+import type { OverlayFrameStroke } from '../src/core/pipeline/active';
 import {
   compilePipelineEngine,
-  computeOriginWindowsWithEngine,
+  evaluateExactOutputFramesAtTimes,
   evaluateMaskDebugAtTime,
   evaluatePolylinesAtTime,
 } from '../src/core/pipeline/engine';
@@ -38,12 +36,6 @@ interface SerializablePolyline {
   closed: boolean;
   clipCount: number;
   points: Array<{ x: number; y: number }>;
-}
-
-interface ActivePreviewNote {
-  pitch: number;
-  velocity: number;
-  channel: number;
 }
 
 const DEFAULT_BEATS = [0, 0.25, 0.5, 0.75];
@@ -161,53 +153,11 @@ const serializePolylines = (
   })),
 }));
 
-const serializeMap = <T>(
-  map: ReadonlyMap<string, T>,
-): Record<string, T> => Object.fromEntries(map.entries());
-
 const toTileCoordinates = (tileId: number): { tileId: number; x: number; y: number } => ({
   tileId,
   x: tileId % TILE_COUNT,
   y: Math.floor(tileId / TILE_COUNT),
 });
-
-const buildAddressToTileIdMap = (
-  launchpadModel: LaunchpadModel,
-): Map<string, number> => {
-  const runtimeMap = getLaunchpadRuntimeMap(launchpadModel);
-  return new Map(runtimeMap.buttons.map((button) => [
-    `${button.output.channel}:${button.output.number}`,
-    (button.y * TILE_COUNT) + button.x,
-  ]));
-};
-
-const getActivePreviewNotesAtBeat = (
-  notes: ReadonlyArray<{
-    pitch: number;
-    channel: number;
-    velocity: number;
-    startBeat: number;
-    durationBeats: number;
-  }>,
-  beat: number,
-): ActivePreviewNote[] => notes
-  .filter((note) => note.startBeat <= beat && beat < note.startBeat + note.durationBeats)
-  .map((note) => ({
-    pitch: note.pitch,
-    velocity: note.velocity,
-    channel: note.channel,
-  }));
-
-const toActiveTileIds = (
-  notes: ReadonlyArray<ActivePreviewNote>,
-  addressToTileId: ReadonlyMap<string, number>,
-): number[] => Array.from(
-  new Set(
-    notes
-      .map((note) => addressToTileId.get(`${note.channel}:${note.pitch}`))
-      .filter((tileId): tileId is number => tileId !== undefined),
-  ),
-).sort((left, right) => left - right);
 
 const toSvgPath = (stroke: OverlayFrameStroke): string => {
   const [first, ...rest] = stroke.points;
@@ -270,9 +220,8 @@ const writeMaskDebugBeat = async (
   maskDevice: MaskEffectNode,
   beat: number,
   engine: ReturnType<typeof compilePipelineEngine>,
-  originWindows: ReadonlyMap<string, { min: number; max: number }>,
 ): Promise<void> => {
-  const snapshot = evaluateMaskDebugAtTime(engine, maskDevice.id, beat, originWindows as Map<string, { min: number; max: number }>);
+  const snapshot = evaluateMaskDebugAtTime(engine, maskDevice.id, beat);
   if (!snapshot) {
     return;
   }
@@ -364,40 +313,25 @@ const main = async (): Promise<void> => {
     loopLengthBeats: options.loopLengthBeats,
     launchpadModel: options.launchpadModel,
   });
-  const addressToTileId = buildAddressToTileIdMap(options.launchpadModel);
-  const overlayFrames = generateOverlayFrames({
-    chain,
-    beats01: options.beats,
-    loopLengthBeats: options.loopLengthBeats,
-    launchpadModel: options.launchpadModel,
-  });
-
   const engine = compilePipelineEngine(chain, {
     buttons: runtimeMap.buttons,
     buttonIndex: runtimeMap.buttonIndex,
   });
-  const originWindows = computeOriginWindowsWithEngine(
-    engine,
-    NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-  );
+  const frameBeats = Array.from({ length: SAMPLES_PER_BEAT }, (_, step) => step / SAMPLES_PER_BEAT);
+  const sampledFrames = evaluateExactOutputFramesAtTimes(engine, frameBeats);
+  const exactFrames = evaluateExactOutputFramesAtTimes(engine, options.beats);
 
   await writeJson(path.join(outputDirectory, 'notes.json'), {
     notes: preview.notes,
-    overlayTimingByOriginId: serializeMap(preview.overlayTimingByOriginId),
   });
 
   const framesDirectory = path.join(outputDirectory, 'frames');
   await mkdir(framesDirectory, { recursive: true });
 
-  const activitySummary: Array<{ beat: number; activeTileCount: number }> = [];
-  for (let step = 0; step < SAMPLES_PER_BEAT; step += 1) {
-    const beat = step / SAMPLES_PER_BEAT;
-    const activeNotes = getActivePreviewNotesAtBeat(preview.notes, beat);
-    activitySummary.push({
-      beat,
-      activeTileCount: toActiveTileIds(activeNotes, addressToTileId).length,
-    });
-  }
+  const activitySummary = sampledFrames.map((frame) => ({
+    beat: frame.time,
+    activeTileCount: frame.activationFrame.activeTiles.size,
+  }));
   await writeJson(path.join(outputDirectory, 'activity-summary.json'), {
     samplesPerBeat: SAMPLES_PER_BEAT,
     nonEmptyFrames: activitySummary.filter((frame) => frame.activeTileCount > 0),
@@ -405,19 +339,20 @@ const main = async (): Promise<void> => {
 
   for (let index = 0; index < options.beats.length; index += 1) {
     const beat = options.beats[index];
+    const exactFrame = exactFrames[index];
     const beatKey = beat.toFixed(3);
     const frameDirectory = path.join(framesDirectory, `beat-${beatKey}`);
     await mkdir(frameDirectory, { recursive: true });
 
-    const polylines = evaluatePolylinesAtTime(engine, beat, originWindows);
-    const activeNotes = getActivePreviewNotesAtBeat(preview.notes, beat);
-    const activeTiles = toActiveTileIds(activeNotes, addressToTileId)
+    const polylines = evaluatePolylinesAtTime(engine, beat);
+    const activeTiles = Array.from(exactFrame?.activationFrame.activeTiles ?? [])
+      .sort((left, right) => left - right)
       .map((tileId) => toTileCoordinates(tileId));
-    const activePitches = activeNotes
-      .map((note) => ({
-        pitch: note.pitch,
-        velocity: note.velocity,
-        channel: note.channel,
+    const activePitches = Array.from(exactFrame?.activationFrame.activeByPitch.entries() ?? [])
+      .map(([pitch, info]) => ({
+        pitch,
+        velocity: info.velocity,
+        channel: info.channel,
       }))
       .sort((left, right) => left.pitch - right.pitch || left.channel - right.channel);
 
@@ -426,7 +361,7 @@ const main = async (): Promise<void> => {
     await writeJson(path.join(frameDirectory, 'polylines.json'), serializePolylines(polylines));
     await writeFile(
       path.join(frameDirectory, 'overlay.svg'),
-      buildOverlaySvg(overlayFrames[index] ?? [], activeTiles),
+      buildOverlaySvg(exactFrame?.overlayStrokes ?? [], activeTiles),
       'utf8',
     );
   }
@@ -435,7 +370,7 @@ const main = async (): Promise<void> => {
     device.kind === 'mask' && device.enabled);
   for (const maskDevice of maskDevices) {
     for (const beat of options.beats) {
-      await writeMaskDebugBeat(outputDirectory, maskDevice, beat, engine, originWindows);
+      await writeMaskDebugBeat(outputDirectory, maskDevice, beat, engine);
     }
   }
 

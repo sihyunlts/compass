@@ -8,11 +8,14 @@ import {
 import {
   stripModulationDevicesFromChain,
 } from '../modulation/routing';
-import { projectSceneToActivationFrame } from './active';
+import {
+  projectSceneToExactOutputFrame,
+  type ExactOutputFrame,
+  type OverlayFrameStroke,
+  type ActivationFrame,
+} from './active';
 import { buildButtonIndex } from './buttons';
 import {
-  SAMPLES_PER_BEAT,
-  THICKNESS,
   buildWorldBounds,
 } from './constants';
 import {
@@ -20,21 +23,13 @@ import {
   resolveMutedSources,
   splitChainByGroup,
 } from './groups';
-import { distanceToPolylineSquared, isPointInsideClipStack } from '../geometry';
 import {
   buildPolylinesForAllGroups,
   buildSceneInstancesForAllGroups,
   evaluateMaskDebugSnapshot,
   type MaskDebugSnapshot,
 } from './polylines';
-import type {
-  ActivePitchInfo,
-  ButtonIndex,
-  GroupChain,
-  GroupEvaluationContext,
-  GroupId,
-  OriginWindow,
-} from './types';
+import type { ButtonIndex, GroupChain, GroupEvaluationContext, GroupId } from './types';
 
 export interface CompiledPipelineEngine {
   buttons: ReadonlyArray<LaunchpadButton>;
@@ -51,6 +46,7 @@ export interface CompiledPipelineEngine {
 }
 
 export type { MaskDebugSnapshot } from './polylines';
+export type { ActivationFrame, ExactOutputFrame, OverlayFrameStroke } from './active';
 
 interface CompilePipelineEngineOptions {
   buttons?: ReadonlyArray<LaunchpadButton>;
@@ -60,7 +56,6 @@ interface CompilePipelineEngineOptions {
 
 const EMPTY_BUTTON_INDEX: ButtonIndex = {
   groups: [],
-  coordinates: [],
 };
 
 const cloneChainWithoutModulators = (sourceChain: GeneratorChain): GeneratorChain => {
@@ -175,69 +170,32 @@ export const evaluateSceneInstancesAtTime = (
 export const evaluatePolylinesAtTime = (
   engine: CompiledPipelineEngine,
   time01: number,
-  originWindows?: Map<string, OriginWindow>,
 ): Polyline[] => {
   const context = prepareEvaluationContext(engine, time01);
-  return buildPolylinesForAllGroups(context, originWindows);
+  return buildPolylinesForAllGroups(context);
 };
 
-export const evaluateActiveByPitchAtTime = (
+export const evaluateExactOutputFrameAtTime = (
   engine: CompiledPipelineEngine,
   time01: number,
-): Map<number, ActivePitchInfo> => {
+  bounds?: Bounds,
+): ExactOutputFrame => {
   const scene = evaluateSceneInstancesAtTime(engine, time01);
-  return projectSceneToActivationFrame(scene, time01, engine.buttonIndex).activeByPitch;
+  return projectSceneToExactOutputFrame(scene, time01, engine.buttonIndex, bounds);
 };
+
+export const evaluateExactOutputFramesAtTimes = (
+  engine: CompiledPipelineEngine,
+  times01: ReadonlyArray<number>,
+  bounds?: Bounds,
+): ExactOutputFrame[] => times01.map((time01) =>
+  evaluateExactOutputFrameAtTime(engine, time01, bounds));
 
 export const evaluateMaskDebugAtTime = (
   engine: CompiledPipelineEngine,
   maskDeviceId: string,
   time01: number,
-  originWindows?: Map<string, OriginWindow>,
 ): MaskDebugSnapshot | null => {
   const context = prepareEvaluationContext(engine, time01);
-  return evaluateMaskDebugSnapshot(maskDeviceId, context, originWindows);
-};
-
-export const computeOriginWindowsWithEngine = (
-  engine: CompiledPipelineEngine,
-  loopLengthBeats: number,
-): Map<string, OriginWindow> => {
-  const steps = Math.round(loopLengthBeats * SAMPLES_PER_BEAT);
-  if (!Number.isFinite(steps) || steps <= 0) {
-    return new Map();
-  }
-
-  const windows = new Map<string, OriginWindow>();
-  const thicknessSq = THICKNESS * THICKNESS;
-
-  for (let step = 0; step < steps; step += 1) {
-    const t = step / steps;
-    const polylines = evaluatePolylinesAtTime(engine, t);
-    const activeOrigins = new Set<string>();
-
-    for (const coord of engine.buttonIndex.coordinates) {
-      for (const polyline of polylines) {
-        if (polyline.clipStack.length > 0 && !isPointInsideClipStack(polyline.clipStack, coord)) {
-          continue;
-        }
-        const distanceSq = distanceToPolylineSquared(coord, polyline);
-        if (distanceSq <= thicknessSq) {
-          activeOrigins.add(polyline.originId);
-        }
-      }
-    }
-
-    for (const originId of activeOrigins) {
-      const existing = windows.get(originId);
-      if (!existing) {
-        windows.set(originId, { min: t, max: t });
-      } else {
-        existing.min = Math.min(existing.min, t);
-        existing.max = Math.max(existing.max, t);
-      }
-    }
-  }
-
-  return windows;
+  return evaluateMaskDebugSnapshot(maskDeviceId, context);
 };

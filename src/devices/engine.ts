@@ -1,4 +1,4 @@
-import type { Bounds, Polyline, SceneInstance } from '../core/core-types';
+import type { Bounds, Polyline, SceneInstance, SceneInstanceOfKind } from '../core/core-types';
 import type { GeneratorDeviceNode, GeneratorNode } from '../shared/model';
 import { maskEngineHandler } from './mask/engine';
 import { mirrorEngineHandler } from './mirror/engine';
@@ -88,12 +88,12 @@ export const buildGeneratorPolyline = (
   step: number,
 ): Polyline | null => {
   if (sceneInstance.primitive.kind === 'waterdrop') {
-    return waterdropEngineHandler.buildPolyline(sceneInstance, t01, step);
+    return waterdropEngineHandler.buildPolyline(sceneInstance as SceneInstanceOfKind<'waterdrop'>, t01, step);
   }
   if (sceneInstance.primitive.kind === 'scanner') {
-    return scannerEngineHandler.buildPolyline(sceneInstance, t01, step);
+    return scannerEngineHandler.buildPolyline(sceneInstance as SceneInstanceOfKind<'scanner'>, t01, step);
   }
-  return spiralEngineHandler.buildPolyline(sceneInstance, t01, step);
+  return spiralEngineHandler.buildPolyline(sceneInstance as SceneInstanceOfKind<'spiral'>, t01, step);
 };
 
 export const applyPipelineEffect = (
