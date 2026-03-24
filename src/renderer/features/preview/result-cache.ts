@@ -1,16 +1,11 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 import {
-  compilePipelineEngine,
-  evaluateExactOutputFramesAtTimes,
-} from '../../../core/pipeline/engine';
-import {
   generatePreviewNotesData,
   generatePreviewStats,
-  getLaunchpadRuntimeMap,
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
 } from '../../../domain';
-import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
+import type { ClipNote, GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
 import {
   PREVIEW_FRAME_COUNT,
@@ -19,13 +14,6 @@ import {
 } from './frame-index';
 import { EMPTY_ACTIVE_VELOCITY_BY_PITCH } from './utils';
 import { LatestSourceKeyFamilyCache } from './source-key-cache';
-
-const DEFAULT_EXACT_OUTPUT_WORLD_BOUNDS = {
-  minX: -4,
-  maxX: 13,
-  minY: -4,
-  maxY: 13,
-} as const;
 
 export interface PreviewResultCacheEntry {
   key: string;
@@ -41,6 +29,57 @@ interface PreviewResultInput {
   launchpadModel: LaunchpadModel;
   preview?: GeneratorPreview | null;
 }
+
+const isNoteActiveAtBeat = (
+  note: ClipNote,
+  beat: number,
+  sourceTimelineEndBeat: number,
+): boolean => {
+  if (!Number.isFinite(note.startBeat) || !Number.isFinite(note.durationBeats)) {
+    return false;
+  }
+
+  const noteStart = note.startBeat;
+  const noteEnd = note.startBeat + Math.max(note.durationBeats, 0);
+  if (beat >= sourceTimelineEndBeat) {
+    return noteStart <= beat && noteEnd >= beat;
+  }
+
+  return noteStart <= beat && beat < noteEnd;
+};
+
+const buildLedFrameAtBeat = (
+  notes: ReadonlyArray<ClipNote>,
+  beat: number,
+  sourceTimelineEndBeat: number,
+): ReadonlyMap<number, number> => {
+  const activeVelocityByPitch = new Map<number, number>();
+
+  for (const note of notes) {
+    if (!isNoteActiveAtBeat(note, beat, sourceTimelineEndBeat)) {
+      continue;
+    }
+
+    const previousVelocity = activeVelocityByPitch.get(note.pitch) ?? 0;
+    if (note.velocity > previousVelocity) {
+      activeVelocityByPitch.set(note.pitch, note.velocity);
+    }
+  }
+
+  return activeVelocityByPitch;
+};
+
+const buildLedFramesFromNotes = (
+  notes: ReadonlyArray<ClipNote>,
+  sourceTimelineEndBeat: number,
+): ReadonlyArray<ReadonlyMap<number, number>> => Array.from(
+  { length: PREVIEW_FRAME_COUNT },
+  (_, index) => buildLedFrameAtBeat(
+    notes,
+    toPreviewFrameBeat(index, sourceTimelineEndBeat),
+    sourceTimelineEndBeat,
+  ),
+);
 
 class PreviewResultCache {
   private readonly resultsByKey = new SvelteMap<string, PreviewResultCacheEntry>();
@@ -70,17 +109,14 @@ class PreviewResultCache {
       ...generatePreviewStats(generatedNotes?.notes ?? []),
       notes: generatedNotes?.notes ?? [],
     };
-    const exactFrames = this.buildExactOutputFrames(
-      input.sourceChain,
-      input.launchpadModel,
-    );
     const entry: PreviewResultCacheEntry = {
       key,
       preview,
       sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-      ledFramesByIndex: exactFrames.map((frame) => new Map(
-        Array.from(frame.activationFrame.activeByPitch.entries(), ([pitch, info]) => [pitch, info.velocity]),
-      )),
+      ledFramesByIndex: buildLedFramesFromNotes(
+        preview.notes,
+        NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+      ),
     };
     this.resultsByKey.set(key, entry);
     return entry;
@@ -109,26 +145,6 @@ class PreviewResultCache {
 
     const frameIndex = toPreviewFrameIndex(beat, previewResult.sourceTimelineEndBeat);
     return previewResult.ledFramesByIndex[frameIndex] ?? EMPTY_ACTIVE_VELOCITY_BY_PITCH;
-  }
-
-  private buildExactOutputFrames(
-    chain: GeneratorChain,
-    launchpadModel: LaunchpadModel,
-  ) {
-    const runtimeMap = getLaunchpadRuntimeMap(launchpadModel);
-    const engine = compilePipelineEngine(chain, {
-      buttons: runtimeMap.buttons,
-      buttonIndex: runtimeMap.buttonIndex,
-    });
-
-    return evaluateExactOutputFramesAtTimes(
-      engine,
-      Array.from(
-        { length: PREVIEW_FRAME_COUNT },
-        (_, index) => toPreviewFrameBeat(index, NORMALIZED_SOURCE_TIMELINE_END_BEAT),
-      ),
-      DEFAULT_EXACT_OUTPUT_WORLD_BOUNDS,
-    );
   }
 
   private toPreviewResultKey(
