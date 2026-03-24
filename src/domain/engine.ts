@@ -3,6 +3,10 @@ import {
   SAMPLES_PER_BEAT,
 } from '../core/pipeline/constants';
 import {
+  closeSampledNote,
+  collectPitchSampledNotes,
+} from '../core/pipeline/note-sampling';
+import {
   compilePipelineEngine,
   evaluateExactOutputFrameAtTime,
   type CompiledPipelineEngine,
@@ -45,14 +49,6 @@ export interface PreviewNotesData {
   sourceTimelineEndBeat: number;
 }
 
-interface OpenNoteState {
-  pitch: number;
-  startBeat: number;
-  velocity: number;
-  channel: number;
-  originId?: string;
-}
-
 interface RawNotesData {
   notes: ClipNoteWithOrigin[];
 }
@@ -84,24 +80,6 @@ const sortClipNotes = <T extends ClipNote>(notes: T[]): void => {
     left.startBeat - right.startBeat
     || left.pitch - right.pitch
     || left.channel - right.channel);
-};
-
-const closeOpenNote = (
-  notes: ClipNoteWithOrigin[],
-  pitch: number,
-  open: OpenNoteState,
-  endBeat: number,
-): void => {
-  const orderedStart = Math.max(Math.min(open.startBeat, endBeat), 0);
-  const orderedEnd = Math.max(Math.max(open.startBeat, endBeat), 0);
-  notes.push({
-    pitch,
-    channel: open.channel,
-    startBeat: orderedStart,
-    durationBeats: Math.max(orderedEnd - orderedStart, MIN_NOTE_DURATION),
-    velocity: open.velocity,
-    originId: open.originId,
-  });
 };
 
 const toClipNote = (note: ClipNoteWithOrigin): ClipNote => ({
@@ -163,59 +141,13 @@ const collectRawNotesData = ({
   }
 
   const engine = buildEngine(chain, runtimeMap);
-  const openByPitch = new Map<number, OpenNoteState>();
-  const notes: ClipNoteWithOrigin[] = [];
-
-  for (let step = 0; step < steps; step += 1) {
-    const t01 = step / steps;
-    const activeByPitch = evaluateExactOutputFrameAtTime(
-      engine,
-      t01,
-    ).activationFrame.activeByPitch;
-
-    for (const [pitch, open] of openByPitch.entries()) {
-      if (activeByPitch.has(pitch)) {
-        continue;
-      }
-      closeOpenNote(notes, pitch, open, t01);
-      openByPitch.delete(pitch);
-    }
-
-    for (const [pitch, active] of activeByPitch.entries()) {
-      const existing = openByPitch.get(pitch);
-      if (!existing) {
-        openByPitch.set(pitch, {
-          pitch,
-          startBeat: t01,
-          velocity: active.velocity,
-          channel: active.channel,
-          originId: active.originId,
-        });
-        continue;
-      }
-
-      if (
-        existing.velocity === active.velocity
-        && existing.channel === active.channel
-        && existing.originId === active.originId
-      ) {
-        continue;
-      }
-
-      closeOpenNote(notes, pitch, existing, t01);
-      openByPitch.set(pitch, {
-        pitch,
-        startBeat: t01,
-        velocity: active.velocity,
-        channel: active.channel,
-        originId: active.originId,
-      });
-    }
-  }
-
-  for (const [pitch, open] of openByPitch.entries()) {
-    closeOpenNote(notes, pitch, open, NORMALIZED_SOURCE_TIMELINE_END_BEAT);
-  }
+  const notes: ClipNoteWithOrigin[] = collectPitchSampledNotes({
+    sampleCount: steps,
+    endBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+    minimumNoteDuration: MIN_NOTE_DURATION,
+    resolveActiveByPitch: (sampleBeat) =>
+      evaluateExactOutputFrameAtTime(engine, sampleBeat).activationFrame.activeByPitch,
+  });
 
   sortClipNotes(notes);
   return { notes };
@@ -315,7 +247,13 @@ const filterNotesByMask = (
     return [];
   }
 
-  const openByAddress = new Map<string, OpenNoteState>();
+  const openByAddress = new Map<string, {
+    pitch: number;
+    startBeat: number;
+    velocity: number;
+    channel: number;
+    originId?: string;
+  }>();
   const filtered: ClipNoteWithOrigin[] = [];
 
   for (let step = 0; step < SAMPLES_PER_BEAT; step += 1) {
@@ -350,7 +288,7 @@ const filterNotesByMask = (
       if (activeByAddress.has(addressKey)) {
         continue;
       }
-      closeOpenNote(filtered, open.pitch, open, beat);
+      closeSampledNote(filtered, open.pitch, open, beat, MIN_NOTE_DURATION);
       openByAddress.delete(addressKey);
     }
 
@@ -366,7 +304,7 @@ const filterNotesByMask = (
       }
 
       if (existing) {
-        closeOpenNote(filtered, existing.pitch, existing, beat);
+        closeSampledNote(filtered, existing.pitch, existing, beat, MIN_NOTE_DURATION);
       }
 
       openByAddress.set(addressKey, {
@@ -381,7 +319,13 @@ const filterNotesByMask = (
 
   for (const [addressKey, open] of openByAddress.entries()) {
     void addressKey;
-    closeOpenNote(filtered, open.pitch, open, NORMALIZED_SOURCE_TIMELINE_END_BEAT);
+    closeSampledNote(
+      filtered,
+      open.pitch,
+      open,
+      NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+      MIN_NOTE_DURATION,
+    );
   }
 
   sortClipNotes(filtered);

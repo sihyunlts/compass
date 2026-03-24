@@ -15,6 +15,7 @@ import {
   SAMPLES_PER_BEAT,
   TILE_COUNT,
 } from './constants';
+import { collectPitchSampledNotes } from './note-sampling';
 import { fitNotesToTimeline } from './timeline-fit';
 import { isGeneratorNode, resolveMaskTime, resolveMutedSources, splitChainByGroup } from './groups';
 import {
@@ -24,7 +25,6 @@ import type {
   GroupEvaluationContext,
   GroupId,
   MaskTimeKind,
-  OpenNoteState,
   TimedOutputNote,
 } from './types';
 
@@ -182,82 +182,30 @@ const createSourceEvaluationContext = (
   };
 };
 
-const closeOpenNote = (
-  notes: TimedOutputNote[],
-  pitch: number,
-  open: OpenNoteState,
-  endBeat: number,
-): void => {
-  const orderedStart = Math.max(Math.min(open.startBeat, endBeat), 0);
-  const orderedEnd = Math.max(Math.max(open.startBeat, endBeat), 0);
-  notes.push({
-    pitch,
-    channel: open.channel,
-    startBeat: orderedStart,
-    durationBeats: Math.max(orderedEnd - orderedStart, MIN_NOTE_DURATION),
-    velocity: open.velocity,
-    originId: open.originId,
-  });
-};
-
 const collectGroupOutputNotes = (
   sourceGroupId: string,
   context: GroupEvaluationContext,
   consumingDeviceIndex?: number,
 ): TimedOutputNote[] => {
-  const notes: TimedOutputNote[] = [];
-  const openByPitch = new Map<number, OpenNoteState>();
   const sourceChain = createBaseChainForMaskSource(context, consumingDeviceIndex);
-
-  for (let step = 0; step < SAMPLES_PER_BEAT; step += 1) {
-    const sample = step / SAMPLES_PER_BEAT;
-    const sourceContext = createSourceEvaluationContext(
-      sourceChain,
-      context,
-      sample,
-      sourceGroupId,
-    );
-    const activeByPitch = projectSceneToActivationFrame(
-      buildOutputGroupSceneInstances(sourceGroupId, sourceContext),
-      sample,
-      context.buttonIndex,
-    ).activeByPitch;
-
-    for (const [pitch, open] of openByPitch.entries()) {
-      if (activeByPitch.has(pitch)) {
-        continue;
-      }
-      closeOpenNote(notes, pitch, open, sample);
-      openByPitch.delete(pitch);
-    }
-
-    for (const [pitch, active] of activeByPitch.entries()) {
-      const existing = openByPitch.get(pitch);
-      if (
-        existing
-        && existing.velocity === active.velocity
-        && existing.channel === active.channel
-        && existing.originId === active.originId
-      ) {
-        continue;
-      }
-
-      if (existing) {
-        closeOpenNote(notes, pitch, existing, sample);
-      }
-
-      openByPitch.set(pitch, {
-        startBeat: sample,
-        velocity: active.velocity,
-        channel: active.channel,
-        originId: active.originId,
-      });
-    }
-  }
-
-  for (const [pitch, open] of openByPitch.entries()) {
-    closeOpenNote(notes, pitch, open, 1);
-  }
+  const notes: TimedOutputNote[] = collectPitchSampledNotes({
+    sampleCount: SAMPLES_PER_BEAT,
+    endBeat: 1,
+    minimumNoteDuration: MIN_NOTE_DURATION,
+    resolveActiveByPitch: (sampleBeat) => {
+      const sourceContext = createSourceEvaluationContext(
+        sourceChain,
+        context,
+        sampleBeat,
+        sourceGroupId,
+      );
+      return projectSceneToActivationFrame(
+        buildOutputGroupSceneInstances(sourceGroupId, sourceContext),
+        sampleBeat,
+        context.buttonIndex,
+      ).activeByPitch;
+    },
+  });
 
   return applyNoteStageColorPrograms(sourceChain, notes, MIN_NOTE_DURATION);
 };

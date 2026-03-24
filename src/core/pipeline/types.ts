@@ -57,10 +57,3 @@ export interface ActivePitchInfo {
   channel: number;
   originId?: string;
 }
-
-export interface OpenNoteState {
-  startBeat: number;
-  velocity: number;
-  channel: number;
-  originId?: string;
-}
