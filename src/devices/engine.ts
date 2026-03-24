@@ -5,6 +5,7 @@ import { mirrorEngineHandler } from './mirror/engine';
 import { reverseEngineHandler } from './reverse/engine';
 import { rotateEngineHandler } from './rotate/engine';
 import { scannerEngineHandler } from './scanner/engine';
+import { scaleEngineHandler } from './scale/engine';
 import { spiralEngineHandler } from './spiral/engine';
 import { symmetryEngineHandler } from './symmetry/engine';
 import { pathEngineHandler } from './path/engine';
@@ -32,6 +33,7 @@ const pipelineEffectEngineHandlers = {
   mask: maskEngineHandler,
   symmetry: symmetryEngineHandler,
   rotate: rotateEngineHandler,
+  scale: scaleEngineHandler,
   translate: translateEngineHandler,
   reverse: reverseEngineHandler,
 } as const satisfies Record<PipelineEffectKind, EffectDeviceEngineHandler>;

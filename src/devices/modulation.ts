@@ -1,4 +1,5 @@
 import type { GeneratorDeviceNode } from '../shared/model';
+import { normalizePositiveScaleFactor } from './scale/schema';
 
 type DeviceKind = GeneratorDeviceNode['kind'];
 type DeviceNodeOfKind<K extends DeviceKind> = Extract<GeneratorDeviceNode, { kind: K }>;
@@ -96,6 +97,34 @@ const NUMERIC_PARAM_ACCESSORS: Record<
       read: (device) => (device as DeviceNodeOfKind<'rotate'>).params.angleDeg,
       write: (device, value) => {
         (device as DeviceNodeOfKind<'rotate'>).params.angleDeg = value;
+      },
+    },
+  },
+  scale: {
+    centerX: {
+      read: (device) => (device as DeviceNodeOfKind<'scale'>).params.centerX,
+      write: (device, value) => {
+        (device as DeviceNodeOfKind<'scale'>).params.centerX = value;
+      },
+    },
+    centerY: {
+      read: (device) => (device as DeviceNodeOfKind<'scale'>).params.centerY,
+      write: (device, value) => {
+        (device as DeviceNodeOfKind<'scale'>).params.centerY = value;
+      },
+    },
+    scaleX: {
+      read: (device) => (device as DeviceNodeOfKind<'scale'>).params.scaleX,
+      write: (device, value) => {
+        const scaleDevice = device as DeviceNodeOfKind<'scale'>;
+        scaleDevice.params.scaleX = normalizePositiveScaleFactor(value, scaleDevice.params.scaleX);
+      },
+    },
+    scaleY: {
+      read: (device) => (device as DeviceNodeOfKind<'scale'>).params.scaleY,
+      write: (device, value) => {
+        const scaleDevice = device as DeviceNodeOfKind<'scale'>;
+        scaleDevice.params.scaleY = normalizePositiveScaleFactor(value, scaleDevice.params.scaleY);
       },
     },
   },

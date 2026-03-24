@@ -180,5 +180,16 @@ export const cloneDeviceNode = (
     };
   }
 
+  if (device.kind === 'scale') {
+    return {
+      id: device.id,
+      kind: 'scale',
+      enabled: device.enabled,
+      groupId: device.groupId ?? null,
+      name: device.name ?? null,
+      params: { ...device.params },
+    };
+  }
+
   return assertUnsupportedDeviceKind(device);
 };

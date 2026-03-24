@@ -21,6 +21,7 @@ export type {
   PathPoint,
   ReverseEffectNode,
   RotateEffectNode,
+  ScaleEffectNode,
   ScannerGeneratorNode,
   ScannerParams,
   SpiralGeneratorNode,

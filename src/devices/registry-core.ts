@@ -14,6 +14,8 @@ import { rotateDeviceControls } from './rotate/controls';
 import { rotateDeviceSchema } from './rotate/schema';
 import { scannerDeviceControls } from './scanner/controls';
 import { scannerDeviceSchema } from './scanner/schema';
+import { scaleDeviceControls } from './scale/controls';
+import { scaleDeviceSchema } from './scale/schema';
 import { spiralDeviceControls } from './spiral/controls';
 import { spiralDeviceSchema } from './spiral/schema';
 import { symmetryDeviceControls } from './symmetry/controls';
@@ -84,6 +86,11 @@ export const RENDERER_DEVICE_MANIFEST = [
     ...rotateDeviceSchema,
     controls: rotateDeviceControls,
     editor: './rotate/ui.svelte',
+  },
+  {
+    ...scaleDeviceSchema,
+    controls: scaleDeviceControls,
+    editor: './scale/ui.svelte',
   },
   {
     ...translateDeviceSchema,

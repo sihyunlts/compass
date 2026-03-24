@@ -130,6 +130,18 @@ export interface TranslateEffectNode extends GroupedDeviceNode {
   };
 }
 
+export interface ScaleEffectNode extends GroupedDeviceNode {
+  id: string;
+  kind: 'scale';
+  enabled: boolean;
+  params: {
+    centerX: number;
+    centerY: number;
+    scaleX: number;
+    scaleY: number;
+  };
+}
+
 export interface ColorEffectNode extends GroupedDeviceNode {
   id: string;
   kind: 'color';
@@ -177,6 +189,7 @@ export type GeneratorEffectNode =
   | ReverseEffectNode
   | RotateEffectNode
   | TranslateEffectNode
+  | ScaleEffectNode
   | ColorEffectNode;
 
 export type GeneratorDeviceNode =

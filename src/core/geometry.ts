@@ -189,6 +189,30 @@ export const toTranslationTransform = (
   ty: offsetY,
 });
 
+export const toScaleTransformAt = (
+  scaleX: number,
+  scaleY: number,
+  center: Vec2,
+): AffineTransform | null => {
+  if (!Number.isFinite(center.x)
+    || !Number.isFinite(center.y)
+    || !Number.isFinite(scaleX)
+    || !Number.isFinite(scaleY)
+    || scaleX <= 0
+    || scaleY <= 0) {
+    return null;
+  }
+
+  return {
+    a: scaleX,
+    b: 0,
+    c: 0,
+    d: scaleY,
+    tx: center.x - (center.x * scaleX),
+    ty: center.y - (center.y * scaleY),
+  };
+};
+
 export const createTileUnionClip = (
   tiles: Iterable<number>,
 ): TileUnionClipShape => ({
