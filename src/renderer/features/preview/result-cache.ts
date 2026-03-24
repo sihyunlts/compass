@@ -17,7 +17,7 @@ import { LatestSourceKeyFamilyCache } from './source-key-cache';
 
 export interface PreviewResultCacheEntry {
   key: string;
-  preview: GeneratorPreview | null;
+  preview: GeneratorPreview;
   sourceTimelineEndBeat: number;
   ledFramesByIndex: ReadonlyArray<ReadonlyMap<number, number>>;
 }
@@ -27,7 +27,7 @@ interface PreviewResultInput {
   sourceKey: string;
   loopLengthBeats: number;
   launchpadModel: LaunchpadModel;
-  preview?: GeneratorPreview | null;
+  preview?: GeneratorPreview;
 }
 
 const isNoteActiveAtBeat = (
@@ -105,22 +105,24 @@ class PreviewResultCache {
         loopLengthBeats: input.loopLengthBeats,
         launchpadModel: input.launchpadModel,
       });
-    const sourceTimelineEndBeat =
-      input.preview?.sourceTimelineEndBeat
-      ?? generatedNotes?.sourceTimelineEndBeat
-      ?? NORMALIZED_SOURCE_TIMELINE_END_BEAT;
-    const preview = input.preview ?? {
-      ...generatePreviewStats(generatedNotes?.notes ?? []),
-      notes: generatedNotes?.notes ?? [],
-      sourceTimelineEndBeat,
-    };
+    const preview = input.preview ?? (() => {
+      const generatedPreview = generatedNotes ?? {
+        notes: [],
+        sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+      };
+      return {
+        ...generatePreviewStats(generatedPreview.notes),
+        notes: generatedPreview.notes,
+        sourceTimelineEndBeat: generatedPreview.sourceTimelineEndBeat,
+      };
+    })();
     const entry: PreviewResultCacheEntry = {
       key,
       preview,
-      sourceTimelineEndBeat,
+      sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
       ledFramesByIndex: buildLedFramesFromNotes(
         preview.notes,
-        sourceTimelineEndBeat,
+        preview.sourceTimelineEndBeat,
       ),
     };
     this.resultsByKey.set(key, entry);

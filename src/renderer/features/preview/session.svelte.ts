@@ -74,13 +74,8 @@ export class PreviewSession {
   private readonly modulationReadoutCache = createModulationReadoutCache();
 
   public readonly commands = {
-    generateRendererPreview: (input: PreviewGenerateInput): GeneratorPreview => {
-      const preview = this.previewResultCache.resolve(input).preview;
-      if (!preview) {
-        throw new Error('Renderer preview generation returned no preview');
-      }
-      return preview;
-    },
+    generateRendererPreview: (input: PreviewGenerateInput): GeneratorPreview =>
+      this.previewResultCache.resolve(input).preview,
     applyPreviewResult: (input: PreviewApplyInput): void => {
       this.applyPreviewResult(input);
     },
@@ -128,8 +123,8 @@ export class PreviewSession {
       currentBeat: beat,
       sourceTimelineEndBeat,
       loopLengthBeats: input.loopLengthBeats,
-      noteCount: previewResult?.preview?.noteCount ?? 0,
-      uniquePitchCount: previewResult?.preview?.uniquePitchCount ?? 0,
+      noteCount: previewResult?.preview.noteCount ?? 0,
+      uniquePitchCount: previewResult?.preview.uniquePitchCount ?? 0,
       bpm: input.bpm,
       isPlaying: input.isPlaying,
       isLoopEnabled: input.isLoopEnabled,
@@ -198,8 +193,8 @@ export class PreviewSession {
   ): void {
     this.state.previewRevision = previewRevision;
     this.state.sourceTimelineEndBeat = previewResult.sourceTimelineEndBeat;
-    this.state.noteCount = previewResult.preview?.noteCount ?? 0;
-    this.state.uniquePitchCount = previewResult.preview?.uniquePitchCount ?? 0;
+    this.state.noteCount = previewResult.preview.noteCount;
+    this.state.uniquePitchCount = previewResult.preview.uniquePitchCount;
   }
 
   private resolveRenderSource(input: PreviewFrameInput): {
