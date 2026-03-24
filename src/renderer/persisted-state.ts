@@ -12,7 +12,6 @@ export interface PersistedRendererState {
   preview?: {
     bpm?: number;
     loopEnabled?: boolean;
-    guideEnabled?: boolean;
   };
   ui?: {
     sidebarWidthPx?: number;

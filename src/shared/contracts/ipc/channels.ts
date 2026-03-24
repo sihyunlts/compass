@@ -9,8 +9,6 @@ export const IPC_CHANNELS = {
   requestPreviewWindowState: 'preview:request-state',
   requestPreviewWindowVisibility: 'preview:request-window-visibility',
   previewWindowVisibilityUpdate: 'preview:window-visibility-update',
-  requestPreviewGuideEnabledUpdate: 'preview:request-guide-enabled-update',
-  previewGuideEnabledUpdate: 'preview:guide-enabled-update',
   openExternal: 'bridge:open-external',
   savePresetFile: 'preset:save-file',
   listPresetBrowserTree: 'preset:list-browser-tree',

@@ -29,15 +29,11 @@ export interface CompassApi {
   pushPreviewWindowState: (state: PreviewWindowState) => void;
   requestPreviewWindowState: () => Promise<PreviewWindowState | null>;
   requestPreviewWindowVisibility: () => Promise<boolean>;
-  requestPreviewGuideEnabledUpdate: (enabled: boolean) => Promise<void>;
   subscribePreviewWindowState: (
     listener: (state: PreviewWindowState) => void,
   ) => () => void;
   subscribePreviewWindowVisibility: (
     listener: (isOpen: boolean) => void,
-  ) => () => void;
-  subscribePreviewGuideEnabledUpdate: (
-    listener: (enabled: boolean) => void,
   ) => () => void;
   subscribeLiveTempo: (
     listener: (update: LiveTempoUpdate) => void,

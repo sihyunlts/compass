@@ -9,7 +9,6 @@ import {
 } from './result-cache';
 import { toActiveCells } from './utils';
 import {
-  DEFAULT_OVERLAY_WORLD_BOUNDS,
   buildPreviewSurfaceViewModel,
   createEmptyPreviewSurfaceViewModel,
   type PreviewSurfaceViewModel,
@@ -42,7 +41,6 @@ interface PreviewFrameInput {
   bpm: number;
   isPlaying: boolean;
   isLoopEnabled: boolean;
-  isGuideEnabled: boolean;
   resolveLedRgb: (velocity: number) => string;
 }
 
@@ -135,13 +133,10 @@ export class PreviewSession {
       bpm: input.bpm,
       isPlaying: input.isPlaying,
       isLoopEnabled: input.isLoopEnabled,
-      isGuideEnabled: input.isGuideEnabled,
     };
 
     this.syncPreviewSurface(
       previewWindowState,
-      previewResult?.overlayFramesByIndex ?? [],
-      previewResult?.overlayWorldBounds ?? DEFAULT_OVERLAY_WORLD_BOUNDS,
     );
     this.state.modulationReadoutById = this.modulationReadoutCache.resolveReadoutById(
       sourceKey,
@@ -174,8 +169,6 @@ export class PreviewSession {
     });
     this.syncPreviewSurface(
       previewState,
-      previewResult.overlayFramesByIndex,
-      previewResult.overlayWorldBounds,
     );
     this.state.previewRevision = previewState.previewRevision;
     this.state.sourceTimelineEndBeat = previewState.sourceTimelineEndBeat;
@@ -228,15 +221,9 @@ export class PreviewSession {
 
   private syncPreviewSurface(
     previewState: PreviewWindowState | null,
-    overlayFramesByIndex: Parameters<typeof buildPreviewSurfaceViewModel>[1],
-    overlayBounds: Parameters<typeof buildPreviewSurfaceViewModel>[2],
   ): void {
     this.state.previewWindowState = previewState;
-    this.state.surfaceModel = buildPreviewSurfaceViewModel(
-      previewState,
-      overlayFramesByIndex,
-      overlayBounds,
-    );
+    this.state.surfaceModel = buildPreviewSurfaceViewModel(previewState);
   }
 }
 

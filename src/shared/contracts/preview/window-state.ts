@@ -16,5 +16,4 @@ export interface PreviewWindowState {
   bpm: number;
   isPlaying: boolean;
   isLoopEnabled: boolean;
-  isGuideEnabled: boolean;
 }

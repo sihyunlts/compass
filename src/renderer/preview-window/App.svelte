@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
 
   import type { PreviewWindowState } from '../../shared/contracts/preview/window-state';
-  import Button from '../components/Button.svelte';
   import { createPreviewSession } from '../features/preview/session.svelte';
   import PreviewSurface from '../components/PreviewSurface.svelte';
 
@@ -22,7 +21,6 @@
       previewState.isPlaying ? 'Playing' : 'Stopped',
       `BPM ${previewState.bpm.toFixed(2)}`,
       previewState.isLoopEnabled ? 'Loop On' : 'Loop Off',
-      previewState.isGuideEnabled ? 'Guide On' : 'Guide Off',
     ].join(' | ');
   });
 
@@ -33,20 +31,6 @@
 
     return `Notes ${previewState.noteCount} | Pitches ${previewState.uniquePitchCount} | Beat ${toBeatText(previewState.currentBeat)}`;
   });
-
-  const applyGuideToggle = async (nextEnabled: boolean): Promise<void> => {
-    try {
-      await window.compass.requestPreviewGuideEnabledUpdate(nextEnabled);
-    } catch {
-      // If toggle request fails, next state push restores view state.
-    }
-  };
-
-  const isGuideVisible = (): boolean => previewState?.isGuideEnabled !== false;
-
-  const handleGuideToggle = (): void => {
-    void applyGuideToggle(!isGuideVisible());
-  };
 
   onMount(() => {
     const unsubscribe = window.compass.subscribePreviewWindowState((nextState) => {
@@ -77,12 +61,6 @@
     <PreviewSurface
       mode="popout"
       surfaceModel={previewViewState.surfaceModel}
-    />
-    <Button
-      class="preview-guide-toggle"
-      text={isGuideVisible() ? 'Guide On' : 'Guide Off'}
-      pressed={isGuideVisible()}
-      onClick={handleGuideToggle}
     />
   </div>
 

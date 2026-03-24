@@ -8,7 +8,6 @@
 
   let {
     surfaceModel,
-    onGuideToggle,
     onPopout,
     isPlaying = false,
     loopEnabled,
@@ -18,7 +17,6 @@
     onScrubInput,
   } = $props<{
     surfaceModel: PreviewSurfaceViewModel;
-    onGuideToggle: (nextEnabled: boolean) => void;
     onPopout: () => void | Promise<void>;
     isPlaying?: boolean;
     loopEnabled: boolean;
@@ -28,18 +26,11 @@
     onScrubInput: () => void;
   }>();
 
-  const isGuideVisible = (): boolean => surfaceModel.isGuideEnabled;
   const resolvePlayIcon = (): string => (isPlaying ? 'pause' : 'play_arrow');
   const resolvePlayButtonLabel = (): string =>
     isPlaying ? 'Pause preview' : 'Play preview';
   const resolveLoopButtonLabel = (): string =>
     loopEnabled ? 'Disable preview loop' : 'Enable preview loop';
-  const resolveGuideButtonLabel = (): string =>
-    isGuideVisible() ? 'Hide preview guide' : 'Show preview guide';
-
-  const handleGuideToggle = (): void => {
-    onGuideToggle(!isGuideVisible());
-  };
 
   const handlePopout = (): void => {
     void onPopout();
@@ -86,14 +77,6 @@
       label="Open preview in a separate window"
       icon="open_in_new"
       onClick={handlePopout}
-    />
-    <Button
-      class="preview-guide-toggle"
-      variant="icon"
-      label={resolveGuideButtonLabel()}
-      icon="grid_guides"
-      pressed={isGuideVisible()}
-      onClick={handleGuideToggle}
     />
   </div>
 </section>

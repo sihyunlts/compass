@@ -2,24 +2,14 @@ import {
   getLaunchpadRuntimeMap,
   resolveLaunchpadModel,
 } from '../../../domain';
-import type { OverlayFrameStroke } from '../../../core/pipeline/active';
 import { clamp } from '../../../shared/math';
 import type { LaunchpadButton, LaunchpadModel } from '../../../shared/model';
 import type { PreviewWindowState } from '../../../shared/contracts/preview/window-state';
-import { toPreviewFrameIndex } from './frame-index';
 
 const PREVIEW_COLS = 10;
 const PREVIEW_ROWS = 10;
 const PREVIEW_LED_GAMMA = 0.3;
 const PREVIEW_LED_PAD_FLOOR = 50;
-const OVERLAY_WORLD_BASE_PADDING = 4;
-
-export interface OverlayWorldBounds {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-}
 
 interface PreviewSurfaceCellModel {
   key: string;
@@ -32,9 +22,6 @@ export interface PreviewSurfaceViewModel {
   launchpadModel: LaunchpadModel;
   cells: ReadonlyArray<PreviewSurfaceCellModel>;
   activeCells: ReadonlyArray<PreviewWindowState['activeCells'][number]>;
-  overlayStrokes: ReadonlyArray<OverlayFrameStroke>;
-  overlayWorldBounds: OverlayWorldBounds;
-  isGuideEnabled: boolean;
 }
 
 const previewCellCache = new Map<LaunchpadModel, ReadonlyArray<PreviewSurfaceCellModel>>();
@@ -108,24 +95,6 @@ const parseRgbChannels = (rgb: string): [number, number, number] | null => {
 
 const applyPreviewLedGamma = (channel: number): number =>
   Math.pow(clamp(channel, 0, 255) / 255, PREVIEW_LED_GAMMA) * 255;
-
-export const resolveOverlayWorldBounds = (padding: number): OverlayWorldBounds => ({
-  minX: 0 - padding,
-  maxX: 9 + padding,
-  minY: 0 - padding,
-  maxY: 9 + padding,
-});
-
-export const DEFAULT_OVERLAY_WORLD_BOUNDS = resolveOverlayWorldBounds(
-  OVERLAY_WORLD_BASE_PADDING,
-);
-
-const resolvePreviewSourceTimelineEndBeat = (
-  state: PreviewWindowState | null,
-): number => {
-  const endBeat = state?.sourceTimelineEndBeat;
-  return Number.isFinite(endBeat) && endBeat > 0 ? endBeat : 1;
-};
 
 const resolvePreviewCellModels = (
   model?: LaunchpadModel,
@@ -214,25 +183,13 @@ export const createEmptyPreviewSurfaceViewModel = (
     launchpadModel: resolvedModel,
     cells: resolvePreviewCellModels(resolvedModel),
     activeCells: [],
-    overlayStrokes: [],
-    overlayWorldBounds: DEFAULT_OVERLAY_WORLD_BOUNDS,
-    isGuideEnabled: false,
   };
 };
 
 export const buildPreviewSurfaceViewModel = (
   previewState: PreviewWindowState | null,
-  overlayFramesByIndex: ReadonlyArray<ReadonlyArray<OverlayFrameStroke>>,
-  overlayWorldBounds: OverlayWorldBounds,
 ): PreviewSurfaceViewModel => {
   const resolvedModel = resolveLaunchpadModel(previewState?.launchpadModel);
-  const sourceTimelineEndBeat = resolvePreviewSourceTimelineEndBeat(previewState);
-  const overlayStrokes = previewState && previewState.isGuideEnabled !== false
-    ? (overlayFramesByIndex[toPreviewFrameIndex(
-        previewState.currentBeat,
-        sourceTimelineEndBeat,
-      )] ?? [])
-    : [];
 
   return {
     launchpadModel: resolvedModel,
@@ -241,8 +198,5 @@ export const buildPreviewSurfaceViewModel = (
       pitch: cell.pitch,
       rgb: resolvePreviewSurfaceRgb(cell.rgb),
     })),
-    overlayStrokes,
-    overlayWorldBounds,
-    isGuideEnabled: previewState?.isGuideEnabled !== false,
   };
 };

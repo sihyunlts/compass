@@ -11,7 +11,6 @@ import {
   saveBridgeSettings,
   saveLaunchpadModel,
   savePreviewBpm,
-  savePreviewGuideEnabled,
   savePreviewLoopEnabled,
 } from './persistence-storage';
 import type { EditorSessionState } from './session.svelte';
@@ -55,19 +54,6 @@ export const togglePreviewLoopEnabled = (
 ): boolean => {
   state.isPreviewLoopEnabled = !state.isPreviewLoopEnabled;
   savePreviewLoopEnabled(state.isPreviewLoopEnabled);
-  return true;
-};
-
-export const setPreviewGuideEnabled = (
-  state: EditorSessionState,
-  nextEnabled: boolean,
-): boolean => {
-  if (state.isPreviewGuideEnabled === nextEnabled) {
-    return false;
-  }
-
-  state.isPreviewGuideEnabled = nextEnabled;
-  savePreviewGuideEnabled(nextEnabled);
   return true;
 };
 

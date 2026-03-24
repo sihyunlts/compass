@@ -46,7 +46,6 @@ const createListenerSet = <T>(): ListenerSet<T> => {
 const liveTempoListeners = createListenerSet<LiveTempoUpdate>();
 const previewWindowStateListeners = createListenerSet<PreviewWindowState>();
 const previewWindowVisibilityListeners = createListenerSet<boolean>();
-const previewGuideEnabledListeners = createListenerSet<boolean>();
 
 ipcRenderer.on(IPC_CHANNELS.liveTempoUpdate, (_event, payload: LiveTempoUpdate) => {
   liveTempoListeners.emit(payload);
@@ -66,13 +65,6 @@ ipcRenderer.on(
   },
 );
 
-ipcRenderer.on(
-  IPC_CHANNELS.previewGuideEnabledUpdate,
-  (_event, payload: boolean) => {
-    previewGuideEnabledListeners.emit(payload === true);
-  },
-);
-
 const api: CompassApi = {
   generateAndSend: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.generateAndSend, request),
@@ -89,14 +81,10 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.requestPreviewWindowState),
   requestPreviewWindowVisibility: () =>
     ipcRenderer.invoke(IPC_CHANNELS.requestPreviewWindowVisibility),
-  requestPreviewGuideEnabledUpdate: (enabled) =>
-    ipcRenderer.invoke(IPC_CHANNELS.requestPreviewGuideEnabledUpdate, enabled),
   subscribePreviewWindowState: (listener) =>
     previewWindowStateListeners.subscribe(listener),
   subscribePreviewWindowVisibility: (listener) =>
     previewWindowVisibilityListeners.subscribe(listener),
-  subscribePreviewGuideEnabledUpdate: (listener) =>
-    previewGuideEnabledListeners.subscribe(listener),
   subscribeLiveTempo: (listener) =>
     liveTempoListeners.subscribe(listener),
   openExternal: (url) =>

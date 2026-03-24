@@ -156,19 +156,6 @@ export const savePreviewLoopEnabled = (enabled: boolean): void => {
   });
 };
 
-/** Loads preview guide flag with `true` fallback for missing or invalid values. */
-export const loadPreviewGuideEnabled = (): boolean =>
-  toBoolean(readPersistedRendererState().preview?.guideEnabled, true);
-
-/** Persists preview guide flag as a strict boolean. */
-export const savePreviewGuideEnabled = (enabled: boolean): void => {
-  writePersistedRendererState({
-    preview: {
-      guideEnabled: enabled === true,
-    },
-  });
-};
-
 /** Loads sidebar width and clamps it to the supported layout range. */
 export const loadSidebarWidth = (): number =>
   sanitizeSidebarWidth(readPersistedRendererState().ui?.sidebarWidthPx ?? DEFAULT_SIDEBAR_WIDTH_PX);

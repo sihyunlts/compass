@@ -25,10 +25,6 @@ export const mountBridgeSubscriptions = (
     options.bridgeClient.subscribePreviewWindowVisibility((isOpen) => {
       options.playbackSession.setPreviewPopoutOpen(isOpen === true);
     });
-  let previewGuideEnabledUnsubscribe: (() => void) | null =
-    options.bridgeClient.subscribePreviewGuideEnabledUpdate((enabled) => {
-      options.playbackSession.setPreviewGuideEnabled(enabled === true);
-    });
 
   runBestEffort(
     options.bridgeClient.requestAppVersion().then((version) => {
@@ -50,10 +46,6 @@ export const mountBridgeSubscriptions = (
     if (previewWindowVisibilityUnsubscribe) {
       previewWindowVisibilityUnsubscribe();
       previewWindowVisibilityUnsubscribe = null;
-    }
-    if (previewGuideEnabledUnsubscribe) {
-      previewGuideEnabledUnsubscribe();
-      previewGuideEnabledUnsubscribe = null;
     }
   };
 };

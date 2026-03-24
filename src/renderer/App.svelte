@@ -439,7 +439,6 @@
         {#if !uiState.isPreviewPopoutOpen}
           <PreviewPanel
             surfaceModel={previewState.surfaceModel}
-            onGuideToggle={(enabled) => playbackSession.setPreviewGuideEnabled(enabled)}
             onPopout={() => playbackSession.openPreviewPopout()}
             isPlaying={playbackSession.state.isPlaying}
             loopEnabled={uiState.isPreviewLoopEnabled}

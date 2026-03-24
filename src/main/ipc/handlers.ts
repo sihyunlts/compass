@@ -69,19 +69,6 @@ export const registerIpcHandlers = (
     () => isPreviewWindowOpen(),
   );
 
-  ipcMain.handle(
-    IPC_CHANNELS.requestPreviewGuideEnabledUpdate,
-    (_event, enabled: boolean) => {
-      const nextEnabled = enabled === true;
-      for (const window of BrowserWindow.getAllWindows()) {
-        if (window.isDestroyed()) {
-          continue;
-        }
-        window.webContents.send(IPC_CHANNELS.previewGuideEnabledUpdate, nextEnabled);
-      }
-    },
-  );
-
   ipcMain.on(
     IPC_CHANNELS.pushPreviewWindowState,
     (_event, state: PreviewWindowState) => {

@@ -151,7 +151,6 @@ class PreviewWindowStatePusher {
       snapshot.bpm.toFixed(2),
       snapshot.isPlaying ? 1 : 0,
       snapshot.isLoopEnabled ? 1 : 0,
-      snapshot.isGuideEnabled ? 1 : 0,
     ].join(':');
 
     const now = this.options.now ? this.options.now() : window.performance.now();

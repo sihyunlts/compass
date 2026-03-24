@@ -99,7 +99,6 @@ export class PlaybackSessionController {
       bpm: uiState.previewBpm,
       isPlaying: this.state.isPlaying,
       isLoopEnabled: uiState.isPreviewLoopEnabled,
-      isGuideEnabled: uiState.isPreviewGuideEnabled,
       resolveLedRgb,
     });
 
@@ -206,12 +205,6 @@ export class PlaybackSessionController {
 
   public togglePreviewLoop(): void {
     if (this.options.editorSession.commands.togglePreviewLoopEnabled()) {
-      this.renderPreviewFrame();
-    }
-  }
-
-  public setPreviewGuideEnabled(nextEnabled: boolean): void {
-    if (this.options.editorSession.commands.setPreviewGuideEnabled(nextEnabled)) {
       this.renderPreviewFrame();
     }
   }

@@ -20,7 +20,6 @@ import {
   handleAutoCreateLengthChange,
   readBridgeSettingsFromLabel,
   setLaunchpadModelEnabled,
-  setPreviewGuideEnabled,
   syncPreviewBpm,
   togglePreviewLoopEnabled,
 } from './bridge-settings';
@@ -102,7 +101,6 @@ export interface EditorSessionState {
   previewBpm: number;
   previewLoopLengthBeats: number;
   isPreviewLoopEnabled: boolean;
-  isPreviewGuideEnabled: boolean;
   isPreviewPopoutOpen: boolean;
   previewScrubValue: number;
   autoCreateLengthLabel: string;
@@ -353,8 +351,6 @@ export class EditorSession {
     setLaunchpadModelEnabled: (nextEnabled: boolean): boolean =>
       setLaunchpadModelEnabled(this.state, nextEnabled, (delayMs) => this.scheduleAutoPreview(delayMs)),
     togglePreviewLoopEnabled: (): boolean => togglePreviewLoopEnabled(this.state),
-    setPreviewGuideEnabled: (nextEnabled: boolean): boolean =>
-      setPreviewGuideEnabled(this.state, nextEnabled),
     syncPreviewBpm: (nextBpm: number): boolean => syncPreviewBpm(this.state, nextBpm),
   };
 

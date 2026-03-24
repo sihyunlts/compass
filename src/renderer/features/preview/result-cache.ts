@@ -19,19 +19,19 @@ import {
 } from './frame-index';
 import { EMPTY_ACTIVE_VELOCITY_BY_PITCH } from './utils';
 import { LatestSourceKeyFamilyCache } from './source-key-cache';
-import {
-  DEFAULT_OVERLAY_WORLD_BOUNDS,
-  type OverlayWorldBounds,
-  type PreviewSurfaceViewModel,
-} from './view-model';
+
+const DEFAULT_EXACT_OUTPUT_WORLD_BOUNDS = {
+  minX: -4,
+  maxX: 13,
+  minY: -4,
+  maxY: 13,
+} as const;
 
 export interface PreviewResultCacheEntry {
   key: string;
   preview: GeneratorPreview | null;
   sourceTimelineEndBeat: number;
   ledFramesByIndex: ReadonlyArray<ReadonlyMap<number, number>>;
-  overlayFramesByIndex: ReadonlyArray<PreviewSurfaceViewModel['overlayStrokes']>;
-  overlayWorldBounds: OverlayWorldBounds;
 }
 
 interface PreviewResultInput {
@@ -81,8 +81,6 @@ class PreviewResultCache {
       ledFramesByIndex: exactFrames.map((frame) => new Map(
         Array.from(frame.activationFrame.activeByPitch.entries(), ([pitch, info]) => [pitch, info.velocity]),
       )),
-      overlayFramesByIndex: exactFrames.map((frame) => frame.overlayStrokes),
-      overlayWorldBounds: DEFAULT_OVERLAY_WORLD_BOUNDS,
     };
     this.resultsByKey.set(key, entry);
     return entry;
@@ -129,7 +127,7 @@ class PreviewResultCache {
         { length: PREVIEW_FRAME_COUNT },
         (_, index) => toPreviewFrameBeat(index, NORMALIZED_SOURCE_TIMELINE_END_BEAT),
       ),
-      DEFAULT_OVERLAY_WORLD_BOUNDS,
+      DEFAULT_EXACT_OUTPUT_WORLD_BOUNDS,
     );
   }
 
