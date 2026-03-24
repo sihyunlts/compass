@@ -43,10 +43,28 @@ export interface SpiralGeneratorNode extends GroupedDeviceNode {
   params: SpiralParams;
 }
 
+export interface PathPoint {
+  x: number;
+  y: number;
+}
+
+export interface PathParams {
+  points: PathPoint[];
+  closed: boolean;
+}
+
+export interface PathGeneratorNode extends GroupedDeviceNode {
+  id: string;
+  kind: 'path';
+  enabled: boolean;
+  params: PathParams;
+}
+
 export type GeneratorNode =
   | WaterdropGeneratorNode
   | ScannerGeneratorNode
-  | SpiralGeneratorNode;
+  | SpiralGeneratorNode
+  | PathGeneratorNode;
 
 export interface MirrorEffectNode extends GroupedDeviceNode {
   id: string;

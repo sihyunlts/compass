@@ -5,7 +5,10 @@ import {
   evaluateExactOutputFrameAtTime,
   type CompiledPipelineEngine,
 } from '../core/pipeline/engine';
-import { resolveMutedSources } from '../core/pipeline/groups';
+import {
+  isGeneratorNode as isPipelineGeneratorNode,
+  resolveMutedSources,
+} from '../core/pipeline/groups';
 import { fitNotesToTimeline } from '../core/pipeline/timeline-fit';
 import {
   applyColorDeviceToNotes,
@@ -115,9 +118,7 @@ const applyColorToCurrentNotes = (
 const isGeneratorNode = (
   device: GeneratorDeviceNode,
 ): boolean => (
-  device.kind === 'waterdrop'
-  || device.kind === 'scanner'
-  || device.kind === 'spiral'
+  isPipelineGeneratorNode(device)
 );
 
 const buildGeometryOnlyCheckpointChain = (

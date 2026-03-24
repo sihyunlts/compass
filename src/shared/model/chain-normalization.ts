@@ -1,8 +1,10 @@
 import {
+  getRendererDeviceGroup,
   hydrateImportedRendererDeviceNode,
   isRendererDeviceKind,
 } from '../../devices/schema-registry';
 import { normalizeColorDeviceParams } from '../../devices/color/schema';
+import { sanitizePathParams } from '../../devices/path/schema';
 import { reconcileGeneratorChainModulators } from '../../core/modulation/routing';
 import { normalizeOptionalId } from '../normalize-id';
 import type {
@@ -134,11 +136,7 @@ const collectGeneratorIds = (
 ): Set<string> => {
   const ids = new Set<string>();
   for (const device of devices) {
-    if (
-      device.kind === 'waterdrop'
-      || device.kind === 'scanner'
-      || device.kind === 'spiral'
-    ) {
+    if (getRendererDeviceGroup(device.kind) === 'generator') {
       ids.add(device.id);
     }
   }
@@ -186,6 +184,16 @@ const reconcileColorDeviceParams = (chain: GeneratorChain): void => {
   }
 };
 
+const reconcilePathDeviceParams = (chain: GeneratorChain): void => {
+  for (const device of chain.devices) {
+    if (device.kind !== 'path') {
+      continue;
+    }
+
+    device.params = sanitizePathParams(device.params);
+  }
+};
+
 const reconcileMaskSourceIds = (chain: GeneratorChain): void => {
   const groupIds = collectActiveGroupIds(chain.devices);
   const generatorIds = collectGeneratorIds(chain.devices);
@@ -223,6 +231,7 @@ export const sanitizeGeneratorChain = (
   const sanitized = cloneChainForIpc(chain);
   sanitized.name = normalizeRackName((chain as { name?: unknown }).name);
   reconcileColorDeviceParams(sanitized);
+  reconcilePathDeviceParams(sanitized);
   reconcileStoredNames(sanitized);
   reconcileMaskSourceIds(sanitized);
   reconcileGeneratorChainModulators(sanitized);

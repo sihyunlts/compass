@@ -1,5 +1,5 @@
 import { applyNoteStageColorPrograms } from '../../devices/color/engine';
-import type { GeneratorChain } from '../../shared/model';
+import type { GeneratorChain, GeneratorNode } from '../../shared/model';
 import type { SceneInstance } from '../core-types';
 import { projectSceneToActivationFrame } from './active';
 import { MIN_NOTE_DURATION, SAMPLES_PER_BEAT, TILE_COUNT } from './constants';
@@ -32,8 +32,8 @@ const buildGroupById = (
 
 const buildGeneratorById = (
   chain: GeneratorChain,
-): Map<string, Extract<GeneratorChain['devices'][number], { kind: 'waterdrop' | 'scanner' | 'spiral' }>> => {
-  const generatorById = new Map<string, Extract<GeneratorChain['devices'][number], { kind: 'waterdrop' | 'scanner' | 'spiral' }>>();
+): Map<string, GeneratorNode> => {
+  const generatorById = new Map<string, GeneratorNode>();
   for (const device of chain.devices) {
     if (isGeneratorNode(device)) {
       generatorById.set(device.id, device);

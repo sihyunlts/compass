@@ -56,6 +56,23 @@ export const cloneDeviceNode = (
     };
   }
 
+  if (device.kind === 'path') {
+    return {
+      id: device.id,
+      kind: 'path',
+      enabled: device.enabled,
+      groupId: device.groupId ?? null,
+      name: device.name ?? null,
+      params: {
+        closed: device.params.closed === true,
+        points: device.params.points.map((point) => ({
+          x: point.x,
+          y: point.y,
+        })),
+      },
+    };
+  }
+
   if (device.kind === 'reverse') {
     return {
       id: device.id,

@@ -4,7 +4,10 @@
   import type { GeneratorDeviceNode } from '../../shared/model';
   import { normalizeOptionalId } from '../../shared/normalize-id';
   import MaskTilePicker from '../../renderer/components/MaskTilePicker.svelte';
-  import { getRendererDeviceLabel } from '../schema-registry';
+  import {
+    getRendererDeviceGroup,
+    getRendererDeviceLabel,
+  } from '../schema-registry';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   type MaskDeviceEditorProps = RendererDeviceEditorPropsBase & {
@@ -32,7 +35,7 @@
 
   const maskGeneratorOptions = $derived.by(() =>
     devices.filter((item: GeneratorDeviceNode) =>
-      item.kind === 'waterdrop' || item.kind === 'scanner' || item.kind === 'spiral'));
+      getRendererDeviceGroup(item.kind) === 'generator'));
 </script>
 
 <div class="device-controls">

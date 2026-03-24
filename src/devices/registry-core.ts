@@ -7,6 +7,8 @@ import { mirrorDeviceControls } from './mirror/controls';
 import { mirrorDeviceSchema } from './mirror/schema';
 import { modulatorDeviceControls } from './modulator/controls';
 import { modulatorDeviceSchema } from './modulator/schema';
+import { pathDeviceControls } from './path/controls';
+import { pathDeviceSchema } from './path/schema';
 import { reverseDeviceSchema } from './reverse/schema';
 import { rotateDeviceControls } from './rotate/controls';
 import { rotateDeviceSchema } from './rotate/schema';
@@ -50,6 +52,11 @@ export const RENDERER_DEVICE_MANIFEST = [
     ...spiralDeviceSchema,
     controls: spiralDeviceControls,
     editor: './spiral/ui.svelte',
+  },
+  {
+    ...pathDeviceSchema,
+    controls: pathDeviceControls,
+    editor: './path/ui.svelte',
   },
   {
     ...modulatorDeviceSchema,

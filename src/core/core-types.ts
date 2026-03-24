@@ -1,4 +1,9 @@
-import type { ScannerParams, SpiralParams, WaterdropParams } from '../shared/model';
+import type {
+  PathParams,
+  ScannerParams,
+  SpiralParams,
+  WaterdropParams,
+} from '../shared/model';
 
 export interface Vec2 {
   x: number;
@@ -83,7 +88,12 @@ export interface SpiralPrimitive {
   params: SpiralParams;
 }
 
-export type ScenePrimitive = WaterdropPrimitive | ScannerPrimitive | SpiralPrimitive;
+export interface PathPrimitive {
+  kind: 'path';
+  params: PathParams;
+}
+
+export type ScenePrimitive = WaterdropPrimitive | ScannerPrimitive | SpiralPrimitive | PathPrimitive;
 export type ScenePrimitiveKind = ScenePrimitive['kind'];
 
 interface WaterdropSceneInstance extends SceneInstanceBase {
@@ -98,5 +108,13 @@ interface SpiralSceneInstance extends SceneInstanceBase {
   primitive: SpiralPrimitive;
 }
 
-export type SceneInstance = WaterdropSceneInstance | ScannerSceneInstance | SpiralSceneInstance;
+interface PathSceneInstance extends SceneInstanceBase {
+  primitive: PathPrimitive;
+}
+
+export type SceneInstance =
+  | WaterdropSceneInstance
+  | ScannerSceneInstance
+  | SpiralSceneInstance
+  | PathSceneInstance;
 export type SceneInstanceOfKind<K extends ScenePrimitiveKind> = Extract<SceneInstance, { primitive: { kind: K } }>;

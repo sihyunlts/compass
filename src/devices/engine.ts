@@ -7,6 +7,7 @@ import { rotateEngineHandler } from './rotate/engine';
 import { scannerEngineHandler } from './scanner/engine';
 import { spiralEngineHandler } from './spiral/engine';
 import { symmetryEngineHandler } from './symmetry/engine';
+import { pathEngineHandler } from './path/engine';
 import type {
   EffectApplicationContext,
   EffectDeviceEngineHandler,
@@ -22,6 +23,7 @@ const generatorDeviceEngineHandlers = {
   waterdrop: waterdropEngineHandler,
   scanner: scannerEngineHandler,
   spiral: spiralEngineHandler,
+  path: pathEngineHandler,
 } as const satisfies Record<GeneratorDeviceKind, GeneratorDeviceEngineHandler>;
 
 const pipelineEffectEngineHandlers = {
@@ -79,7 +81,10 @@ export const createSceneInstanceFromGenerator = (
   if (device.kind === 'scanner') {
     return scannerEngineHandler.createSceneInstance(device, worldBounds);
   }
-  return spiralEngineHandler.createSceneInstance(device, worldBounds);
+  if (device.kind === 'spiral') {
+    return spiralEngineHandler.createSceneInstance(device, worldBounds);
+  }
+  return pathEngineHandler.createSceneInstance(device, worldBounds);
 };
 
 export const buildGeneratorPolyline = (
@@ -93,7 +98,10 @@ export const buildGeneratorPolyline = (
   if (sceneInstance.primitive.kind === 'scanner') {
     return scannerEngineHandler.buildPolyline(sceneInstance as SceneInstanceOfKind<'scanner'>, t01, step);
   }
-  return spiralEngineHandler.buildPolyline(sceneInstance as SceneInstanceOfKind<'spiral'>, t01, step);
+  if (sceneInstance.primitive.kind === 'spiral') {
+    return spiralEngineHandler.buildPolyline(sceneInstance as SceneInstanceOfKind<'spiral'>, t01, step);
+  }
+  return pathEngineHandler.buildPolyline(sceneInstance as SceneInstanceOfKind<'path'>);
 };
 
 export const applyPipelineEffect = (

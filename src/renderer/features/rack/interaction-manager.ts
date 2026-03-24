@@ -1,4 +1,5 @@
 import type { GeneratorChain } from '../../../shared/model';
+import { getRendererDeviceGroup } from '../../../devices';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
 import type { ChainMutationMeta } from '../editor/history-core';
@@ -306,7 +307,7 @@ export class RackInteractionManager {
   private getMaskSourceGeneratorIds(): string[] {
     return this.getChainState().devices
       .filter((device) =>
-        device.kind === 'waterdrop' || device.kind === 'scanner' || device.kind === 'spiral')
+        getRendererDeviceGroup(device.kind) === 'generator')
       .map((device) => device.id);
   }
 
