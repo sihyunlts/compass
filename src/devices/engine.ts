@@ -10,6 +10,7 @@ import { spiralEngineHandler } from './spiral/engine';
 import { stretchEngineHandler } from './stretch/engine';
 import { symmetryEngineHandler } from './symmetry/engine';
 import { pathEngineHandler } from './path/engine';
+import { trimEngineHandler } from './trim/engine';
 import { translateEngineHandler } from './translate/engine';
 import type {
   EffectApplicationContext,
@@ -36,6 +37,7 @@ const pipelineEffectEngineHandlers = {
   rotate: rotateEngineHandler,
   scale: scaleEngineHandler,
   translate: translateEngineHandler,
+  trim: trimEngineHandler,
   stretch: stretchEngineHandler,
   reverse: reverseEngineHandler,
 } as const satisfies Record<PipelineEffectKind, EffectDeviceEngineHandler>;
@@ -107,7 +109,7 @@ export const buildGeneratorPolyline = (
   if (sceneInstance.primitive.kind === 'spiral') {
     return spiralEngineHandler.buildPolyline(sceneInstance as SceneInstanceOfKind<'spiral'>, t01, step);
   }
-  return pathEngineHandler.buildPolyline(sceneInstance as SceneInstanceOfKind<'path'>);
+  return pathEngineHandler.buildPolyline(sceneInstance as SceneInstanceOfKind<'path'>, t01, step);
 };
 
 export const applyPipelineEffect = (

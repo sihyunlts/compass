@@ -108,6 +108,27 @@ export const stretchSceneInstancesTemporally = (
   });
 };
 
+export const trimSceneInstancesTemporally = (
+  sceneInstances: ReadonlyArray<SceneInstance>,
+  start: number,
+  end: number,
+): SceneInstance[] => {
+  if (!isNonWrapping01TemporalWindow(start, end)) {
+    return [];
+  }
+
+  return transformSceneInstancesTemporally(sceneInstances, {
+    remapToInput: {
+      alpha: 1,
+      beta: 0,
+    },
+    visibilityWindow: {
+      start,
+      end,
+    },
+  });
+};
+
 export const reverseSceneInstancesTemporally = (
   sceneInstances: ReadonlyArray<SceneInstance>,
 ): SceneInstance[] => transformSceneInstancesTemporally(sceneInstances, {

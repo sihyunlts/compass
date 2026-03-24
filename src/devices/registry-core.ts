@@ -22,6 +22,8 @@ import { stretchDeviceControls } from './stretch/controls';
 import { stretchDeviceSchema } from './stretch/schema';
 import { symmetryDeviceControls } from './symmetry/controls';
 import { symmetryDeviceSchema } from './symmetry/schema';
+import { trimDeviceControls } from './trim/controls';
+import { trimDeviceSchema } from './trim/schema';
 import { translateDeviceControls } from './translate/controls';
 import { translateDeviceSchema } from './translate/schema';
 import type {
@@ -98,6 +100,11 @@ export const RENDERER_DEVICE_MANIFEST = [
     ...maskDeviceSchema,
     controls: maskDeviceControls,
     editor: './mask/ui.svelte',
+  },
+  {
+    ...trimDeviceSchema,
+    controls: trimDeviceControls,
+    editor: './trim/ui.svelte',
   },
   {
     ...stretchDeviceSchema,

@@ -102,6 +102,16 @@ export interface StretchEffectNode extends GroupedDeviceNode {
   };
 }
 
+export interface TrimEffectNode extends GroupedDeviceNode {
+  id: string;
+  kind: 'trim';
+  enabled: boolean;
+  params: {
+    start: number;
+    end: number;
+  };
+}
+
 export type MaskMode = 'include' | 'exclude';
 export type MaskSourceKind = 'tiles' | 'group' | 'generator';
 export type MaskSourceDomain = 'scene' | 'activation';
@@ -197,6 +207,7 @@ export type GeneratorEffectNode =
   | MaskEffectNode
   | SymmetryEffectNode
   | ReverseEffectNode
+  | TrimEffectNode
   | StretchEffectNode
   | RotateEffectNode
   | TranslateEffectNode

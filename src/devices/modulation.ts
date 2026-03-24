@@ -156,6 +156,20 @@ const NUMERIC_PARAM_ACCESSORS: Record<
       },
     },
   },
+  trim: {
+    start: {
+      read: (device) => (device as DeviceNodeOfKind<'trim'>).params.start,
+      write: (device, value) => {
+        (device as DeviceNodeOfKind<'trim'>).params.start = value;
+      },
+    },
+    end: {
+      read: (device) => (device as DeviceNodeOfKind<'trim'>).params.end,
+      write: (device, value) => {
+        (device as DeviceNodeOfKind<'trim'>).params.end = value;
+      },
+    },
+  },
 };
 
 const MODULATION_TARGET_DEVICE_KINDS = Object.freeze(

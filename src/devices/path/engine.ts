@@ -1,6 +1,6 @@
 import { GENERATED_VELOCITY } from '../../core/pipeline/constants';
 import { buildPathPolyline } from '../../core/generators/path';
-import { createSceneInstanceBase } from '../engine-utils';
+import { createSceneInstanceBase, isSceneInstanceVisibleAtTime } from '../engine-utils';
 import type { GeneratorDeviceEngineHandler } from '../engine-types';
 
 export const pathEngineHandler = {
@@ -25,7 +25,12 @@ export const pathEngineHandler = {
       velocity: GENERATED_VELOCITY,
     };
   },
-  buildPolyline(sceneInstance) {
+  buildPolyline(sceneInstance, t01, step) {
+    void step;
+    if (!isSceneInstanceVisibleAtTime(sceneInstance, t01)) {
+      return null;
+    }
+
     return buildPathPolyline(
       sceneInstance.originId,
       sceneInstance.primitive.params,

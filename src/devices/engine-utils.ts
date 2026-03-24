@@ -43,3 +43,15 @@ export const resolveSceneLocalTime = (
 
   return localT;
 };
+
+export const isSceneInstanceVisibleAtTime = (
+  sceneInstance: Pick<SceneInstanceBase, 'temporal'>,
+  t01: number,
+): boolean => {
+  if (!Number.isFinite(t01)) {
+    return false;
+  }
+
+  const { visibilityWindow } = sceneInstance.temporal;
+  return t01 >= visibilityWindow.start && t01 <= visibilityWindow.end;
+};

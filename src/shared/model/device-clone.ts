@@ -94,6 +94,17 @@ export const cloneDeviceNode = (
     };
   }
 
+  if (device.kind === 'trim') {
+    return {
+      id: device.id,
+      kind: 'trim',
+      enabled: device.enabled,
+      groupId: device.groupId ?? null,
+      name: device.name ?? null,
+      params: { ...device.params },
+    };
+  }
+
   if (device.kind === 'modulator') {
     return {
       id: device.id,
