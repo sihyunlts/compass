@@ -3,7 +3,7 @@ import type { EffectDeviceEngineHandler } from '../engine-types';
 
 export const mirrorEngineHandler = {
   kind: 'mirror',
-  applyEffect(layers, effect, context) {
-    return applyMirrorEffect(layers, effect, context.worldBounds);
+  applyEffect(sceneInstances, effect, context) {
+    return applyMirrorEffect(sceneInstances, effect, context.worldBounds);
   },
 } satisfies EffectDeviceEngineHandler<'mirror'>;

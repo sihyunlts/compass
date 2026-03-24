@@ -1,7 +1,6 @@
 import type { SceneInstance } from '../core-types';
 import type { MaskEffectNode, MaskMode } from '../../shared/model';
-import { createTileUnionClip } from '../geometry';
-import { appendClipToSceneInstance } from '../layer-utils';
+import { appendTileUnionClipToSceneInstances } from '../scene-operators/clip';
 
 const TILE_COUNT = 10;
 const ALL_TILES = Array.from({ length: TILE_COUNT * TILE_COUNT }, (_, tileId) => tileId);
@@ -22,11 +21,10 @@ export const applyMaskEffect = (
   sceneInstances: ReadonlyArray<SceneInstance>,
   effect: MaskEffectNode,
   tilesOverride?: Iterable<number> | null,
-): SceneInstance[] => {
-  const clip = createTileUnionClip(resolveMaskTiles(
+): SceneInstance[] => appendTileUnionClipToSceneInstances(
+  sceneInstances,
+  resolveMaskTiles(
     tilesOverride ?? effect.params.tiles,
     effect.params.mode,
-  ));
-
-  return sceneInstances.map((sceneInstance) => appendClipToSceneInstance(sceneInstance, clip));
-};
+  ),
+);

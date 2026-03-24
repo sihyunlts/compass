@@ -3,7 +3,7 @@ import type { EffectDeviceEngineHandler } from '../engine-types';
 
 export const rotateEngineHandler = {
   kind: 'rotate',
-  applyEffect(layers, effect, context) {
-    return applyRotateEffect(layers, effect, context.worldBounds);
+  applyEffect(sceneInstances, effect, context) {
+    return applyRotateEffect(sceneInstances, effect, context.worldBounds);
   },
 } satisfies EffectDeviceEngineHandler<'rotate'>;

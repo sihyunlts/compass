@@ -4,8 +4,8 @@ import type { EffectDeviceEngineHandler } from '../engine-types';
 
 export const maskEngineHandler = {
   kind: 'mask',
-  applyEffect(layers, effect, context) {
-    return applyMaskEffect(layers, effect, context.tilesOverride);
+  applyEffect(sceneInstances, effect, context) {
+    return applyMaskEffect(sceneInstances, effect, context.tilesOverride);
   },
   resolveMutedSource(effect) {
     if (effect.params.sourceVisibility === 'show') {

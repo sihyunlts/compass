@@ -4,7 +4,7 @@ import type { EffectDeviceEngineHandler } from '../engine-types';
 export const reverseEngineHandler = {
   kind: 'reverse',
   togglesTimelineParity: true,
-  applyEffect(layers) {
-    return applyReverseEffect(layers);
+  applyEffect(sceneInstances) {
+    return applyReverseEffect(sceneInstances);
   },
 } satisfies EffectDeviceEngineHandler<'reverse'>;

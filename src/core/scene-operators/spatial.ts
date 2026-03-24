@@ -1,10 +1,5 @@
-import type { AffineTransform, Bounds, ClipShape, SceneInstance } from './core-types';
-import {
-  IDENTITY_AFFINE,
-  composeAffine,
-  invertAffine,
-  mapBoundsThroughAffine,
-} from './geometry';
+import type { AffineTransform, Bounds, SceneInstance } from '../core-types';
+import { composeAffine, invertAffine, mapBoundsThroughAffine } from '../geometry';
 
 export const applySpatialTransformToSceneInstance = (
   sceneInstance: SceneInstance,
@@ -34,24 +29,19 @@ export const applySpatialTransformToSceneInstance = (
   };
 };
 
-export const appendClipToSceneInstance = (
-  sceneInstance: SceneInstance,
-  shape: ClipShape,
-): SceneInstance => ({
-  ...sceneInstance,
-  clipStack: [
-    ...sceneInstance.clipStack,
-    {
-      shape,
-      inverseTransform: IDENTITY_AFFINE,
-    },
-  ],
-});
+export const applySpatialTransformToSceneInstances = (
+  sceneInstances: ReadonlyArray<SceneInstance>,
+  transform: AffineTransform,
+  worldBounds: Bounds,
+): SceneInstance[] => {
+  const next: SceneInstance[] = [];
 
-export const applyReverseTemporalToSceneInstance = (sceneInstance: SceneInstance): SceneInstance => ({
-  ...sceneInstance,
-  temporal: {
-    alpha: -sceneInstance.temporal.alpha,
-    beta: 1 - sceneInstance.temporal.beta,
-  },
-});
+  for (const sceneInstance of sceneInstances) {
+    const transformed = applySpatialTransformToSceneInstance(sceneInstance, transform, worldBounds);
+    if (transformed) {
+      next.push(transformed);
+    }
+  }
+
+  return next;
+};

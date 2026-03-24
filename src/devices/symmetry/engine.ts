@@ -3,7 +3,7 @@ import type { EffectDeviceEngineHandler } from '../engine-types';
 
 export const symmetryEngineHandler = {
   kind: 'symmetry',
-  applyEffect(layers, effect, context) {
-    return applySymmetryEffect(layers, effect, context.worldBounds);
+  applyEffect(sceneInstances, effect, context) {
+    return applySymmetryEffect(sceneInstances, effect, context.worldBounds);
   },
 } satisfies EffectDeviceEngineHandler<'symmetry'>;
