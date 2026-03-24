@@ -84,7 +84,7 @@ export const createNumericParamSetter = <
   options: {
     isKind: (device: GeneratorDeviceNode) => device is Device;
     readParam: (input: HTMLInputElement) => ParamKey | null;
-    assign: (device: Device, param: ParamKey, value: number) => void;
+    assign: (device: Device, param: ParamKey, value: number, input: HTMLInputElement) => void;
   },
 ): RendererControlHandler => (device, target) => {
   if (!options.isKind(device)) {
@@ -106,7 +106,7 @@ export const createNumericParamSetter = <
     return false;
   }
 
-  options.assign(device, param, value);
+  options.assign(device, param, value, input);
   return true;
 };
 

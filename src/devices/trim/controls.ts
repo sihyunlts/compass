@@ -2,12 +2,13 @@ import type { GeneratorDeviceNode } from '../../shared/model';
 import {
   createDefaultNumericValueResolver,
   createMergeKeyResolver,
-  createNumericParamSetter,
-  readDatasetParam,
   resolveNumericDatasetParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
-import { TRIM_NUMERIC_PARAM_KEYS } from './schema';
+import {
+  createTimeWindowParamSetter,
+  readTimeWindowParamKey,
+} from '../time-window-controls';
 
 const isTrimDevice = (
   device: GeneratorDeviceNode,
@@ -19,16 +20,20 @@ export const trimDeviceControls = {
     'set-trim-param': {
       resolveMergeKey: createMergeKeyResolver('set-trim-param', resolveNumericDatasetParam),
       resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readDatasetParam(input, TRIM_NUMERIC_PARAM_KEYS),
+        readTimeWindowParamKey,
       ),
     },
   },
   createHandlers: () => ({
-    'set-trim-param': createNumericParamSetter({
+    'set-trim-param': createTimeWindowParamSetter({
       isKind: isTrimDevice,
-      readParam: (input) => readDatasetParam(input, TRIM_NUMERIC_PARAM_KEYS),
-      assign: (device, param, value) => {
-        device.params[param] = value;
+      readWindow: (device) => ({
+        start: device.params.start,
+        end: device.params.end,
+      }),
+      writeWindow: (device, nextWindow) => {
+        device.params.start = nextWindow.start;
+        device.params.end = nextWindow.end;
       },
     }),
   }),
