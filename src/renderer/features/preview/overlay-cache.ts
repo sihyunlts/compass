@@ -2,7 +2,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 import {
   generateOverlayFrames,
-  type ColorGuideWarp,
+  type OverlayTimingAdapter,
   type OverlayFrameStroke,
 } from '../../../domain';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
@@ -83,7 +83,7 @@ class OverlayFrameCache {
     chain: GeneratorChain,
     launchpadModel: LaunchpadModel,
     loopLengthBeats: number,
-    colorGuideWarpByOriginId?: ReadonlyMap<string, ColorGuideWarp>,
+    overlayTimingByOriginId?: ReadonlyMap<string, OverlayTimingAdapter>,
   ): OverlayCacheEntry {
     this.evictStaleSourceFamilyEntries(sourceKey);
     const key = `${sourceKey}:${launchpadModel}:${loopLengthBeats}`;
@@ -99,7 +99,7 @@ class OverlayFrameCache {
       nextBounds,
       launchpadModel,
       loopLengthBeats,
-      colorGuideWarpByOriginId,
+      overlayTimingByOriginId,
     );
 
     while (
@@ -116,7 +116,7 @@ class OverlayFrameCache {
         nextBounds,
         launchpadModel,
         loopLengthBeats,
-        colorGuideWarpByOriginId,
+        overlayTimingByOriginId,
       );
     }
 
@@ -139,7 +139,7 @@ class OverlayFrameCache {
     bounds: OverlayWorldBounds,
     launchpadModel: LaunchpadModel,
     loopLengthBeats: number,
-    colorGuideWarpByOriginId?: ReadonlyMap<string, ColorGuideWarp>,
+    overlayTimingByOriginId?: ReadonlyMap<string, OverlayTimingAdapter>,
   ): ReadonlyArray<ReadonlyArray<OverlayFrameStroke>> {
     return generateOverlayFrames({
       chain,
@@ -148,7 +148,7 @@ class OverlayFrameCache {
       bounds,
       launchpadModel,
       loopLengthBeats,
-      colorGuideWarpByOriginId,
+      overlayTimingByOriginId,
     });
   }
 

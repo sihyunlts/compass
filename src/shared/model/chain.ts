@@ -76,6 +76,7 @@ export interface ReverseEffectNode extends GroupedDeviceNode {
 
 export type MaskMode = 'include' | 'exclude';
 export type MaskSourceKind = 'tiles' | 'group' | 'generator';
+export type MaskSourceDomain = 'scene' | 'activation';
 export type MaskSourceVisibility = 'hide' | 'show';
 
 export interface MaskEffectNode extends GroupedDeviceNode {
@@ -86,6 +87,7 @@ export interface MaskEffectNode extends GroupedDeviceNode {
     mode: MaskMode;
     tiles: number[];
     sourceKind: MaskSourceKind;
+    sourceDomain: MaskSourceDomain;
     sourceId?: string | null;
     sourceVisibility: MaskSourceVisibility;
   };

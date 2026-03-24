@@ -97,6 +97,7 @@ export const cloneDeviceNode = (
         mode: device.params.mode,
         tiles: [...device.params.tiles],
         sourceKind: device.params.sourceKind,
+        sourceDomain: device.params.sourceDomain,
         sourceId: device.params.sourceId ?? null,
         sourceVisibility: device.params.sourceVisibility,
       },

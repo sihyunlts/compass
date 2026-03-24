@@ -12,7 +12,7 @@ export {
   type PreviewStats,
 } from './engine';
 
-export type { ColorGuideWarp } from '../devices/color/engine';
+export type { OverlayTimingAdapter } from '../devices/color/engine';
 
 export {
   getLaunchpadRuntimeMap,

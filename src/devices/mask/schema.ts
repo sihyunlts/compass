@@ -13,6 +13,7 @@ const DEFAULT_MASK_PARAMS: MaskEffectNode['params'] = {
   mode: 'include',
   tiles: [],
   sourceKind: 'tiles',
+  sourceDomain: 'activation',
   sourceId: null,
   sourceVisibility: 'hide',
 };
@@ -29,6 +30,7 @@ const createDefaultMaskNode = (
     mode: DEFAULT_MASK_PARAMS.mode,
     tiles: [...DEFAULT_MASK_PARAMS.tiles],
     sourceKind: DEFAULT_MASK_PARAMS.sourceKind,
+    sourceDomain: DEFAULT_MASK_PARAMS.sourceDomain,
     sourceId: DEFAULT_MASK_PARAMS.sourceId,
     sourceVisibility: DEFAULT_MASK_PARAMS.sourceVisibility,
   },
@@ -54,6 +56,10 @@ const hydrateImportedMaskNode = (
     || params.sourceKind === 'tiles'
     ? params.sourceKind
     : DEFAULT_MASK_PARAMS.sourceKind;
+  device.params.sourceDomain = params.sourceDomain === 'scene'
+    || params.sourceDomain === 'activation'
+    ? params.sourceDomain
+    : DEFAULT_MASK_PARAMS.sourceDomain;
   device.params.sourceVisibility = params.sourceVisibility === 'show'
     ? 'show'
     : DEFAULT_MASK_PARAMS.sourceVisibility;

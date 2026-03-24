@@ -1,5 +1,5 @@
+import { splitChainByGroup } from '../../core/pipeline/groups';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
-import { normalizeOptionalId } from '../../shared/normalize-id';
 import type { ClipNote, ColorEffectNode, GeneratorChain } from '../../shared/model';
 import { isGeneratorEngineNode } from '../engine';
 import { DEFAULT_COLOR_PARAMS, sanitizeColorGapPercent } from './schema';
@@ -8,32 +8,39 @@ export interface ClipNoteWithOrigin extends ClipNote {
   originId?: string;
 }
 
-export interface ColorGuideWarp {
+export interface OverlayTimingAdapter {
   sourceStartBeat: number;
   sourceEndBeat: number;
   scale: number;
 }
 
-interface ColorOriginConfig {
+interface ColorProgram {
+  notes: ClipNoteWithOrigin[];
+  overlayTimingAdapter: OverlayTimingAdapter;
+}
+
+export interface NoteStageColorResult {
+  notes: ClipNoteWithOrigin[];
+  overlayTimingByOriginId: ReadonlyMap<string, OverlayTimingAdapter>;
+}
+
+interface ColorDeviceConfig {
   velocities: number[];
   noteLengthPercent: number;
   gapPercent: number;
-}
-
-export interface ColorProgram {
-  notes: ClipNoteWithOrigin[];
-  guideWarp: ColorGuideWarp;
-}
-
-interface AppliedColorProgramsResult {
-  notes: ClipNoteWithOrigin[];
-  colorGuideWarpByOriginId: ReadonlyMap<string, ColorGuideWarp>;
 }
 
 const DEFAULT_COLOR_VELOCITY = DEFAULT_COLOR_PARAMS.velocities[0];
 const DEFAULT_COLOR_NOTE_LENGTH_PERCENT = DEFAULT_COLOR_PARAMS.noteLengthPercent;
 
 const sortNumbersAscending = (left: number, right: number): number => left - right;
+
+const sortClipNotes = <T extends ClipNote>(notes: T[]): void => {
+  notes.sort((left, right) =>
+    left.startBeat - right.startBeat
+    || left.pitch - right.pitch
+    || left.channel - right.channel);
+};
 
 const sanitizeColorVelocities = (velocities: readonly number[]): number[] => {
   const sanitized = velocities
@@ -51,62 +58,6 @@ const sanitizeColorNoteLengthPercent = (value: number): number => {
     : DEFAULT_COLOR_NOTE_LENGTH_PERCENT;
 };
 
-const isColorDevice = (
-  device: GeneratorChain['devices'][number],
-): device is Extract<GeneratorChain['devices'][number], { kind: 'color' }> =>
-  device.kind === 'color';
-
-const resolveColorConfigByOriginId = (
-  chain: GeneratorChain,
-): Map<string, ColorOriginConfig> => {
-  const devicesByGroupId = new Map<string | null, Array<GeneratorChain['devices'][number]>>();
-  for (const device of chain.devices) {
-    const groupId = normalizeOptionalId(device.groupId);
-    const groupDevices = devicesByGroupId.get(groupId);
-    if (groupDevices) {
-      groupDevices.push(device);
-      continue;
-    }
-    devicesByGroupId.set(groupId, [device]);
-  }
-
-  const configByOriginId = new Map<string, ColorOriginConfig>();
-  for (const groupDevices of devicesByGroupId.values()) {
-    let accumulatedVelocities: number[] = [];
-    let accumulatedNoteLengthPercent: number | null = null;
-    let accumulatedGapPercent: number | null = null;
-
-    for (let index = groupDevices.length - 1; index >= 0; index -= 1) {
-      const device = groupDevices[index];
-      if (!isDeviceEffectivelyEnabled(chain, device)) {
-        continue;
-      }
-
-      if (isColorDevice(device)) {
-        const velocities = sanitizeColorVelocities(device.params.velocities);
-        accumulatedVelocities = [...velocities, ...accumulatedVelocities];
-        accumulatedNoteLengthPercent = sanitizeColorNoteLengthPercent(
-          device.params.noteLengthPercent,
-        );
-        accumulatedGapPercent = sanitizeColorGapPercent(device.params.gapPercent);
-        continue;
-      }
-
-      if (!isGeneratorEngineNode(device) || accumulatedVelocities.length === 0) {
-        continue;
-      }
-
-      configByOriginId.set(device.id, {
-        velocities: [...accumulatedVelocities],
-        noteLengthPercent: accumulatedNoteLengthPercent,
-        gapPercent: accumulatedGapPercent ?? DEFAULT_COLOR_PARAMS.gapPercent,
-      });
-    }
-  }
-
-  return configByOriginId;
-};
-
 const resolveMedianDuration = (
   durations: ReadonlyArray<number>,
 ): number | null => {
@@ -122,37 +73,6 @@ const resolveMedianDuration = (
   }
 
   return (orderedDurations[middleIndex - 1] + orderedDurations[middleIndex]) / 2;
-};
-
-const resolveMedianDurationByOriginId = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-): Map<string, number> => {
-  const durationsByOriginId = new Map<string, number[]>();
-
-  for (const note of notes) {
-    if (!note.originId || !Number.isFinite(note.durationBeats) || note.durationBeats <= 0) {
-      continue;
-    }
-
-    const originDurations = durationsByOriginId.get(note.originId);
-    if (originDurations) {
-      originDurations.push(note.durationBeats);
-      continue;
-    }
-
-    durationsByOriginId.set(note.originId, [note.durationBeats]);
-  }
-
-  const medianDurationByOriginId = new Map<string, number>();
-  for (const [originId, durations] of durationsByOriginId.entries()) {
-    const medianDuration = resolveMedianDuration(durations);
-    if (medianDuration === null) {
-      continue;
-    }
-    medianDurationByOriginId.set(originId, medianDuration);
-  }
-
-  return medianDurationByOriginId;
 };
 
 const groupNotesByOriginId = (
@@ -177,9 +97,13 @@ const groupNotesByOriginId = (
   return notesByOriginId;
 };
 
+const cloneNotes = (
+  notes: ReadonlyArray<ClipNoteWithOrigin>,
+): ClipNoteWithOrigin[] => notes.map((note) => ({ ...note }));
+
 const buildNominalColorProgram = (
   originNotes: ReadonlyArray<ClipNoteWithOrigin>,
-  colorConfig: ColorOriginConfig,
+  colorConfig: ColorDeviceConfig,
   referenceDuration: number,
   minimumNoteDuration: number,
 ): ClipNoteWithOrigin[] => {
@@ -220,10 +144,8 @@ const buildNominalColorProgram = (
     }
   }
 
-  return programNotes.sort((left, right) =>
-    left.startBeat - right.startBeat
-    || left.pitch - right.pitch
-    || left.channel - right.channel);
+  sortClipNotes(programNotes);
+  return programNotes;
 };
 
 const fitColorProgramToOriginSpan = (
@@ -290,50 +212,52 @@ const fitColorProgramToOriginSpan = (
     });
   }
 
-  return {
-    notes: fitted,
-    guideWarp: {
-      sourceStartBeat: sourceStart,
-      sourceEndBeat: sourceEnd,
-      scale,
-    },
-  };
+  return fitted.length === 0
+    ? null
+    : {
+      notes: fitted,
+      overlayTimingAdapter: {
+        sourceStartBeat: sourceStart,
+        sourceEndBeat: sourceEnd,
+        scale,
+      },
+    };
 };
 
-export const resolveColorGuideBeat = (
+export const resolveOverlaySourceBeat = (
   beat01: number,
-  warp: ColorGuideWarp | undefined,
+  adapter: OverlayTimingAdapter | undefined,
 ): number => {
-  if (!warp || !Number.isFinite(warp.scale) || warp.scale >= 1) {
+  if (!adapter || !Number.isFinite(adapter.scale) || adapter.scale >= 1) {
     return beat01;
   }
 
-  const sourceSpan = warp.sourceEndBeat - warp.sourceStartBeat;
+  const sourceSpan = adapter.sourceEndBeat - adapter.sourceStartBeat;
   if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
     return beat01;
   }
 
-  const relativeBeat = Math.max(0, beat01 - warp.sourceStartBeat);
-  const advancedBeat = warp.sourceStartBeat + Math.min(relativeBeat / warp.scale, sourceSpan);
+  const relativeBeat = Math.max(0, beat01 - adapter.sourceStartBeat);
+  const advancedBeat = adapter.sourceStartBeat + Math.min(relativeBeat / adapter.scale, sourceSpan);
   return Math.min(Math.max(advancedBeat, 0), 1);
 };
 
-export const composeColorGuideWarp = (
-  previous: ColorGuideWarp | undefined,
-  current: ColorGuideWarp,
-): ColorGuideWarp => {
+const composeOverlayTimingAdapter = (
+  previous: OverlayTimingAdapter | undefined,
+  current: OverlayTimingAdapter,
+): OverlayTimingAdapter => {
   if (!previous) {
     return current;
   }
 
   return {
-    sourceStartBeat: resolveColorGuideBeat(current.sourceStartBeat, previous),
-    sourceEndBeat: resolveColorGuideBeat(current.sourceEndBeat, previous),
+    sourceStartBeat: resolveOverlaySourceBeat(current.sourceStartBeat, previous),
+    sourceEndBeat: resolveOverlaySourceBeat(current.sourceEndBeat, previous),
     scale: previous.scale * current.scale,
   };
 };
 
-export const applyColorDeviceToNotes = (
+const applyColorDeviceToNotes = (
   notes: ReadonlyArray<ClipNoteWithOrigin>,
   device: ColorEffectNode,
   minimumNoteDuration: number,
@@ -355,7 +279,7 @@ export const applyColorDeviceToNotes = (
     return null;
   }
 
-  const fittedProgram = fitColorProgramToOriginSpan(
+  return fitColorProgramToOriginSpan(
     notes,
     buildNominalColorProgram(
       notes,
@@ -368,110 +292,80 @@ export const applyColorDeviceToNotes = (
       minimumNoteDuration,
     ),
   );
-  return fittedProgram && fittedProgram.notes.length > 0 ? fittedProgram : null;
 };
 
-const buildColorProgramByOriginId = (
+export const applyNoteStageColorPrograms = (
   chain: GeneratorChain,
   notes: ReadonlyArray<ClipNoteWithOrigin>,
   minimumNoteDuration: number,
-): Map<string, ColorProgram> => {
-  if (notes.length === 0) {
-    return new Map();
-  }
-
-  const colorConfigByOriginId = resolveColorConfigByOriginId(chain);
-  if (colorConfigByOriginId.size === 0) {
-    return new Map();
-  }
-
-  const medianDurationByOriginId = resolveMedianDurationByOriginId(notes);
-  if (medianDurationByOriginId.size === 0) {
-    return new Map();
-  }
-
-  const notesByOriginId = groupNotesByOriginId(notes);
-  const colorProgramByOriginId = new Map<string, ColorProgram>();
-
-  for (const [originId, originNotes] of notesByOriginId.entries()) {
-    const colorConfig = colorConfigByOriginId.get(originId);
-    const referenceDuration = medianDurationByOriginId.get(originId);
-    if (!colorConfig || referenceDuration === undefined) {
-      continue;
-    }
-
-    const nominalProgram = buildNominalColorProgram(
-      originNotes,
-      colorConfig,
-      referenceDuration,
-      minimumNoteDuration,
-    );
-    if (nominalProgram.length === 0) {
-      continue;
-    }
-
-    const fittedProgram = fitColorProgramToOriginSpan(originNotes, nominalProgram);
-    if (!fittedProgram || fittedProgram.notes.length === 0) {
-      continue;
-    }
-
-    colorProgramByOriginId.set(originId, fittedProgram);
-  }
-
-  return colorProgramByOriginId;
-};
-
-export const applyColorProgramsDetailed = (
-  chain: GeneratorChain,
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-  minimumNoteDuration: number,
-): AppliedColorProgramsResult => {
+): NoteStageColorResult => {
   if (notes.length === 0) {
     return {
       notes: [],
-      colorGuideWarpByOriginId: new Map(),
+      overlayTimingByOriginId: new Map(),
     };
   }
 
-  const colorProgramByOriginId = buildColorProgramByOriginId(
-    chain,
-    notes,
-    minimumNoteDuration,
-  );
-  if (colorProgramByOriginId.size === 0) {
-    return {
-      notes: notes.map((note) => ({ ...note })),
-      colorGuideWarpByOriginId: new Map(),
+  const passthroughNotes = notes
+    .filter((note) => !note.originId)
+    .map((note) => ({ ...note }));
+  const notesByOriginId = groupNotesByOriginId(notes);
+  const overlayTimingByOriginId = new Map<string, OverlayTimingAdapter>();
+
+  for (const group of splitChainByGroup(chain)) {
+    const groupChain: GeneratorChain = {
+      devices: group.devices,
+      groupStateById: chain.groupStateById,
     };
+    const upstreamOriginIds: string[] = [];
+
+    for (const device of group.devices) {
+      if (!isDeviceEffectivelyEnabled(groupChain, device)) {
+        continue;
+      }
+
+      if (isGeneratorEngineNode(device)) {
+        upstreamOriginIds.push(device.id);
+        if (!notesByOriginId.has(device.id)) {
+          notesByOriginId.set(device.id, []);
+        }
+        continue;
+      }
+
+      if (device.kind !== 'color') {
+        continue;
+      }
+
+      for (const originId of upstreamOriginIds) {
+        const colorProgram = applyColorDeviceToNotes(
+          notesByOriginId.get(originId) ?? [],
+          device,
+          minimumNoteDuration,
+        );
+        if (!colorProgram) {
+          continue;
+        }
+
+        notesByOriginId.set(originId, colorProgram.notes);
+        overlayTimingByOriginId.set(
+          originId,
+          composeOverlayTimingAdapter(
+            overlayTimingByOriginId.get(originId),
+            colorProgram.overlayTimingAdapter,
+          ),
+        );
+      }
+    }
   }
 
-  const colorized: ClipNoteWithOrigin[] = [];
-  const emittedOriginIds = new Set<string>();
-  const colorGuideWarpByOriginId = new Map<string, ColorGuideWarp>();
-
-  for (const note of notes) {
-    if (!note.originId) {
-      colorized.push({ ...note });
-      continue;
-    }
-
-    const colorProgram = colorProgramByOriginId.get(note.originId);
-    if (!colorProgram) {
-      colorized.push({ ...note });
-      continue;
-    }
-
-    if (emittedOriginIds.has(note.originId)) {
-      continue;
-    }
-
-    colorized.push(...colorProgram.notes);
-    colorGuideWarpByOriginId.set(note.originId, colorProgram.guideWarp);
-    emittedOriginIds.add(note.originId);
+  const colorized = [...passthroughNotes];
+  for (const originNotes of notesByOriginId.values()) {
+    colorized.push(...cloneNotes(originNotes));
   }
+  sortClipNotes(colorized);
 
   return {
     notes: colorized,
-    colorGuideWarpByOriginId,
+    overlayTimingByOriginId,
   };
 };

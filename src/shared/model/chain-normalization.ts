@@ -195,6 +195,10 @@ const reconcileMaskSourceIds = (chain: GeneratorChain): void => {
       continue;
     }
 
+    device.params.sourceDomain = device.params.sourceDomain === 'scene'
+      ? 'scene'
+      : 'activation';
+
     const prevSourceId = normalizeOptionalId(device.params.sourceId);
     let nextSourceId: string | null = null;
 

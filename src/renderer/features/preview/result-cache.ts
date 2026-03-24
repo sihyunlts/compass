@@ -5,7 +5,7 @@ import {
   generatePreviewNotesData,
   generatePreviewStats,
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-  type ColorGuideWarp,
+  type OverlayTimingAdapter,
 } from '../../../domain';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
@@ -22,7 +22,7 @@ export interface PreviewResultCacheEntry {
   preview: GeneratorPreview | null;
   sourceTimelineEndBeat: number;
   ledFramesByIndex: ReadonlyArray<ReadonlyMap<number, number>>;
-  colorGuideWarpByOriginId: ReadonlyMap<string, ColorGuideWarp>;
+  overlayTimingByOriginId: ReadonlyMap<string, OverlayTimingAdapter>;
 }
 
 interface PreviewResultInput {
@@ -61,8 +61,8 @@ class PreviewResultCache {
       ...generatePreviewStats(generatedNotes?.notes ?? []),
       notes: generatedNotes?.notes ?? [],
     };
-    const colorGuideWarpByOriginId = generatedNotes?.colorGuideWarpByOriginId
-      ?? this.generateColorGuideWarp(
+    const overlayTimingByOriginId = generatedNotes?.overlayTimingByOriginId
+      ?? this.generateOverlayTimingByOriginId(
         input.sourceChain,
         input.loopLengthBeats,
         input.launchpadModel,
@@ -75,7 +75,7 @@ class PreviewResultCache {
         input.sourceChain,
         input.launchpadModel,
       ),
-      colorGuideWarpByOriginId,
+      overlayTimingByOriginId,
     };
     this.resultsByKey.set(key, entry);
     return entry;
@@ -106,16 +106,16 @@ class PreviewResultCache {
     return previewResult.ledFramesByIndex[frameIndex] ?? EMPTY_ACTIVE_VELOCITY_BY_PITCH;
   }
 
-  private generateColorGuideWarp(
+  private generateOverlayTimingByOriginId(
     chain: GeneratorChain,
     loopLengthBeats: number,
     launchpadModel: LaunchpadModel,
-  ): ReadonlyMap<string, ColorGuideWarp> {
+  ): ReadonlyMap<string, OverlayTimingAdapter> {
     return generatePreviewNotesData({
       chain,
       loopLengthBeats,
       launchpadModel,
-    }).colorGuideWarpByOriginId;
+    }).overlayTimingByOriginId;
   }
 
   private buildLedFrameCache(

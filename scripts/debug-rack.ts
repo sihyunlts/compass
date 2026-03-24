@@ -293,6 +293,7 @@ const writeMaskDebugBeat = async (
     maskDeviceId: snapshot.maskDeviceId,
     consumingGroupId: snapshot.consumingGroupId,
     sourceKind: snapshot.sourceKind,
+    sourceDomain: snapshot.sourceDomain,
     sourceId: snapshot.sourceId,
     timeKind: snapshot.timeKind,
   });
@@ -382,7 +383,7 @@ const main = async (): Promise<void> => {
 
   await writeJson(path.join(outputDirectory, 'notes.json'), {
     notes: preview.notes,
-    colorGuideWarpByOriginId: serializeMap(preview.colorGuideWarpByOriginId),
+    overlayTimingByOriginId: serializeMap(preview.overlayTimingByOriginId),
   });
 
   const framesDirectory = path.join(outputDirectory, 'frames');

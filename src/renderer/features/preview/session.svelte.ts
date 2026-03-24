@@ -145,7 +145,7 @@ export class PreviewSession {
       sourceChain,
       input.launchpadModel,
       input.loopLengthBeats,
-      previewResult?.colorGuideWarpByOriginId,
+      previewResult?.overlayTimingByOriginId,
     );
     this.syncPreviewSurface(previewWindowState, overlayCache.framesByIndex, overlayCache.bounds);
     this.state.modulationReadoutById = this.modulationReadoutCache.resolveReadoutById(

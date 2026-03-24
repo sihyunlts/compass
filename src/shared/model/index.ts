@@ -10,6 +10,7 @@ export type {
   GroupStateEntry,
   MaskEffectNode,
   MaskMode,
+  MaskSourceDomain,
   MaskSourceKind,
   MaskSourceVisibility,
   MirrorEffectNode,

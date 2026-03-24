@@ -4,7 +4,10 @@ import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import type { Polyline, SceneInstance } from '../core-types';
 import { applyTransformToPolyline } from '../geometry';
-import { projectSceneToActivationFrame } from './active';
+import {
+  projectSceneToActivationFrame,
+  resolveActiveTilesFromPolylines,
+} from './active';
 import { POLYLINE_STEP } from './constants';
 import { resolveMaskTime } from './groups';
 import {
@@ -23,6 +26,7 @@ export interface MaskDebugSnapshot {
   maskDeviceId: string;
   consumingGroupId: GroupId;
   sourceKind: MaskEffectNode['params']['sourceKind'];
+  sourceDomain: MaskEffectNode['params']['sourceDomain'];
   sourceId: string | null;
   timeKind: MaskTimeKind;
   sourcePolylines: Polyline[];
@@ -223,6 +227,66 @@ const resolveGeneratorSourceActiveTiles = (
   context.buttonIndex,
 ).activeTiles;
 
+const resolveGroupSourceTiles = (
+  sourceDomain: MaskEffectNode['params']['sourceDomain'],
+  groupId: GroupId,
+  context: GroupEvaluationContext,
+  timeKind: MaskTimeKind,
+  consumingGroupId?: GroupId,
+  consumingDeviceIndex?: number,
+): Set<number> => {
+  if (sourceDomain === 'scene') {
+    return resolveActiveTilesFromPolylines(
+      resolveGroupSourcePolylines(
+        groupId,
+        context,
+        timeKind,
+        consumingGroupId,
+        consumingDeviceIndex,
+      ),
+      context.buttonIndex,
+    );
+  }
+
+  return resolveGroupSourceActiveTiles(
+    groupId,
+    context,
+    timeKind,
+    consumingGroupId,
+    consumingDeviceIndex,
+  );
+};
+
+const resolveGeneratorSourceTiles = (
+  sourceDomain: MaskEffectNode['params']['sourceDomain'],
+  generatorId: string,
+  context: GroupEvaluationContext,
+  timeKind: MaskTimeKind,
+  consumingGroupId?: GroupId,
+  consumingDeviceIndex?: number,
+): Set<number> => {
+  if (sourceDomain === 'scene') {
+    return resolveActiveTilesFromPolylines(
+      resolveGeneratorSourcePolylines(
+        generatorId,
+        context,
+        timeKind,
+        consumingGroupId,
+        consumingDeviceIndex,
+      ),
+      context.buttonIndex,
+    );
+  }
+
+  return resolveGeneratorSourceActiveTiles(
+    generatorId,
+    context,
+    timeKind,
+    consumingGroupId,
+    consumingDeviceIndex,
+  );
+};
+
 const resolveMaskEffectContext = (
   effect: MaskEffectNode,
   context: GroupEvaluationContext,
@@ -237,7 +301,8 @@ const resolveMaskEffectContext = (
       return { tilesOverride: [] };
     }
     return {
-      tilesOverride: resolveGroupSourceActiveTiles(
+      tilesOverride: resolveGroupSourceTiles(
+        effect.params.sourceDomain,
         sourceId,
         context,
         timeKind,
@@ -253,7 +318,8 @@ const resolveMaskEffectContext = (
       return { tilesOverride: [] };
     }
     return {
-      tilesOverride: resolveGeneratorSourceActiveTiles(
+      tilesOverride: resolveGeneratorSourceTiles(
+        effect.params.sourceDomain,
         sourceId,
         context,
         timeKind,
@@ -414,13 +480,28 @@ export const evaluateMaskDebugSnapshot = (
       maskDeviceId,
       consumingGroupId: group.id,
       sourceKind: maskDevice.params.sourceKind,
+      sourceDomain: maskDevice.params.sourceDomain,
       sourceId,
       timeKind,
       sourcePolylines,
       sourceActiveTiles: maskDevice.params.sourceKind === 'group' && sourceId
-        ? resolveGroupSourceActiveTiles(sourceId, context, timeKind, group.id, maskIndex)
+        ? resolveGroupSourceTiles(
+          maskDevice.params.sourceDomain,
+          sourceId,
+          context,
+          timeKind,
+          group.id,
+          maskIndex,
+        )
         : (maskDevice.params.sourceKind === 'generator' && sourceId
-          ? resolveGeneratorSourceActiveTiles(sourceId, context, timeKind, group.id, maskIndex)
+          ? resolveGeneratorSourceTiles(
+            maskDevice.params.sourceDomain,
+            sourceId,
+            context,
+            timeKind,
+            group.id,
+            maskIndex,
+          )
           : new Set()),
       consumerPolylinesBeforeMask: projectPolylinesAtTime(
         buildCheckpointSceneInstances(group.id, context, maskIndex),
