@@ -28,6 +28,7 @@ export interface GenerateNotesInput {
 
 export interface PreviewNotesData {
   notes: ClipNote[];
+  sourceTimelineEndBeat: number;
 }
 
 interface OpenNoteState {
@@ -75,6 +76,49 @@ const toClipNote = (note: ClipNoteWithOrigin): ClipNote => ({
   durationBeats: note.durationBeats,
   velocity: note.velocity,
 });
+
+const trimSilenceFromNotes = (
+  notes: ReadonlyArray<ClipNoteWithOrigin>,
+): {
+  notes: ClipNoteWithOrigin[];
+  sourceTimelineEndBeat: number;
+} => {
+  if (notes.length === 0) {
+    return {
+      notes: [],
+      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+    };
+  }
+
+  let firstBeat = Number.POSITIVE_INFINITY;
+  let lastBeat = Number.NEGATIVE_INFINITY;
+  for (const note of notes) {
+    if (!Number.isFinite(note.startBeat) || !Number.isFinite(note.durationBeats)) {
+      continue;
+    }
+
+    firstBeat = Math.min(firstBeat, note.startBeat);
+    lastBeat = Math.max(lastBeat, note.startBeat + Math.max(note.durationBeats, 0));
+  }
+
+  if (!Number.isFinite(firstBeat) || !Number.isFinite(lastBeat) || lastBeat <= firstBeat) {
+    return {
+      notes: notes.map((note) => ({ ...note })),
+      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+    };
+  }
+
+  const trimmedNotes = notes.map((note) => ({
+    ...note,
+    startBeat: Math.max(0, note.startBeat - firstBeat),
+  }));
+  sortClipNotes(trimmedNotes);
+
+  return {
+    notes: trimmedNotes,
+    sourceTimelineEndBeat: Math.max(lastBeat - firstBeat, MIN_NOTE_DURATION),
+  };
+};
 
 const buildEngine = (
   chain: GeneratorChain,
@@ -162,19 +206,27 @@ const buildGeneratedNotes = ({
   chain,
   loopLengthBeats,
   launchpadModel,
-}: GenerateNotesInput): ClipNoteWithOrigin[] => {
+}: GenerateNotesInput): {
+  notes: ClipNoteWithOrigin[];
+  sourceTimelineEndBeat: number;
+} => {
   if (!Number.isFinite(loopLengthBeats) || loopLengthBeats <= 0) {
-    return [];
+    return {
+      notes: [],
+      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+    };
   }
 
-  return applyNoteStageColorPrograms(
-    chain,
-    collectRawNotesData({
+  return trimSilenceFromNotes(
+    applyNoteStageColorPrograms(
       chain,
-      loopLengthBeats,
-      launchpadModel,
-    }).notes,
-    MIN_NOTE_DURATION,
+      collectRawNotesData({
+        chain,
+        loopLengthBeats,
+        launchpadModel,
+      }).notes,
+      MIN_NOTE_DURATION,
+    ),
   );
 };
 
@@ -183,13 +235,18 @@ export const generatePreviewNotesData = ({
   chain,
   loopLengthBeats,
   launchpadModel,
-}: GenerateNotesInput): PreviewNotesData => ({
-  notes: buildGeneratedNotes({
+}: GenerateNotesInput): PreviewNotesData => {
+  const generated = buildGeneratedNotes({
     chain,
     loopLengthBeats,
     launchpadModel,
-  }).map((note) => toClipNote(note)),
-});
+  });
+
+  return {
+    notes: generated.notes.map((note) => toClipNote(note)),
+    sourceTimelineEndBeat: generated.sourceTimelineEndBeat,
+  };
+};
 
 /** Generates clip notes from one chain and one Launchpad model. */
 export const generateNotes = ({

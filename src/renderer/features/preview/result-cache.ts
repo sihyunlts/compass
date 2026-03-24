@@ -105,17 +105,22 @@ class PreviewResultCache {
         loopLengthBeats: input.loopLengthBeats,
         launchpadModel: input.launchpadModel,
       });
+    const sourceTimelineEndBeat =
+      input.preview?.sourceTimelineEndBeat
+      ?? generatedNotes?.sourceTimelineEndBeat
+      ?? NORMALIZED_SOURCE_TIMELINE_END_BEAT;
     const preview = input.preview ?? {
       ...generatePreviewStats(generatedNotes?.notes ?? []),
       notes: generatedNotes?.notes ?? [],
+      sourceTimelineEndBeat,
     };
     const entry: PreviewResultCacheEntry = {
       key,
       preview,
-      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+      sourceTimelineEndBeat,
       ledFramesByIndex: buildLedFramesFromNotes(
         preview.notes,
-        NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+        sourceTimelineEndBeat,
       ),
     };
     this.resultsByKey.set(key, entry);

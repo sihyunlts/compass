@@ -3,9 +3,8 @@ import {
   type LaunchpadLayout,
 } from '../../core/launchpad-map';
 import {
-  generateNotes,
+  generatePreviewNotesData,
   generatePreviewStats,
-  NORMALIZED_SOURCE_TIMELINE_END_BEAT,
 } from '../../domain';
 import { LIVE_BRIDGE_TARGET } from '../../shared/bridge/protocol';
 import { sanitizeBridgeSettings } from '../../shared/validation/bridge-settings';
@@ -59,12 +58,18 @@ const createPipelineNotes = (
   chain: GeneratorChain,
   loopLengthBeats: number,
   launchpadModel: LaunchpadModel | undefined,
-): ClipNote[] => {
-  return generateNotes({
+): GeneratorPreview => {
+  const preview = generatePreviewNotesData({
     chain,
     loopLengthBeats,
     launchpadModel: resolveLaunchpadModel(launchpadModel),
   });
+
+  return {
+    ...generatePreviewStats(preview.notes),
+    notes: preview.notes,
+    sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
+  };
 };
 
 const resolveLaunchpadModel = (
@@ -83,15 +88,15 @@ export class GeneratorService {
     request: GenerateAndSendRequest,
   ): Promise<GenerateAndSendResponse> {
     const bridgeSettings = sanitizeBridgeSettings(request.bridge);
-    const notes = createPipelineNotes(
+    const preview = createPipelineNotes(
       request.chain,
       bridgeSettings.autoCreateLengthBeats,
       request.launchpadModel,
     );
     const envelope = toEnvelope(
       bridgeSettings,
-      notes,
-      NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+      preview.notes,
+      preview.sourceTimelineEndBeat,
     );
 
     await this.bridge.send(envelope, LIVE_BRIDGE_TARGET);
@@ -100,10 +105,7 @@ export class GeneratorService {
       sentAtIso: new Date().toISOString(),
       target: LIVE_BRIDGE_TARGET,
       bridge: bridgeSettings,
-      preview: {
-        ...generatePreviewStats(notes),
-        notes,
-      },
+      preview,
     };
   }
 
