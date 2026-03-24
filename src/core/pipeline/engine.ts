@@ -8,7 +8,7 @@ import {
 import {
   stripModulationDevicesFromChain,
 } from '../modulation/routing';
-import { resolveActiveByPitch } from './active';
+import { projectSceneToActivationFrame } from './active';
 import { buildButtonIndex } from './buttons';
 import {
   SAMPLES_PER_BEAT,
@@ -144,11 +144,6 @@ const createEvaluationContext = (
   mutedGeneratorIds: engine.mutedGeneratorIds,
   cache: {
     sceneInstancesByGroup: new Map(),
-    sourcePolylinesByGroup: new Map(),
-    sourcePolylinesByGroupReversed: new Map(),
-    resolvingSourcePolylinesByGroup: new Set(),
-    resolvingSourcePolylinesByGroupReversed: new Set(),
-    sourceColorGuideWarpByGroup: new Map(),
     outputPolylinesByGroup: new Map(),
   },
 });
@@ -189,10 +184,9 @@ export const evaluatePolylinesAtTime = (
 export const evaluateActiveByPitchAtTime = (
   engine: CompiledPipelineEngine,
   time01: number,
-  originWindows?: Map<string, OriginWindow>,
 ): Map<number, ActivePitchInfo> => {
-  const polylines = evaluatePolylinesAtTime(engine, time01, originWindows);
-  return resolveActiveByPitch(polylines, engine.buttonIndex);
+  const scene = evaluateSceneInstancesAtTime(engine, time01);
+  return projectSceneToActivationFrame(scene, time01, engine.buttonIndex).activeByPitch;
 };
 
 export const evaluateMaskDebugAtTime = (

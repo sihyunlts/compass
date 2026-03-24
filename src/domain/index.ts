@@ -1,5 +1,6 @@
 export {
   generateNotes,
+  generatePreviewActiveVelocityFrames,
   generateOverlayFrames,
   generatePreviewNotesData,
   generatePreviewStats,

@@ -9,11 +9,12 @@ import {
 import {
   compilePipelineEngine,
   computeOriginWindowsWithEngine,
-  evaluateActiveByPitchAtTime,
   evaluatePolylinesAtTime,
+  evaluateSceneInstancesAtTime,
   type CompiledPipelineEngine,
 } from '../core/pipeline/engine';
-import type { GroupChain, GroupId } from '../core/pipeline/types';
+import { projectSceneToActivationFrame } from '../core/pipeline/active';
+import type { GroupChain } from '../core/pipeline/types';
 import {
   applyColorDeviceToNotes,
   composeColorGuideWarp,
@@ -23,9 +24,8 @@ import {
 import { isGeneratorEngineNode } from '../devices/engine';
 import { isDeviceEffectivelyEnabled } from '../shared/group-state';
 import { getLaunchpadRuntimeMap } from './launchpad-model';
-import { splitChainByGroup, resolveMutedSources } from '../core/pipeline/groups';
-import { normalizeOptionalId } from '../shared/normalize-id';
-import type { ClipNote, GeneratorChain, GeneratorNode, LaunchpadModel } from '../shared/model';
+import { splitChainByGroup } from '../core/pipeline/groups';
+import type { ClipNote, GeneratorChain, LaunchpadModel } from '../shared/model';
 
 /** Statistics summary for generated notes. */
 export interface PreviewStats {
@@ -119,43 +119,6 @@ interface RawNotesData {
   notes: ClipNoteWithOrigin[];
 }
 
-interface OrderedCheckpointEvaluation {
-  notes: ClipNoteWithOrigin[];
-  colorGuideWarpByOriginId: ReadonlyMap<string, ColorGuideWarp>;
-}
-
-interface OrderedNotesEvaluationContext {
-  chain: GeneratorChain;
-  groupById: Map<GroupId, GroupChain>;
-  generatorById: Map<string, Extract<GeneratorChain['devices'][number], { kind: GeneratorNode['kind'] }>>;
-  loopLengthBeats: number;
-  launchpadModel?: LaunchpadModel;
-  rawNotesByCheckpointKey: Map<string, RawNotesData>;
-  orderedNotesByCheckpointKey: Map<string, OrderedCheckpointEvaluation>;
-  resolvingCheckpointKeys: Set<string>;
-}
-
-const buildGroupById = (
-  groupChains: ReadonlyArray<GroupChain>,
-): Map<GroupId, GroupChain> => new Map(groupChains.map((group) => [group.id, group]));
-
-const buildGeneratorById = (
-  chain: GeneratorChain,
-): Map<string, Extract<GeneratorChain['devices'][number], { kind: GeneratorNode['kind'] }>> => {
-  const generatorById = new Map<string, Extract<GeneratorChain['devices'][number], { kind: GeneratorNode['kind'] }>>();
-  for (const device of chain.devices) {
-    if (isGeneratorEngineNode(device)) {
-      generatorById.set(device.id, device);
-    }
-  }
-  return generatorById;
-};
-
-const buildCheckpointKey = (
-  groupId: GroupId,
-  endExclusive: number,
-): string => `${groupId ?? '__ungrouped__'}:${endExclusive}`;
-
 const cloneOriginNotes = (
   notes: ReadonlyArray<ClipNoteWithOrigin>,
 ): ClipNoteWithOrigin[] => notes.map((note) => ({ ...note }));
@@ -181,66 +144,6 @@ const groupNotesByOriginId = (
 
   return notesByOriginId;
 };
-
-const intersectNotesByAddress = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-  sourceNotes: ReadonlyArray<ClipNoteWithOrigin>,
-  minimumNoteDuration: number,
-): ClipNoteWithOrigin[] => {
-  if (notes.length === 0 || sourceNotes.length === 0) {
-    return [];
-  }
-
-  const sourceNotesByAddress = new Map<string, ClipNoteWithOrigin[]>();
-  for (const sourceNote of sourceNotes) {
-    const key = `${sourceNote.channel}:${sourceNote.pitch}`;
-    const existing = sourceNotesByAddress.get(key);
-    if (existing) {
-      existing.push(sourceNote);
-      continue;
-    }
-    sourceNotesByAddress.set(key, [sourceNote]);
-  }
-
-  const intersected: ClipNoteWithOrigin[] = [];
-  for (const note of notes) {
-    const overlaps = sourceNotesByAddress.get(`${note.channel}:${note.pitch}`);
-    if (!overlaps) {
-      continue;
-    }
-
-    const noteEnd = note.startBeat + note.durationBeats;
-    for (const sourceNote of overlaps) {
-      const sourceEnd = sourceNote.startBeat + sourceNote.durationBeats;
-      const startBeat = Math.max(note.startBeat, sourceNote.startBeat);
-      const endBeat = Math.min(noteEnd, sourceEnd);
-      if (!Number.isFinite(startBeat) || !Number.isFinite(endBeat) || endBeat <= startBeat) {
-        continue;
-      }
-
-      intersected.push({
-        ...note,
-        startBeat,
-        durationBeats: Math.max(endBeat - startBeat, minimumNoteDuration),
-      });
-    }
-  }
-
-  sortClipNotes(intersected);
-  return intersected;
-};
-
-const buildGeometryOnlyCheckpointChain = (
-  group: GroupChain,
-  endExclusive: number,
-  groupStateById: GeneratorChain['groupStateById'],
-): GeneratorChain => ({
-  devices: group.devices
-    .slice(0, endExclusive)
-    .filter((device) => device.kind !== 'color')
-    .filter((device) => device.kind !== 'mask' || device.params.sourceKind === 'tiles'),
-  groupStateById,
-});
 
 const buildOverlayFrameStrokes = (
   polylines: ReadonlyArray<Polyline>,
@@ -315,14 +218,18 @@ const collectRawNotesData = ({
   }
 
   const engine = buildEngine(chain, launchpadModel);
-  const originWindows = computeOriginWindowsWithEngine(engine, loopLengthBeats);
 
   const openByPitch = new Map<number, OpenNoteState>();
   const notes: ClipNoteWithOrigin[] = [];
 
   for (let step = 0; step < steps; step += 1) {
     const t01 = step / steps;
-    const activeByPitch = evaluateActiveByPitchAtTime(engine, t01, originWindows);
+    const scene = evaluateSceneInstancesAtTime(engine, t01);
+    const activeByPitch = projectSceneToActivationFrame(
+      scene,
+      t01,
+      engine.buttonIndex,
+    ).activeByPitch;
 
     for (const [pitch, open] of openByPitch.entries()) {
       if (activeByPitch.has(pitch)) {
@@ -370,116 +277,40 @@ const collectRawNotesData = ({
   return { notes };
 };
 
-const resolveMaskSourceNotes = (
-  context: OrderedNotesEvaluationContext,
-  consumingGroupId: GroupId,
-  consumingDeviceIndex: number,
-  maskDevice: Extract<GeneratorChain['devices'][number], { kind: 'mask' }>,
-): ClipNoteWithOrigin[] => {
-  if (maskDevice.params.sourceKind === 'tiles') {
-    return [];
-  }
-
-  const sourceId = normalizeOptionalId(maskDevice.params.sourceId);
-  if (!sourceId) {
-    return [];
-  }
-
-  if (maskDevice.params.sourceKind === 'group') {
-    const sourceGroup = context.groupById.get(sourceId);
-    if (!sourceGroup) {
-      return [];
-    }
-
-    return evaluateOrderedCheckpointNotes(
-      context,
-      sourceId,
-      sourceId === consumingGroupId ? consumingDeviceIndex : sourceGroup.devices.length,
-    ).notes;
-  }
-
-  const sourceGenerator = context.generatorById.get(sourceId);
-  if (!sourceGenerator) {
-    return [];
-  }
-
-  const sourceGroupId = normalizeOptionalId(sourceGenerator.groupId);
-  const sourceGroup = context.groupById.get(sourceGroupId);
-  if (!sourceGroup) {
-    return [];
-  }
-
-  return evaluateOrderedCheckpointNotes(
-    context,
-    sourceGroupId,
-    sourceGroupId === consumingGroupId ? consumingDeviceIndex : sourceGroup.devices.length,
-  ).notes.filter((note) => note.originId === sourceId);
-};
-
-const evaluateOrderedCheckpointNotes = (
-  context: OrderedNotesEvaluationContext,
-  groupId: GroupId,
-  endExclusive: number,
-): OrderedCheckpointEvaluation => {
-  const checkpointKey = buildCheckpointKey(groupId, endExclusive);
-  const cached = context.orderedNotesByCheckpointKey.get(checkpointKey);
-  if (cached) {
-    return cached;
-  }
-
-  if (context.resolvingCheckpointKeys.has(checkpointKey)) {
-    return {
-      notes: [],
-      colorGuideWarpByOriginId: new Map(),
-    };
-  }
-
-  const group = context.groupById.get(groupId);
-  if (!group) {
-    const empty: OrderedCheckpointEvaluation = {
-      notes: [],
-      colorGuideWarpByOriginId: new Map<string, ColorGuideWarp>(),
-    };
-    context.orderedNotesByCheckpointKey.set(checkpointKey, empty);
-    return empty;
-  }
-
-  context.resolvingCheckpointKeys.add(checkpointKey);
-
-  const rawCached = context.rawNotesByCheckpointKey.get(checkpointKey);
-  const rawNotes = rawCached ?? collectRawNotesData({
-    chain: buildGeometryOnlyCheckpointChain(group, endExclusive, context.chain.groupStateById),
-    loopLengthBeats: context.loopLengthBeats,
-    launchpadModel: context.launchpadModel,
-  });
-  if (!rawCached) {
-    context.rawNotesByCheckpointKey.set(checkpointKey, rawNotes);
-  }
-
-  const prefixDevices = group.devices.slice(0, endExclusive);
-  const prefixChain: GeneratorChain = {
-    devices: prefixDevices,
-    groupStateById: context.chain.groupStateById,
-  };
-  const notesByOriginId = groupNotesByOriginId(rawNotes.notes);
+const applyColorProgramsToRawNotes = (
+  chain: GeneratorChain,
+  rawNotes: ReadonlyArray<ClipNoteWithOrigin>,
+): {
+  notes: ClipNoteWithOrigin[];
+  colorGuideWarpByOriginId: ReadonlyMap<string, ColorGuideWarp>;
+} => {
+  const notesByOriginId = groupNotesByOriginId(rawNotes);
   const colorGuideWarpByOriginId = new Map<string, ColorGuideWarp>();
-  const upstreamOriginIds: string[] = [];
 
-  for (let index = 0; index < prefixDevices.length; index += 1) {
-    const device = prefixDevices[index];
-    if (!isDeviceEffectivelyEnabled(prefixChain, device)) {
-      continue;
-    }
+  for (const group of splitChainByGroup(chain)) {
+    const groupChain: GeneratorChain = {
+      devices: group.devices,
+      groupStateById: chain.groupStateById,
+    };
+    const upstreamOriginIds: string[] = [];
 
-    if (isGeneratorEngineNode(device)) {
-      upstreamOriginIds.push(device.id);
-      if (!notesByOriginId.has(device.id)) {
-        notesByOriginId.set(device.id, []);
+    for (const device of group.devices) {
+      if (!isDeviceEffectivelyEnabled(groupChain, device)) {
+        continue;
       }
-      continue;
-    }
 
-    if (device.kind === 'color') {
+      if (isGeneratorEngineNode(device)) {
+        upstreamOriginIds.push(device.id);
+        if (!notesByOriginId.has(device.id)) {
+          notesByOriginId.set(device.id, []);
+        }
+        continue;
+      }
+
+      if (device.kind !== 'color') {
+        continue;
+      }
+
       for (const originId of upstreamOriginIds) {
         const colorProgram = applyColorDeviceToNotes(
           notesByOriginId.get(originId) ?? [],
@@ -499,37 +330,15 @@ const evaluateOrderedCheckpointNotes = (
           ),
         );
       }
-      continue;
-    }
-
-    if (device.kind === 'mask' && device.params.sourceKind !== 'tiles' && upstreamOriginIds.length > 0) {
-      const sourceNotes = resolveMaskSourceNotes(context, groupId, index, device);
-      for (const originId of upstreamOriginIds) {
-        notesByOriginId.set(
-          originId,
-          intersectNotesByAddress(
-            notesByOriginId.get(originId) ?? [],
-            sourceNotes,
-            MIN_NOTE_DURATION,
-          ),
-        );
-      }
     }
   }
 
   const notes: ClipNoteWithOrigin[] = [];
-  for (const originId of upstreamOriginIds) {
-    notes.push(...cloneOriginNotes(notesByOriginId.get(originId) ?? []));
+  for (const originNotes of notesByOriginId.values()) {
+    notes.push(...cloneOriginNotes(originNotes));
   }
   sortClipNotes(notes);
-
-  const evaluated: OrderedCheckpointEvaluation = {
-    notes,
-    colorGuideWarpByOriginId,
-  };
-  context.orderedNotesByCheckpointKey.set(checkpointKey, evaluated);
-  context.resolvingCheckpointKeys.delete(checkpointKey);
-  return evaluated;
+  return { notes, colorGuideWarpByOriginId };
 };
 
 const buildGeneratedNotesData = ({
@@ -547,53 +356,41 @@ const buildGeneratedNotesData = ({
     };
   }
 
-  const groupChains = splitChainByGroup(chain);
-  const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(chain);
-  const context: OrderedNotesEvaluationContext = {
+  return applyColorProgramsToRawNotes(
     chain,
-    groupById: buildGroupById(groupChains),
-    generatorById: buildGeneratorById(chain),
-    loopLengthBeats,
-    launchpadModel,
-    rawNotesByCheckpointKey: new Map(),
-    orderedNotesByCheckpointKey: new Map(),
-    resolvingCheckpointKeys: new Set(),
-  };
+    collectRawNotesData({
+      chain,
+      loopLengthBeats,
+      launchpadModel,
+    }).notes,
+  );
+};
 
-  const orderedNotes: ClipNoteWithOrigin[] = [];
-  const colorGuideWarpByOriginId = new Map<string, ColorGuideWarp>();
-
-  for (const group of groupChains) {
-    if (group.id && mutedGroupIds.has(group.id)) {
-      continue;
-    }
-
-    const evaluated = evaluateOrderedCheckpointNotes(
-      context,
-      group.id,
-      group.devices.length,
-    );
-
-    for (const note of evaluated.notes) {
-      if (note.originId && mutedGeneratorIds.has(note.originId)) {
-        continue;
-      }
-      orderedNotes.push({ ...note });
-    }
-
-    for (const [originId, warp] of evaluated.colorGuideWarpByOriginId.entries()) {
-      if (mutedGeneratorIds.has(originId)) {
-        continue;
-      }
-      colorGuideWarpByOriginId.set(originId, warp);
-    }
+export const generatePreviewActiveVelocityFrames = ({
+  chain,
+  beats01,
+  launchpadModel,
+}: {
+  chain: GeneratorChain;
+  beats01: ReadonlyArray<number>;
+  launchpadModel?: LaunchpadModel;
+}): ReadonlyArray<ReadonlyMap<number, number>> => {
+  if (beats01.length === 0) {
+    return [];
   }
 
-  sortClipNotes(orderedNotes);
-  return {
-    notes: orderedNotes,
-    colorGuideWarpByOriginId,
-  };
+  const engine = buildEngine(chain, launchpadModel);
+  return beats01.map((beat) => {
+    const scene = evaluateSceneInstancesAtTime(engine, beat);
+    const activationFrame = projectSceneToActivationFrame(
+      scene,
+      beat,
+      engine.buttonIndex,
+    );
+    return new Map(
+      Array.from(activationFrame.activeByPitch.entries(), ([pitch, info]) => [pitch, info.velocity]),
+    );
+  });
 };
 
 const resolveGuideBeat = (

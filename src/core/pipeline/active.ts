@@ -1,12 +1,45 @@
-import type { Polyline } from '../core-types';
-import { distanceToPolylineSquared, isPointInsideClipStack } from '../geometry';
+import { buildGeneratorPolyline } from '../../devices/engine';
+import type { Polyline, SceneInstance } from '../core-types';
 import {
+  applyTransformToPolyline,
+  distanceToPolylineSquared,
+  isPointInsideClipStack,
+} from '../geometry';
+import {
+  POLYLINE_STEP,
   THICKNESS,
   TILE_COUNT,
   TILE_MAX,
   TILE_MIN,
 } from './constants';
 import type { ActivePitchInfo, ButtonIndex } from './types';
+
+export interface ActivationFrame {
+  time: number;
+  activeTiles: Set<number>;
+  activeByPitch: Map<number, ActivePitchInfo>;
+}
+
+export const projectSceneToPolylinesAtTime = (
+  scene: ReadonlyArray<SceneInstance>,
+  time: number,
+): Polyline[] => {
+  const polylines: Polyline[] = [];
+
+  for (const sceneInstance of scene) {
+    const polyline = buildGeneratorPolyline(sceneInstance, time, POLYLINE_STEP);
+    if (!polyline) {
+      continue;
+    }
+
+    polylines.push(applyTransformToPolyline({
+      ...polyline,
+      clipStack: sceneInstance.clipStack,
+    }, sceneInstance.spatial));
+  }
+
+  return polylines;
+};
 
 export const resolveActiveTilesFromPolylines = (
   polylines: ReadonlyArray<Polyline>,
@@ -80,4 +113,18 @@ export const resolveActiveByPitch = (
   }
 
   return active;
+};
+
+export const projectSceneToActivationFrame = (
+  scene: ReadonlyArray<SceneInstance>,
+  time: number,
+  launchpadMap: ButtonIndex,
+): ActivationFrame => {
+  const polylines = projectSceneToPolylinesAtTime(scene, time);
+
+  return {
+    time,
+    activeTiles: resolveActiveTilesFromPolylines(polylines),
+    activeByPitch: resolveActiveByPitch(polylines, launchpadMap),
+  };
 };

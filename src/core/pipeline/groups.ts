@@ -40,12 +40,6 @@ export const splitChainByGroup = (chain: GeneratorChain): GroupChain[] => {
   return groups;
 };
 
-export const pickByTimeKind = <T>(
-  timeKind: MaskTimeKind,
-  forward: T,
-  reversed: T,
-): T => (timeKind === 'reversed' ? reversed : forward);
-
 export const resolveMaskTime = (
   context: GroupEvaluationContext,
   timeKind: MaskTimeKind,

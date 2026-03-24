@@ -1,6 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 import {
+  generatePreviewActiveVelocityFrames,
   generatePreviewNotesData,
   generatePreviewStats,
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
@@ -13,10 +14,7 @@ import {
   toPreviewFrameBeat,
   toPreviewFrameIndex,
 } from './frame-index';
-import {
-  collectActiveVelocityByPitch,
-  EMPTY_ACTIVE_VELOCITY_BY_PITCH,
-} from './utils';
+import { EMPTY_ACTIVE_VELOCITY_BY_PITCH } from './utils';
 import { LatestSourceKeyFamilyCache } from './source-key-cache';
 
 export interface PreviewResultCacheEntry {
@@ -74,8 +72,8 @@ class PreviewResultCache {
       preview,
       sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
       ledFramesByIndex: this.buildLedFrameCache(
-        preview,
-        NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+        input.sourceChain,
+        input.launchpadModel,
       ),
       colorGuideWarpByOriginId,
     };
@@ -121,23 +119,17 @@ class PreviewResultCache {
   }
 
   private buildLedFrameCache(
-    preview: GeneratorPreview | null,
-    timelineSpanBeats: number,
+    chain: GeneratorChain,
+    launchpadModel: LaunchpadModel,
   ): ReadonlyArray<ReadonlyMap<number, number>> {
-    if (!preview) {
-      return [];
-    }
-
-    const frames: Array<ReadonlyMap<number, number>> = [];
-    for (let index = 0; index < PREVIEW_FRAME_COUNT; index += 1) {
-      frames.push(
-        collectActiveVelocityByPitch(
-          preview,
-          toPreviewFrameBeat(index, timelineSpanBeats),
-        ),
-      );
-    }
-    return frames;
+    return generatePreviewActiveVelocityFrames({
+      chain,
+      beats01: Array.from(
+        { length: PREVIEW_FRAME_COUNT },
+        (_, index) => toPreviewFrameBeat(index, NORMALIZED_SOURCE_TIMELINE_END_BEAT),
+      ),
+      launchpadModel,
+    });
   }
 
   private toPreviewResultKey(
