@@ -26,6 +26,7 @@ export type {
   ScannerParams,
   SpiralGeneratorNode,
   SpiralParams,
+  StretchEffectNode,
   SymmetryEffectNode,
   TranslateEffectNode,
   WaterdropGeneratorNode,

@@ -76,6 +76,38 @@ export const transformSceneInstancesTemporally = (
   temporal: composeSceneTemporalState(sceneInstance.temporal, transform),
 }));
 
+export const isNonWrapping01TemporalWindow = (
+  start: number,
+  end: number,
+): boolean => (
+  Number.isFinite(start)
+  && Number.isFinite(end)
+  && start >= 0
+  && end <= 1
+  && end > start
+);
+
+export const stretchSceneInstancesTemporally = (
+  sceneInstances: ReadonlyArray<SceneInstance>,
+  start: number,
+  end: number,
+): SceneInstance[] => {
+  if (!isNonWrapping01TemporalWindow(start, end)) {
+    return [];
+  }
+
+  return transformSceneInstancesTemporally(sceneInstances, {
+    remapToInput: {
+      alpha: end - start,
+      beta: start,
+    },
+    visibilityWindow: {
+      start: 0,
+      end: 1,
+    },
+  });
+};
+
 export const reverseSceneInstancesTemporally = (
   sceneInstances: ReadonlyArray<SceneInstance>,
 ): SceneInstance[] => transformSceneInstancesTemporally(sceneInstances, {

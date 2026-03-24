@@ -18,6 +18,8 @@ import { scaleDeviceControls } from './scale/controls';
 import { scaleDeviceSchema } from './scale/schema';
 import { spiralDeviceControls } from './spiral/controls';
 import { spiralDeviceSchema } from './spiral/schema';
+import { stretchDeviceControls } from './stretch/controls';
+import { stretchDeviceSchema } from './stretch/schema';
 import { symmetryDeviceControls } from './symmetry/controls';
 import { symmetryDeviceSchema } from './symmetry/schema';
 import { translateDeviceControls } from './translate/controls';
@@ -96,6 +98,11 @@ export const RENDERER_DEVICE_MANIFEST = [
     ...maskDeviceSchema,
     controls: maskDeviceControls,
     editor: './mask/ui.svelte',
+  },
+  {
+    ...stretchDeviceSchema,
+    controls: stretchDeviceControls,
+    editor: './stretch/ui.svelte',
   },
   {
     ...reverseDeviceSchema,

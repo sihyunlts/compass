@@ -83,6 +83,17 @@ export const cloneDeviceNode = (
     };
   }
 
+  if (device.kind === 'stretch') {
+    return {
+      id: device.id,
+      kind: 'stretch',
+      enabled: device.enabled,
+      groupId: device.groupId ?? null,
+      name: device.name ?? null,
+      params: { ...device.params },
+    };
+  }
+
   if (device.kind === 'modulator') {
     return {
       id: device.id,

@@ -142,6 +142,20 @@ const NUMERIC_PARAM_ACCESSORS: Record<
       },
     },
   },
+  stretch: {
+    start: {
+      read: (device) => (device as DeviceNodeOfKind<'stretch'>).params.start,
+      write: (device, value) => {
+        (device as DeviceNodeOfKind<'stretch'>).params.start = value;
+      },
+    },
+    end: {
+      read: (device) => (device as DeviceNodeOfKind<'stretch'>).params.end,
+      write: (device, value) => {
+        (device as DeviceNodeOfKind<'stretch'>).params.end = value;
+      },
+    },
+  },
 };
 
 const MODULATION_TARGET_DEVICE_KINDS = Object.freeze(
