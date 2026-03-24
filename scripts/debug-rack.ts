@@ -43,7 +43,7 @@ const printUsage = (): void => {
     [
       'Usage: npm run debug:rack -- <rack-path> [--out <dir>] [--beats 0,0.25,0.5,0.75] [--loop-length 1] [--model mk3|mk2]',
       '',
-      'Outputs notes, beat snapshots, and overlay SVGs for one rack preset.',
+      'Outputs notes and beat snapshots for one rack preset.',
       '',
     ].join('\n'),
   );

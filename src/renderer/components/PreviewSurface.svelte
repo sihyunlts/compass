@@ -67,7 +67,6 @@
 
 <style lang="scss">
   .preview-launchpad {
-    position: relative;
     border: 1px solid var(--neutral-20);
     border-radius: var(--radius-4);
     background: var(--neutral-00);
