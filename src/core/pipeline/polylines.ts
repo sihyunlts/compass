@@ -120,16 +120,13 @@ const buildGeneratorById = (
 
 const buildMaskSourceCacheKey = (
   sourceGroupId: string,
-  consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
-): string => `group:${sourceGroupId}|consumer:${consumingGroupId ?? 'none'}|index:${consumingDeviceIndex ?? -1}`;
+): string => `group:${sourceGroupId}|index:${consumingDeviceIndex ?? -1}`;
 
 const createBaseChainForMaskSource = (
   context: GroupEvaluationContext,
-  consumingGroupId: GroupId | undefined,
   consumingDeviceIndex: number | undefined,
 ): GeneratorChain => {
-  void consumingGroupId;
   if (consumingDeviceIndex === undefined) {
     return context.baseChain;
   }
@@ -206,12 +203,11 @@ const closeOpenNote = (
 const collectGroupOutputNotes = (
   sourceGroupId: string,
   context: GroupEvaluationContext,
-  consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
 ): TimedOutputNote[] => {
   const notes: TimedOutputNote[] = [];
   const openByPitch = new Map<number, OpenNoteState>();
-  const sourceChain = createBaseChainForMaskSource(context, consumingGroupId, consumingDeviceIndex);
+  const sourceChain = createBaseChainForMaskSource(context, consumingDeviceIndex);
 
   for (let step = 0; step < SAMPLES_PER_BEAT; step += 1) {
     const sample = step / SAMPLES_PER_BEAT;
@@ -269,14 +265,9 @@ const collectGroupOutputNotes = (
 const resolveGroupSourceOutputNotes = (
   sourceGroupId: string,
   context: GroupEvaluationContext,
-  consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
 ): ReadonlyArray<TimedOutputNote> => {
-  const cacheKey = buildMaskSourceCacheKey(
-    sourceGroupId,
-    consumingGroupId,
-    consumingDeviceIndex,
-  );
+  const cacheKey = buildMaskSourceCacheKey(sourceGroupId, consumingDeviceIndex);
   const cached = context.cache.maskSourceOutputNotesByKey.get(cacheKey);
   if (cached) {
     return cached;
@@ -285,7 +276,6 @@ const resolveGroupSourceOutputNotes = (
   const notes = collectGroupOutputNotes(
     sourceGroupId,
     context,
-    consumingGroupId,
     consumingDeviceIndex,
   );
   const fittedNotes = fitNotesToTimeline(notes).fittedNotes;
@@ -297,7 +287,6 @@ const resolveGroupSourceOutputActiveTiles = (
   sourceGroupId: string,
   context: GroupEvaluationContext,
   timeKind: MaskTimeKind,
-  consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
 ): Set<number> => {
   const time = resolveMaskTime(context, timeKind);
@@ -306,7 +295,6 @@ const resolveGroupSourceOutputActiveTiles = (
   for (const note of resolveGroupSourceOutputNotes(
     sourceGroupId,
     context,
-    consumingGroupId,
     consumingDeviceIndex,
   )) {
     if (note.startBeat <= time && time < note.startBeat + note.durationBeats) {
@@ -369,7 +357,6 @@ const buildFinalSceneInstances = (
         effect,
         context,
         timeKind,
-        targetGroupId,
         deviceIndex,
       );
     },
@@ -405,7 +392,6 @@ const buildCheckpointSceneInstances = (
       effect,
       context,
       timeKind,
-      targetGroupId,
       deviceIndex,
     );
   });
@@ -416,10 +402,8 @@ const buildCheckpointSceneInstances = (
 const resolveGroupSourceSceneInstances = (
   groupId: GroupId,
   context: GroupEvaluationContext,
-  consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
 ): SceneInstance[] => {
-  void consumingGroupId;
   const originIds = buildOriginIdsForGroup(groupId, context);
   if (originIds.size === 0) {
     return [];
@@ -434,7 +418,6 @@ const resolveGroupSourceSceneInstances = (
 const resolveGeneratorSourceSceneInstances = (
   generatorId: string,
   context: GroupEvaluationContext,
-  consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
 ): SceneInstance[] => {
   const generator = context.generatorById.get(generatorId);
@@ -442,7 +425,6 @@ const resolveGeneratorSourceSceneInstances = (
     return [];
   }
 
-  void consumingGroupId;
   const sceneInstances = consumingDeviceIndex !== undefined
     ? buildCheckpointSceneInstances(context, consumingDeviceIndex)
     : buildFinalSceneInstances(context);
@@ -453,13 +435,11 @@ const resolveGroupSourcePolylines = (
   groupId: GroupId,
   context: GroupEvaluationContext,
   timeKind: MaskTimeKind,
-  consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
 ): Polyline[] => projectPolylinesAtTime(
   resolveGroupSourceSceneInstances(
     groupId,
     context,
-    consumingGroupId,
     consumingDeviceIndex,
   ),
   resolveMaskTime(context, timeKind),
@@ -469,13 +449,11 @@ const resolveGeneratorSourcePolylines = (
   generatorId: string,
   context: GroupEvaluationContext,
   timeKind: MaskTimeKind,
-  consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
 ): Polyline[] => projectPolylinesAtTime(
   resolveGeneratorSourceSceneInstances(
     generatorId,
     context,
-    consumingGroupId,
     consumingDeviceIndex,
   ),
   resolveMaskTime(context, timeKind),
@@ -485,7 +463,6 @@ const resolveGroupSourceActiveTiles = (
   groupId: GroupId,
   context: GroupEvaluationContext,
   timeKind: MaskTimeKind,
-  consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
 ): Set<number> => {
   if (!groupId) {
@@ -496,7 +473,6 @@ const resolveGroupSourceActiveTiles = (
     groupId,
     context,
     timeKind,
-    consumingGroupId,
     consumingDeviceIndex,
   );
 };
@@ -505,13 +481,11 @@ const resolveGeneratorSourceActiveTiles = (
   generatorId: string,
   context: GroupEvaluationContext,
   timeKind: MaskTimeKind,
-  consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
 ): Set<number> => projectSceneToActivationFrame(
   resolveGeneratorSourceSceneInstances(
     generatorId,
     context,
-    consumingGroupId,
     consumingDeviceIndex,
   ),
   resolveMaskTime(context, timeKind),
@@ -523,7 +497,6 @@ const resolveGroupSourceTiles = (
   groupId: GroupId,
   context: GroupEvaluationContext,
   timeKind: MaskTimeKind,
-  consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
 ): Set<number> => {
   if (sourceDomain === 'scene') {
@@ -532,7 +505,6 @@ const resolveGroupSourceTiles = (
         groupId,
         context,
         timeKind,
-        consumingGroupId,
         consumingDeviceIndex,
       ),
     );
@@ -542,7 +514,6 @@ const resolveGroupSourceTiles = (
     groupId,
     context,
     timeKind,
-    consumingGroupId,
     consumingDeviceIndex,
   );
 };
@@ -552,7 +523,6 @@ const resolveGeneratorSourceTiles = (
   generatorId: string,
   context: GroupEvaluationContext,
   timeKind: MaskTimeKind,
-  consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
 ): Set<number> => {
   if (sourceDomain === 'scene') {
@@ -561,7 +531,6 @@ const resolveGeneratorSourceTiles = (
         generatorId,
         context,
         timeKind,
-        consumingGroupId,
         consumingDeviceIndex,
       ),
     );
@@ -571,7 +540,6 @@ const resolveGeneratorSourceTiles = (
     generatorId,
     context,
     timeKind,
-    consumingGroupId,
     consumingDeviceIndex,
   );
 };
@@ -580,7 +548,6 @@ const resolveMaskEffectContext = (
   effect: MaskEffectNode,
   context: GroupEvaluationContext,
   timeKind: MaskTimeKind,
-  consumingGroupId: GroupId,
   consumingDeviceIndex: number,
 ): { tilesOverride?: Iterable<number> | null } => {
   const sourceKind = effect.params.sourceKind;
@@ -595,7 +562,6 @@ const resolveMaskEffectContext = (
         sourceId,
         context,
         timeKind,
-        consumingGroupId,
         consumingDeviceIndex,
       ),
     };
@@ -612,7 +578,6 @@ const resolveMaskEffectContext = (
         sourceId,
         context,
         timeKind,
-        consumingGroupId,
         consumingDeviceIndex,
       ),
     };
@@ -734,7 +699,6 @@ export const evaluateMaskDebugSnapshot = (
         sourceId,
         context,
         timeKind,
-        group.id,
         globalMaskIndex,
       );
     } else if (maskDevice.params.sourceKind === 'generator' && sourceId) {
@@ -742,7 +706,6 @@ export const evaluateMaskDebugSnapshot = (
         sourceId,
         context,
         timeKind,
-        group.id,
         globalMaskIndex,
       );
     }
@@ -761,7 +724,6 @@ export const evaluateMaskDebugSnapshot = (
           sourceId,
           context,
           timeKind,
-          group.id,
           globalMaskIndex,
         )
         : (maskDevice.params.sourceKind === 'generator' && sourceId
@@ -770,7 +732,6 @@ export const evaluateMaskDebugSnapshot = (
             sourceId,
             context,
             timeKind,
-            group.id,
             globalMaskIndex,
           )
           : new Set()),
