@@ -11,7 +11,6 @@ import {
 import {
   projectSceneToExactOutputFrame,
   type ExactOutputFrame,
-  type OverlayFrameStroke,
   type ActivationFrame,
 } from './active';
 import { buildButtonIndex } from './buttons';
@@ -46,7 +45,7 @@ export interface CompiledPipelineEngine {
 }
 
 export type { MaskDebugSnapshot } from './polylines';
-export type { ActivationFrame, ExactOutputFrame, OverlayFrameStroke } from './active';
+export type { ActivationFrame, ExactOutputFrame } from './active';
 
 interface CompilePipelineEngineOptions {
   buttons?: ReadonlyArray<LaunchpadButton>;
@@ -178,18 +177,16 @@ export const evaluatePolylinesAtTime = (
 export const evaluateExactOutputFrameAtTime = (
   engine: CompiledPipelineEngine,
   time01: number,
-  bounds?: Bounds,
 ): ExactOutputFrame => {
   const scene = evaluateSceneInstancesAtTime(engine, time01);
-  return projectSceneToExactOutputFrame(scene, time01, engine.buttonIndex, bounds);
+  return projectSceneToExactOutputFrame(scene, time01, engine.buttonIndex);
 };
 
 export const evaluateExactOutputFramesAtTimes = (
   engine: CompiledPipelineEngine,
   times01: ReadonlyArray<number>,
-  bounds?: Bounds,
 ): ExactOutputFrame[] => times01.map((time01) =>
-  evaluateExactOutputFrameAtTime(engine, time01, bounds));
+  evaluateExactOutputFrameAtTime(engine, time01));
 
 export const evaluateMaskDebugAtTime = (
   engine: CompiledPipelineEngine,

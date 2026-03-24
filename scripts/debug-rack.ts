@@ -6,7 +6,6 @@ import {
   generatePreviewNotesData,
   resolveLaunchpadModel,
 } from '../src/domain';
-import type { OverlayFrameStroke } from '../src/core/pipeline/active';
 import {
   compilePipelineEngine,
   evaluateExactOutputFramesAtTimes,
@@ -16,7 +15,6 @@ import {
 import {
   SAMPLES_PER_BEAT,
   TILE_COUNT,
-  buildWorldBounds,
 } from '../src/core/pipeline/constants';
 import type { Polyline } from '../src/core/core-types';
 import type { LaunchpadModel, MaskEffectNode } from '../src/shared/model';
@@ -159,55 +157,6 @@ const toTileCoordinates = (tileId: number): { tileId: number; x: number; y: numb
   y: Math.floor(tileId / TILE_COUNT),
 });
 
-const toSvgPath = (stroke: OverlayFrameStroke): string => {
-  const [first, ...rest] = stroke.points;
-  if (!first) {
-    return '';
-  }
-
-  const commands = [`M ${round(first.x, 3)} ${round(first.y, 3)}`];
-  for (const point of rest) {
-    commands.push(`L ${round(point.x, 3)} ${round(point.y, 3)}`);
-  }
-  if (stroke.closed) {
-    commands.push('Z');
-  }
-  return commands.join(' ');
-};
-
-const buildOverlaySvg = (
-  strokes: ReadonlyArray<OverlayFrameStroke>,
-  activeTiles: ReadonlyArray<{ tileId: number; x: number; y: number }>,
-): string => {
-  const bounds = buildWorldBounds();
-  const width = bounds.maxX - bounds.minX;
-  const height = bounds.maxY - bounds.minY;
-  const tileRects = activeTiles
-    .map((tile) =>
-      `<rect x="${tile.x - 0.5}" y="${tile.y - 0.5}" width="1" height="1" fill="#ffd54a" fill-opacity="0.28" stroke="#d89b00" stroke-width="0.04" />`)
-    .join('\n');
-  const paths = strokes
-    .map((stroke) => toSvgPath(stroke))
-    .filter((pathValue) => pathValue.length > 0)
-    .map((pathValue) => `<path d="${pathValue}" fill="none" stroke="#0f172a" stroke-width="0.08" stroke-linecap="round" stroke-linejoin="round" />`)
-    .join('\n');
-
-  return [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${bounds.minX} ${bounds.minY} ${width} ${height}">`,
-    '<rect width="100%" height="100%" fill="#fcfcf7" />',
-    '<g opacity="0.22" stroke="#94a3b8" stroke-width="0.03">',
-    Array.from({ length: TILE_COUNT + 1 }, (_, index) =>
-      `<line x1="${index - 0.5}" y1="-0.5" x2="${index - 0.5}" y2="${TILE_COUNT - 0.5}" />`).join('\n'),
-    Array.from({ length: TILE_COUNT + 1 }, (_, index) =>
-      `<line x1="-0.5" y1="${index - 0.5}" x2="${TILE_COUNT - 0.5}" y2="${index - 0.5}" />`).join('\n'),
-    '</g>',
-    tileRects,
-    paths,
-    '</svg>',
-    '',
-  ].join('\n');
-};
-
 const writeJson = async (
   filePath: string,
   value: unknown,
@@ -250,39 +199,6 @@ const writeMaskDebugBeat = async (
   await writeJson(path.join(beatDirectory, 'source-active-tiles.json'), sourceActiveTiles);
   await writeJson(path.join(beatDirectory, 'consumer-before-mask-polylines.json'), serializePolylines(snapshot.consumerPolylinesBeforeMask));
   await writeJson(path.join(beatDirectory, 'consumer-after-mask-polylines.json'), serializePolylines(snapshot.consumerPolylinesAfterMask));
-  await writeFile(
-    path.join(beatDirectory, 'source-overlay.svg'),
-    buildOverlaySvg(
-      snapshot.sourcePolylines.map((polyline) => ({
-        points: polyline.points,
-        closed: polyline.closed,
-      })),
-      sourceActiveTiles,
-    ),
-    'utf8',
-  );
-  await writeFile(
-    path.join(beatDirectory, 'consumer-before-mask.svg'),
-    buildOverlaySvg(
-      snapshot.consumerPolylinesBeforeMask.map((polyline) => ({
-        points: polyline.points,
-        closed: polyline.closed,
-      })),
-      [],
-    ),
-    'utf8',
-  );
-  await writeFile(
-    path.join(beatDirectory, 'consumer-after-mask.svg'),
-    buildOverlaySvg(
-      snapshot.consumerPolylinesAfterMask.map((polyline) => ({
-        points: polyline.points,
-        closed: polyline.closed,
-      })),
-      [],
-    ),
-    'utf8',
-  );
 };
 
 const main = async (): Promise<void> => {
@@ -359,11 +275,6 @@ const main = async (): Promise<void> => {
     await writeJson(path.join(frameDirectory, 'active-tiles.json'), activeTiles);
     await writeJson(path.join(frameDirectory, 'active-pitches.json'), activePitches);
     await writeJson(path.join(frameDirectory, 'polylines.json'), serializePolylines(polylines));
-    await writeFile(
-      path.join(frameDirectory, 'overlay.svg'),
-      buildOverlaySvg(exactFrame?.overlayStrokes ?? [], activeTiles),
-      'utf8',
-    );
   }
 
   const maskDevices = chain.devices.filter((device): device is MaskEffectNode =>
