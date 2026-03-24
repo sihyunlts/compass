@@ -311,7 +311,12 @@ class PresetController {
   public async handleSaveGroupPreset(groupId: string): Promise<void> {
     const chain = this.options.editorSession.state.chainState;
     const memberDeviceIds = resolveGroupMemberIds(chain.devices, groupId);
-    const payload = buildGroupPresetFile(chain, groupId, memberDeviceIds);
+    const payload = buildGroupPresetFile(
+      chain,
+      groupId,
+      memberDeviceIds,
+      this.options.editorSession.state.collapsedDeviceIds,
+    );
     await this.savePreset(
       payload
         ? {
@@ -333,7 +338,10 @@ class PresetController {
         suggestedName: resolveRackPresetSuggestedName(
           this.options.editorSession.state.chainState,
         ),
-        payload: buildRackPresetFile(this.options.editorSession.state.chainState),
+        payload: buildRackPresetFile(
+          this.options.editorSession.state.chainState,
+          this.options.editorSession.state.collapsedDeviceIds,
+        ),
       },
       {
         successMessage: 'Rack preset saved.',

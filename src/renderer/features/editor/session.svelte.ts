@@ -61,8 +61,10 @@ import {
 } from './grouping';
 import {
   createInitialEditorState,
+  mergeCollapsedDeviceIds,
   persistChainState as persistEditorChainState,
   persistSidebarWidth,
+  replaceCollapsedDeviceIds,
   toggleCollapse,
 } from './persistence';
 import { buildOrderedGroupIds } from '../rack/layout';
@@ -80,6 +82,7 @@ import {
   insertDevicePresetFile,
   insertGroupPresetFile,
   type PresetApplyResult,
+  type RackPresetApplyResult,
 } from './presets';
 import type { RackClipboard } from './rack-clipboard';
 import type { ChainMutationMeta } from './history-core';
@@ -347,7 +350,7 @@ export class EditorSession {
       dropZone: RackDropZone,
       preset: GroupPresetFile,
     ): GroupPresetApplyResult => this.insertGroupPreset(dropZone, preset),
-    applyRackPreset: (preset: RackPresetFile): PresetApplyResult => this.applyRackPreset(preset),
+    applyRackPreset: (preset: RackPresetFile): RackPresetApplyResult => this.applyRackPreset(preset),
     setLaunchpadModelEnabled: (nextEnabled: boolean): boolean =>
       setLaunchpadModelEnabled(this.state, nextEnabled, (delayMs) => this.scheduleAutoPreview(delayMs)),
     togglePreviewLoopEnabled: (): boolean => togglePreviewLoopEnabled(this.state),
@@ -683,11 +686,12 @@ export class EditorSession {
     }
 
     this.applyChainMutation(result.chain, EDITOR_HISTORY_META.insertGroupPreset);
+    mergeCollapsedDeviceIds(this.state, result.collapsedDeviceIds);
     this.selectGroupIds([result.groupId], result.chain);
     return result;
   }
 
-  private applyRackPreset(preset: RackPresetFile): PresetApplyResult {
+  private applyRackPreset(preset: RackPresetFile): RackPresetApplyResult {
     const result = applyRackPresetFile(preset);
     if (!result.ok) {
       return result;
@@ -695,6 +699,7 @@ export class EditorSession {
 
     this.rackBinding?.clearSelection();
     this.applyChainMutation(result.chain, EDITOR_HISTORY_META.loadRackPreset);
+    replaceCollapsedDeviceIds(this.state, result.collapsedDeviceIds);
     return result;
   }
 

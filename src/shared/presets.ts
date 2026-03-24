@@ -37,10 +37,16 @@ export interface GroupPresetFile extends PresetFileBase<'group'> {
     name: string | null;
     devices: GeneratorDeviceNode[];
   };
+  ui?: PresetFileUiMetadata;
+}
+
+export interface PresetFileUiMetadata {
+  collapsedDeviceIds?: string[];
 }
 
 export interface RackPresetFile extends PresetFileBase<'rack'> {
   chain: GeneratorChain;
+  ui?: PresetFileUiMetadata;
 }
 
 export type PresetFile = DevicePresetFile | GroupPresetFile | RackPresetFile;
@@ -58,6 +64,34 @@ export type ParsedPresetFileResult =
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
+
+const toCollapsedDeviceIds = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const unique = new Set<string>();
+  for (const item of value) {
+    if (typeof item === 'string' && item.trim()) {
+      unique.add(item.trim());
+    }
+  }
+
+  return [...unique];
+};
+
+export const sanitizeCollapsedDeviceIdsForDevices = (
+  devices: readonly Pick<GeneratorDeviceNode, 'id'>[],
+  value: unknown,
+): string[] => {
+  const validIds = new Set(devices.map((device) => device.id));
+  return toCollapsedDeviceIds(value).filter((id) => validIds.has(id));
+};
+
+export const sanitizeCollapsedDeviceIdsForChain = (
+  chain: Pick<GeneratorChain, 'devices'>,
+  value: unknown,
+): string[] => sanitizeCollapsedDeviceIdsForDevices(chain.devices, value);
 
 const extractBaseName = (fileName: string): string => {
   const separatorIndex = Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\'));
@@ -135,6 +169,7 @@ const parseDevicePresetPayload = (
 
 const parseGroupPresetPayload = (
   rawGroup: unknown,
+  rawUi: unknown,
   header: {
     schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
     savedAtIso: string;
@@ -164,6 +199,11 @@ const parseGroupPresetPayload = (
     return null;
   }
 
+  const collapsedDeviceIds = sanitizeCollapsedDeviceIdsForDevices(
+    hydratedDevices.devices,
+    isRecord(rawUi) ? rawUi.collapsedDeviceIds : undefined,
+  );
+
   return {
     preset: {
       schemaVersion: header.schemaVersion,
@@ -174,6 +214,13 @@ const parseGroupPresetPayload = (
         name: typeof group.name === 'string' ? group.name : null,
         devices: hydratedDevices.devices,
       },
+      ...(collapsedDeviceIds.length > 0
+        ? {
+            ui: {
+              collapsedDeviceIds,
+            },
+          }
+        : {}),
     },
     warning: formatInvalidHydratedDeviceWarning(
       hydratedDevices.invalidDeviceCount,
@@ -184,6 +231,7 @@ const parseGroupPresetPayload = (
 
 const parseRackPresetPayload = (
   rawChain: unknown,
+  rawUi: unknown,
   header: {
     schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
     savedAtIso: string;
@@ -201,12 +249,24 @@ const parseRackPresetPayload = (
     return null;
   }
 
+  const collapsedDeviceIds = sanitizeCollapsedDeviceIdsForChain(
+    hydratedChain.chain,
+    isRecord(rawUi) ? rawUi.collapsedDeviceIds : undefined,
+  );
+
   return {
     preset: {
       schemaVersion: header.schemaVersion,
       presetType: 'rack',
       savedAtIso: header.savedAtIso,
       chain: hydratedChain.chain,
+      ...(collapsedDeviceIds.length > 0
+        ? {
+            ui: {
+              collapsedDeviceIds,
+            },
+          }
+        : {}),
     },
     warning: formatInvalidHydratedDeviceWarning(
       hydratedChain.invalidDeviceCount,
@@ -231,15 +291,25 @@ export const parsePresetFile = (
   }
 
   if (header.presetType === 'group') {
-    return parseGroupPresetPayload((value as { group?: unknown }).group, header, {
-      mode: options.mode,
-      allowStoredName: true,
-    });
+    return parseGroupPresetPayload(
+      (value as { group?: unknown }).group,
+      (value as { ui?: unknown }).ui,
+      header,
+      {
+        mode: options.mode,
+        allowStoredName: true,
+      },
+    );
   }
 
-  return parseRackPresetPayload((value as { chain?: unknown }).chain, header, {
+  return parseRackPresetPayload(
+    (value as { chain?: unknown }).chain,
+    (value as { ui?: unknown }).ui,
+    header,
+    {
     mode: options.mode,
-  });
+    },
+  );
 };
 
 const parseStoredPresetFile = (
@@ -260,15 +330,25 @@ const parseStoredPresetFile = (
   }
 
   if (header.presetType === 'group') {
-    return parseGroupPresetPayload((value as { group?: unknown }).group, header, {
-      mode: options.mode,
-      allowStoredName: false,
-    });
+    return parseGroupPresetPayload(
+      (value as { group?: unknown }).group,
+      (value as { ui?: unknown }).ui,
+      header,
+      {
+        mode: options.mode,
+        allowStoredName: false,
+      },
+    );
   }
 
-  return parseRackPresetPayload((value as { chain?: unknown }).chain, header, {
+  return parseRackPresetPayload(
+    (value as { chain?: unknown }).chain,
+    (value as { ui?: unknown }).ui,
+    header,
+    {
     mode: options.mode,
-  });
+    },
+  );
 };
 
 export const resolvePresetFileKindFromName = (

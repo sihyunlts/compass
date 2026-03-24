@@ -62,9 +62,37 @@ export const toggleCollapse = (
   saveCollapsedDeviceIds(next);
 };
 
+const filterCollapsedDeviceIds = (
+  state: EditorSessionState,
+  ids: readonly string[],
+): string[] => {
+  const validIds = new Set(state.chainState.devices.map((device) => device.id));
+  return ids.filter((id) => validIds.has(id));
+};
+
+export const replaceCollapsedDeviceIds = (
+  state: EditorSessionState,
+  ids: readonly string[],
+): void => {
+  const next = filterCollapsedDeviceIds(state, ids);
+  state.collapsedDeviceIds = next;
+  saveCollapsedDeviceIds(next);
+};
+
+export const mergeCollapsedDeviceIds = (
+  state: EditorSessionState,
+  ids: readonly string[],
+): void => {
+  const next = filterCollapsedDeviceIds(state, [
+    ...state.collapsedDeviceIds,
+    ...ids,
+  ]);
+  state.collapsedDeviceIds = [...new Set(next)];
+  saveCollapsedDeviceIds(state.collapsedDeviceIds);
+};
+
 const pruneCollapsedDeviceIds = (state: EditorSessionState): void => {
-  const validIds = state.chainState.devices.map((device) => device.id);
-  const next = state.collapsedDeviceIds.filter((id) => validIds.includes(id));
+  const next = filterCollapsedDeviceIds(state, state.collapsedDeviceIds);
   if (next.length === state.collapsedDeviceIds.length) {
     return;
   }

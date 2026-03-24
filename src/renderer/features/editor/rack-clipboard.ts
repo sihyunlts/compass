@@ -24,6 +24,7 @@ type ClipboardBuildOptions =
 
 type PreparedClipboardInsert = {
   devices: GeneratorDeviceNode[];
+  idMap: ReadonlyMap<string, string>;
   forcedGroupId: string | null;
   groupStatePatch: { groupId: string; enabled: boolean; name: string | null } | null;
 };
@@ -96,6 +97,7 @@ export const prepareClipboardInsert = (
 
     return {
       devices: cloned,
+      idMap,
       forcedGroupId: nextGroupId,
       groupStatePatch: {
         groupId: nextGroupId,
@@ -116,6 +118,7 @@ export const prepareClipboardInsert = (
 
   return {
     devices: cloned,
+    idMap,
     forcedGroupId: null,
     groupStatePatch: null,
   };

@@ -5,6 +5,8 @@ import type {
 } from '../../../shared/presets';
 import {
   PRESET_FILE_SCHEMA_VERSION,
+  sanitizeCollapsedDeviceIdsForChain,
+  sanitizeCollapsedDeviceIdsForDevices,
   toStandaloneDevicePresetDevice,
 } from '../../../shared/presets';
 import {
@@ -51,6 +53,19 @@ export type GroupPresetApplyResult =
       ok: true;
       chain: GeneratorChain;
       groupId: string;
+      collapsedDeviceIds: string[];
+      message: string;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+export type RackPresetApplyResult =
+  | {
+      ok: true;
+      chain: GeneratorChain;
+      collapsedDeviceIds: string[];
       message: string;
     }
   | {
@@ -86,6 +101,25 @@ const buildPreparedPresetInsert = (
     groupIdOverride: options.groupIdOverride,
     unresolvedReferencePolicy: CLEAR_UNRESOLVED_IMPORT_REFERENCES,
   });
+};
+
+const remapCollapsedDeviceIds = (
+  ids: readonly string[] | undefined,
+  idMap: ReadonlyMap<string, string>,
+): string[] => {
+  if (!ids || ids.length === 0) {
+    return [];
+  }
+
+  const remapped = new Set<string>();
+  for (const id of ids) {
+    const nextId = idMap.get(id);
+    if (nextId) {
+      remapped.add(nextId);
+    }
+  }
+
+  return [...remapped];
 };
 
 const buildChainWithPreparedPresetInsert = (
@@ -180,11 +214,17 @@ export const buildGroupPresetFile = (
   chain: GeneratorChain,
   groupId: string,
   memberDeviceIds: readonly string[],
+  collapsedDeviceIds: readonly string[],
 ): GroupPresetFile | null => {
   const devices = resolveDevicesByIds(chain.devices, memberDeviceIds);
   if (devices.length === 0) {
     return null;
   }
+
+  const sanitizedCollapsedDeviceIds = sanitizeCollapsedDeviceIdsForDevices(
+    devices,
+    collapsedDeviceIds,
+  );
 
   return {
     schemaVersion: PRESET_FILE_SCHEMA_VERSION,
@@ -195,17 +235,40 @@ export const buildGroupPresetFile = (
       name: chain.groupStateById[groupId]?.name ?? null,
       devices: devices.map((device) => cloneDeviceNode(device)),
     },
+    ...(sanitizedCollapsedDeviceIds.length > 0
+      ? {
+          ui: {
+            collapsedDeviceIds: sanitizedCollapsedDeviceIds,
+          },
+        }
+      : {}),
   };
 };
 
 export const buildRackPresetFile = (
   chain: GeneratorChain,
-): RackPresetFile => ({
-  schemaVersion: PRESET_FILE_SCHEMA_VERSION,
-  presetType: 'rack',
-  savedAtIso: createSavedAtIso(),
-  chain: cloneChainForIpc(chain),
-});
+  collapsedDeviceIds: readonly string[],
+): RackPresetFile => {
+  const clonedChain = cloneChainForIpc(chain);
+  const sanitizedCollapsedDeviceIds = sanitizeCollapsedDeviceIdsForChain(
+    clonedChain,
+    collapsedDeviceIds,
+  );
+
+  return {
+    schemaVersion: PRESET_FILE_SCHEMA_VERSION,
+    presetType: 'rack',
+    savedAtIso: createSavedAtIso(),
+    chain: clonedChain,
+    ...(sanitizedCollapsedDeviceIds.length > 0
+      ? {
+          ui: {
+            collapsedDeviceIds: sanitizedCollapsedDeviceIds,
+          },
+        }
+      : {}),
+  };
+};
 
 export const insertDevicePresetFile = (
   chain: GeneratorChain,
@@ -252,6 +315,10 @@ export const insertGroupPresetFile = (
   return {
     ok: true,
     groupId,
+    collapsedDeviceIds: remapCollapsedDeviceIds(
+      preset.ui?.collapsedDeviceIds,
+      prepared.idMap,
+    ),
     chain: buildChainWithPreparedPresetInsert(
       chain,
       coerceGroupInsertDropZone(chain, dropZone),
@@ -263,11 +330,16 @@ export const insertGroupPresetFile = (
 
 export const applyRackPresetFile = (
   preset: RackPresetFile,
-): PresetApplyResult => {
+): RackPresetApplyResult => {
   syncDeviceNodeIdSeeds(preset.chain.devices);
+  const collapsedDeviceIds = sanitizeCollapsedDeviceIdsForChain(
+    preset.chain,
+    preset.ui?.collapsedDeviceIds,
+  );
   return {
     ok: true,
     chain: preset.chain,
+    collapsedDeviceIds,
     message: 'Rack preset loaded.',
   };
 };
