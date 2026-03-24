@@ -3,6 +3,7 @@ import type {
   CreatePresetFolderRequest,
   PresetBrowserTreeNode,
   ReadPresetEntryResponse,
+  RenamePresetFolderRequest,
   SavePresetFileRequest,
 } from '../../shared/contracts/ipc/presets';
 import { parsePresetFileText } from '../../shared/presets';
@@ -235,12 +236,31 @@ class PresetController {
     }
 
     this.state.pendingPresetFolderDraft = {
-      temporaryId: `pending-preset-folder:${this.nextPendingPresetFolderId}`,
+      mode: 'create',
       presetType: target.presetType,
-      parentRelativePath: [...target.relativePath],
+      relativePath: [...target.relativePath],
       draftName: '',
+      temporaryId: `pending-preset-folder:${this.nextPendingPresetFolderId}`,
     };
     this.nextPendingPresetFolderId += 1;
+    this.state.presetFolderSelectionTarget = null;
+  }
+
+  public beginPresetFolderRename(target: ContextMenuTarget): void {
+    if (
+      target.kind !== 'preset-entry'
+      || target.entryKind !== 'directory'
+      || target.relativePath.length === 0
+    ) {
+      return;
+    }
+
+    this.state.pendingPresetFolderDraft = {
+      mode: 'rename',
+      presetType: target.presetType,
+      relativePath: [...target.relativePath],
+      draftName: target.relativePath[target.relativePath.length - 1] ?? '',
+    };
     this.state.presetFolderSelectionTarget = null;
   }
 
@@ -256,11 +276,11 @@ class PresetController {
     };
   }
 
-  public cancelPendingPresetFolderCreate(): void {
+  public cancelPendingPresetFolderDraft(): void {
     this.state.pendingPresetFolderDraft = null;
   }
 
-  public async commitPendingPresetFolderCreate(): Promise<void> {
+  public async commitPendingPresetFolderDraft(): Promise<void> {
     const draft = this.state.pendingPresetFolderDraft;
     if (!draft) {
       return;
@@ -268,19 +288,32 @@ class PresetController {
 
     const folderName = draft.draftName.trim();
     if (!folderName) {
-      this.cancelPendingPresetFolderCreate();
+      this.cancelPendingPresetFolderDraft();
+      return;
+    }
+
+    if (
+      draft.mode === 'rename'
+      && folderName === (draft.relativePath[draft.relativePath.length - 1] ?? '')
+    ) {
+      this.cancelPendingPresetFolderDraft();
       return;
     }
 
     this.state.pendingPresetFolderDraft = null;
-    const request: CreatePresetFolderRequest = {
-      presetType: draft.presetType,
-      relativePath: [...draft.parentRelativePath],
-      folderName,
-    };
-    const response = await this.options.bridgeClient.createPresetFolder(request);
+    const response = draft.mode === 'create'
+      ? await this.options.bridgeClient.createPresetFolder({
+          presetType: draft.presetType,
+          relativePath: [...draft.relativePath],
+          folderName,
+        } satisfies CreatePresetFolderRequest)
+      : await this.options.bridgeClient.renamePresetFolder({
+          presetType: draft.presetType,
+          relativePath: [...draft.relativePath],
+          folderName,
+        } satisfies RenamePresetFolderRequest);
     if (response.status === 'error') {
-      this.showMessage(`Preset folder create failed | ${response.message}`);
+      this.showMessage(`Preset folder ${draft.mode} failed | ${response.message}`);
       return;
     }
 

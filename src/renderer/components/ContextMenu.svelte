@@ -99,9 +99,12 @@
       : CLIPBOARD_ACTIONS.filter((action) => !action.requiresClipboard || canPasteForTarget));
   const canRenameTarget = $derived.by(() =>
     target !== null
-    && target.kind !== 'preset-entry'
-    && target.kind !== 'presets-root'
-    && (target.kind === 'group' || target.deviceIds.length === 1));
+    && (
+      (target.kind === 'preset-entry' && target.entryKind === 'directory' && target.relativePath.length > 0)
+      || (target.kind !== 'preset-entry'
+        && target.kind !== 'presets-root'
+        && (target.kind === 'group' || target.deviceIds.length === 1))
+    ));
   export async function open(clientX: number, clientY: number, nextTarget: ContextMenuTarget) {
     if (
       (nextTarget.kind === 'devices' && nextTarget.deviceIds.length === 0)
@@ -243,8 +246,19 @@
           New Folder
         </button>
       {/if}
+      {#if canRenameTarget}
+        <button
+          id="context-rename"
+          class="context-menu-item"
+          type="button"
+          role="menuitem"
+          onclick={handleRenameClick}
+        >
+          Rename
+        </button>
+      {/if}
       {#if isDeletablePresetTarget}
-        {#if canCreatePresetFolder}
+        {#if canCreatePresetFolder || canRenameTarget}
           <hr class="context-menu-separator" />
         {/if}
         <button

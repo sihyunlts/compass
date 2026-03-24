@@ -1,6 +1,6 @@
 import { app } from 'electron';
 import type { Dirent } from 'node:fs';
-import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { ReadPresetEntryResponse } from '../../../shared/contracts/ipc/presets';
@@ -107,6 +107,66 @@ export class PresetStorage {
     }
 
     return relativePath;
+  }
+
+  public async renamePresetFolder(
+    presetType: PresetFileKind,
+    relativePath: readonly string[],
+    folderName: string,
+  ): Promise<string[]> {
+    if (relativePath.length === 0) {
+      throw new Error('Preset root folders cannot be renamed.');
+    }
+
+    const normalizedFolderName = normalizePresetPathSegment(folderName);
+    if (!isValidPresetPathSegment(normalizedFolderName)) {
+      throw new Error('Invalid folder name.');
+    }
+
+    const rootDirectory = await this.resolvePresetDirectory(presetType);
+    const sourceDirectory = resolvePresetPath(rootDirectory, relativePath);
+    if (!sourceDirectory) {
+      throw new Error('Invalid preset folder path.');
+    }
+
+    const parentRelativePath = relativePath.slice(0, -1);
+    const nextRelativePath = [...parentRelativePath, normalizedFolderName];
+    if (nextRelativePath.every((segment, index) => segment === relativePath[index])) {
+      return nextRelativePath;
+    }
+
+    const targetDirectory = resolvePresetPath(rootDirectory, nextRelativePath);
+    if (!targetDirectory) {
+      throw new Error('Invalid preset folder path.');
+    }
+
+    try {
+      await access(targetDirectory);
+      throw new Error('A preset or folder with that name already exists.');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        if (error instanceof Error && error.message === 'A preset or folder with that name already exists.') {
+          throw error;
+        }
+        throw error;
+      }
+    }
+
+    try {
+      await rename(sourceDirectory, targetDirectory);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'EEXIST') {
+        throw new Error('A preset or folder with that name already exists.', { cause: error });
+      }
+      if (code === 'ENOENT' || code === 'ENOTDIR') {
+        throw new Error('Preset folder does not exist.', { cause: error });
+      }
+
+      throw error;
+    }
+
+    return nextRelativePath;
   }
 
   public async ensureAccessible(filePath: string): Promise<void> {

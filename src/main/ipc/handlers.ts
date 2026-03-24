@@ -99,6 +99,12 @@ export const registerIpcHandlers = (
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.renamePresetFolder,
+    (_event, request) =>
+      presetService.renamePresetFolder(request),
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.listPresetBrowserTree,
     () =>
       presetService.listPresetBrowserTree(),

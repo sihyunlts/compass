@@ -35,10 +35,11 @@ export interface BrowserTreePresetLeafNode {
 }
 
 export interface PendingPresetFolderDraft {
-  temporaryId: string;
+  mode: 'create' | 'rename';
   presetType: PresetFileKind;
-  parentRelativePath: string[];
+  relativePath: string[];
   draftName: string;
+  temporaryId?: string;
 }
 
 export interface PresetFolderSelectionTarget {

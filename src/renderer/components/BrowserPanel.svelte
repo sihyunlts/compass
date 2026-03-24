@@ -63,19 +63,49 @@
   ): PendingPresetFolderNode => ({
     kind: 'folder',
     treeKind: 'preset',
-    id: draft.temporaryId,
+    id: draft.temporaryId ?? '',
     label: draft.draftName,
     presetType: draft.presetType,
-    relativePath: [...draft.parentRelativePath, draft.draftName.trim()],
+    relativePath: [...draft.relativePath, draft.draftName.trim()],
     children: [],
     isPending: true,
   });
+
+  const resolvePresetFolderNodeId = (
+    presetType: PresetFileKind,
+    relativePath: readonly string[],
+  ): string =>
+    relativePath.length === 0
+      ? `preset-root:${presetType}`
+      : `preset:${presetType}:${relativePath.join('/')}`;
+
+  const isPendingPresetFolderRow = (
+    node: VisibleBrowserTreeNode,
+  ): node is PendingPresetFolderNode =>
+    node.kind === 'folder' && 'isPending' in node && node.isPending;
+
+  const isEditingPresetFolderRow = (
+    node: VisibleBrowserTreeNode,
+    draft: PendingPresetFolderDraft | null,
+  ): boolean => {
+    if (!draft || node.kind !== 'folder' || node.treeKind !== 'preset') {
+      return false;
+    }
+
+    if (draft.mode === 'create') {
+      return isPendingPresetFolderRow(node);
+    }
+
+    return !isPendingPresetFolderRow(node)
+      && node.presetType === draft.presetType
+      && areEqualRelativePaths(node.relativePath, draft.relativePath);
+  };
 
   const insertPendingPresetFolder = (
     roots: readonly BrowserTreePresetFolderNode[],
     draft: PendingPresetFolderDraft | null,
   ): BrowserTreePresetFolderNode[] => {
-    if (!draft) {
+    if (!draft || draft.mode !== 'create') {
       return roots.map((root) => ({
         ...root,
         children: [...root.children],
@@ -99,7 +129,7 @@
       return nextRoots;
     }
 
-    if (draft.parentRelativePath.length === 0) {
+    if (draft.relativePath.length === 0) {
       rootNode.children = [...rootNode.children, pendingNode];
       return nextRoots;
     }
@@ -107,7 +137,7 @@
     const visit = (node: BrowserTreePresetFolderNode): boolean => {
       if (
         node.presetType === draft.presetType
-        && areEqualRelativePaths(node.relativePath, draft.parentRelativePath)
+        && areEqualRelativePaths(node.relativePath, draft.relativePath)
       ) {
         node.children = [...node.children, pendingNode];
         return true;
@@ -198,8 +228,8 @@
     onPresetEntryOpen,
     onPresetFilePointerDown,
     onPendingPresetFolderDraftNameChange = () => {},
-    onPendingPresetFolderCommit = () => {},
-    onPendingPresetFolderCancel = () => {},
+    onPendingPresetFolderDraftCommit = () => {},
+    onPendingPresetFolderDraftCancel = () => {},
     onPresetFolderSelectionHandled = () => {},
   } = $props<{
     activePage?: BrowserPanelPage;
@@ -234,8 +264,8 @@
       itemEl: HTMLElement,
     ) => void | Promise<void>;
     onPendingPresetFolderDraftNameChange?: (nextName: string) => void;
-    onPendingPresetFolderCommit?: () => void | Promise<void>;
-    onPendingPresetFolderCancel?: () => void;
+    onPendingPresetFolderDraftCommit?: () => void | Promise<void>;
+    onPendingPresetFolderDraftCancel?: () => void;
     onPresetFolderSelectionHandled?: (token: number) => void;
   }>();
 
@@ -453,22 +483,22 @@
     event.preventDefault();
   };
 
-  const handlePendingPresetFolderCommit = (): void => {
-    void onPendingPresetFolderCommit();
+  const handlePendingPresetFolderDraftCommit = (): void => {
+    void onPendingPresetFolderDraftCommit();
   };
 
-  const handlePendingPresetFolderBlur = (rowId: string): void => {
+  const handlePendingPresetFolderDraftBlur = (rowId: string): void => {
     if (skipPendingPresetFolderBlurId === rowId) {
       skipPendingPresetFolderBlurId = null;
       return;
     }
 
     if ((pendingPresetFolderDraft?.draftName.trim() ?? '').length === 0) {
-      onPendingPresetFolderCancel();
+      onPendingPresetFolderDraftCancel();
       return;
     }
 
-    handlePendingPresetFolderCommit();
+    handlePendingPresetFolderDraftCommit();
   };
 
   $effect(() => {
@@ -501,10 +531,13 @@
       return;
     }
 
+    const ancestorRelativePath = draft.mode === 'create'
+      ? draft.relativePath
+      : draft.relativePath.slice(0, -1);
     const ancestorIds = [
       `preset-root:${draft.presetType}`,
-      ...draft.parentRelativePath.map((_segment: string, index: number) =>
-        `preset:${draft.presetType}:${draft.parentRelativePath.slice(0, index + 1).join('/')}`),
+      ...ancestorRelativePath.map((_segment: string, index: number) =>
+        `preset:${draft.presetType}:${ancestorRelativePath.slice(0, index + 1).join('/')}`),
     ];
     const nextExpandedFolderIds = Array.from(new Set([...expandedFolderIds, ...ancestorIds]));
     const didExpandFolders = nextExpandedFolderIds.length !== expandedFolderIds.length;
@@ -512,9 +545,12 @@
       expandedFolderIds = nextExpandedFolderIds;
     }
 
-    const didSelectPendingRow = selectedRowId !== draft.temporaryId;
+    const targetRowId = draft.mode === 'create'
+      ? draft.temporaryId ?? ''
+      : resolvePresetFolderNodeId(draft.presetType, draft.relativePath);
+    const didSelectPendingRow = selectedRowId !== targetRowId;
     if (didSelectPendingRow) {
-      selectedRowId = draft.temporaryId;
+      selectedRowId = targetRowId;
     }
 
     if (didExpandFolders || didSelectPendingRow) {
@@ -665,7 +701,7 @@
                     {resolveLeafIcon(row.node)}
                   </span>
                 {/if}
-                {#if row.node.kind === 'folder' && 'isPending' in row.node && row.node.isPending}
+                {#if isEditingPresetFolderRow(row.node, pendingPresetFolderDraft)}
                   <input
                     bind:this={pendingPresetFolderInputEl}
                     class="browser-tree-item-input"
@@ -687,16 +723,16 @@
                       if (event.key === 'Enter') {
                         event.preventDefault();
                         skipPendingPresetFolderBlurId = row.node.id;
-                        handlePendingPresetFolderCommit();
+                        handlePendingPresetFolderDraftCommit();
                         return;
                       }
                       if (event.key === 'Escape') {
                         event.preventDefault();
                         skipPendingPresetFolderBlurId = row.node.id;
-                        onPendingPresetFolderCancel();
+                        onPendingPresetFolderDraftCancel();
                       }
                     }}
-                    onblur={() => handlePendingPresetFolderBlur(row.node.id)}
+                    onblur={() => handlePendingPresetFolderDraftBlur(row.node.id)}
                   />
                 {:else}
                   <span class="browser-tree-item-label">{row.node.label}</span>

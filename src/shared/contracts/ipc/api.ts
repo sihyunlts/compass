@@ -8,6 +8,8 @@ import type {
   ListPresetBrowserTreeResponse,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
+  RenamePresetFolderRequest,
+  RenamePresetFolderResponse,
   SavePresetFileRequest,
   SavePresetFileResponse,
   ShowPresetEntryInFolderRequest,
@@ -47,6 +49,9 @@ export interface CompassApi {
   createPresetFolder: (
     request: CreatePresetFolderRequest,
   ) => Promise<CreatePresetFolderResponse>;
+  renamePresetFolder: (
+    request: RenamePresetFolderRequest,
+  ) => Promise<RenamePresetFolderResponse>;
   listPresetBrowserTree: () => Promise<ListPresetBrowserTreeResponse>;
   showPresetEntryInFolder: (
     request: ShowPresetEntryInFolderRequest,

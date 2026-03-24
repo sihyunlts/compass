@@ -12,6 +12,7 @@ export const IPC_CHANNELS = {
   openExternal: 'bridge:open-external',
   savePresetFile: 'preset:save-file',
   createPresetFolder: 'preset:create-folder',
+  renamePresetFolder: 'preset:rename-folder',
   listPresetBrowserTree: 'preset:list-browser-tree',
   showPresetEntryInFolder: 'preset:show-entry-in-folder',
   showPresetsRootInFolder: 'preset:show-root-in-folder',

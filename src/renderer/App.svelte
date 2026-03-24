@@ -251,6 +251,18 @@
     closeContextMenu();
   };
 
+  const handleContextMenuRename = (
+    target: ContextMenuTarget,
+  ): void => {
+    if (target.kind === 'preset-entry' && target.entryKind === 'directory') {
+      presetController.beginPresetFolderRename(target);
+      closeContextMenu();
+      return;
+    }
+
+    editorSession.commands.beginRenameFromContextTarget(target);
+  };
+
   onMount(() => {
     editorSession.initialize();
     playbackSession.initialize();
@@ -331,8 +343,8 @@
         presetController.handlePresetFilePointerDown(entry, sourceEvent, itemEl)}
       onPendingPresetFolderDraftNameChange={(nextName) =>
         presetController.updatePendingPresetFolderDraftName(nextName)}
-      onPendingPresetFolderCommit={() => presetController.commitPendingPresetFolderCreate()}
-      onPendingPresetFolderCancel={() => presetController.cancelPendingPresetFolderCreate()}
+      onPendingPresetFolderDraftCommit={() => presetController.commitPendingPresetFolderDraft()}
+      onPendingPresetFolderDraftCancel={() => presetController.cancelPendingPresetFolderDraft()}
       onPresetFolderSelectionHandled={(token) =>
         presetController.clearPresetFolderSelectionTarget(token)}
     />
@@ -472,7 +484,7 @@
     onCut={editorSession.commands.cutFromContextTarget}
     onPaste={editorSession.commands.pasteFromContextTarget}
     onDuplicate={editorSession.commands.duplicateFromContextTarget}
-    onRename={editorSession.commands.beginRenameFromContextTarget}
+    onRename={handleContextMenuRename}
     onDelete={handleContextMenuDelete}
     onCreatePresetFolder={handleContextMenuCreatePresetFolder}
     onShowInFolder={(target) => presetController.handleShowPresetEntryInFolder(target)}

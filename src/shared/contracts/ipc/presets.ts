@@ -40,6 +40,22 @@ export type CreatePresetFolderResponse =
       message: string;
     };
 
+export interface RenamePresetFolderRequest<K extends PresetFileKind = PresetFileKind> {
+  presetType: K;
+  relativePath: string[];
+  folderName: string;
+}
+
+export type RenamePresetFolderResponse =
+  | {
+      status: 'ok';
+      relativePath: string[];
+    }
+  | {
+      status: 'error';
+      message: string;
+    };
+
 export interface PresetBrowserTreeLeafNode<K extends PresetFileKind = PresetFileKind> {
   kind: 'preset';
   id: string;

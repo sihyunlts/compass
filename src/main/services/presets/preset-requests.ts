@@ -1,6 +1,7 @@
 import type {
   CreatePresetFolderRequest,
   ReadPresetEntryRequest,
+  RenamePresetFolderRequest,
   SavePresetFileRequest,
   ShowPresetEntryInFolderRequest,
 } from '../../../shared/contracts/ipc/presets';
@@ -106,6 +107,30 @@ export const parseCreatePresetFolderRequest = (
 
   const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
   if (!relativePath) {
+    return null;
+  }
+
+  return {
+    presetType: (value as { presetType: PresetFileKind }).presetType,
+    relativePath,
+    folderName: (value as { folderName: string }).folderName,
+  };
+};
+
+export const parseRenamePresetFolderRequest = (
+  value: unknown,
+): RenamePresetFolderRequest | null => {
+  if (
+    typeof value !== 'object'
+    || value === null
+    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
+    || typeof (value as { folderName?: unknown }).folderName !== 'string'
+  ) {
+    return null;
+  }
+
+  const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
+  if (!relativePath || relativePath.length === 0) {
     return null;
   }
 

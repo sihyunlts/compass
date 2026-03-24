@@ -5,6 +5,7 @@ import type {
   DeletePresetEntryResponse,
   ListPresetBrowserTreeResponse,
   ReadPresetEntryResponse,
+  RenamePresetFolderResponse,
   SavePresetFileResponse,
   ShowPresetEntryInFolderResponse,
   ShowPresetsRootInFolderResponse,
@@ -20,6 +21,7 @@ import {
   parseCreatePresetFolderRequest,
   parsePresetEntryRequest,
   parseReadPresetEntryRequest,
+  parseRenamePresetFolderRequest,
   parseSavePresetFileRequest,
 } from './presets/preset-requests';
 import { PresetStorage } from './presets/preset-storage';
@@ -116,6 +118,34 @@ export class PresetService {
       return {
         status: 'error',
         message: toErrorMessage(error, 'Failed to create preset folder.'),
+      };
+    }
+  }
+
+  public async renamePresetFolder(
+    request: unknown,
+  ): Promise<RenamePresetFolderResponse> {
+    const parsedRequest = parseRenamePresetFolderRequest(request);
+    if (!parsedRequest) {
+      return {
+        status: 'error',
+        message: 'Invalid preset folder request.',
+      };
+    }
+
+    try {
+      return {
+        status: 'ok',
+        relativePath: await this.storage.renamePresetFolder(
+          parsedRequest.presetType,
+          parsedRequest.relativePath,
+          parsedRequest.folderName,
+        ),
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to rename preset folder.'),
       };
     }
   }
