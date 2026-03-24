@@ -1,4 +1,4 @@
-import type { Bounds, GeneratorLayer, Polyline } from '../core/core-types';
+import type { Bounds, Polyline, SceneInstance, SceneInstanceOfKind } from '../core/core-types';
 import type { GeneratorEffectNode, GeneratorNode } from '../shared/model';
 
 export type GeneratorDeviceKind = GeneratorNode['kind'];
@@ -9,12 +9,12 @@ export interface GeneratorDeviceEngineHandler<
   K extends GeneratorDeviceKind = GeneratorDeviceKind,
 > {
   kind: K;
-  createLayer: (
+  createSceneInstance: (
     device: Extract<GeneratorNode, { kind: K }>,
     worldBounds: Bounds,
-  ) => GeneratorLayer | null;
+  ) => SceneInstance | null;
   buildPolyline: (
-    layer: Extract<GeneratorLayer, { kind: K }>,
+    sceneInstance: SceneInstanceOfKind<K>,
     t01: number,
     step: number,
   ) => Polyline | null;
@@ -35,10 +35,10 @@ export interface EffectDeviceEngineHandler<
 > {
   kind: K;
   applyEffect: (
-    layers: ReadonlyArray<GeneratorLayer>,
+    sceneInstances: ReadonlyArray<SceneInstance>,
     effect: Extract<PipelineEffectNode, { kind: K }>,
     context: EffectApplicationContext,
-  ) => GeneratorLayer[];
+  ) => SceneInstance[];
   togglesTimelineParity?: boolean;
   resolveMutedSource?: (
     effect: Extract<PipelineEffectNode, { kind: K }>,

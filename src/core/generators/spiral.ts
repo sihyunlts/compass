@@ -58,5 +58,6 @@ export const buildSpiralPolyline = (
     closed: false,
     originId,
     velocity,
+    clipStack: [],
   };
 };

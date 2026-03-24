@@ -1,17 +1,17 @@
-import type { Bounds, GeneratorLayer } from '../core-types';
+import type { Bounds, SceneInstance } from '../core-types';
 import type { MirrorEffectNode } from '../../shared/model';
 import { COMPOSITION_CENTER, toMirrorTransformAt } from '../geometry';
-import { applySpatialTransformToLayer } from '../layer-utils';
+import { applySpatialTransformToSceneInstance } from '../layer-utils';
 
 export const applyMirrorEffect = (
-  layers: ReadonlyArray<GeneratorLayer>,
+  sceneInstances: ReadonlyArray<SceneInstance>,
   effect: MirrorEffectNode,
   worldBounds: Bounds,
-): GeneratorLayer[] => {
+): SceneInstance[] => {
   const transform = toMirrorTransformAt(effect.params.angleDeg, COMPOSITION_CENTER);
-  const next: GeneratorLayer[] = [];
-  for (const layer of layers) {
-    const transformed = applySpatialTransformToLayer(layer, transform, worldBounds);
+  const next: SceneInstance[] = [];
+  for (const sceneInstance of sceneInstances) {
+    const transformed = applySpatialTransformToSceneInstance(sceneInstance, transform, worldBounds);
     if (transformed) {
       next.push(transformed);
     }

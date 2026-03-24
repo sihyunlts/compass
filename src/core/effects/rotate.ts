@@ -1,17 +1,17 @@
-import type { Bounds, GeneratorLayer } from '../core-types';
+import type { Bounds, SceneInstance } from '../core-types';
 import type { RotateEffectNode } from '../../shared/model';
 import { COMPOSITION_CENTER, toRotateTransformAt } from '../geometry';
-import { applySpatialTransformToLayer } from '../layer-utils';
+import { applySpatialTransformToSceneInstance } from '../layer-utils';
 
 export const applyRotateEffect = (
-  layers: ReadonlyArray<GeneratorLayer>,
+  sceneInstances: ReadonlyArray<SceneInstance>,
   effect: RotateEffectNode,
   worldBounds: Bounds,
-): GeneratorLayer[] => {
+): SceneInstance[] => {
   const transform = toRotateTransformAt(effect.params.angleDeg, COMPOSITION_CENTER);
-  const next: GeneratorLayer[] = [];
-  for (const layer of layers) {
-    const transformed = applySpatialTransformToLayer(layer, transform, worldBounds);
+  const next: SceneInstance[] = [];
+  for (const sceneInstance of sceneInstances) {
+    const transformed = applySpatialTransformToSceneInstance(sceneInstance, transform, worldBounds);
     if (transformed) {
       next.push(transformed);
     }

@@ -1,56 +1,32 @@
-import type { GeneratorLayer, Mask } from '../core-types';
+import type { SceneInstance } from '../core-types';
 import type { MaskEffectNode, MaskMode } from '../../shared/model';
-import { applyMaskToLayer } from '../layer-utils';
+import { createTileUnionClip } from '../geometry';
+import { appendClipToSceneInstance } from '../layer-utils';
 
-const TILE_MIN = 0;
-const TILE_MAX = 9;
 const TILE_COUNT = 10;
+const ALL_TILES = Array.from({ length: TILE_COUNT * TILE_COUNT }, (_, tileId) => tileId);
 
-const isInTileBounds = (value: number): boolean =>
-  Number.isFinite(value) && value >= TILE_MIN && value <= TILE_MAX;
-
-const toTileIndex = (x: number, y: number): number | null => {
-  if (!isInTileBounds(x) || !isInTileBounds(y)) {
-    return null;
-  }
-
-  const tileX = Math.round(x);
-  const tileY = Math.round(y);
-  if (!isInTileBounds(tileX) || !isInTileBounds(tileY)) {
-    return null;
-  }
-
-  return tileY * TILE_COUNT + tileX;
-};
-
-const createMaskFromTiles = (
+const resolveMaskTiles = (
   tiles: Iterable<number>,
   mode: MaskMode,
-): Mask => {
+): number[] => {
   const tileSet = new Set<number>(tiles);
-
-  if (tileSet.size === 0) {
-    return mode === 'exclude'
-      ? () => true
-      : () => false;
+  if (mode === 'include') {
+    return Array.from(tileSet).sort((left, right) => left - right);
   }
 
-  return (x, y) => {
-    const tileIndex = toTileIndex(x, y);
-    if (tileIndex === null) {
-      return mode === 'exclude';
-    }
-    const isSelected = tileSet.has(tileIndex);
-    return mode === 'include' ? isSelected : !isSelected;
-  };
+  return ALL_TILES.filter((tileId) => !tileSet.has(tileId));
 };
 
 export const applyMaskEffect = (
-  layers: ReadonlyArray<GeneratorLayer>,
+  sceneInstances: ReadonlyArray<SceneInstance>,
   effect: MaskEffectNode,
   tilesOverride?: Iterable<number> | null,
-): GeneratorLayer[] => {
-  const mask = createMaskFromTiles(tilesOverride ?? effect.params.tiles, effect.params.mode);
+): SceneInstance[] => {
+  const clip = createTileUnionClip(resolveMaskTiles(
+    tilesOverride ?? effect.params.tiles,
+    effect.params.mode,
+  ));
 
-  return layers.map((layer) => applyMaskToLayer(layer, mask));
+  return sceneInstances.map((sceneInstance) => appendClipToSceneInstance(sceneInstance, clip));
 };

@@ -1,10 +1,10 @@
-import type { Bounds, GeneratorLayerBase } from '../core/core-types';
+import type { Bounds, SceneInstanceBase } from '../core/core-types';
 import { IDENTITY_AFFINE, mapBoundsThroughAffine } from '../core/geometry';
 
-export const createGeneratorLayerBase = (
+export const createSceneInstanceBase = (
   originId: string,
   worldBounds: Bounds,
-): Omit<GeneratorLayerBase, 'velocity'> => {
+): Omit<SceneInstanceBase, 'primitive' | 'velocity'> => {
   const inverseSpatial = IDENTITY_AFFINE;
 
   return {
@@ -13,18 +13,19 @@ export const createGeneratorLayerBase = (
     inverseSpatial,
     sourceBounds: mapBoundsThroughAffine(worldBounds, inverseSpatial),
     temporal: { alpha: 1, beta: 0 },
+    clipStack: [],
   };
 };
 
-export const resolveLayerLocalTime = (
-  layer: Pick<GeneratorLayerBase, 'temporal'>,
+export const resolveSceneLocalTime = (
+  sceneInstance: Pick<SceneInstanceBase, 'temporal'>,
   t01: number,
 ): number | null => {
   if (!Number.isFinite(t01)) {
     return null;
   }
 
-  const localT = layer.temporal.alpha * t01 + layer.temporal.beta;
+  const localT = sceneInstance.temporal.alpha * t01 + sceneInstance.temporal.beta;
   if (!Number.isFinite(localT) || localT < 0 || localT > 1) {
     return null;
   }

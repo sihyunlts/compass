@@ -1,4 +1,4 @@
-import { clampBounds } from '../core/geometry';
+import { clampBounds, isPointInsideClipStack } from '../core/geometry';
 import type { Bounds, Polyline, Vec2 } from '../core/core-types';
 import {
   MIN_NOTE_DURATION,
@@ -258,7 +258,7 @@ const buildOverlayFrameStrokes = (
     let broke = false;
     for (let index = 0; index < polyline.points.length; index += stride) {
       const point = polyline.points[index];
-      if (polyline.mask && !polyline.mask(point.x, point.y)) {
+      if (polyline.clipStack.length > 0 && !isPointInsideClipStack(polyline.clipStack, point)) {
         if (segment.length > 1) {
           strokes.push({ points: segment, closed: false });
         }

@@ -59,5 +59,6 @@ export const buildWaterdropPolyline = (
     closed: true,
     originId,
     velocity,
+    clipStack: [],
   };
 };

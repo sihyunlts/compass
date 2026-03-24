@@ -1,5 +1,5 @@
 import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode, LaunchpadButton } from '../../shared/model';
-import type { Bounds, GeneratorLayer, Polyline, Vec2 } from '../core-types';
+import type { Bounds, Polyline, SceneInstance, Vec2 } from '../core-types';
 import type { ColorGuideWarp } from '../../devices/color/engine';
 
 export interface OriginWindow {
@@ -16,7 +16,7 @@ export interface GroupChain {
 }
 
 interface GroupEvaluationCache {
-  layersByGroup: Map<GroupId, GeneratorLayer[]>;
+  sceneInstancesByGroup: Map<GroupId, SceneInstance[]>;
   sourcePolylinesByGroup: Map<GroupId, Polyline[]>;
   sourcePolylinesByGroupReversed: Map<GroupId, Polyline[]>;
   resolvingSourcePolylinesByGroup: Set<GroupId>;
@@ -32,7 +32,6 @@ export interface GroupEvaluationContext {
   chain: GeneratorChain;
   groupStateById: GeneratorChain['groupStateById'];
   worldBounds: Bounds;
-  originWindows?: Map<string, OriginWindow>;
   groupChains: GroupChain[];
   groupById: Map<GroupId, GroupChain>;
   generatorById: Map<string, GeneratorNode>;

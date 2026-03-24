@@ -1,43 +1,57 @@
-import type { AffineTransform, Bounds, GeneratorLayer, Mask } from './core-types';
-import { applyAffine, combineMasks, composeAffine, invertAffine, mapBoundsThroughAffine } from './geometry';
+import type { AffineTransform, Bounds, ClipShape, SceneInstance } from './core-types';
+import {
+  IDENTITY_AFFINE,
+  composeAffine,
+  invertAffine,
+  mapBoundsThroughAffine,
+} from './geometry';
 
-export const applySpatialTransformToLayer = (
-  layer: GeneratorLayer,
+export const applySpatialTransformToSceneInstance = (
+  sceneInstance: SceneInstance,
   transform: AffineTransform,
   worldBounds: Bounds,
-): GeneratorLayer | null => {
-  const nextSpatial = composeAffine(transform, layer.spatial);
+): SceneInstance | null => {
+  const nextSpatial = composeAffine(transform, sceneInstance.spatial);
   const nextInverse = invertAffine(nextSpatial);
   if (!nextInverse) {
     return null;
   }
 
   const inverseTransform = invertAffine(transform);
-  const nextMask: Mask | undefined = inverseTransform && layer.mask
-    ? (x, y) => {
-      const point = applyAffine(inverseTransform, { x, y });
-      return layer.mask ? layer.mask(point.x, point.y) : true;
-    }
-    : layer.mask;
+  if (!inverseTransform) {
+    return null;
+  }
 
   return {
-    ...layer,
+    ...sceneInstance,
     spatial: nextSpatial,
     inverseSpatial: nextInverse,
     sourceBounds: mapBoundsThroughAffine(worldBounds, nextInverse),
-    mask: nextMask,
+    clipStack: sceneInstance.clipStack.map((clip) => ({
+      ...clip,
+      inverseTransform: composeAffine(clip.inverseTransform, inverseTransform),
+    })),
   };
 };
 
-export const applyMaskToLayer = (layer: GeneratorLayer, mask: Mask): GeneratorLayer => ({
-  ...layer,
-  mask: combineMasks(layer.mask, mask),
+export const appendClipToSceneInstance = (
+  sceneInstance: SceneInstance,
+  shape: ClipShape,
+): SceneInstance => ({
+  ...sceneInstance,
+  clipStack: [
+    ...sceneInstance.clipStack,
+    {
+      shape,
+      inverseTransform: IDENTITY_AFFINE,
+    },
+  ],
 });
 
-export const applyReverseTemporalToLayer = (layer: GeneratorLayer): GeneratorLayer => ({
-  ...layer,
+export const applyReverseTemporalToSceneInstance = (sceneInstance: SceneInstance): SceneInstance => ({
+  ...sceneInstance,
   temporal: {
-    alpha: -layer.temporal.alpha,
-    beta: 1 - layer.temporal.beta,
+    alpha: -sceneInstance.temporal.alpha,
+    beta: 1 - sceneInstance.temporal.beta,
   },
 });

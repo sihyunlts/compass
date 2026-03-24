@@ -1,11 +1,11 @@
 import { GENERATED_VELOCITY } from '../../core/pipeline/constants';
 import { buildWaterdropPolyline } from '../../core/generators/waterdrop';
-import { createGeneratorLayerBase, resolveLayerLocalTime } from '../engine-utils';
+import { createSceneInstanceBase, resolveSceneLocalTime } from '../engine-utils';
 import type { GeneratorDeviceEngineHandler } from '../engine-types';
 
 export const waterdropEngineHandler = {
   kind: 'waterdrop',
-  createLayer(device, worldBounds) {
+  createSceneInstance(device, worldBounds) {
     const params = device.params;
     if (!Number.isFinite(params.centerX)
       || !Number.isFinite(params.centerY)
@@ -15,24 +15,26 @@ export const waterdropEngineHandler = {
     }
 
     return {
-      ...createGeneratorLayerBase(device.id, worldBounds),
-      kind: 'waterdrop',
-      params,
+      ...createSceneInstanceBase(device.id, worldBounds),
+      primitive: {
+        kind: 'waterdrop',
+        params,
+      },
       velocity: GENERATED_VELOCITY,
     };
   },
-  buildPolyline(layer, t01, step) {
-    const localT = resolveLayerLocalTime(layer, t01);
+  buildPolyline(sceneInstance, t01, step) {
+    const localT = resolveSceneLocalTime(sceneInstance, t01);
     if (localT === null) {
       return null;
     }
 
     return buildWaterdropPolyline(
-      layer.originId,
-      layer.params,
+      sceneInstance.originId,
+      sceneInstance.primitive.params,
       localT,
       step,
-      layer.velocity,
+      sceneInstance.velocity,
     );
   },
 } satisfies GeneratorDeviceEngineHandler<'waterdrop'>;

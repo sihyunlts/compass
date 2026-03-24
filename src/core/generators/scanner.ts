@@ -81,5 +81,6 @@ export const buildScannerPolyline = (
     closed: false,
     originId,
     velocity,
+    clipStack: [],
   };
 };

@@ -1,13 +1,13 @@
 import {
   applyPipelineEffect,
-  createGeneratorLayer,
+  createSceneInstanceFromGenerator,
   doesDeviceToggleTimelineParity,
   type EffectApplicationContext,
   type PipelineEffectNode,
 } from '../../devices/engine';
 import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode } from '../../shared/model';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
-import type { Bounds, GeneratorLayer } from '../core-types';
+import type { Bounds, SceneInstance } from '../core-types';
 import { isEffectNode, isGeneratorNode } from './groups';
 
 type EffectContextResolver = (
@@ -15,17 +15,17 @@ type EffectContextResolver = (
   deviceIndex: number,
 ) => Omit<EffectApplicationContext, 'worldBounds'> | null;
 
-export const createLayerFromGenerator = (
+export const createSceneInstanceFromNode = (
   device: GeneratorNode,
   worldBounds: Bounds,
-): GeneratorLayer | null => createGeneratorLayer(device, worldBounds);
+): SceneInstance | null => createSceneInstanceFromGenerator(device, worldBounds);
 
-export const buildLayers = (
+export const buildSceneInstances = (
   chain: GeneratorChain,
   worldBounds: Bounds,
   resolveEffectContext?: EffectContextResolver,
-): GeneratorLayer[] => {
-  let layers: GeneratorLayer[] = [];
+): SceneInstance[] => {
+  let sceneInstances: SceneInstance[] = [];
 
   for (let index = 0; index < chain.devices.length; index += 1) {
     const device = chain.devices[index];
@@ -34,9 +34,9 @@ export const buildLayers = (
     }
 
     if (isGeneratorNode(device)) {
-      const layer = createLayerFromGenerator(device, worldBounds);
-      if (layer) {
-        layers.push(layer);
+      const sceneInstance = createSceneInstanceFromNode(device, worldBounds);
+      if (sceneInstance) {
+        sceneInstances.push(sceneInstance);
       }
       continue;
     }
@@ -46,13 +46,13 @@ export const buildLayers = (
     }
 
     const effectContext = resolveEffectContext?.(device, index);
-    layers = applyPipelineEffect(layers, device, {
+    sceneInstances = applyPipelineEffect(sceneInstances, device, {
       worldBounds,
       tilesOverride: effectContext?.tilesOverride ?? null,
     });
   }
 
-  return layers;
+  return sceneInstances;
 };
 
 export const resolveReverseParityAfter = (

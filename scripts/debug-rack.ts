@@ -36,7 +36,7 @@ interface SerializablePolyline {
   originId: string;
   velocity: number;
   closed: boolean;
-  hasMask: boolean;
+  clipCount: number;
   points: Array<{ x: number; y: number }>;
 }
 
@@ -154,7 +154,7 @@ const serializePolylines = (
   originId: polyline.originId,
   velocity: polyline.velocity,
   closed: polyline.closed,
-  hasMask: polyline.mask !== undefined,
+  clipCount: polyline.clipStack.length,
   points: polyline.points.map((point) => ({
     x: round(point.x, 3),
     y: round(point.y, 3),

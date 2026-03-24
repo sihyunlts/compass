@@ -1,5 +1,5 @@
 import { cloneDeviceNode, type GeneratorChain, type GeneratorDeviceNode, type GeneratorNode, type LaunchpadButton } from '../../shared/model';
-import type { Bounds, Polyline } from '../core-types';
+import type { Bounds, Polyline, SceneInstance } from '../core-types';
 import {
   applyModulationProgramToChain,
   compileModulationProgram,
@@ -20,8 +20,13 @@ import {
   resolveMutedSources,
   splitChainByGroup,
 } from './groups';
-import { distanceToPolylineSquared } from '../geometry';
-import { buildPolylinesForAllGroups, evaluateMaskDebugSnapshot, type MaskDebugSnapshot } from './polylines';
+import { distanceToPolylineSquared, isPointInsideClipStack } from '../geometry';
+import {
+  buildPolylinesForAllGroups,
+  buildSceneInstancesForAllGroups,
+  evaluateMaskDebugSnapshot,
+  type MaskDebugSnapshot,
+} from './polylines';
 import type {
   ActivePitchInfo,
   ButtonIndex,
@@ -125,7 +130,6 @@ export const compilePipelineEngine = (
 const createEvaluationContext = (
   engine: CompiledPipelineEngine,
   time: number,
-  originWindows?: Map<string, OriginWindow>,
 ): GroupEvaluationContext => ({
   time,
   timeReversed: 1 - time,
@@ -133,14 +137,13 @@ const createEvaluationContext = (
   chain: engine.chainWithoutModulators,
   groupStateById: engine.chainWithoutModulators.groupStateById,
   worldBounds: engine.worldBounds,
-  originWindows,
   groupChains: engine.groupChains,
   groupById: engine.groupById,
   generatorById: engine.generatorById,
   mutedGroupIds: engine.mutedGroupIds,
   mutedGeneratorIds: engine.mutedGeneratorIds,
   cache: {
-    layersByGroup: new Map(),
+    sceneInstancesByGroup: new Map(),
     sourcePolylinesByGroup: new Map(),
     sourcePolylinesByGroupReversed: new Map(),
     resolvingSourcePolylinesByGroup: new Set(),
@@ -150,11 +153,10 @@ const createEvaluationContext = (
   },
 });
 
-export const evaluatePolylinesAtTime = (
+const prepareEvaluationContext = (
   engine: CompiledPipelineEngine,
   time01: number,
-  originWindows?: Map<string, OriginWindow>,
-): Polyline[] => {
+): GroupEvaluationContext => {
   applyModulationProgramToChain(
     engine.modulation,
     engine.chainWithoutModulators,
@@ -164,8 +166,24 @@ export const evaluatePolylinesAtTime = (
     { wrap: true },
   );
 
-  const context = createEvaluationContext(engine, time01, originWindows);
-  return buildPolylinesForAllGroups(context);
+  return createEvaluationContext(engine, time01);
+};
+
+export const evaluateSceneInstancesAtTime = (
+  engine: CompiledPipelineEngine,
+  time01: number,
+): SceneInstance[] => {
+  const context = prepareEvaluationContext(engine, time01);
+  return buildSceneInstancesForAllGroups(context);
+};
+
+export const evaluatePolylinesAtTime = (
+  engine: CompiledPipelineEngine,
+  time01: number,
+  originWindows?: Map<string, OriginWindow>,
+): Polyline[] => {
+  const context = prepareEvaluationContext(engine, time01);
+  return buildPolylinesForAllGroups(context, originWindows);
 };
 
 export const evaluateActiveByPitchAtTime = (
@@ -183,17 +201,8 @@ export const evaluateMaskDebugAtTime = (
   time01: number,
   originWindows?: Map<string, OriginWindow>,
 ): MaskDebugSnapshot | null => {
-  applyModulationProgramToChain(
-    engine.modulation,
-    engine.chainWithoutModulators,
-    engine.deviceById,
-    time01,
-    1,
-    { wrap: true },
-  );
-
-  const context = createEvaluationContext(engine, time01, originWindows);
-  return evaluateMaskDebugSnapshot(maskDeviceId, context);
+  const context = prepareEvaluationContext(engine, time01);
+  return evaluateMaskDebugSnapshot(maskDeviceId, context, originWindows);
 };
 
 export const computeOriginWindowsWithEngine = (
@@ -215,7 +224,7 @@ export const computeOriginWindowsWithEngine = (
 
     for (const coord of engine.buttonIndex.coordinates) {
       for (const polyline of polylines) {
-        if (polyline.mask && !polyline.mask(coord.x, coord.y)) {
+        if (polyline.clipStack.length > 0 && !isPointInsideClipStack(polyline.clipStack, coord)) {
           continue;
         }
         const distanceSq = distanceToPolylineSquared(coord, polyline);

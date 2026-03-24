@@ -1,4 +1,4 @@
-import type { Bounds, GeneratorLayer, Polyline } from '../core/core-types';
+import type { Bounds, Polyline, SceneInstance } from '../core/core-types';
 import type { GeneratorDeviceNode, GeneratorNode } from '../shared/model';
 import { maskEngineHandler } from './mask/engine';
 import { mirrorEngineHandler } from './mirror/engine';
@@ -64,35 +64,44 @@ export const isPipelineEffectNode = (
   device: GeneratorDeviceNode,
 ): device is PipelineEffectNode => isPipelineEffectKind(device.kind);
 
-const getGeneratorEngineHandler = <K extends GeneratorDeviceKind>(
-  kind: K,
-): GeneratorDeviceEngineHandler<K> =>
-  generatorDeviceEngineHandlers[kind] as GeneratorDeviceEngineHandler<K>;
-
 const getPipelineEffectEngineHandler = <K extends PipelineEffectKind>(
   kind: K,
 ): EffectDeviceEngineHandler<K> =>
   pipelineEffectEngineHandlers[kind] as EffectDeviceEngineHandler<K>;
 
-export const createGeneratorLayer = (
+export const createSceneInstanceFromGenerator = (
   device: GeneratorNode,
   worldBounds: Bounds,
-): GeneratorLayer | null =>
-  getGeneratorEngineHandler(device.kind).createLayer(device, worldBounds);
+): SceneInstance | null => {
+  if (device.kind === 'waterdrop') {
+    return waterdropEngineHandler.createSceneInstance(device, worldBounds);
+  }
+  if (device.kind === 'scanner') {
+    return scannerEngineHandler.createSceneInstance(device, worldBounds);
+  }
+  return spiralEngineHandler.createSceneInstance(device, worldBounds);
+};
 
 export const buildGeneratorPolyline = (
-  layer: GeneratorLayer,
+  sceneInstance: SceneInstance,
   t01: number,
   step: number,
-): Polyline | null =>
-  getGeneratorEngineHandler(layer.kind).buildPolyline(layer, t01, step);
+): Polyline | null => {
+  if (sceneInstance.primitive.kind === 'waterdrop') {
+    return waterdropEngineHandler.buildPolyline(sceneInstance, t01, step);
+  }
+  if (sceneInstance.primitive.kind === 'scanner') {
+    return scannerEngineHandler.buildPolyline(sceneInstance, t01, step);
+  }
+  return spiralEngineHandler.buildPolyline(sceneInstance, t01, step);
+};
 
 export const applyPipelineEffect = (
-  layers: ReadonlyArray<GeneratorLayer>,
+  sceneInstances: ReadonlyArray<SceneInstance>,
   effect: PipelineEffectNode,
   context: EffectApplicationContext,
-): GeneratorLayer[] =>
-  getPipelineEffectEngineHandler(effect.kind).applyEffect(layers, effect, context);
+): SceneInstance[] =>
+  getPipelineEffectEngineHandler(effect.kind).applyEffect(sceneInstances, effect, context);
 
 export const doesDeviceToggleTimelineParity = (
   device: GeneratorDeviceNode,

@@ -7,17 +7,16 @@ import {
 import type { GeneratorChain, MaskEffectNode } from '../../shared/model';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { normalizeOptionalId } from '../../shared/normalize-id';
-import type { GeneratorLayer, Polyline } from '../core-types';
-import { applyTransformToPolyline, distanceToPolylineSquared } from '../geometry';
+import type { Polyline, SceneInstance } from '../core-types';
+import {
+  applyTransformToPolyline,
+} from '../geometry';
 import { resolveActiveByPitch, resolveActiveTilesFromPolylines } from './active';
-import { MIN_NOTE_DURATION, POLYLINE_STEP, SAMPLES_PER_BEAT, THICKNESS } from './constants';
+import { MIN_NOTE_DURATION, POLYLINE_STEP, SAMPLES_PER_BEAT } from './constants';
+import { pickByTimeKind, resolveMaskTime } from './groups';
 import {
-  pickByTimeKind,
-  resolveMaskTime,
-} from './groups';
-import {
-  buildLayers,
-  createLayerFromGenerator,
+  buildSceneInstances,
+  createSceneInstanceFromNode,
   resolveReverseParityAfter,
 } from './layers';
 import type {
@@ -56,38 +55,41 @@ const getOriginFitTime = (
     return t;
   }
 
-  // Warp output time into the active window (trim leading/trailing silence).
   return window.min + t * span;
 };
 
-const buildPolylineForLayer = (
-  layer: GeneratorLayer,
+const projectSceneInstancePolyline = (
+  sceneInstance: SceneInstance,
   t01: number,
-): Polyline | null => buildGeneratorPolyline(layer, t01, POLYLINE_STEP);
+): Polyline | null => {
+  const polyline = buildGeneratorPolyline(sceneInstance, t01, POLYLINE_STEP);
+  if (!polyline) {
+    return null;
+  }
 
-const buildPolylinesAtTime = (
-  layers: ReadonlyArray<GeneratorLayer>,
+  return applyTransformToPolyline({
+    ...polyline,
+    clipStack: sceneInstance.clipStack,
+  }, sceneInstance.spatial);
+};
+
+const projectPolylinesAtTime = (
+  sceneInstances: ReadonlyArray<SceneInstance>,
   t01: number,
   originWindows?: Map<string, OriginWindow>,
 ): Polyline[] => {
   const polylines: Polyline[] = [];
 
-  for (const layer of layers) {
-    const fitTime = getOriginFitTime(t01, originWindows?.get(layer.originId));
+  for (const sceneInstance of sceneInstances) {
+    const fitTime = getOriginFitTime(t01, originWindows?.get(sceneInstance.originId));
     if (fitTime === null) {
       continue;
     }
 
-    const polyline = buildPolylineForLayer(layer, fitTime);
-    if (!polyline) {
-      continue;
+    const polyline = projectSceneInstancePolyline(sceneInstance, fitTime);
+    if (polyline) {
+      polylines.push(polyline);
     }
-
-    const transformed = applyTransformToPolyline(polyline, layer.spatial);
-    if (layer.mask) {
-      transformed.mask = layer.mask;
-    }
-    polylines.push(transformed);
   }
 
   return polylines;
@@ -118,59 +120,21 @@ const closeOpenNote = (
   });
 };
 
-const computeOriginWindowsForLayers = (
-  layers: ReadonlyArray<GeneratorLayer>,
-  context: GroupEvaluationContext,
-): Map<string, OriginWindow> => {
-  const windows = new Map<string, OriginWindow>();
-  const thicknessSq = THICKNESS * THICKNESS;
-
-  for (let step = 0; step < SAMPLES_PER_BEAT; step += 1) {
-    const sample = step / SAMPLES_PER_BEAT;
-    const polylines = buildPolylinesAtTime(layers, sample);
-    const activeOrigins = new Set<string>();
-
-    for (const coord of context.buttonIndex.coordinates) {
-      for (const polyline of polylines) {
-        if (polyline.mask && !polyline.mask(coord.x, coord.y)) {
-          continue;
-        }
-        if (distanceToPolylineSquared(coord, polyline) <= thicknessSq) {
-          activeOrigins.add(polyline.originId);
-        }
-      }
-    }
-
-    for (const originId of activeOrigins) {
-      const existing = windows.get(originId);
-      if (existing) {
-        existing.min = Math.min(existing.min, sample);
-        existing.max = Math.max(existing.max, sample);
-      } else {
-        windows.set(originId, { min: sample, max: sample });
-      }
-    }
-  }
-
-  return windows;
-};
-
-const collectSourceNotesForLayers = (
-  layers: ReadonlyArray<GeneratorLayer>,
+const collectSourceNotesForSceneInstances = (
+  sceneInstances: ReadonlyArray<SceneInstance>,
   context: GroupEvaluationContext,
 ): ClipNoteWithOrigin[] => {
-  if (layers.length === 0) {
+  if (sceneInstances.length === 0) {
     return [];
   }
 
-  const originWindows = computeOriginWindowsForLayers(layers, context);
   const openByPitch = new Map<number, OpenNoteState>();
   const notes: ClipNoteWithOrigin[] = [];
 
   for (let step = 0; step < SAMPLES_PER_BEAT; step += 1) {
     const sample = step / SAMPLES_PER_BEAT;
     const activeByPitch = resolveActiveByPitch(
-      buildPolylinesAtTime(layers, sample, originWindows),
+      projectPolylinesAtTime(sceneInstances, sample),
       context.buttonIndex,
     );
 
@@ -249,10 +213,7 @@ const resolveGroupSourcePolylines = (
     return [];
   }
 
-  if (
-    consumingDeviceIndex !== undefined
-    && groupId === consumingGroupId
-  ) {
+  if (consumingDeviceIndex !== undefined && groupId === consumingGroupId) {
     const group = context.groupById.get(groupId);
     if (!group) {
       return [];
@@ -262,7 +223,7 @@ const resolveGroupSourcePolylines = (
       devices: group.devices.slice(0, consumingDeviceIndex),
       groupStateById: context.groupStateById,
     };
-    const slicedLayers = buildLayers(slicedChain, context.worldBounds, (effect, deviceIndex) => {
+    const slicedSceneInstances = buildSceneInstances(slicedChain, context.worldBounds, (effect, deviceIndex) => {
       if (effect.kind !== 'mask') {
         return null;
       }
@@ -273,10 +234,9 @@ const resolveGroupSourcePolylines = (
       return resolveMaskEffectContext(effect, context, sliceTimeKind, groupId, deviceIndex);
     });
     return buildGuidedPolylinesAtTime(
-      slicedLayers,
+      slicedSceneInstances,
       resolveMaskTime(context, timeKind),
-      context.originWindows,
-      buildColorGuideWarpForChain(slicedChain, slicedLayers, context),
+      buildColorGuideWarpForChain(slicedChain, slicedSceneInstances, context),
     );
   }
 
@@ -308,9 +268,8 @@ const resolveGroupSourcePolylines = (
 
   resolving.add(groupId);
   const polylines = buildGuidedPolylinesAtTime(
-    buildGroupLayersAtTime(groupId, context),
+    buildGroupSceneInstances(groupId, context),
     resolveMaskTime(context, timeKind),
-    context.originWindows,
     buildSourceColorGuideWarpByGroup(groupId, context),
   );
   resolving.delete(groupId);
@@ -344,7 +303,7 @@ const resolveGeneratorSourcePolylines = (
       devices: group.devices.slice(0, consumingDeviceIndex),
       groupStateById: context.groupStateById,
     };
-    const slicedLayers = buildLayers(slicedChain, context.worldBounds, (effect, deviceIndex) => {
+    const slicedSceneInstances = buildSceneInstances(slicedChain, context.worldBounds, (effect, deviceIndex) => {
       if (effect.kind !== 'mask') {
         return null;
       }
@@ -355,26 +314,24 @@ const resolveGeneratorSourcePolylines = (
       return resolveMaskEffectContext(effect, context, sliceTimeKind, consumingGroupId, deviceIndex);
     });
 
-    const guideWarp = buildColorGuideWarpForChain(slicedChain, slicedLayers, context).get(generator.id);
-    return buildPolylinesAtTime(
-      [createLayerFromGenerator(generator, context.worldBounds)].filter((layer): layer is GeneratorLayer => layer !== null),
+    const guideWarp = buildColorGuideWarpForChain(slicedChain, slicedSceneInstances, context).get(generator.id);
+    return projectPolylinesAtTime(
+      [createSceneInstanceFromNode(generator, context.worldBounds)].filter((sceneInstance): sceneInstance is SceneInstance => sceneInstance !== null),
       resolveGuideBeat(resolveMaskTime(context, timeKind), guideWarp),
-      context.originWindows,
     );
   }
 
-  const layer = createLayerFromGenerator(generator, context.worldBounds);
-  if (!layer) {
+  const sceneInstance = createSceneInstanceFromNode(generator, context.worldBounds);
+  if (!sceneInstance) {
     return [];
   }
 
   const time = resolveMaskTime(context, timeKind);
   const groupId = normalizeOptionalId(generator.groupId);
   const guideWarp = buildSourceColorGuideWarpByGroup(groupId, context).get(generator.id);
-  return buildPolylinesAtTime(
-    [layer],
+  return projectPolylinesAtTime(
+    [sceneInstance],
     resolveGuideBeat(time, guideWarp),
-    context.originWindows,
   );
 };
 
@@ -455,19 +412,19 @@ const resolveMaskEffectContext = (
   };
 };
 
-const buildGroupLayersAtTime = (
+const buildGroupSceneInstances = (
   groupId: GroupId,
   context: GroupEvaluationContext,
-): GeneratorLayer[] => {
-  const cached = context.cache.layersByGroup.get(groupId);
+): SceneInstance[] => {
+  const cached = context.cache.sceneInstancesByGroup.get(groupId);
   if (cached) {
     return cached;
   }
 
   const group = context.groupById.get(groupId);
   if (!group) {
-    const empty: GeneratorLayer[] = [];
-    context.cache.layersByGroup.set(groupId, empty);
+    const empty: SceneInstance[] = [];
+    context.cache.sceneInstancesByGroup.set(groupId, empty);
     return empty;
   }
 
@@ -476,7 +433,7 @@ const buildGroupLayersAtTime = (
     groupStateById: context.groupStateById,
   };
   const reverseParityAfter = resolveReverseParityAfter(groupChain, group.devices);
-  const layers = buildLayers(
+  const sceneInstances = buildSceneInstances(
     groupChain,
     context.worldBounds,
     (effect, deviceIndex) => {
@@ -490,8 +447,8 @@ const buildGroupLayersAtTime = (
     },
   );
 
-  context.cache.layersByGroup.set(groupId, layers);
-  return layers;
+  context.cache.sceneInstancesByGroup.set(groupId, sceneInstances);
+  return sceneInstances;
 };
 
 const buildSourceColorGuideWarpByGroup = (
@@ -514,10 +471,10 @@ const buildSourceColorGuideWarpByGroup = (
     devices: group.devices,
     groupStateById: context.groupStateById,
   };
-  const layers = buildGroupLayersAtTime(groupId, context);
+  const sceneInstances = buildGroupSceneInstances(groupId, context);
   const evaluated = applyColorProgramsDetailed(
     chain,
-    collectSourceNotesForLayers(layers, context),
+    collectSourceNotesForSceneInstances(sceneInstances, context),
     MIN_NOTE_DURATION,
   );
   context.cache.sourceColorGuideWarpByGroup.set(groupId, evaluated.colorGuideWarpByOriginId);
@@ -526,21 +483,20 @@ const buildSourceColorGuideWarpByGroup = (
 
 const buildColorGuideWarpForChain = (
   chain: GeneratorChain,
-  layers: ReadonlyArray<GeneratorLayer>,
+  sceneInstances: ReadonlyArray<SceneInstance>,
   context: GroupEvaluationContext,
 ): ReadonlyMap<string, ColorGuideWarp> => applyColorProgramsDetailed(
   chain,
-  collectSourceNotesForLayers(layers, context),
+  collectSourceNotesForSceneInstances(sceneInstances, context),
   MIN_NOTE_DURATION,
 ).colorGuideWarpByOriginId;
 
 const buildGuidedPolylinesAtTime = (
-  layers: ReadonlyArray<GeneratorLayer>,
+  sceneInstances: ReadonlyArray<SceneInstance>,
   sourceTime: number,
-  originWindows: Map<string, OriginWindow> | undefined,
   guideWarpByOriginId: ReadonlyMap<string, ColorGuideWarp>,
 ): Polyline[] => {
-  const basePolylines = buildPolylinesAtTime(layers, sourceTime, originWindows);
+  const basePolylines = projectPolylinesAtTime(sceneInstances, sourceTime);
   if (basePolylines.length === 0) {
     return [];
   }
@@ -550,7 +506,7 @@ const buildGuidedPolylinesAtTime = (
   for (const originId of originIds) {
     const guideBeat = resolveGuideBeat(sourceTime, guideWarpByOriginId.get(originId));
     guidedPolylines.push(
-      ...buildPolylinesAtTime(layers, guideBeat, originWindows)
+      ...projectPolylinesAtTime(sceneInstances, guideBeat)
         .filter((polyline) => polyline.originId === originId),
     );
   }
@@ -562,6 +518,7 @@ const buildGroupPolylinesForDeviceRange = (
   groupId: GroupId,
   context: GroupEvaluationContext,
   endExclusive: number,
+  originWindows?: Map<string, OriginWindow>,
 ): Polyline[] => {
   const group = context.groupById.get(groupId);
   if (!group) {
@@ -572,7 +529,7 @@ const buildGroupPolylinesForDeviceRange = (
     devices: group.devices.slice(0, endExclusive),
     groupStateById: context.groupStateById,
   };
-  const layers = buildLayers(slicedChain, context.worldBounds, (effect, deviceIndex) => {
+  const sceneInstances = buildSceneInstances(slicedChain, context.worldBounds, (effect, deviceIndex) => {
     if (effect.kind !== 'mask') {
       return null;
     }
@@ -582,43 +539,61 @@ const buildGroupPolylinesForDeviceRange = (
     const timeKind: MaskTimeKind = reverseAfter ? 'reversed' : 'forward';
     return resolveMaskEffectContext(effect, context, timeKind, groupId, deviceIndex);
   });
-  return buildPolylinesAtTime(layers, context.time, context.originWindows);
+  return projectPolylinesAtTime(sceneInstances, context.time, originWindows);
+};
+
+const buildOutputGroupSceneInstances = (
+  groupId: GroupId,
+  context: GroupEvaluationContext,
+): SceneInstance[] => {
+  if (groupId && context.mutedGroupIds.has(groupId)) {
+    return [];
+  }
+
+  const sceneInstances = buildGroupSceneInstances(groupId, context);
+  return context.mutedGeneratorIds.size > 0
+    ? sceneInstances.filter((sceneInstance) => !context.mutedGeneratorIds.has(sceneInstance.originId))
+    : sceneInstances;
 };
 
 const buildOutputGroupPolylinesAtTime = (
   groupId: GroupId,
   context: GroupEvaluationContext,
+  originWindows?: Map<string, OriginWindow>,
 ): Polyline[] => {
   const cached = context.cache.outputPolylinesByGroup.get(groupId);
   if (cached) {
     return cached;
   }
 
-  if (groupId && context.mutedGroupIds.has(groupId)) {
-    const empty: Polyline[] = [];
-    context.cache.outputPolylinesByGroup.set(groupId, empty);
-    return empty;
-  }
-
-  const layers = buildGroupLayersAtTime(groupId, context);
-  const filteredLayers = context.mutedGeneratorIds.size > 0
-    ? layers.filter((layer) => !context.mutedGeneratorIds.has(layer.originId))
-    : layers;
-
-  const polylines = filteredLayers.length > 0
-    ? buildPolylinesAtTime(filteredLayers, context.time, context.originWindows)
+  const sceneInstances = buildOutputGroupSceneInstances(groupId, context);
+  const polylines = sceneInstances.length > 0
+    ? projectPolylinesAtTime(sceneInstances, context.time, originWindows)
     : [];
   context.cache.outputPolylinesByGroup.set(groupId, polylines);
   return polylines;
 };
 
+export const buildSceneInstancesForAllGroups = (
+  context: GroupEvaluationContext,
+): SceneInstance[] => {
+  const sceneInstances: SceneInstance[] = [];
+
+  for (const group of context.groupChains) {
+    sceneInstances.push(...buildOutputGroupSceneInstances(group.id, context));
+  }
+
+  return sceneInstances;
+};
+
 export const buildPolylinesForAllGroups = (
   context: GroupEvaluationContext,
+  originWindows?: Map<string, OriginWindow>,
 ): Polyline[] => {
   const polylines: Polyline[] = [];
 
   for (const group of context.groupChains) {
-    polylines.push(...buildOutputGroupPolylinesAtTime(group.id, context));
+    polylines.push(...buildOutputGroupPolylinesAtTime(group.id, context, originWindows));
   }
 
   return polylines;
@@ -627,6 +602,7 @@ export const buildPolylinesForAllGroups = (
 export const evaluateMaskDebugSnapshot = (
   maskDeviceId: string,
   context: GroupEvaluationContext,
+  originWindows?: Map<string, OriginWindow>,
 ): MaskDebugSnapshot | null => {
   for (const group of context.groupChains) {
     const maskIndex = group.devices.findIndex((device) =>
@@ -681,8 +657,8 @@ export const evaluateMaskDebugSnapshot = (
         : (maskDevice.params.sourceKind === 'generator' && sourceId
           ? resolveGeneratorSourceActiveTiles(sourceId, context, timeKind, group.id, maskIndex)
           : new Set()),
-      consumerPolylinesBeforeMask: buildGroupPolylinesForDeviceRange(group.id, context, maskIndex),
-      consumerPolylinesAfterMask: buildOutputGroupPolylinesAtTime(group.id, context),
+      consumerPolylinesBeforeMask: buildGroupPolylinesForDeviceRange(group.id, context, maskIndex, originWindows),
+      consumerPolylinesAfterMask: buildOutputGroupPolylinesAtTime(group.id, context, originWindows),
     };
   }
 

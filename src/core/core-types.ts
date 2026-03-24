@@ -21,44 +21,81 @@ export interface AffineTransform {
   ty: number;
 }
 
-interface TemporalTransform {
+export interface TemporalMapping {
   alpha: number;
   beta: number;
 }
 
-export type Mask = (x: number, y: number) => boolean;
+export interface TileUnionClipShape {
+  kind: 'tile-union';
+  tiles: ReadonlyArray<number>;
+}
+
+export interface HalfPlaneClipShape {
+  kind: 'half-plane';
+  point: Vec2;
+  normal: Vec2;
+}
+
+export interface IntersectionClipShape {
+  kind: 'intersection';
+  shapes: ReadonlyArray<ClipShape>;
+}
+
+export type ClipShape = TileUnionClipShape | HalfPlaneClipShape | IntersectionClipShape;
+
+export interface SceneClip {
+  shape: ClipShape;
+  inverseTransform: AffineTransform;
+}
 
 export interface Polyline {
   points: Vec2[];
   closed: boolean;
   originId: string;
   velocity: number;
-  mask?: Mask;
+  clipStack: SceneClip[];
 }
 
-export interface GeneratorLayerBase {
+export interface SceneInstanceBase {
   originId: string;
   spatial: AffineTransform;
   inverseSpatial: AffineTransform;
   sourceBounds: Bounds;
-  temporal: TemporalTransform;
-  mask?: Mask;
+  temporal: TemporalMapping;
+  clipStack: SceneClip[];
   velocity: number;
 }
 
-interface WaterdropLayer extends GeneratorLayerBase {
+export interface WaterdropPrimitive {
   kind: 'waterdrop';
   params: WaterdropParams;
 }
 
-interface ScannerLayer extends GeneratorLayerBase {
+export interface ScannerPrimitive {
   kind: 'scanner';
   params: ScannerParams;
 }
 
-interface SpiralLayer extends GeneratorLayerBase {
+export interface SpiralPrimitive {
   kind: 'spiral';
   params: SpiralParams;
 }
 
-export type GeneratorLayer = WaterdropLayer | ScannerLayer | SpiralLayer;
+export type ScenePrimitive = WaterdropPrimitive | ScannerPrimitive | SpiralPrimitive;
+export type ScenePrimitiveKind = ScenePrimitive['kind'];
+
+interface WaterdropSceneInstance extends SceneInstanceBase {
+  primitive: WaterdropPrimitive;
+}
+
+interface ScannerSceneInstance extends SceneInstanceBase {
+  primitive: ScannerPrimitive;
+}
+
+interface SpiralSceneInstance extends SceneInstanceBase {
+  primitive: SpiralPrimitive;
+}
+
+export type SceneInstance = WaterdropSceneInstance | ScannerSceneInstance | SpiralSceneInstance;
+export type SceneInstanceOfKind<K extends ScenePrimitiveKind> = Extract<SceneInstance, { primitive: { kind: K } }>;

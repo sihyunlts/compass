@@ -1,5 +1,5 @@
 import type { Polyline } from '../core-types';
-import { distanceToPolylineSquared } from '../geometry';
+import { distanceToPolylineSquared, isPointInsideClipStack } from '../geometry';
 import {
   THICKNESS,
   TILE_COUNT,
@@ -18,7 +18,7 @@ export const resolveActiveTilesFromPolylines = (
     for (let x = TILE_MIN; x <= TILE_MAX; x += 1) {
       let isActive = false;
       for (const polyline of polylines) {
-        if (polyline.mask && !polyline.mask(x, y)) {
+        if (polyline.clipStack.length > 0 && !isPointInsideClipStack(polyline.clipStack, { x, y })) {
           continue;
         }
         const distanceSq = distanceToPolylineSquared({ x, y }, polyline);
@@ -53,15 +53,13 @@ export const resolveActiveByPitch = (
     let maxVelocity = 0;
     let maxVelocityOriginId: string | null = null;
     for (const polyline of polylines) {
-      if (polyline.mask && !polyline.mask(x, y)) {
+      if (polyline.clipStack.length > 0 && !isPointInsideClipStack(polyline.clipStack, { x, y })) {
         continue;
       }
       const distanceSq = distanceToPolylineSquared({ x, y }, polyline);
-      if (distanceSq <= thicknessSq) {
-        if (polyline.velocity > maxVelocity) {
-          maxVelocity = polyline.velocity;
-          maxVelocityOriginId = polyline.originId;
-        }
+      if (distanceSq <= thicknessSq && polyline.velocity > maxVelocity) {
+        maxVelocity = polyline.velocity;
+        maxVelocityOriginId = polyline.originId;
       }
     }
 
