@@ -73,16 +73,6 @@ export const RENDERER_DEVICE_MANIFEST = [
     editor: './mirror/ui.svelte',
   },
   {
-    ...symmetryDeviceSchema,
-    controls: symmetryDeviceControls,
-    editor: './symmetry/ui.svelte',
-  },
-  {
-    ...maskDeviceSchema,
-    controls: maskDeviceControls,
-    editor: './mask/ui.svelte',
-  },
-  {
     ...rotateDeviceSchema,
     controls: rotateDeviceControls,
     editor: './rotate/ui.svelte',
@@ -96,6 +86,16 @@ export const RENDERER_DEVICE_MANIFEST = [
     ...translateDeviceSchema,
     controls: translateDeviceControls,
     editor: './translate/ui.svelte',
+  },
+  {
+    ...symmetryDeviceSchema,
+    controls: symmetryDeviceControls,
+    editor: './symmetry/ui.svelte',
+  },
+  {
+    ...maskDeviceSchema,
+    controls: maskDeviceControls,
+    editor: './mask/ui.svelte',
   },
   {
     ...reverseDeviceSchema,

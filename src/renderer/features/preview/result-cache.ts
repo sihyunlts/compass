@@ -33,7 +33,6 @@ interface PreviewResultInput {
 const isNoteActiveAtBeat = (
   note: ClipNote,
   beat: number,
-  sourceTimelineEndBeat: number,
 ): boolean => {
   if (!Number.isFinite(note.startBeat) || !Number.isFinite(note.durationBeats)) {
     return false;
@@ -41,22 +40,17 @@ const isNoteActiveAtBeat = (
 
   const noteStart = note.startBeat;
   const noteEnd = note.startBeat + Math.max(note.durationBeats, 0);
-  if (beat >= sourceTimelineEndBeat) {
-    return noteStart <= beat && noteEnd >= beat;
-  }
-
   return noteStart <= beat && beat < noteEnd;
 };
 
 const buildLedFrameAtBeat = (
   notes: ReadonlyArray<ClipNote>,
   beat: number,
-  sourceTimelineEndBeat: number,
 ): ReadonlyMap<number, number> => {
   const activeVelocityByPitch = new Map<number, number>();
 
   for (const note of notes) {
-    if (!isNoteActiveAtBeat(note, beat, sourceTimelineEndBeat)) {
+    if (!isNoteActiveAtBeat(note, beat)) {
       continue;
     }
 
@@ -77,7 +71,6 @@ const buildLedFramesFromNotes = (
   (_, index) => buildLedFrameAtBeat(
     notes,
     toPreviewFrameBeat(index, sourceTimelineEndBeat),
-    sourceTimelineEndBeat,
   ),
 );
 

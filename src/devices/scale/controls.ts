@@ -37,12 +37,7 @@ export const scaleDeviceControls = {
       isKind: isScaleDevice,
       readParam: (input) => readDatasetParam(input, SCALE_FACTOR_PARAM_KEYS),
       assign: (device, param, value) => {
-        if ((SCALE_FACTOR_PARAM_KEYS as readonly string[]).includes(param)) {
-          device.params[param] = normalizePositiveScaleFactor(value, device.params[param]);
-          return;
-        }
-
-        device.params[param] = value;
+        device.params[param] = normalizePositiveScaleFactor(value, device.params[param]);
       },
     }),
     'set-center-picker-param': createNumericParamSetter({
