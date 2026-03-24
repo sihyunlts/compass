@@ -27,12 +27,19 @@ import {
   evaluateMaskDebugSnapshot,
   type MaskDebugSnapshot,
 } from './polylines';
-import type { ButtonIndex, GroupChain, GroupEvaluationContext, GroupId } from './types';
+import type {
+  ButtonIndex,
+  GroupChain,
+  GroupEvaluationContext,
+  GroupId,
+  TimedOutputNote,
+} from './types';
 
 export interface CompiledPipelineEngine {
   buttons: ReadonlyArray<LaunchpadButton>;
   buttonIndex: ButtonIndex;
   worldBounds: Bounds;
+  baseChainWithoutModulators: GeneratorChain;
   chainWithoutModulators: GeneratorChain;
   deviceById: Map<string, GeneratorDeviceNode>;
   groupChains: GroupChain[];
@@ -41,6 +48,7 @@ export interface CompiledPipelineEngine {
   mutedGroupIds: Set<string>;
   mutedGeneratorIds: Set<string>;
   modulation: CompiledModulationProgram;
+  maskSourceOutputNotesByKey: Map<string, ReadonlyArray<TimedOutputNote>>;
 }
 
 export type { MaskDebugSnapshot } from './polylines';
@@ -100,7 +108,11 @@ export const compilePipelineEngine = (
   const worldBounds = options?.worldBounds ?? buildWorldBounds();
   const buttonIndex = options?.buttonIndex
     ?? (options?.buttons !== undefined ? buildButtonIndex(options.buttons) : EMPTY_BUTTON_INDEX);
-  const chainWithoutModulators = cloneChainWithoutModulators(sourceChain);
+  const baseChainWithoutModulators = cloneChainWithoutModulators(sourceChain);
+  const chainWithoutModulators = {
+    devices: baseChainWithoutModulators.devices.map((device) => cloneDeviceNode(device)),
+    groupStateById: { ...baseChainWithoutModulators.groupStateById },
+  };
   const groupChains = splitChainByGroup(chainWithoutModulators);
   const groupById = buildGroupById(groupChains);
   const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(chainWithoutModulators);
@@ -109,6 +121,7 @@ export const compilePipelineEngine = (
     buttons,
     buttonIndex,
     worldBounds,
+    baseChainWithoutModulators,
     chainWithoutModulators,
     deviceById: buildDeviceById(chainWithoutModulators),
     groupChains,
@@ -117,6 +130,7 @@ export const compilePipelineEngine = (
     mutedGroupIds,
     mutedGeneratorIds,
     modulation: compileModulationProgram(sourceChain),
+    maskSourceOutputNotesByKey: new Map(),
   };
 };
 
@@ -128,6 +142,7 @@ const createEvaluationContext = (
   timeReversed: 1 - time,
   buttonIndex: engine.buttonIndex,
   chain: engine.chainWithoutModulators,
+  baseChain: engine.baseChainWithoutModulators,
   groupStateById: engine.chainWithoutModulators.groupStateById,
   worldBounds: engine.worldBounds,
   groupChains: engine.groupChains,
@@ -138,6 +153,7 @@ const createEvaluationContext = (
   cache: {
     sceneInstancesByGroup: new Map(),
     outputPolylinesByGroup: new Map(),
+    maskSourceOutputNotesByKey: engine.maskSourceOutputNotesByKey,
   },
 });
 

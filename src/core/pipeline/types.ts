@@ -9,9 +9,19 @@ export interface GroupChain {
   devices: GeneratorDeviceNode[];
 }
 
+export interface TimedOutputNote {
+  pitch: number;
+  channel: number;
+  startBeat: number;
+  durationBeats: number;
+  velocity: number;
+  originId?: string;
+}
+
 interface GroupEvaluationCache {
   sceneInstancesByGroup: Map<GroupId, SceneInstance[]>;
   outputPolylinesByGroup: Map<GroupId, Polyline[]>;
+  maskSourceOutputNotesByKey: Map<string, ReadonlyArray<TimedOutputNote>>;
 }
 
 export interface GroupEvaluationContext {
@@ -19,6 +29,7 @@ export interface GroupEvaluationContext {
   timeReversed: number;
   buttonIndex: ButtonIndex;
   chain: GeneratorChain;
+  baseChain: GeneratorChain;
   groupStateById: GeneratorChain['groupStateById'];
   worldBounds: Bounds;
   groupChains: GroupChain[];

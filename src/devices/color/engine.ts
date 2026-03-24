@@ -203,7 +203,7 @@ const fitColorProgramToOriginSpan = (
   return fitted.length === 0 ? null : { notes: fitted };
 };
 
-const applyColorDeviceToNotes = (
+export const applyColorDeviceToNotes = (
   notes: ReadonlyArray<ClipNoteWithOrigin>,
   device: ColorEffectNode,
   minimumNoteDuration: number,

@@ -1,4 +1,5 @@
 import { buildGeneratorPolyline } from '../../devices/engine';
+import { applyNoteStageColorPrograms } from '../../devices/color/engine';
 import type { GeneratorChain, MaskEffectNode } from '../../shared/model';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { normalizeOptionalId } from '../../shared/normalize-id';
@@ -8,8 +9,14 @@ import {
   projectSceneToActivationFrame,
   resolveActiveTilesFromPolylines,
 } from './active';
-import { POLYLINE_STEP } from './constants';
-import { resolveMaskTime } from './groups';
+import {
+  MIN_NOTE_DURATION,
+  POLYLINE_STEP,
+  SAMPLES_PER_BEAT,
+  TILE_COUNT,
+} from './constants';
+import { fitNotesToTimeline } from './timeline-fit';
+import { isGeneratorNode, resolveMaskTime, resolveMutedSources, splitChainByGroup } from './groups';
 import {
   buildSceneInstances,
   createSceneInstanceFromNode,
@@ -19,6 +26,8 @@ import type {
   GroupEvaluationContext,
   GroupId,
   MaskTimeKind,
+  OpenNoteState,
+  TimedOutputNote,
 } from './types';
 
 export interface MaskDebugSnapshot {
@@ -63,6 +72,241 @@ const projectPolylinesAtTime = (
   }
 
   return polylines;
+};
+
+const buildGroupById = (
+  groupChains: ReadonlyArray<{ id: GroupId; devices: GeneratorChain['devices'] }>,
+): Map<GroupId, { id: GroupId; devices: GeneratorChain['devices'] }> => {
+  const groupById = new Map<GroupId, { id: GroupId; devices: GeneratorChain['devices'] }>();
+  for (const group of groupChains) {
+    groupById.set(group.id, group);
+  }
+  return groupById;
+};
+
+const buildGeneratorById = (
+  chain: GeneratorChain,
+): Map<string, Extract<GeneratorChain['devices'][number], { kind: 'waterdrop' | 'scanner' | 'spiral' }>> => {
+  const generatorById = new Map<string, Extract<GeneratorChain['devices'][number], { kind: 'waterdrop' | 'scanner' | 'spiral' }>>();
+  for (const device of chain.devices) {
+    if (isGeneratorNode(device)) {
+      generatorById.set(device.id, device);
+    }
+  }
+  return generatorById;
+};
+
+const buildMaskSourceCacheKey = (
+  sourceGroupId: string,
+  consumingGroupId?: GroupId,
+  consumingDeviceIndex?: number,
+): string => `group:${sourceGroupId}|consumer:${consumingGroupId ?? 'none'}|index:${consumingDeviceIndex ?? -1}`;
+
+const createBaseChainForMaskSource = (
+  context: GroupEvaluationContext,
+  consumingGroupId: GroupId | undefined,
+  consumingDeviceIndex: number | undefined,
+): GeneratorChain => {
+  if (consumingGroupId === undefined || consumingDeviceIndex === undefined) {
+    return context.baseChain;
+  }
+
+  let groupDeviceCount = 0;
+  return {
+    devices: context.baseChain.devices.filter((device) => {
+      if (normalizeOptionalId(device.groupId) !== consumingGroupId) {
+        return true;
+      }
+
+      const keep = groupDeviceCount < consumingDeviceIndex;
+      groupDeviceCount += 1;
+      return keep;
+    }),
+    groupStateById: context.baseChain.groupStateById,
+  };
+};
+
+const createSourceEvaluationContext = (
+  sourceChain: GeneratorChain,
+  context: GroupEvaluationContext,
+  time: number,
+  unmutedGroupId: GroupId,
+): GroupEvaluationContext => {
+  const groupChains = splitChainByGroup(sourceChain);
+  const groupById = buildGroupById(groupChains);
+  const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(sourceChain);
+
+  if (unmutedGroupId) {
+    mutedGroupIds.delete(unmutedGroupId);
+    const sourceGroup = groupById.get(unmutedGroupId);
+    if (sourceGroup) {
+      for (const device of sourceGroup.devices) {
+        if (isGeneratorNode(device)) {
+          mutedGeneratorIds.delete(device.id);
+        }
+      }
+    }
+  }
+
+  return {
+    time,
+    timeReversed: 1 - time,
+    buttonIndex: context.buttonIndex,
+    chain: sourceChain,
+    baseChain: sourceChain,
+    groupStateById: sourceChain.groupStateById,
+    worldBounds: context.worldBounds,
+    groupChains,
+    groupById,
+    generatorById: buildGeneratorById(sourceChain),
+    mutedGroupIds,
+    mutedGeneratorIds,
+    cache: {
+      sceneInstancesByGroup: new Map(),
+      outputPolylinesByGroup: new Map(),
+      maskSourceOutputNotesByKey: new Map(),
+    },
+  };
+};
+
+const closeOpenNote = (
+  notes: TimedOutputNote[],
+  pitch: number,
+  open: OpenNoteState,
+  endBeat: number,
+): void => {
+  const orderedStart = Math.max(Math.min(open.startBeat, endBeat), 0);
+  const orderedEnd = Math.max(Math.max(open.startBeat, endBeat), 0);
+  notes.push({
+    pitch,
+    channel: open.channel,
+    startBeat: orderedStart,
+    durationBeats: Math.max(orderedEnd - orderedStart, MIN_NOTE_DURATION),
+    velocity: open.velocity,
+    originId: open.originId,
+  });
+};
+
+const collectGroupOutputNotes = (
+  sourceGroupId: string,
+  context: GroupEvaluationContext,
+  consumingGroupId?: GroupId,
+  consumingDeviceIndex?: number,
+): TimedOutputNote[] => {
+  const notes: TimedOutputNote[] = [];
+  const openByPitch = new Map<number, OpenNoteState>();
+  const sourceChain = createBaseChainForMaskSource(context, consumingGroupId, consumingDeviceIndex);
+
+  for (let step = 0; step < SAMPLES_PER_BEAT; step += 1) {
+    const sample = step / SAMPLES_PER_BEAT;
+    const sourceContext = createSourceEvaluationContext(
+      sourceChain,
+      context,
+      sample,
+      sourceGroupId,
+    );
+    const activeByPitch = projectSceneToActivationFrame(
+      buildOutputGroupSceneInstances(sourceGroupId, sourceContext),
+      sample,
+      context.buttonIndex,
+    ).activeByPitch;
+
+    for (const [pitch, open] of openByPitch.entries()) {
+      if (activeByPitch.has(pitch)) {
+        continue;
+      }
+      closeOpenNote(notes, pitch, open, sample);
+      openByPitch.delete(pitch);
+    }
+
+    for (const [pitch, active] of activeByPitch.entries()) {
+      const existing = openByPitch.get(pitch);
+      if (
+        existing
+        && existing.velocity === active.velocity
+        && existing.channel === active.channel
+        && existing.originId === active.originId
+      ) {
+        continue;
+      }
+
+      if (existing) {
+        closeOpenNote(notes, pitch, existing, sample);
+      }
+
+      openByPitch.set(pitch, {
+        startBeat: sample,
+        velocity: active.velocity,
+        channel: active.channel,
+        originId: active.originId,
+      });
+    }
+  }
+
+  for (const [pitch, open] of openByPitch.entries()) {
+    closeOpenNote(notes, pitch, open, 1);
+  }
+
+  return applyNoteStageColorPrograms(sourceChain, notes, MIN_NOTE_DURATION);
+};
+
+const resolveGroupSourceOutputNotes = (
+  sourceGroupId: string,
+  context: GroupEvaluationContext,
+  consumingGroupId?: GroupId,
+  consumingDeviceIndex?: number,
+): ReadonlyArray<TimedOutputNote> => {
+  const cacheKey = buildMaskSourceCacheKey(
+    sourceGroupId,
+    consumingGroupId,
+    consumingDeviceIndex,
+  );
+  const cached = context.cache.maskSourceOutputNotesByKey.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const notes = collectGroupOutputNotes(
+    sourceGroupId,
+    context,
+    consumingGroupId,
+    consumingDeviceIndex,
+  );
+  const fittedNotes = fitNotesToTimeline(notes).fittedNotes;
+  context.cache.maskSourceOutputNotesByKey.set(cacheKey, fittedNotes);
+  return fittedNotes;
+};
+
+const resolveGroupSourceOutputActiveTiles = (
+  sourceGroupId: string,
+  context: GroupEvaluationContext,
+  timeKind: MaskTimeKind,
+  consumingGroupId?: GroupId,
+  consumingDeviceIndex?: number,
+): Set<number> => {
+  const time = resolveMaskTime(context, timeKind);
+  const activeAddresses = new Set<string>();
+
+  for (const note of resolveGroupSourceOutputNotes(
+    sourceGroupId,
+    context,
+    consumingGroupId,
+    consumingDeviceIndex,
+  )) {
+    if (note.startBeat <= time && time < note.startBeat + note.durationBeats) {
+      activeAddresses.add(`${note.channel}:${note.pitch}`);
+    }
+  }
+
+  const activeTiles = new Set<number>();
+  for (const group of context.buttonIndex.groups) {
+    if (group.buttons.some((button) =>
+      activeAddresses.has(`${button.output.channel}:${button.output.number}`))) {
+      activeTiles.add(group.y * TILE_COUNT + group.x);
+    }
+  }
+
+  return activeTiles;
 };
 
 const buildCheckpointSceneInstances = (
@@ -173,16 +417,19 @@ const resolveGroupSourceActiveTiles = (
   timeKind: MaskTimeKind,
   consumingGroupId?: GroupId,
   consumingDeviceIndex?: number,
-): Set<number> => projectSceneToActivationFrame(
-  resolveGroupSourceSceneInstances(
+): Set<number> => {
+  if (!groupId) {
+    return new Set();
+  }
+
+  return resolveGroupSourceOutputActiveTiles(
     groupId,
     context,
+    timeKind,
     consumingGroupId,
     consumingDeviceIndex,
-  ),
-  resolveMaskTime(context, timeKind),
-  context.buttonIndex,
-).activeTiles;
+  );
+};
 
 const resolveGeneratorSourceActiveTiles = (
   generatorId: string,

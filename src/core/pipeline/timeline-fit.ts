@@ -1,80 +1,72 @@
-import { MIN_NOTE_DURATION, THICKNESS } from '../core/pipeline/constants';
-import {
-  evaluatePolylinesAtTime,
-  type CompiledPipelineEngine,
-} from '../core/pipeline/engine';
-import { distanceToPolylineSquared, isPointInsideClipStack } from '../core/geometry';
-import type { ClipNoteWithOrigin } from '../devices/color/engine';
+import { MIN_NOTE_DURATION } from './constants';
 
 interface OriginWindow {
   min: number;
   max: number;
 }
 
-export interface TimelineFitResult {
-  fittedNotes: ClipNoteWithOrigin[];
+interface TimedNoteWithOrigin {
+  pitch: number;
+  channel: number;
+  startBeat: number;
+  durationBeats: number;
+  originId?: string;
+}
+
+export interface TimelineFitResult<T extends TimedNoteWithOrigin> {
+  fittedNotes: T[];
   exportTargetSpan: number;
   originWindows: Map<string, OriginWindow>;
 }
 
 const NORMALIZED_EXPORT_SPAN = 1;
 
-const sortClipNotes = (notes: ClipNoteWithOrigin[]): void => {
+const sortTimedNotes = <T extends TimedNoteWithOrigin>(notes: T[]): void => {
   notes.sort((left, right) =>
     left.startBeat - right.startBeat
     || left.pitch - right.pitch
     || left.channel - right.channel);
 };
 
-const cloneNotes = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-): ClipNoteWithOrigin[] => notes.map((note) => ({ ...note }));
+const cloneNotes = <T extends TimedNoteWithOrigin>(
+  notes: ReadonlyArray<T>,
+): T[] => notes.map((note) => ({ ...note }));
 
-const computeOriginWindows = (
-  engine: CompiledPipelineEngine,
-  steps: number,
+const computeOriginWindows = <T extends TimedNoteWithOrigin>(
+  notes: ReadonlyArray<T>,
 ): Map<string, OriginWindow> => {
   const windows = new Map<string, OriginWindow>();
-  const thicknessSq = THICKNESS * THICKNESS;
 
-  for (let step = 0; step < steps; step += 1) {
-    const sample = step / steps;
-    const polylines = evaluatePolylinesAtTime(engine, sample);
-    const activeOrigins = new Set<string>();
-
-    for (const group of engine.buttonIndex.groups) {
-      const coord = { x: group.x, y: group.y };
-      for (const polyline of polylines) {
-        if (
-          polyline.clipStack.length > 0
-          && !isPointInsideClipStack(polyline.clipStack, coord)
-        ) {
-          continue;
-        }
-
-        if (distanceToPolylineSquared(coord, polyline) <= thicknessSq) {
-          activeOrigins.add(polyline.originId);
-        }
-      }
+  for (const note of notes) {
+    if (
+      !note.originId
+      || !Number.isFinite(note.startBeat)
+      || !Number.isFinite(note.durationBeats)
+    ) {
+      continue;
     }
 
-    for (const originId of activeOrigins) {
-      const existing = windows.get(originId);
-      if (existing) {
-        existing.min = Math.min(existing.min, sample);
-        existing.max = Math.max(existing.max, sample);
-      } else {
-        windows.set(originId, { min: sample, max: sample });
-      }
+    const startBeat = note.startBeat;
+    const endBeat = note.startBeat + Math.max(note.durationBeats, 0);
+    if (!Number.isFinite(endBeat) || endBeat <= startBeat) {
+      continue;
+    }
+
+    const existing = windows.get(note.originId);
+    if (existing) {
+      existing.min = Math.min(existing.min, startBeat);
+      existing.max = Math.max(existing.max, endBeat);
+    } else {
+      windows.set(note.originId, { min: startBeat, max: endBeat });
     }
   }
 
   return windows;
 };
 
-const trimGlobalNoteSilence = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-): TimelineFitResult => {
+const trimGlobalNoteSilence = <T extends TimedNoteWithOrigin>(
+  notes: ReadonlyArray<T>,
+): TimelineFitResult<T> => {
   if (notes.length === 0) {
     return {
       fittedNotes: [],
@@ -106,7 +98,7 @@ const trimGlobalNoteSilence = (
     ...note,
     startBeat: Math.max(0, note.startBeat - firstBeat),
   }));
-  sortClipNotes(fittedNotes);
+  sortTimedNotes(fittedNotes);
 
   return {
     fittedNotes,
@@ -115,10 +107,10 @@ const trimGlobalNoteSilence = (
   };
 };
 
-const fitNoteToWindow = (
-  note: ClipNoteWithOrigin,
+const fitNoteToWindow = <T extends TimedNoteWithOrigin>(
+  note: T,
   window: OriginWindow | undefined,
-): ClipNoteWithOrigin | null => {
+): T | null => {
   if (!window) {
     return { ...note };
   }
@@ -150,8 +142,8 @@ const fitNoteToWindow = (
   };
 };
 
-const hasAnyApplicableWindow = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
+const hasAnyApplicableWindow = <T extends TimedNoteWithOrigin>(
+  notes: ReadonlyArray<T>,
   originWindows: ReadonlyMap<string, OriginWindow>,
 ): boolean => notes.some((note) => {
   if (!note.originId) {
@@ -167,12 +159,10 @@ const hasAnyApplicableWindow = (
   return Number.isFinite(span) && span > 0;
 });
 
-export const fitNotesToTimeline = (
-  engine: CompiledPipelineEngine,
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-  steps: number,
-): TimelineFitResult => {
-  const originWindows = computeOriginWindows(engine, steps);
+export const fitNotesToTimeline = <T extends TimedNoteWithOrigin>(
+  notes: ReadonlyArray<T>,
+): TimelineFitResult<T> => {
+  const originWindows = computeOriginWindows(notes);
   if (!hasAnyApplicableWindow(notes, originWindows)) {
     return trimGlobalNoteSilence(notes);
   }
@@ -182,8 +172,8 @@ export const fitNotesToTimeline = (
       note,
       note.originId ? originWindows.get(note.originId) : undefined,
     ))
-    .filter((note): note is ClipNoteWithOrigin => note !== null);
-  sortClipNotes(fittedNotes);
+    .filter((note): note is T => note !== null);
+  sortTimedNotes(fittedNotes);
 
   return {
     fittedNotes,

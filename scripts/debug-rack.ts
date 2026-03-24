@@ -17,7 +17,7 @@ import {
   TILE_COUNT,
 } from '../src/core/pipeline/constants';
 import type { Polyline } from '../src/core/core-types';
-import type { LaunchpadModel, MaskEffectNode } from '../src/shared/model';
+import type { ClipNote, LaunchpadButton, LaunchpadModel, MaskEffectNode } from '../src/shared/model';
 import { parsePresetFileText } from '../src/shared/presets';
 
 interface CliOptions {
@@ -157,6 +157,59 @@ const toTileCoordinates = (tileId: number): { tileId: number; x: number; y: numb
   y: Math.floor(tileId / TILE_COUNT),
 });
 
+const isNoteActiveAtBeat = (
+  note: ClipNote,
+  beat: number,
+): boolean => note.startBeat <= beat && beat < note.startBeat + note.durationBeats;
+
+const resolvePreviewFrameAtBeat = (
+  notes: ReadonlyArray<ClipNote>,
+  buttons: ReadonlyArray<LaunchpadButton>,
+  beat: number,
+): {
+  activeTiles: Array<{ tileId: number; x: number; y: number }>;
+  activePitches: Array<{ pitch: number; velocity: number; channel: number }>;
+} => {
+  const activeTiles = new Set<number>();
+  const activeByAddress = new Map<string, { pitch: number; velocity: number; channel: number }>();
+
+  for (const note of notes) {
+    if (!isNoteActiveAtBeat(note, beat)) {
+      continue;
+    }
+
+    const addressKey = `${note.channel}:${note.pitch}`;
+    const previous = activeByAddress.get(addressKey);
+    if (!previous || note.velocity > previous.velocity) {
+      activeByAddress.set(addressKey, {
+        pitch: note.pitch,
+        velocity: note.velocity,
+        channel: note.channel,
+      });
+    }
+  }
+
+  for (const active of activeByAddress.values()) {
+    for (const button of buttons) {
+      if (
+        button.output.kind === 'note'
+        && button.output.number === active.pitch
+        && button.output.channel === active.channel
+      ) {
+        activeTiles.add((button.y * TILE_COUNT) + button.x);
+      }
+    }
+  }
+
+  return {
+    activeTiles: Array.from(activeTiles)
+      .sort((left, right) => left - right)
+      .map((tileId) => toTileCoordinates(tileId)),
+    activePitches: Array.from(activeByAddress.values())
+      .sort((left, right) => left.pitch - right.pitch || left.channel - right.channel),
+  };
+};
+
 const writeJson = async (
   filePath: string,
   value: unknown,
@@ -239,6 +292,7 @@ const main = async (): Promise<void> => {
 
   await writeJson(path.join(outputDirectory, 'notes.json'), {
     notes: preview.notes,
+    sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
   });
 
   const framesDirectory = path.join(outputDirectory, 'frames');
@@ -275,6 +329,33 @@ const main = async (): Promise<void> => {
     await writeJson(path.join(frameDirectory, 'active-tiles.json'), activeTiles);
     await writeJson(path.join(frameDirectory, 'active-pitches.json'), activePitches);
     await writeJson(path.join(frameDirectory, 'polylines.json'), serializePolylines(polylines));
+  }
+
+  const previewFramesDirectory = path.join(outputDirectory, 'preview-frames');
+  await mkdir(previewFramesDirectory, { recursive: true });
+  const previewActivitySummary = options.beats.map((beat) => {
+    const previewBeat = beat * preview.sourceTimelineEndBeat;
+    const frame = resolvePreviewFrameAtBeat(preview.notes, runtimeMap.buttons, previewBeat);
+    return {
+      beat,
+      previewBeat,
+      activeTileCount: frame.activeTiles.length,
+    };
+  });
+  await writeJson(path.join(outputDirectory, 'preview-activity-summary.json'), {
+    sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
+    frames: previewActivitySummary,
+  });
+
+  for (const beat of options.beats) {
+    const previewBeat = beat * preview.sourceTimelineEndBeat;
+    const beatKey = beat.toFixed(3);
+    const frameDirectory = path.join(previewFramesDirectory, `beat-${beatKey}`);
+    await mkdir(frameDirectory, { recursive: true });
+
+    const frame = resolvePreviewFrameAtBeat(preview.notes, runtimeMap.buttons, previewBeat);
+    await writeJson(path.join(frameDirectory, 'active-tiles.json'), frame.activeTiles);
+    await writeJson(path.join(frameDirectory, 'active-pitches.json'), frame.activePitches);
   }
 
   const maskDevices = chain.devices.filter((device): device is MaskEffectNode =>
