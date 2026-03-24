@@ -1,17 +1,15 @@
 import type { Polyline, SceneInstance } from '../core-types';
-import { buildGeneratorPolyline } from '../../devices/engine';
 import {
-  applyTransformToPolyline,
   distanceToPolylineSquared,
   isPointInsideClipStack,
 } from '../geometry';
 import {
-  POLYLINE_STEP,
   THICKNESS,
   TILE_COUNT,
   TILE_MAX,
   TILE_MIN,
 } from './constants';
+import { projectSceneToPolylinesAtTime } from './scene-projection';
 import type { ActivePitchInfo, ButtonIndex } from './types';
 
 export interface ActivationFrame {
@@ -24,27 +22,6 @@ export interface ExactOutputFrame {
   time: number;
   activationFrame: ActivationFrame;
 }
-
-export const projectSceneToPolylinesAtTime = (
-  scene: ReadonlyArray<SceneInstance>,
-  time: number,
-): Polyline[] => {
-  const polylines: Polyline[] = [];
-
-  for (const sceneInstance of scene) {
-    const polyline = buildGeneratorPolyline(sceneInstance, time, POLYLINE_STEP);
-    if (!polyline) {
-      continue;
-    }
-
-    polylines.push(applyTransformToPolyline({
-      ...polyline,
-      clipStack: sceneInstance.clipStack,
-    }, sceneInstance.spatial));
-  }
-
-  return polylines;
-};
 
 export const resolveActiveTilesFromPolylines = (
   polylines: ReadonlyArray<Polyline>,
