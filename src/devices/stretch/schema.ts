@@ -5,7 +5,6 @@ import {
   resolveImportedDeviceEnabled,
   resolveImportedDeviceId,
   resolveImportedParams,
-  toFiniteNumber,
 } from '../import-hydration';
 import type { RendererDeviceSchema } from '../types';
 
@@ -44,8 +43,8 @@ const hydrateImportedStretchNode = (
     source,
   );
   const params = resolveImportedParams(source);
-  const start = toFiniteNumber(params.start, device.params.start);
-  const end = toFiniteNumber(params.end, device.params.end);
+  const start = Number(params.start);
+  const end = Number(params.end);
   if (isNonWrapping01TemporalWindow(start, end)) {
     device.params.start = start;
     device.params.end = end;
