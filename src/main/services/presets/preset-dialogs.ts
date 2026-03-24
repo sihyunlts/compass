@@ -3,6 +3,7 @@ import {
   type BaseWindow,
   type SaveDialogOptions,
 } from 'electron';
+import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
 import type {
@@ -44,6 +45,7 @@ export class PresetDialogs {
   ): Promise<SelectedFilePath> {
     const spec = PRESET_FILE_SPECS[request.payload.presetType];
     const directory = resolvePresetSaveDirectory(baseDirectory, request);
+    await mkdir(directory, { recursive: true });
     const suggestedFileName = `${sanitizeFileStem(
       request.suggestedName,
       spec.defaultName,

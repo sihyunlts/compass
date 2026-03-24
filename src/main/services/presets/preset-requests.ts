@@ -1,4 +1,5 @@
 import type {
+  CreatePresetFolderRequest,
   ReadPresetEntryRequest,
   SavePresetFileRequest,
   ShowPresetEntryInFolderRequest,
@@ -8,6 +9,7 @@ import {
   parsePresetFile,
   type PresetFileKind,
 } from '../../../shared/presets';
+import { isValidPresetPathSegment } from './preset-paths';
 
 export const parseSavePresetFileRequest = (
   value: unknown,
@@ -34,12 +36,7 @@ export const parseSavePresetFileRequest = (
 };
 
 const isValidRelativePathSegment = (value: unknown): value is string =>
-  typeof value === 'string'
-  && value.length > 0
-  && value !== '.'
-  && value !== '..'
-  && !value.includes('/')
-  && !value.includes('\\');
+  typeof value === 'string' && isValidPresetPathSegment(value);
 
 const parseRelativePath = (value: unknown): string[] | null => {
   if (!Array.isArray(value) || !value.every((segment) => isValidRelativePathSegment(segment))) {
@@ -92,5 +89,29 @@ export const parsePresetEntryRequest = (
     presetType: (value as { presetType: PresetFileKind }).presetType,
     relativePath,
     entryKind,
+  };
+};
+
+export const parseCreatePresetFolderRequest = (
+  value: unknown,
+): CreatePresetFolderRequest | null => {
+  if (
+    typeof value !== 'object'
+    || value === null
+    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
+    || typeof (value as { folderName?: unknown }).folderName !== 'string'
+  ) {
+    return null;
+  }
+
+  const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
+  if (!relativePath) {
+    return null;
+  }
+
+  return {
+    presetType: (value as { presetType: PresetFileKind }).presetType,
+    relativePath,
+    folderName: (value as { folderName: string }).folderName,
   };
 };

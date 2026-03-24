@@ -12,6 +12,16 @@ export const sanitizeFileStem = (value: string, fallback: string): string => {
   return sanitized || fallback;
 };
 
+export const normalizePresetPathSegment = (value: string): string => value.trim();
+
+export const isValidPresetPathSegment = (value: string): boolean => {
+  const normalized = normalizePresetPathSegment(value);
+  return normalized.length > 0
+    && normalized !== '.'
+    && normalized !== '..'
+    && !/[\\/:*?"<>|]/.test(normalized);
+};
+
 export const resolvePresetSaveDirectory = (
   baseDirectory: string,
   request: SavePresetFileRequest,

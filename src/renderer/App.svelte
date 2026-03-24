@@ -244,6 +244,13 @@
     editorSession.commands.deleteFromContextTarget(target);
   };
 
+  const handleContextMenuCreatePresetFolder = (
+    target: Extract<ContextMenuTarget, { kind: 'preset-entry' }>,
+  ): void => {
+    presetController.beginPresetFolderCreate(target);
+    closeContextMenu();
+  };
+
   onMount(() => {
     editorSession.initialize();
     playbackSession.initialize();
@@ -301,6 +308,8 @@
       presetTree={presetState.presetTree}
       isPresetLoading={presetState.isPresetLoading}
       presetErrorText={presetState.presetErrorText}
+      pendingPresetFolderDraft={presetState.pendingPresetFolderDraft}
+      presetFolderSelectionTarget={presetState.presetFolderSelectionTarget}
       launchpadMk2Enabled={uiState.launchpadModel === 'mk2'}
       paletteDescription={settingsState.paletteDescriptionOverride || uiState.paletteNameText || 'Default palette'}
       paletteDescriptionTone={settingsState.paletteDescriptionTone}
@@ -320,6 +329,12 @@
       onPresetEntryOpen={(entry) => presetController.handlePresetEntryOpen(entry)}
       onPresetFilePointerDown={(entry, sourceEvent, itemEl) =>
         presetController.handlePresetFilePointerDown(entry, sourceEvent, itemEl)}
+      onPendingPresetFolderDraftNameChange={(nextName) =>
+        presetController.updatePendingPresetFolderDraftName(nextName)}
+      onPendingPresetFolderCommit={() => presetController.commitPendingPresetFolderCreate()}
+      onPendingPresetFolderCancel={() => presetController.cancelPendingPresetFolderCreate()}
+      onPresetFolderSelectionHandled={(token) =>
+        presetController.clearPresetFolderSelectionTarget(token)}
     />
 
     {#if uiState.sidebarPage !== 'settings'}
@@ -459,6 +474,7 @@
     onDuplicate={editorSession.commands.duplicateFromContextTarget}
     onRename={editorSession.commands.beginRenameFromContextTarget}
     onDelete={handleContextMenuDelete}
+    onCreatePresetFolder={handleContextMenuCreatePresetFolder}
     onShowInFolder={(target) => presetController.handleShowPresetEntryInFolder(target)}
     onGroup={editorSession.commands.groupDeviceIds}
     onUngroupGroup={editorSession.commands.ungroupGroup}

@@ -1,6 +1,7 @@
 import { shell, type BaseWindow } from 'electron';
 
 import type {
+  CreatePresetFolderResponse,
   DeletePresetEntryResponse,
   ListPresetBrowserTreeResponse,
   ReadPresetEntryResponse,
@@ -16,6 +17,7 @@ import {
   resolvePresetPath,
 } from './presets/preset-paths';
 import {
+  parseCreatePresetFolderRequest,
   parsePresetEntryRequest,
   parseReadPresetEntryRequest,
   parseSavePresetFileRequest,
@@ -86,6 +88,34 @@ export class PresetService {
       return {
         status: 'error',
         message: toErrorMessage(error, 'Failed to list preset browser tree.'),
+      };
+    }
+  }
+
+  public async createPresetFolder(
+    request: unknown,
+  ): Promise<CreatePresetFolderResponse> {
+    const parsedRequest = parseCreatePresetFolderRequest(request);
+    if (!parsedRequest) {
+      return {
+        status: 'error',
+        message: 'Invalid preset folder request.',
+      };
+    }
+
+    try {
+      return {
+        status: 'ok',
+        relativePath: await this.storage.createPresetFolder(
+          parsedRequest.presetType,
+          parsedRequest.relativePath,
+          parsedRequest.folderName,
+        ),
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to create preset folder.'),
       };
     }
   }

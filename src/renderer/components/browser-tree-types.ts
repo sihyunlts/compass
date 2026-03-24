@@ -34,6 +34,19 @@ export interface BrowserTreePresetLeafNode {
   savedAtIso: string;
 }
 
+export interface PendingPresetFolderDraft {
+  temporaryId: string;
+  presetType: PresetFileKind;
+  parentRelativePath: string[];
+  draftName: string;
+}
+
+export interface PresetFolderSelectionTarget {
+  token: number;
+  presetType: PresetFileKind;
+  relativePath: string[];
+}
+
 export type BrowserTreeNode =
   | BrowserTreeDeviceFolderNode
   | BrowserTreePresetFolderNode

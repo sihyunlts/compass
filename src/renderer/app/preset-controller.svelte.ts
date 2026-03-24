@@ -1,5 +1,6 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type {
+  CreatePresetFolderRequest,
   PresetBrowserTreeNode,
   ReadPresetEntryResponse,
   SavePresetFileRequest,
@@ -8,6 +9,8 @@ import { parsePresetFileText } from '../../shared/presets';
 import type {
   BrowserTreePresetFolderNode,
   BrowserTreePresetLeafNode,
+  PendingPresetFolderDraft,
+  PresetFolderSelectionTarget,
 } from '../components/browser-tree-types';
 import type { ContextMenuTarget } from '../components/context-menu-types';
 import type {
@@ -51,6 +54,8 @@ interface PresetControllerState {
   presetTree: BrowserTreePresetFolderNode[];
   isPresetLoading: boolean;
   presetErrorText: string | null;
+  pendingPresetFolderDraft: PendingPresetFolderDraft | null;
+  presetFolderSelectionTarget: PresetFolderSelectionTarget | null;
   pendingPresetDeleteTarget: PresetEntryTarget | null;
   isPresetDeletePending: boolean;
   pendingRackPresetLoadTarget: PendingRackPresetLoadTarget | null;
@@ -94,6 +99,8 @@ class PresetController {
     presetTree: [],
     isPresetLoading: false,
     presetErrorText: null,
+    pendingPresetFolderDraft: null,
+    presetFolderSelectionTarget: null,
     pendingPresetDeleteTarget: null,
     isPresetDeletePending: false,
     pendingRackPresetLoadTarget: null,
@@ -101,6 +108,10 @@ class PresetController {
   });
 
   private presetListRequestToken = 0;
+
+  private nextPendingPresetFolderId = 1;
+
+  private nextPresetFolderSelectionToken = 1;
 
   public constructor(private readonly options: PresetControllerOptions) {}
 
@@ -216,6 +227,78 @@ class PresetController {
       entryKind: target.entryKind,
     };
     this.state.isPresetDeletePending = false;
+  }
+
+  public beginPresetFolderCreate(target: ContextMenuTarget): void {
+    if (target.kind !== 'preset-entry' || target.entryKind !== 'directory') {
+      return;
+    }
+
+    this.state.pendingPresetFolderDraft = {
+      temporaryId: `pending-preset-folder:${this.nextPendingPresetFolderId}`,
+      presetType: target.presetType,
+      parentRelativePath: [...target.relativePath],
+      draftName: '',
+    };
+    this.nextPendingPresetFolderId += 1;
+    this.state.presetFolderSelectionTarget = null;
+  }
+
+  public updatePendingPresetFolderDraftName(nextName: string): void {
+    const draft = this.state.pendingPresetFolderDraft;
+    if (!draft) {
+      return;
+    }
+
+    this.state.pendingPresetFolderDraft = {
+      ...draft,
+      draftName: nextName,
+    };
+  }
+
+  public cancelPendingPresetFolderCreate(): void {
+    this.state.pendingPresetFolderDraft = null;
+  }
+
+  public async commitPendingPresetFolderCreate(): Promise<void> {
+    const draft = this.state.pendingPresetFolderDraft;
+    if (!draft) {
+      return;
+    }
+
+    const folderName = draft.draftName.trim();
+    if (!folderName) {
+      this.cancelPendingPresetFolderCreate();
+      return;
+    }
+
+    this.state.pendingPresetFolderDraft = null;
+    const request: CreatePresetFolderRequest = {
+      presetType: draft.presetType,
+      relativePath: [...draft.parentRelativePath],
+      folderName,
+    };
+    const response = await this.options.bridgeClient.createPresetFolder(request);
+    if (response.status === 'error') {
+      this.showMessage(`Preset folder create failed | ${response.message}`);
+      return;
+    }
+
+    await this.loadTree();
+    this.state.presetFolderSelectionTarget = {
+      token: this.nextPresetFolderSelectionToken,
+      presetType: draft.presetType,
+      relativePath: [...response.relativePath],
+    };
+    this.nextPresetFolderSelectionToken += 1;
+  }
+
+  public clearPresetFolderSelectionTarget(token: number): void {
+    if (this.state.presetFolderSelectionTarget?.token !== token) {
+      return;
+    }
+
+    this.state.presetFolderSelectionTarget = null;
   }
 
   public closePresetDeleteDialog(): void {

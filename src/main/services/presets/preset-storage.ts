@@ -10,6 +10,11 @@ import {
   type PresetFileKind,
 } from '../../../shared/presets';
 import { PRESET_FILE_SPECS, PRESET_ROOT_DIR_NAME } from './preset-config';
+import {
+  isValidPresetPathSegment,
+  normalizePresetPathSegment,
+  resolvePresetPath,
+} from './preset-paths';
 
 const serializePresetFile = (payload: PresetFile): unknown => {
   if (payload.presetType === 'device') {
@@ -63,6 +68,45 @@ export class PresetStorage {
   public async writePresetFile(filePath: string, payload: PresetFile): Promise<void> {
     await mkdir(path.dirname(filePath), { recursive: true });
     await writeFile(filePath, `${JSON.stringify(serializePresetFile(payload), null, 2)}\n`, 'utf8');
+  }
+
+  public async createPresetFolder(
+    presetType: PresetFileKind,
+    parentRelativePath: readonly string[],
+    folderName: string,
+  ): Promise<string[]> {
+    const normalizedFolderName = normalizePresetPathSegment(folderName);
+    if (!isValidPresetPathSegment(normalizedFolderName)) {
+      throw new Error('Invalid folder name.');
+    }
+
+    const rootDirectory = await this.resolvePresetDirectory(presetType);
+    const parentDirectory = resolvePresetPath(rootDirectory, parentRelativePath);
+    if (!parentDirectory) {
+      throw new Error('Invalid preset folder path.');
+    }
+
+    const relativePath = [...parentRelativePath, normalizedFolderName];
+    const directoryPath = resolvePresetPath(rootDirectory, relativePath);
+    if (!directoryPath) {
+      throw new Error('Invalid preset folder path.');
+    }
+
+    try {
+      await mkdir(directoryPath);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'EEXIST') {
+        throw new Error('A preset or folder with that name already exists.', { cause: error });
+      }
+      if (code === 'ENOENT' || code === 'ENOTDIR') {
+        throw new Error('Parent preset folder does not exist.', { cause: error });
+      }
+
+      throw error;
+    }
+
+    return relativePath;
   }
 
   public async ensureAccessible(filePath: string): Promise<void> {

@@ -2,12 +2,15 @@
   import { tick } from 'svelte';
 
   import type { RendererDeviceKind } from '../../devices';
+  import type { PresetFileKind } from '../../shared/presets';
   import Button from './Button.svelte';
   import SidebarSettingsPage from './SidebarSettingsPage.svelte';
   import type {
     BrowserTreeDeviceLeafNode,
     BrowserTreeDeviceFolderNode,
     BrowserTreeNode,
+    PendingPresetFolderDraft,
+    PresetFolderSelectionTarget,
     BrowserTreePresetLeafNode,
     BrowserTreePresetFolderNode,
   } from './browser-tree-types';
@@ -17,12 +20,25 @@
   export type BrowserPanelPage = 'devices' | 'presets' | 'settings';
 
   interface VisibleTreeRow {
-    node: BrowserTreeNode;
+    node: VisibleBrowserTreeNode;
     level: number;
     parentId: string | null;
     posInSet: number;
     setSize: number;
   }
+
+  interface PendingPresetFolderNode {
+    kind: 'folder';
+    treeKind: 'preset';
+    id: string;
+    label: string;
+    presetType: PresetFileKind;
+    relativePath: string[];
+    children: [];
+    isPending: true;
+  }
+
+  type VisibleBrowserTreeNode = BrowserTreeNode | PendingPresetFolderNode;
 
   type BrowserPointerDownPayload = {
     source: BrowserInsertSource;
@@ -36,8 +52,85 @@
     { kind: 'preset-entry' | 'presets-root' }
   >;
 
+  const areEqualRelativePaths = (
+    left: readonly string[],
+    right: readonly string[],
+  ): boolean =>
+    left.length === right.length && left.every((segment, index) => segment === right[index]);
+
+  const buildPendingPresetFolderNode = (
+    draft: PendingPresetFolderDraft,
+  ): PendingPresetFolderNode => ({
+    kind: 'folder',
+    treeKind: 'preset',
+    id: draft.temporaryId,
+    label: draft.draftName,
+    presetType: draft.presetType,
+    relativePath: [...draft.parentRelativePath, draft.draftName.trim()],
+    children: [],
+    isPending: true,
+  });
+
+  const insertPendingPresetFolder = (
+    roots: readonly BrowserTreePresetFolderNode[],
+    draft: PendingPresetFolderDraft | null,
+  ): BrowserTreePresetFolderNode[] => {
+    if (!draft) {
+      return roots.map((root) => ({
+        ...root,
+        children: [...root.children],
+      }));
+    }
+
+    const pendingNode = buildPendingPresetFolderNode(draft);
+    const cloneFolderNode = (
+      node: BrowserTreePresetFolderNode,
+    ): BrowserTreePresetFolderNode => ({
+      ...node,
+      children: node.children.map((child) =>
+        child.kind === 'folder' && child.treeKind === 'preset'
+          ? cloneFolderNode(child)
+          : child),
+    });
+
+    const nextRoots = roots.map((root) => cloneFolderNode(root));
+    const rootNode = nextRoots.find((root) => root.presetType === draft.presetType);
+    if (!rootNode) {
+      return nextRoots;
+    }
+
+    if (draft.parentRelativePath.length === 0) {
+      rootNode.children = [...rootNode.children, pendingNode];
+      return nextRoots;
+    }
+
+    const visit = (node: BrowserTreePresetFolderNode): boolean => {
+      if (
+        node.presetType === draft.presetType
+        && areEqualRelativePaths(node.relativePath, draft.parentRelativePath)
+      ) {
+        node.children = [...node.children, pendingNode];
+        return true;
+      }
+
+      for (const child of node.children) {
+        if (child.kind !== 'folder' || child.treeKind !== 'preset') {
+          continue;
+        }
+        if (visit(child)) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    visit(rootNode);
+    return nextRoots;
+  };
+
   const collectVisibleRows = (
-    nodes: readonly BrowserTreeNode[],
+    nodes: readonly VisibleBrowserTreeNode[],
     expandedFolderIdSet: ReadonlySet<string>,
     level = 1,
     parentId: string | null = null,
@@ -86,6 +179,8 @@
     presetTree = [] as BrowserTreePresetFolderNode[],
     isPresetLoading = false,
     presetErrorText = null,
+    pendingPresetFolderDraft = null,
+    presetFolderSelectionTarget = null,
     launchpadMk2Enabled = false,
     paletteDescription = 'Default palette',
     paletteDescriptionTone = 'neutral',
@@ -102,12 +197,18 @@
     onOpenAboutSite = () => {},
     onPresetEntryOpen,
     onPresetFilePointerDown,
+    onPendingPresetFolderDraftNameChange = () => {},
+    onPendingPresetFolderCommit = () => {},
+    onPendingPresetFolderCancel = () => {},
+    onPresetFolderSelectionHandled = () => {},
   } = $props<{
     activePage?: BrowserPanelPage;
     deviceTree: BrowserTreeDeviceFolderNode[];
     presetTree: BrowserTreePresetFolderNode[];
     isPresetLoading?: boolean;
     presetErrorText?: string | null;
+    pendingPresetFolderDraft?: PendingPresetFolderDraft | null;
+    presetFolderSelectionTarget?: PresetFolderSelectionTarget | null;
     launchpadMk2Enabled?: boolean;
     paletteDescription?: string;
     paletteDescriptionTone?: 'neutral' | 'error';
@@ -132,11 +233,17 @@
       event: PointerEvent,
       itemEl: HTMLElement,
     ) => void | Promise<void>;
+    onPendingPresetFolderDraftNameChange?: (nextName: string) => void;
+    onPendingPresetFolderCommit?: () => void | Promise<void>;
+    onPendingPresetFolderCancel?: () => void;
+    onPresetFolderSelectionHandled?: (token: number) => void;
   }>();
 
   let expandedFolderIds = $state<string[]>([]);
   let initializedRootFolderIds = $state<string[]>([]);
   let selectedRowId = $state<string | null>(null);
+  let pendingPresetFolderInputEl = $state<HTMLInputElement | null>(null);
+  let skipPendingPresetFolderBlurId = $state<string | null>(null);
 
   const activeTreeRoots = $derived.by(() => {
     if (activePage === 'devices') {
@@ -144,7 +251,7 @@
     }
 
     if (activePage === 'presets') {
-      return presetTree;
+      return insertPendingPresetFolder(presetTree, pendingPresetFolderDraft);
     }
 
     return [];
@@ -231,8 +338,12 @@
   };
 
   const resolvePresetContextMenuTarget = (
-    node: BrowserTreeNode,
+    node: VisibleBrowserTreeNode,
   ): PresetContextMenuTarget | null => {
+    if (node.kind === 'folder' && 'isPending' in node && node.isPending) {
+      return null;
+    }
+
     if (node.kind === 'preset') {
       return {
         kind: 'preset-entry',
@@ -255,7 +366,7 @@
   };
 
   const handleTreeItemContextMenu = (
-    node: BrowserTreeNode,
+    node: VisibleBrowserTreeNode,
     event: MouseEvent,
   ): void => {
     const target = resolvePresetContextMenuTarget(node);
@@ -342,6 +453,24 @@
     event.preventDefault();
   };
 
+  const handlePendingPresetFolderCommit = (): void => {
+    void onPendingPresetFolderCommit();
+  };
+
+  const handlePendingPresetFolderBlur = (rowId: string): void => {
+    if (skipPendingPresetFolderBlurId === rowId) {
+      skipPendingPresetFolderBlurId = null;
+      return;
+    }
+
+    if ((pendingPresetFolderDraft?.draftName.trim() ?? '').length === 0) {
+      onPendingPresetFolderCancel();
+      return;
+    }
+
+    handlePendingPresetFolderCommit();
+  };
+
   $effect(() => {
     const nextRootIds = [...deviceTree, ...presetTree]
       .map((node) => node.id)
@@ -364,6 +493,56 @@
     if (!selectedRowId || resolveRowIndex(selectedRowId) === -1) {
       selectedRowId = firstVisibleRowId;
     }
+  });
+
+  $effect(() => {
+    const draft = pendingPresetFolderDraft;
+    if (!draft) {
+      return;
+    }
+
+    const ancestorIds = [
+      `preset-root:${draft.presetType}`,
+      ...draft.parentRelativePath.map((_segment: string, index: number) =>
+        `preset:${draft.presetType}:${draft.parentRelativePath.slice(0, index + 1).join('/')}`),
+    ];
+    const nextExpandedFolderIds = Array.from(new Set([...expandedFolderIds, ...ancestorIds]));
+    const didExpandFolders = nextExpandedFolderIds.length !== expandedFolderIds.length;
+    if (didExpandFolders) {
+      expandedFolderIds = nextExpandedFolderIds;
+    }
+
+    const didSelectPendingRow = selectedRowId !== draft.temporaryId;
+    if (didSelectPendingRow) {
+      selectedRowId = draft.temporaryId;
+    }
+
+    if (didExpandFolders || didSelectPendingRow) {
+      void tick().then(() => {
+        pendingPresetFolderInputEl?.focus();
+        pendingPresetFolderInputEl?.select();
+      });
+    }
+  });
+
+  $effect(() => {
+    const selectionTarget = presetFolderSelectionTarget;
+    if (!selectionTarget || activePage !== 'presets') {
+      return;
+    }
+
+    const match = visibleRows.find((row) =>
+      row.node.kind === 'folder'
+      && row.node.treeKind === 'preset'
+      && row.node.presetType === selectionTarget.presetType
+      && areEqualRelativePaths(row.node.relativePath, selectionTarget.relativePath));
+    if (!match) {
+      return;
+    }
+
+    void focusRow(match.node.id).then(() => {
+      onPresetFolderSelectionHandled(selectionTarget.token);
+    });
   });
 </script>
 
@@ -424,8 +603,6 @@
         <p class="browser-status">Loading presets...</p>
       {:else if activePage === 'presets' && presetErrorText}
         <p class="browser-status browser-status-error">{presetErrorText}</p>
-      {:else if activePage === 'presets' && visibleRows.length === 0}
-        <p class="browser-status">No presets yet.</p>
       {:else}
         <ul
           class="browser-tree-list browser-tree-root"
@@ -488,7 +665,42 @@
                     {resolveLeafIcon(row.node)}
                   </span>
                 {/if}
-                <span class="browser-tree-item-label">{row.node.label}</span>
+                {#if row.node.kind === 'folder' && 'isPending' in row.node && row.node.isPending}
+                  <input
+                    bind:this={pendingPresetFolderInputEl}
+                    class="browser-tree-item-input"
+                    type="text"
+                    value={pendingPresetFolderDraft?.draftName ?? ''}
+                    aria-label="New preset folder name"
+                    onpointerdown={(event) => event.stopPropagation()}
+                    onclick={(event) => event.stopPropagation()}
+                    ondblclick={(event) => event.stopPropagation()}
+                    oninput={(event) => {
+                      const target = event.currentTarget;
+                      if (!(target instanceof HTMLInputElement)) {
+                        return;
+                      }
+                      onPendingPresetFolderDraftNameChange(target.value);
+                    }}
+                    onkeydown={(event) => {
+                      event.stopPropagation();
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        skipPendingPresetFolderBlurId = row.node.id;
+                        handlePendingPresetFolderCommit();
+                        return;
+                      }
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        skipPendingPresetFolderBlurId = row.node.id;
+                        onPendingPresetFolderCancel();
+                      }
+                    }}
+                    onblur={() => handlePendingPresetFolderBlur(row.node.id)}
+                  />
+                {:else}
+                  <span class="browser-tree-item-label">{row.node.label}</span>
+                {/if}
               </div>
             </li>
           {/each}
@@ -624,6 +836,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    &-input {
+      min-width: 0;
+      width: 100%;
+      font: inherit;
     }
   }
 

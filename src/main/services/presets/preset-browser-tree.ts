@@ -24,13 +24,11 @@ export class PresetBrowserTreeBuilder {
   }
 
   public async listTree(): Promise<PresetBrowserTreeFolderNode[]> {
-    return (
-      await Promise.all(
-        (['device', 'group', 'rack'] as const).map((presetType) =>
-          this.buildRootNode(presetType)
-        ),
-      )
-    ).filter((node) => node.children.length > 0);
+    return Promise.all(
+      (['device', 'group', 'rack'] as const).map((presetType) =>
+        this.buildRootNode(presetType)
+      ),
+    );
   }
 
   private async buildRootNode(
@@ -66,22 +64,17 @@ export class PresetBrowserTreeBuilder {
 
     for (const directory of childDirectories) {
       const nextRelativePath = [...relativePath, directory.name];
-      const children = await this.buildChildren(
-        presetType,
-        rootDirectory,
-        nextRelativePath,
-      );
-      if (children.length === 0) {
-        continue;
-      }
-
       entries.push({
         kind: 'folder',
         id: `preset:${presetType}:${nextRelativePath.join('/')}`,
         label: directory.name,
         presetType,
         relativePath: nextRelativePath,
-        children,
+        children: await this.buildChildren(
+          presetType,
+          rootDirectory,
+          nextRelativePath,
+        ),
       });
     }
 

@@ -14,6 +14,7 @@
     onDuplicate,
     onRename,
     onDelete,
+    onCreatePresetFolder,
     onShowInFolder,
     onGroup,
     onUngroupGroup,
@@ -25,6 +26,7 @@
     onDuplicate: (target: ContextMenuTarget) => void;
     onRename: (target: ContextMenuTarget) => void;
     onDelete: (target: ContextMenuTarget) => void;
+    onCreatePresetFolder: (target: Extract<ContextMenuTarget, { kind: 'preset-entry' }>) => void;
     onShowInFolder: (
       target: Extract<ContextMenuTarget, { kind: 'preset-entry' | 'presets-root' }>,
     ) => void;
@@ -71,6 +73,8 @@
     target?.kind === 'preset-entry' || target?.kind === 'presets-root');
   const isDeletablePresetTarget = $derived.by(() =>
     target?.kind === 'preset-entry');
+  const canCreatePresetFolder = $derived.by(() =>
+    target?.kind === 'preset-entry' && target.entryKind === 'directory');
   const canPasteForTarget = $derived.by(() =>
     target !== null
     && target.kind !== 'preset-entry'
@@ -182,6 +186,15 @@
     close();
   }
 
+  function handleCreatePresetFolderClick() {
+    if (target?.kind !== 'preset-entry' || target.entryKind !== 'directory') {
+      return;
+    }
+
+    onCreatePresetFolder(target);
+    close();
+  }
+
   function handleGroupClick() {
     if (target?.kind !== 'devices') {
       return;
@@ -219,7 +232,21 @@
 >
   {#if target}
     {#if isPresetBrowserTarget}
+      {#if canCreatePresetFolder}
+        <button
+          id="context-new-folder"
+          class="context-menu-item"
+          type="button"
+          role="menuitem"
+          onclick={handleCreatePresetFolderClick}
+        >
+          New Folder
+        </button>
+      {/if}
       {#if isDeletablePresetTarget}
+        {#if canCreatePresetFolder}
+          <hr class="context-menu-separator" />
+        {/if}
         <button
           id="context-delete"
           class="context-menu-item"
