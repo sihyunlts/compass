@@ -11,7 +11,6 @@ import {
 import {
   projectSceneToExactOutputFrame,
   type ExactOutputFrame,
-  type ActivationFrame,
 } from './active';
 import { buildButtonIndex } from './buttons';
 import {

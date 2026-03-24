@@ -161,7 +161,7 @@ export class PreviewSession {
       return;
     }
 
-    const previewResult = this.previewResultCache.resolve({
+    this.previewResultCache.resolve({
       sourceChain: previewState.chain,
       sourceKey: `preview-window:${previewState.previewRevision}`,
       loopLengthBeats: previewState.loopLengthBeats,

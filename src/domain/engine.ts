@@ -12,6 +12,7 @@ import {
   type ClipNoteWithOrigin,
 } from '../devices/color/engine';
 import { getLaunchpadRuntimeMap } from './launchpad-model';
+import { fitNotesToTimeline } from './timeline-fit';
 import type { ClipNote, GeneratorChain, LaunchpadModel } from '../shared/model';
 
 /** Statistics summary for generated notes. */
@@ -76,49 +77,6 @@ const toClipNote = (note: ClipNoteWithOrigin): ClipNote => ({
   durationBeats: note.durationBeats,
   velocity: note.velocity,
 });
-
-const trimSilenceFromNotes = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-): {
-  notes: ClipNoteWithOrigin[];
-  sourceTimelineEndBeat: number;
-} => {
-  if (notes.length === 0) {
-    return {
-      notes: [],
-      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-    };
-  }
-
-  let firstBeat = Number.POSITIVE_INFINITY;
-  let lastBeat = Number.NEGATIVE_INFINITY;
-  for (const note of notes) {
-    if (!Number.isFinite(note.startBeat) || !Number.isFinite(note.durationBeats)) {
-      continue;
-    }
-
-    firstBeat = Math.min(firstBeat, note.startBeat);
-    lastBeat = Math.max(lastBeat, note.startBeat + Math.max(note.durationBeats, 0));
-  }
-
-  if (!Number.isFinite(firstBeat) || !Number.isFinite(lastBeat) || lastBeat <= firstBeat) {
-    return {
-      notes: notes.map((note) => ({ ...note })),
-      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-    };
-  }
-
-  const trimmedNotes = notes.map((note) => ({
-    ...note,
-    startBeat: Math.max(0, note.startBeat - firstBeat),
-  }));
-  sortClipNotes(trimmedNotes);
-
-  return {
-    notes: trimmedNotes,
-    sourceTimelineEndBeat: Math.max(lastBeat - firstBeat, MIN_NOTE_DURATION),
-  };
-};
 
 const buildEngine = (
   chain: GeneratorChain,
@@ -217,7 +175,17 @@ const buildGeneratedNotes = ({
     };
   }
 
-  return trimSilenceFromNotes(
+  const steps = Math.round(loopLengthBeats * SAMPLES_PER_BEAT);
+  if (!Number.isFinite(steps) || steps <= 0) {
+    return {
+      notes: [],
+      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+    };
+  }
+
+  const engine = buildEngine(chain, launchpadModel);
+  const fitted = fitNotesToTimeline(
+    engine,
     applyNoteStageColorPrograms(
       chain,
       collectRawNotesData({
@@ -227,7 +195,13 @@ const buildGeneratedNotes = ({
       }).notes,
       MIN_NOTE_DURATION,
     ),
+    steps,
   );
+
+  return {
+    notes: fitted.fittedNotes,
+    sourceTimelineEndBeat: fitted.exportTargetSpan,
+  };
 };
 
 /** Generates clip notes from one chain and one Launchpad model. */

@@ -14,6 +14,7 @@ import type {
   GenerateAndSendResponse,
   RequestLiveTempoResponse,
 } from '../../shared/contracts/ipc/generator';
+import type { GeneratorPreview } from '../../shared/contracts/preview/generator-preview';
 import type {
   BridgeSettings,
   LiveBridgeNotesEnvelope,
