@@ -5,9 +5,13 @@ import {
 } from '../../../devices';
 import type { BrowserTreeDeviceFolderNode, BrowserTreeDeviceLeafNode } from '../../components/browser-tree-types';
 
-interface DeviceBrowserCategoryDefinition {
+export type DeviceBrowserCategoryId = 'generators' | 'transform' | 'time' | 'utility';
+
+export interface DeviceBrowserCategoryDefinition {
+  categoryId: DeviceBrowserCategoryId;
   id: string;
   label: string;
+  accentColorVar: `--${string}`;
   deviceKinds: readonly RendererDeviceKind[];
 }
 
@@ -22,23 +26,31 @@ const toDeviceLeafNode = (
 
 const DEVICE_BROWSER_CATEGORY_DEFINITIONS = [
   {
+    categoryId: 'generators',
     id: 'device-group:generators',
     label: 'Generators',
+    accentColorVar: '--category-generators-500',
     deviceKinds: ['waterdrop', 'scanner', 'spiral', 'path'],
   },
   {
+    categoryId: 'transform',
     id: 'device-group:transform',
     label: 'Transform',
+    accentColorVar: '--category-transform-500',
     deviceKinds: ['mirror', 'symmetry', 'rotate', 'scale', 'translate'],
   },
   {
+    categoryId: 'time',
     id: 'device-group:time',
     label: 'Time',
+    accentColorVar: '--category-time-500',
     deviceKinds: ['trim', 'stretch', 'reverse'],
   },
   {
+    categoryId: 'utility',
     id: 'device-group:utility',
     label: 'Utility',
+    accentColorVar: '--category-utility-500',
     deviceKinds: ['mask', 'color', 'modulator'],
   },
 ] as const satisfies readonly DeviceBrowserCategoryDefinition[];
@@ -69,6 +81,14 @@ const validateDeviceBrowserCategories = (
 
 validateDeviceBrowserCategories(DEVICE_BROWSER_CATEGORY_DEFINITIONS);
 
+const DEVICE_BROWSER_CATEGORY_BY_KIND = new Map<RendererDeviceKind, DeviceBrowserCategoryDefinition>();
+
+for (const definition of DEVICE_BROWSER_CATEGORY_DEFINITIONS) {
+  for (const kind of definition.deviceKinds) {
+    DEVICE_BROWSER_CATEGORY_BY_KIND.set(kind, definition);
+  }
+}
+
 export const DEVICE_BROWSER_TREE: BrowserTreeDeviceFolderNode[] =
   DEVICE_BROWSER_CATEGORY_DEFINITIONS.map((definition) => ({
     kind: 'folder',
@@ -77,3 +97,14 @@ export const DEVICE_BROWSER_TREE: BrowserTreeDeviceFolderNode[] =
     label: definition.label,
     children: definition.deviceKinds.map((kind) => toDeviceLeafNode(kind)),
   }));
+
+export const getDeviceBrowserCategory = (
+  kind: RendererDeviceKind,
+): DeviceBrowserCategoryDefinition => {
+  const category = DEVICE_BROWSER_CATEGORY_BY_KIND.get(kind);
+  if (!category) {
+    throw new Error(`Missing device browser category for kind: ${kind}`);
+  }
+
+  return category;
+};

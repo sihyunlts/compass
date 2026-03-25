@@ -3,8 +3,9 @@
 <script lang="ts">
   /** Renders the shared device card shell and mounts the kind-specific editor body. */
   import { tick } from 'svelte';
-  import { getRendererDeviceDefinition } from '../../devices';
   import type { GeneratorDeviceNode } from '../../shared/model';
+  import { getDeviceBrowserCategory } from '../features/editor/device-browser-categories';
+  import { getRendererDeviceDefinition } from '../../devices';
 
   let {
     device,
@@ -62,9 +63,8 @@
   const isDeviceDisabled = $derived(!device.enabled || isDisabledByGroup);
   const isInlineRenaming = $derived(isRenaming && !isCollapsed);
   const deviceDefinition = $derived(getRendererDeviceDefinition(device.kind));
-  const deviceCardClass = $derived(
-    deviceDefinition.group === 'generator' ? 'device-card instrument' : 'device-card effect',
-  );
+  const deviceCategory = $derived(getDeviceBrowserCategory(device.kind));
+  const deviceCardStyle = $derived(`--device-category-accent:var(${deviceCategory.accentColorVar});`);
   const DeviceEditor = $derived(deviceDefinition.editor);
 
   $effect(() => {
@@ -94,7 +94,8 @@
 </script>
 
 <div
-  class={deviceCardClass}
+  class="device-card"
+  style={deviceCardStyle}
   class:is-disabled={isDeviceDisabled}
   class:is-collapsed={isCollapsed}
   class:is-selected={isSelected}
@@ -171,6 +172,8 @@
 
 <style lang="scss">
   .device-card {
+    --device-category-accent: var(--category-generators-500);
+    --accent-500: var(--device-category-accent);
     display: flex;
     flex-direction: column;
     flex: 0 0 auto;
@@ -185,13 +188,7 @@
       }
     }
 
-    &.instrument {
-      box-shadow: inset 0 .125rem 0 0 var(--accent-500);
-    }
-
-    &.effect {
-      box-shadow: inset 0 .125rem 0 0 var(--effect-500);
-    }
+    box-shadow: inset 0 .125rem 0 0 var(--device-category-accent);
 
     .device-head {
       padding: var(--gap-8) var(--gap-8) var(--gap-4);
@@ -214,6 +211,10 @@
         align-items: center;
         gap: var(--gap-6);
         flex: 0 0 auto;
+      }
+
+      .device-toggle:checked {
+        background-color: var(--device-category-accent);
       }
 
       .device-title,

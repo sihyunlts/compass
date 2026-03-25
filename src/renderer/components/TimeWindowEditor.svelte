@@ -180,6 +180,7 @@
 
 <style lang="scss">
   .time-window-editor {
+    --time-window-accent: var(--device-category-accent, var(--category-time-500));
     display: flex;
     flex-direction: column;
     gap: var(--gap-8);
@@ -237,7 +238,7 @@
       cursor: pointer;
 
       &.selected {
-        background: var(--effect-500);
+        background: var(--time-window-accent);
         color: var(--neutral-00);
       }
     }
@@ -259,7 +260,7 @@
     padding: var(--gap-10) var(--gap-10) var(--gap-12);
 
     &.is-invalid {
-      border-color: var(--effect-500);
+      border-color: var(--time-window-accent);
 
       .time-window-selected-span {
         opacity: 0;
@@ -309,7 +310,7 @@
     min-width: 0;
     background:
       linear-gradient(180deg, rgb(var(--rgb-white) / 0.14), rgb(var(--rgb-white) / 0.04)),
-      var(--effect-500);
+      var(--time-window-accent);
     opacity: 0.88;
   }
 
@@ -317,7 +318,7 @@
     .time-window-selected-span {
       background:
         linear-gradient(180deg, rgb(var(--rgb-white) / 0.1), rgb(var(--rgb-white) / 0.02)),
-        var(--effect-500);
+        var(--time-window-accent);
       box-shadow:
         inset 0 0 0 1px rgb(var(--rgb-white) / 0.12),
         0 0 0 1px rgb(var(--rgb-black) / 0.18);
@@ -339,7 +340,7 @@
           rgb(var(--rgb-white) / 0.04) 12px
         ),
         linear-gradient(180deg, rgb(var(--rgb-white) / 0.12), rgb(var(--rgb-white) / 0.02)),
-        var(--effect-500);
+        var(--time-window-accent);
       opacity: 0.94;
     }
 
@@ -353,7 +354,7 @@
     bottom: 0;
     left: var(--playhead, 0%);
     width: 2px;
-    background: var(--accent-500);
+    background: var(--time-window-accent);
     transform: translateX(-1px);
     box-shadow: 0 0 0 1px rgb(var(--rgb-white) / 0.12);
   }
