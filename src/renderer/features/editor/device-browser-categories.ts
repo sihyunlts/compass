@@ -89,6 +89,24 @@ for (const definition of DEVICE_BROWSER_CATEGORY_DEFINITIONS) {
   }
 }
 
+const DEVICE_BROWSER_ICON_BY_KIND: Record<RendererDeviceKind, string> = {
+  waterdrop: 'water_drop',
+  scanner: 'scan',
+  spiral: 'cyclone',
+  path: 'line_end_diamond',
+  mirror: 'flip',
+  symmetry: 'balance',
+  rotate: 'rotate_right',
+  scale: 'resize',
+  translate: 'open_with',
+  trim: 'content_cut',
+  stretch: 'fit_width',
+  reverse: 'swap_horiz',
+  mask: 'grid_view',
+  color: 'palette',
+  modulator: 'show_chart',
+};
+
 export const DEVICE_BROWSER_TREE: BrowserTreeDeviceFolderNode[] =
   DEVICE_BROWSER_CATEGORY_DEFINITIONS.map((definition) => ({
     kind: 'folder',
@@ -108,3 +126,6 @@ export const getDeviceBrowserCategory = (
 
   return category;
 };
+
+export const getDeviceBrowserIcon = (kind: RendererDeviceKind): string =>
+  DEVICE_BROWSER_ICON_BY_KIND[kind];

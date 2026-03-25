@@ -3,6 +3,7 @@
 
   import type { RendererDeviceKind } from '../../devices';
   import type { PresetFileKind } from '../../shared/presets';
+  import { getDeviceBrowserIcon } from '../features/editor/device-browser-categories';
   import Button from './Button.svelte';
   import SidebarSettingsPage from './SidebarSettingsPage.svelte';
   import type {
@@ -317,7 +318,7 @@
 
   const resolveLeafIcon = (node: BrowserTreeDeviceLeafNode | BrowserTreePresetLeafNode): string => {
     if (node.kind === 'device') {
-      return 'tune';
+      return getDeviceBrowserIcon(node.deviceKind);
     }
 
     if (node.presetType === 'group') {
