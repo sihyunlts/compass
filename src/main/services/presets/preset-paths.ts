@@ -1,5 +1,6 @@
 import path from 'node:path';
 
+import { getDeviceBrowserCategoryDirectoryName } from '../../../devices/browser-categories';
 import { getRendererDeviceLabel } from '../../../devices/schema-registry';
 import type { SavePresetFileRequest } from '../../../shared/contracts/ipc/presets';
 
@@ -34,7 +35,11 @@ export const resolvePresetSaveDirectory = (
     getRendererDeviceLabel(request.payload.device.kind),
     'Device',
   );
-  return path.join(baseDirectory, deviceDirectoryName);
+  return path.join(
+    baseDirectory,
+    getDeviceBrowserCategoryDirectoryName(request.payload.device.kind),
+    deviceDirectoryName,
+  );
 };
 
 export const hasPresetExtension = (

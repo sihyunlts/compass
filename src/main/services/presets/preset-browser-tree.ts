@@ -1,5 +1,6 @@
 import path from 'node:path';
 
+import { compareDeviceBrowserCategoryDirectoryNames } from '../../../devices/browser-categories';
 import type {
   PresetBrowserTreeFolderNode,
   PresetBrowserTreeNode,
@@ -14,6 +15,19 @@ const compareEntryNames = (left: string, right: string): number =>
     numeric: true,
     sensitivity: 'base',
   });
+
+const comparePresetDirectoryNames = (
+  presetType: PresetFileKind,
+  relativePath: readonly string[],
+  left: string,
+  right: string,
+): number => {
+  if (presetType === 'device' && relativePath.length === 0) {
+    return compareDeviceBrowserCategoryDirectoryNames(left, right);
+  }
+
+  return compareEntryNames(left, right);
+};
 
 /** Builds the preset browser tree from on-disk preset folders. */
 export class PresetBrowserTreeBuilder {
@@ -60,7 +74,14 @@ export class PresetBrowserTreeBuilder {
 
     const childDirectories = directoryEntries
       .filter((entry) => entry.isDirectory())
-      .sort((left, right) => compareEntryNames(left.name, right.name));
+      .sort((left, right) =>
+        comparePresetDirectoryNames(
+          presetType,
+          relativePath,
+          left.name,
+          right.name,
+        )
+      );
 
     for (const directory of childDirectories) {
       const nextRelativePath = [...relativePath, directory.name];
