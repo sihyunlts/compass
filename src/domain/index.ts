@@ -1,5 +1,4 @@
 export {
-  generateNotes,
   generatePreviewNotesData,
   generatePreviewStats,
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,

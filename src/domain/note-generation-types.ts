@@ -22,7 +22,6 @@ export interface PreviewNotesData {
 export interface RuntimeMapData {
   buttons: ReadonlyArray<LaunchpadButton>;
   buttonIndex: ButtonIndex;
-  buttonAddressToTileId: Map<string, number>;
 }
 
 export interface NoteGenerationState {

@@ -32,17 +32,6 @@ export const generatePreviewNotesData = ({
   };
 };
 
-/** Generates clip notes from one chain and one Launchpad model. */
-export const generateNotes = ({
-  chain,
-  loopLengthBeats,
-  launchpadModel,
-}: GenerateNotesInput): ClipNote[] => generatePreviewNotesData({
-  chain,
-  loopLengthBeats,
-  launchpadModel,
-}).notes;
-
 /** Counts total notes and unique pitches (deduped by pitch value). */
 export const generatePreviewStats = (notes: ReadonlyArray<ClipNote>): PreviewStats => {
   const uniquePitches = new Set<number>();
