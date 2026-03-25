@@ -1,4 +1,7 @@
+import type { GeneratorDeviceNode } from '../../model';
 import type { PresetFile, PresetFileKind } from '../../presets';
+
+type RendererDeviceKind = GeneratorDeviceNode['kind'];
 
 export interface SavePresetFileRequest {
   suggestedName: string;
@@ -63,6 +66,7 @@ export interface PresetBrowserTreeLeafNode<K extends PresetFileKind = PresetFile
   presetType: K;
   relativePath: string[];
   savedAtIso: string;
+  deviceKind?: RendererDeviceKind;
 }
 
 export interface PresetBrowserTreeFolderNode {

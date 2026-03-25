@@ -102,6 +102,11 @@ export class PresetBrowserTreeBuilder {
         label: path.parse(entry.name).name,
         relativePath: nextRelativePath,
         savedAtIso: readResult.payload.savedAtIso,
+        ...(readResult.payload.presetType === 'device'
+          ? {
+              deviceKind: readResult.payload.device.kind,
+            }
+          : {}),
       });
     }
 

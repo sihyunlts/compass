@@ -321,6 +321,10 @@
       return getDeviceBrowserIcon(node.deviceKind);
     }
 
+    if (node.presetType === 'device' && node.deviceKind) {
+      return getDeviceBrowserIcon(node.deviceKind);
+    }
+
     if (node.presetType === 'group') {
       return 'stacks';
     }

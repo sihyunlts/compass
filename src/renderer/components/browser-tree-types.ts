@@ -32,6 +32,7 @@ export interface BrowserTreePresetLeafNode {
   presetType: PresetFileKind;
   relativePath: string[];
   savedAtIso: string;
+  deviceKind?: RendererDeviceKind;
 }
 
 export interface PendingPresetFolderDraft {

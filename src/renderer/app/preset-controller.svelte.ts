@@ -91,6 +91,7 @@ const mapPresetTreeNode = (
     presetType: node.presetType,
     relativePath: [...node.relativePath],
     savedAtIso: node.savedAtIso,
+    deviceKind: node.deviceKind,
   };
 };
 
