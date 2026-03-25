@@ -12,16 +12,14 @@ const DEFAULT_WATERDROP_PARAMS: WaterdropGeneratorNode['params'] = {
   centerX: 4.5,
   centerY: 4.5,
   curvature: 2,
-  startRadius: 0,
 };
 
 const WATERDROP_MODULATION_TARGET_PARAMS = [
   { key: 'centerX', label: 'Center X' },
   { key: 'centerY', label: 'Center Y' },
   { key: 'curvature', label: 'Curvature' },
-  { key: 'startRadius', label: 'Start Radius' },
 ] as const;
-export const WATERDROP_NUMERIC_PARAM_KEYS = ['centerX', 'centerY', 'curvature', 'startRadius'] as const;
+export const WATERDROP_NUMERIC_PARAM_KEYS = ['centerX', 'centerY', 'curvature'] as const;
 
 const createDefaultWaterdropNode = (
   id: string,
@@ -50,7 +48,6 @@ const hydrateImportedWaterdropNode = (
   device.params.centerX = toFiniteNumber(params.centerX, device.params.centerX);
   device.params.centerY = toFiniteNumber(params.centerY, device.params.centerY);
   device.params.curvature = toFiniteNumber(params.curvature, device.params.curvature);
-  device.params.startRadius = toFiniteNumber(params.startRadius, device.params.startRadius);
   return device;
 };
 

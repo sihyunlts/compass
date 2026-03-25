@@ -9,8 +9,7 @@ export const waterdropEngineHandler = {
     const params = device.params;
     if (!Number.isFinite(params.centerX)
       || !Number.isFinite(params.centerY)
-      || !Number.isFinite(params.curvature)
-      || !Number.isFinite(params.startRadius)) {
+      || !Number.isFinite(params.curvature)) {
       return null;
     }
 

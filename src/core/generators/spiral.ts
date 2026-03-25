@@ -14,13 +14,12 @@ export const buildSpiralPolyline = (
   if (!Number.isFinite(params.centerX)
     || !Number.isFinite(params.centerY)
     || !Number.isFinite(params.turns)
-    || !Number.isFinite(params.startRadius)
     || !Number.isFinite(t01)) {
     return null;
   }
 
   const center = { x: params.centerX, y: params.centerY };
-  const targetDistance = params.startRadius + t01 * SPIRAL_TRAVEL_SPAN;
+  const targetDistance = t01 * SPIRAL_TRAVEL_SPAN;
   if (!Number.isFinite(targetDistance)) {
     return null;
   }

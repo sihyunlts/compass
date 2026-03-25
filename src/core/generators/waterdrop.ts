@@ -26,8 +26,7 @@ export const buildWaterdropPolyline = (
 ): Polyline | null => {
   if (!Number.isFinite(params.centerX)
     || !Number.isFinite(params.centerY)
-    || !Number.isFinite(params.curvature)
-    || !Number.isFinite(params.startRadius)) {
+    || !Number.isFinite(params.curvature)) {
     return null;
   }
   if (!Number.isFinite(t01)) {
@@ -39,7 +38,7 @@ export const buildWaterdropPolyline = (
     return null;
   }
 
-  const radius = params.startRadius + t01 * RING_TRAVEL_SPAN;
+  const radius = t01 * RING_TRAVEL_SPAN;
   if (!Number.isFinite(radius)) {
     return null;
   }

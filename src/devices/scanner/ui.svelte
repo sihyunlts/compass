@@ -20,15 +20,4 @@
     dataId={device.id}
     dataParam="angleDeg"
   />
-  <div class="control-field">
-    <span class="field-label">Start Offset</span>
-    <input
-      type="number"
-      step="0.1"
-      value={device.params.startOffset}
-      data-action="set-scanner-param"
-      data-id={device.id}
-      data-param="startOffset"
-    />
-  </div>
 </div>

@@ -37,24 +37,12 @@ const NUMERIC_PARAM_ACCESSORS: Record<
         (device as DeviceNodeOfKind<'waterdrop'>).params.curvature = value;
       },
     },
-    startRadius: {
-      read: (device) => (device as DeviceNodeOfKind<'waterdrop'>).params.startRadius,
-      write: (device, value) => {
-        (device as DeviceNodeOfKind<'waterdrop'>).params.startRadius = value;
-      },
-    },
   },
   scanner: {
     angleDeg: {
       read: (device) => (device as DeviceNodeOfKind<'scanner'>).params.angleDeg,
       write: (device, value) => {
         (device as DeviceNodeOfKind<'scanner'>).params.angleDeg = value;
-      },
-    },
-    startOffset: {
-      read: (device) => (device as DeviceNodeOfKind<'scanner'>).params.startOffset,
-      write: (device, value) => {
-        (device as DeviceNodeOfKind<'scanner'>).params.startOffset = value;
       },
     },
   },
@@ -75,12 +63,6 @@ const NUMERIC_PARAM_ACCESSORS: Record<
       read: (device) => (device as DeviceNodeOfKind<'spiral'>).params.turns,
       write: (device, value) => {
         (device as DeviceNodeOfKind<'spiral'>).params.turns = value;
-      },
-    },
-    startRadius: {
-      read: (device) => (device as DeviceNodeOfKind<'spiral'>).params.startRadius,
-      write: (device, value) => {
-        (device as DeviceNodeOfKind<'spiral'>).params.startRadius = value;
       },
     },
   },

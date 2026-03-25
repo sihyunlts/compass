@@ -7,7 +7,7 @@ export const scannerEngineHandler = {
   kind: 'scanner',
   createSceneInstance(device, worldBounds) {
     const params = device.params;
-    if (!Number.isFinite(params.angleDeg) || !Number.isFinite(params.startOffset)) {
+    if (!Number.isFinite(params.angleDeg)) {
       return null;
     }
 

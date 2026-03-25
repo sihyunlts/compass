@@ -2,7 +2,6 @@ export interface WaterdropParams {
   centerX: number;
   centerY: number;
   curvature: number;
-  startRadius: number;
 }
 
 export interface GroupedDeviceNode {
@@ -19,7 +18,6 @@ export interface WaterdropGeneratorNode extends GroupedDeviceNode {
 
 export interface ScannerParams {
   angleDeg: number;
-  startOffset: number;
 }
 
 export interface ScannerGeneratorNode extends GroupedDeviceNode {
@@ -33,7 +31,6 @@ export interface SpiralParams {
   centerX: number;
   centerY: number;
   turns: number;
-  startRadius: number;
 }
 
 export interface SpiralGeneratorNode extends GroupedDeviceNode {

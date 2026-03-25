@@ -15,7 +15,6 @@ export const buildScannerPolyline = (
   bounds: Bounds,
 ): Polyline | null => {
   if (!Number.isFinite(params.angleDeg)
-    || !Number.isFinite(params.startOffset)
     || !Number.isFinite(t01)) {
     return null;
   }
@@ -54,8 +53,8 @@ export const buildScannerPolyline = (
     return null;
   }
 
-  const scanStart = minAxis - SCAN_TRAVEL_PADDING + params.startOffset;
-  const scanEnd = maxAxis + SCAN_TRAVEL_PADDING + params.startOffset;
+  const scanStart = minAxis - SCAN_TRAVEL_PADDING;
+  const scanEnd = maxAxis + SCAN_TRAVEL_PADDING;
   const travelRange = scanEnd - scanStart;
   if (!Number.isFinite(travelRange) || travelRange <= 0) {
     return null;

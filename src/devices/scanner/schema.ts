@@ -10,14 +10,12 @@ import type { RendererDeviceSchema } from '../types';
 
 const DEFAULT_SCANNER_PARAMS: ScannerGeneratorNode['params'] = {
   angleDeg: 0,
-  startOffset: 0,
 };
 
 const SCANNER_MODULATION_TARGET_PARAMS = [
   { key: 'angleDeg', label: 'Angle' },
-  { key: 'startOffset', label: 'Start Offset' },
 ] as const;
-export const SCANNER_NUMERIC_PARAM_KEYS = ['angleDeg', 'startOffset'] as const;
+export const SCANNER_NUMERIC_PARAM_KEYS = ['angleDeg'] as const;
 
 const createDefaultScannerNode = (
   id: string,
@@ -44,7 +42,6 @@ const hydrateImportedScannerNode = (
   );
   const params = resolveImportedParams(source);
   device.params.angleDeg = toFiniteNumber(params.angleDeg, device.params.angleDeg);
-  device.params.startOffset = toFiniteNumber(params.startOffset, device.params.startOffset);
   return device;
 };
 

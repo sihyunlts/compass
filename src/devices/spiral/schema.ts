@@ -12,16 +12,14 @@ const DEFAULT_SPIRAL_PARAMS: SpiralGeneratorNode['params'] = {
   centerX: 4.5,
   centerY: 4.5,
   turns: 2,
-  startRadius: 0,
 };
 
 const SPIRAL_MODULATION_TARGET_PARAMS = [
   { key: 'centerX', label: 'Center X' },
   { key: 'centerY', label: 'Center Y' },
   { key: 'turns', label: 'Turns' },
-  { key: 'startRadius', label: 'Start Radius' },
 ] as const;
-export const SPIRAL_NUMERIC_PARAM_KEYS = ['centerX', 'centerY', 'turns', 'startRadius'] as const;
+export const SPIRAL_NUMERIC_PARAM_KEYS = ['centerX', 'centerY', 'turns'] as const;
 
 const createDefaultSpiralNode = (
   id: string,
@@ -50,7 +48,6 @@ const hydrateImportedSpiralNode = (
   device.params.centerX = toFiniteNumber(params.centerX, device.params.centerX);
   device.params.centerY = toFiniteNumber(params.centerY, device.params.centerY);
   device.params.turns = toFiniteNumber(params.turns, device.params.turns);
-  device.params.startRadius = toFiniteNumber(params.startRadius, device.params.startRadius);
   return device;
 };
 
