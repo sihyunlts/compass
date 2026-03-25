@@ -1,6 +1,7 @@
 import { SAMPLES_PER_BEAT } from '../core/pipeline/constants';
-import { fitNotesToTimeline } from '../core/pipeline/timeline-fit';
-import { buildFinalOutputNotes, buildOriginGroupIdByGeneratorId } from './checkpoint-note-evaluator';
+import { analyzeChainOriginTimelinePolicy } from '../core/pipeline/origin-timeline-policy';
+import { normalizeNotesByOriginTimelinePolicy } from '../core/pipeline/timeline-fit';
+import { buildFinalOutputNotes } from './checkpoint-note-evaluator';
 import {
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   type GenerateNotesInput,
@@ -29,18 +30,26 @@ export const buildGeneratedNotes = ({
     };
   }
 
+  const originTimelineAnalysis = analyzeChainOriginTimelinePolicy(chain);
   const state: NoteGenerationState = {
     chain,
     loopLengthBeats,
     runtimeMap: buildRuntimeMapData(launchpadModel),
     checkpointNotesByIndex: new Map(),
-    fittedSourceNotesByKey: new Map(),
-    originGroupIdByGeneratorId: buildOriginGroupIdByGeneratorId(chain),
+    normalizedSourceNotesByKey: new Map(),
+    originTimelinePolicyByCheckpointIndex: new Map([[
+      chain.devices.length,
+      originTimelineAnalysis.originTimelinePolicyByGeneratorId,
+    ]]),
+    originGroupIdByGeneratorId: originTimelineAnalysis.originGroupIdByGeneratorId,
   };
-  const fitted = fitNotesToTimeline(buildFinalOutputNotes(state));
+  const normalized = normalizeNotesByOriginTimelinePolicy(
+    buildFinalOutputNotes(state),
+    originTimelineAnalysis.originTimelinePolicyByGeneratorId,
+  );
 
   return {
-    notes: fitted.fittedNotes,
-    sourceTimelineEndBeat: fitted.exportTargetSpan,
+    notes: normalized.notes,
+    sourceTimelineEndBeat: normalized.sourceTimelineEndBeat,
   };
 };

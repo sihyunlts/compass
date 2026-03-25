@@ -5,7 +5,8 @@ import { projectSceneToActivationFrame } from './active';
 import { MIN_NOTE_DURATION, SAMPLES_PER_BEAT, TILE_COUNT } from './constants';
 import { isGeneratorNode, resolveMaskTime, resolveMutedSources, splitChainByGroup } from './groups';
 import { collectPitchSampledNotes } from './note-sampling';
-import { fitNotesToTimeline } from './timeline-fit';
+import { analyzeChainOriginTimelinePolicy } from './origin-timeline-policy';
+import { normalizeNotesByOriginTimelinePolicy } from './timeline-fit';
 import type {
   GroupEvaluationContext,
   GroupId,
@@ -108,11 +109,10 @@ const createSourceEvaluationContext = (
 
 const collectGroupOutputNotes = (
   sourceGroupId: string,
+  sourceChain: GeneratorChain,
   context: GroupEvaluationContext,
   dependencies: MaskSourceOutputDependencies,
-  consumingDeviceIndex?: number,
 ): TimedOutputNote[] => {
-  const sourceChain = createBaseChainForMaskSource(context, consumingDeviceIndex);
   const notes: TimedOutputNote[] = collectPitchSampledNotes({
     sampleCount: SAMPLES_PER_BEAT,
     endBeat: 1,
@@ -154,15 +154,19 @@ export const createMaskSourceOutputResolver = (
       return cached;
     }
 
+    const sourceChain = createBaseChainForMaskSource(context, consumingDeviceIndex);
     const notes = collectGroupOutputNotes(
       sourceGroupId,
+      sourceChain,
       context,
       dependencies,
-      consumingDeviceIndex,
     );
-    const fittedNotes = fitNotesToTimeline(notes).fittedNotes;
-    context.cache.maskSourceOutputNotesByKey.set(cacheKey, fittedNotes);
-    return fittedNotes;
+    const normalizedNotes = normalizeNotesByOriginTimelinePolicy(
+      notes,
+      analyzeChainOriginTimelinePolicy(sourceChain).originTimelinePolicyByGeneratorId,
+    ).notes;
+    context.cache.maskSourceOutputNotesByKey.set(cacheKey, normalizedNotes);
+    return normalizedNotes;
   };
 
   return (

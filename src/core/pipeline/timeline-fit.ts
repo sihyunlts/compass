@@ -1,3 +1,4 @@
+import type { OriginTimelinePolicy } from './origin-timeline-policy';
 import { MIN_NOTE_DURATION } from './constants';
 
 interface OriginWindow {
@@ -13,13 +14,12 @@ interface TimedNoteWithOrigin {
   originId?: string;
 }
 
-export interface TimelineFitResult<T extends TimedNoteWithOrigin> {
-  fittedNotes: T[];
-  exportTargetSpan: number;
-  originWindows: Map<string, OriginWindow>;
+export interface TimelineNormalizationResult<T extends TimedNoteWithOrigin> {
+  notes: T[];
+  sourceTimelineEndBeat: number;
 }
 
-const NORMALIZED_EXPORT_SPAN = 1;
+const NORMALIZED_SOURCE_TIMELINE_END_BEAT = 1;
 
 const sortTimedNotes = <T extends TimedNoteWithOrigin>(notes: T[]): void => {
   notes.sort((left, right) =>
@@ -28,14 +28,14 @@ const sortTimedNotes = <T extends TimedNoteWithOrigin>(notes: T[]): void => {
     || left.channel - right.channel);
 };
 
-const cloneNotes = <T extends TimedNoteWithOrigin>(
+const cloneTimedNotes = <T extends TimedNoteWithOrigin>(
   notes: ReadonlyArray<T>,
 ): T[] => notes.map((note) => ({ ...note }));
 
-const computeOriginWindows = <T extends TimedNoteWithOrigin>(
+const buildOriginWindows = <T extends TimedNoteWithOrigin>(
   notes: ReadonlyArray<T>,
 ): Map<string, OriginWindow> => {
-  const windows = new Map<string, OriginWindow>();
+  const originWindows = new Map<string, OriginWindow>();
 
   for (const note of notes) {
     if (
@@ -52,26 +52,26 @@ const computeOriginWindows = <T extends TimedNoteWithOrigin>(
       continue;
     }
 
-    const existing = windows.get(note.originId);
+    const existing = originWindows.get(note.originId);
     if (existing) {
       existing.min = Math.min(existing.min, startBeat);
       existing.max = Math.max(existing.max, endBeat);
-    } else {
-      windows.set(note.originId, { min: startBeat, max: endBeat });
+      continue;
     }
+
+    originWindows.set(note.originId, { min: startBeat, max: endBeat });
   }
 
-  return windows;
+  return originWindows;
 };
 
-const trimGlobalNoteSilence = <T extends TimedNoteWithOrigin>(
+const trimLegacyNotesToOccupiedSpan = <T extends TimedNoteWithOrigin>(
   notes: ReadonlyArray<T>,
-): TimelineFitResult<T> => {
+): TimelineNormalizationResult<T> => {
   if (notes.length === 0) {
     return {
-      fittedNotes: [],
-      exportTargetSpan: NORMALIZED_EXPORT_SPAN,
-      originWindows: new Map(),
+      notes: [],
+      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
     };
   }
 
@@ -88,96 +88,131 @@ const trimGlobalNoteSilence = <T extends TimedNoteWithOrigin>(
 
   if (!Number.isFinite(firstBeat) || !Number.isFinite(lastBeat) || lastBeat <= firstBeat) {
     return {
-      fittedNotes: cloneNotes(notes),
-      exportTargetSpan: NORMALIZED_EXPORT_SPAN,
-      originWindows: new Map(),
+      notes: cloneTimedNotes(notes),
+      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
     };
   }
 
-  const fittedNotes = notes.map((note) => ({
+  const normalizedNotes = notes.map((note) => ({
     ...note,
     startBeat: Math.max(0, note.startBeat - firstBeat),
   }));
-  sortTimedNotes(fittedNotes);
+  sortTimedNotes(normalizedNotes);
 
   return {
-    fittedNotes,
-    exportTargetSpan: Math.max(lastBeat - firstBeat, MIN_NOTE_DURATION),
-    originWindows: new Map(),
+    notes: normalizedNotes,
+    sourceTimelineEndBeat: Math.max(lastBeat - firstBeat, MIN_NOTE_DURATION),
   };
 };
 
-const fitNoteToWindow = <T extends TimedNoteWithOrigin>(
+const normalizeLegacyNoteToOriginWindow = <T extends TimedNoteWithOrigin>(
   note: T,
-  window: OriginWindow | undefined,
+  originWindow: OriginWindow | undefined,
 ): T | null => {
-  if (!window) {
+  if (!originWindow) {
     return { ...note };
   }
 
-  const span = window.max - window.min;
-  if (!Number.isFinite(span) || span <= 0) {
+  const originSpan = originWindow.max - originWindow.min;
+  if (!Number.isFinite(originSpan) || originSpan <= 0) {
     return { ...note };
   }
 
-  const noteStart = Math.max(note.startBeat, window.min);
+  const noteStart = Math.max(note.startBeat, originWindow.min);
   const noteEnd = Math.min(
     note.startBeat + Math.max(note.durationBeats, 0),
-    window.max,
+    originWindow.max,
   );
   if (!Number.isFinite(noteStart) || !Number.isFinite(noteEnd) || noteEnd <= noteStart) {
     return null;
   }
 
-  const fittedStart = Math.max(0, (noteStart - window.min) / span);
-  const fittedEnd = Math.min(1, (noteEnd - window.min) / span);
-  if (!Number.isFinite(fittedStart) || !Number.isFinite(fittedEnd) || fittedEnd <= fittedStart) {
+  const normalizedStartBeat = Math.max(0, (noteStart - originWindow.min) / originSpan);
+  const normalizedEndBeat = Math.min(1, (noteEnd - originWindow.min) / originSpan);
+  if (
+    !Number.isFinite(normalizedStartBeat)
+    || !Number.isFinite(normalizedEndBeat)
+    || normalizedEndBeat <= normalizedStartBeat
+  ) {
     return null;
   }
 
   return {
     ...note,
-    startBeat: fittedStart,
-    durationBeats: Math.max(fittedEnd - fittedStart, MIN_NOTE_DURATION),
+    startBeat: normalizedStartBeat,
+    durationBeats: Math.max(normalizedEndBeat - normalizedStartBeat, MIN_NOTE_DURATION),
   };
 };
 
-const hasAnyApplicableWindow = <T extends TimedNoteWithOrigin>(
+const normalizeLegacyNotesToOriginWindows = <T extends TimedNoteWithOrigin>(
   notes: ReadonlyArray<T>,
-  originWindows: ReadonlyMap<string, OriginWindow>,
-): boolean => notes.some((note) => {
-  if (!note.originId) {
-    return false;
-  }
-
-  const window = originWindows.get(note.originId);
-  if (!window) {
-    return false;
-  }
-
-  const span = window.max - window.min;
-  return Number.isFinite(span) && span > 0;
-});
-
-export const fitNotesToTimeline = <T extends TimedNoteWithOrigin>(
-  notes: ReadonlyArray<T>,
-): TimelineFitResult<T> => {
-  const originWindows = computeOriginWindows(notes);
-  if (!hasAnyApplicableWindow(notes, originWindows)) {
-    return trimGlobalNoteSilence(notes);
-  }
-
-  const fittedNotes = notes
-    .map((note) => fitNoteToWindow(
+): TimelineNormalizationResult<T> => {
+  const originWindows = buildOriginWindows(notes);
+  const normalizedNotes = notes
+    .map((note) => normalizeLegacyNoteToOriginWindow(
       note,
       note.originId ? originWindows.get(note.originId) : undefined,
     ))
     .filter((note): note is T => note !== null);
-  sortTimedNotes(fittedNotes);
+  sortTimedNotes(normalizedNotes);
 
   return {
-    fittedNotes,
-    exportTargetSpan: NORMALIZED_EXPORT_SPAN,
-    originWindows,
+    notes: normalizedNotes,
+    sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   };
+};
+
+const hasAnyOriginWindow = <T extends TimedNoteWithOrigin>(
+  notes: ReadonlyArray<T>,
+): boolean => buildOriginWindows(notes).size > 0;
+
+const clonePreservedTimelineNotes = <T extends TimedNoteWithOrigin>(
+  notes: ReadonlyArray<T>,
+): T[] => {
+  const cloned = cloneTimedNotes(notes);
+  sortTimedNotes(cloned);
+  return cloned;
+};
+
+export const normalizeNotesByOriginTimelinePolicy = <T extends TimedNoteWithOrigin>(
+  notes: ReadonlyArray<T>,
+  originTimelinePolicyByOriginId: ReadonlyMap<string, OriginTimelinePolicy>,
+): TimelineNormalizationResult<T> => {
+  const preservedNotes: T[] = [];
+  const legacyAutoFitNotes: T[] = [];
+  const originlessNotes: T[] = [];
+
+  for (const note of notes) {
+    if (!note.originId) {
+      originlessNotes.push({ ...note });
+      continue;
+    }
+
+    const timelinePolicy = originTimelinePolicyByOriginId.get(note.originId);
+    if (timelinePolicy === 'preserve-authored-timeline') {
+      preservedNotes.push({ ...note });
+    } else {
+      legacyAutoFitNotes.push({ ...note });
+    }
+  }
+
+  if (preservedNotes.length > 0) {
+    const normalizedNotes = [
+      ...clonePreservedTimelineNotes(preservedNotes),
+      ...normalizeLegacyNotesToOriginWindows(legacyAutoFitNotes).notes,
+      ...clonePreservedTimelineNotes(originlessNotes),
+    ];
+    sortTimedNotes(normalizedNotes);
+
+    return {
+      notes: normalizedNotes,
+      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+    };
+  }
+
+  if (hasAnyOriginWindow(notes)) {
+    return normalizeLegacyNotesToOriginWindows(notes);
+  }
+
+  return trimLegacyNotesToOccupiedSpan(notes);
 };
