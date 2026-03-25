@@ -27,9 +27,17 @@ export interface AffineTransform {
 }
 
 export interface TemporalAffineRemap {
+  kind: 'affine';
   alpha: number;
   beta: number;
 }
+
+export interface TemporalSampledRemap {
+  kind: 'sampled';
+  samples: Array<number | null>;
+}
+
+export type TemporalRemap = TemporalAffineRemap | TemporalSampledRemap;
 
 export interface TemporalVisibilityWindow {
   start: number;
@@ -37,7 +45,7 @@ export interface TemporalVisibilityWindow {
 }
 
 export interface SceneTemporalState {
-  remap: TemporalAffineRemap;
+  remap: TemporalRemap;
   visibilityWindow: TemporalVisibilityWindow;
   hasAuthoredTimeline: boolean;
 }

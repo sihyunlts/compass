@@ -28,6 +28,8 @@ export type {
   SpiralParams,
   StretchEffectNode,
   SymmetryEffectNode,
+  TimeWarpCurve,
+  TimeWarpEffectNode,
   TrimEffectNode,
   TranslateEffectNode,
   WaterdropGeneratorNode,

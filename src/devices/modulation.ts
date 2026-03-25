@@ -6,7 +6,7 @@ type DeviceNodeOfKind<K extends DeviceKind> = Extract<GeneratorDeviceNode, { kin
 
 type ModulationTargetDeviceKind = Exclude<
   DeviceKind,
-  'path' | 'reverse' | 'modulator' | 'symmetry' | 'mask' | 'color'
+  'path' | 'reverse' | 'timewarp' | 'modulator' | 'symmetry' | 'mask' | 'color'
 >;
 
 type NumericParamAccessor = {

@@ -2,16 +2,19 @@ import type {
   SceneInstance,
   SceneTemporalState,
   TemporalAffineRemap,
+  TemporalRemap,
   TemporalVisibilityWindow,
 } from '../core-types';
 
 export interface TemporalTransform {
-  remapToInput: TemporalAffineRemap;
+  remapToInput: TemporalRemap;
   visibilityWindow: TemporalVisibilityWindow;
   marksAuthoredTimeline?: boolean;
 }
 
-const NORMALIZED_TIMELINE_WINDOW: TemporalVisibilityWindow = {
+const DEFAULT_TEMPORAL_SAMPLE_COUNT = 129;
+
+export const NORMALIZED_TIMELINE_WINDOW: TemporalVisibilityWindow = {
   start: 0,
   end: 1,
 };
@@ -20,6 +23,15 @@ const EMPTY_VISIBILITY_WINDOW: TemporalVisibilityWindow = {
   start: 1,
   end: 0,
 };
+
+const createAffineTemporalRemap = (
+  alpha: number,
+  beta: number,
+): TemporalAffineRemap => ({
+  kind: 'affine',
+  alpha,
+  beta,
+});
 
 const intersectVisibilityWindows = (
   left: TemporalVisibilityWindow,
@@ -47,10 +59,111 @@ const resolveVisibilityPreimage = (
   };
 };
 
+const isAffineTemporalRemap = (
+  remap: TemporalRemap,
+): remap is TemporalAffineRemap => remap.kind === 'affine';
+
+const resolveTemporalSampleCount = (
+  ...remaps: readonly TemporalRemap[]
+): number => Math.max(
+  DEFAULT_TEMPORAL_SAMPLE_COUNT,
+  ...remaps.map((remap) => remap.kind === 'sampled' ? remap.samples.length : 0),
+);
+
+const interpolateNullableSample = (
+  left: number | null,
+  right: number | null,
+  ratio: number,
+): number | null => {
+  if (left === null) {
+    return ratio <= 0 ? left : null;
+  }
+  if (right === null) {
+    return ratio >= 1 ? right : null;
+  }
+
+  return left + (right - left) * ratio;
+};
+
+export const evaluateTemporalRemap = (
+  remap: TemporalRemap,
+  t01: number,
+): number | null => {
+  if (!Number.isFinite(t01)) {
+    return null;
+  }
+
+  if (remap.kind === 'affine') {
+    return remap.alpha * t01 + remap.beta;
+  }
+
+  const sampleCount = remap.samples.length;
+  if (sampleCount === 0) {
+    return null;
+  }
+  if (sampleCount === 1) {
+    return remap.samples[0];
+  }
+
+  const clampedT = Math.min(Math.max(t01, 0), 1);
+  const scaledIndex = clampedT * (sampleCount - 1);
+  const lowerIndex = Math.floor(scaledIndex);
+  const upperIndex = Math.min(sampleCount - 1, Math.ceil(scaledIndex));
+  const ratio = scaledIndex - lowerIndex;
+  const lowerSample = remap.samples[lowerIndex] ?? null;
+  const upperSample = remap.samples[upperIndex] ?? null;
+
+  return interpolateNullableSample(lowerSample, upperSample, ratio);
+};
+
+export const resolveSceneTemporalInputTime = (
+  sceneTemporal: SceneTemporalState,
+  t01: number,
+): number | null => {
+  if (!Number.isFinite(t01) || !isTimeVisibleInWindow(sceneTemporal.visibilityWindow, t01)) {
+    return null;
+  }
+
+  const localT = evaluateTemporalRemap(sceneTemporal.remap, t01);
+  if (localT === null || !Number.isFinite(localT) || localT < 0 || localT > 1) {
+    return null;
+  }
+
+  return localT;
+};
+
+const resolveSampledVisibilityWindow = (
+  samples: readonly (number | null)[],
+): TemporalVisibilityWindow => {
+  const firstVisibleIndex = samples.findIndex((sample) => sample !== null);
+  if (firstVisibleIndex === -1) {
+    return EMPTY_VISIBILITY_WINDOW;
+  }
+
+  const lastVisibleIndex = samples.findLastIndex((sample) => sample !== null);
+  const sampleSpan = Math.max(samples.length - 1, 1);
+  return {
+    start: firstVisibleIndex / sampleSpan,
+    end: lastVisibleIndex / sampleSpan,
+  };
+};
+
+const composeAffineTemporalRemaps = (
+  sceneRemap: TemporalAffineRemap,
+  transformRemap: TemporalAffineRemap,
+): TemporalAffineRemap => createAffineTemporalRemap(
+  sceneRemap.alpha * transformRemap.alpha,
+  sceneRemap.alpha * transformRemap.beta + sceneRemap.beta,
+);
+
 const resolveComposedVisibilityWindow = (
   sceneTemporal: SceneTemporalState,
   transform: TemporalTransform,
 ): TemporalVisibilityWindow => {
+  if (!isAffineTemporalRemap(transform.remapToInput) || !isAffineTemporalRemap(sceneTemporal.remap)) {
+    return EMPTY_VISIBILITY_WINDOW;
+  }
+
   if (transform.remapToInput.alpha === 0) {
     return isTimeVisibleInWindow(sceneTemporal.visibilityWindow, transform.remapToInput.beta)
       ? transform.visibilityWindow
@@ -63,17 +176,52 @@ const resolveComposedVisibilityWindow = (
   );
 };
 
+const composeSceneTemporalStateBySampling = (
+  sceneTemporal: SceneTemporalState,
+  transform: TemporalTransform,
+): SceneTemporalState => {
+  const sampleCount = resolveTemporalSampleCount(
+    sceneTemporal.remap,
+    transform.remapToInput,
+  );
+  const samples = Array.from({ length: sampleCount }, (_, index) => {
+    const t = sampleCount <= 1 ? 0 : index / (sampleCount - 1);
+    if (!isTimeVisibleInWindow(transform.visibilityWindow, t)) {
+      return null;
+    }
+
+    const transformedT = evaluateTemporalRemap(transform.remapToInput, t);
+    if (transformedT === null) {
+      return null;
+    }
+
+    return resolveSceneTemporalInputTime(sceneTemporal, transformedT);
+  });
+
+  return {
+    remap: {
+      kind: 'sampled',
+      samples,
+    },
+    visibilityWindow: resolveSampledVisibilityWindow(samples),
+    hasAuthoredTimeline: sceneTemporal.hasAuthoredTimeline || transform.marksAuthoredTimeline === true,
+  };
+};
+
 export const composeSceneTemporalState = (
   sceneTemporal: SceneTemporalState,
   transform: TemporalTransform,
-): SceneTemporalState => ({
-  remap: {
-    alpha: sceneTemporal.remap.alpha * transform.remapToInput.alpha,
-    beta: sceneTemporal.remap.alpha * transform.remapToInput.beta + sceneTemporal.remap.beta,
-  },
-  visibilityWindow: resolveComposedVisibilityWindow(sceneTemporal, transform),
-  hasAuthoredTimeline: sceneTemporal.hasAuthoredTimeline || transform.marksAuthoredTimeline === true,
-});
+): SceneTemporalState => {
+  if (isAffineTemporalRemap(sceneTemporal.remap) && isAffineTemporalRemap(transform.remapToInput)) {
+    return {
+      remap: composeAffineTemporalRemaps(sceneTemporal.remap, transform.remapToInput),
+      visibilityWindow: resolveComposedVisibilityWindow(sceneTemporal, transform),
+      hasAuthoredTimeline: sceneTemporal.hasAuthoredTimeline || transform.marksAuthoredTimeline === true,
+    };
+  }
+
+  return composeSceneTemporalStateBySampling(sceneTemporal, transform);
+};
 
 export const transformSceneInstancesTemporally = (
   sceneInstances: ReadonlyArray<SceneInstance>,
@@ -137,10 +285,10 @@ export const stretchSceneInstancesTemporally = (
     return {
       ...sceneInstance,
       temporal: composeSceneTemporalState(sceneInstance.temporal, {
-        remapToInput: {
-          alpha: sourceSpan / (end - start),
-          beta: sourceWindow.start - (sourceSpan * start) / (end - start),
-        },
+        remapToInput: createAffineTemporalRemap(
+          sourceSpan / (end - start),
+          sourceWindow.start - (sourceSpan * start) / (end - start),
+        ),
         visibilityWindow: {
           start,
           end,
@@ -178,10 +326,10 @@ export const trimSceneInstancesTemporally = (
     return {
       ...sceneInstance,
       temporal: composeSceneTemporalState(sceneInstance.temporal, {
-        remapToInput: {
-          alpha: sourceSpan * (end - start),
-          beta: sourceWindow.start + sourceSpan * start,
-        },
+        remapToInput: createAffineTemporalRemap(
+          sourceSpan * (end - start),
+          sourceWindow.start + sourceSpan * start,
+        ),
         visibilityWindow: NORMALIZED_TIMELINE_WINDOW,
         marksAuthoredTimeline: true,
       }),
@@ -192,9 +340,6 @@ export const trimSceneInstancesTemporally = (
 export const reverseSceneInstancesTemporally = (
   sceneInstances: ReadonlyArray<SceneInstance>,
 ): SceneInstance[] => transformSceneInstancesTemporally(sceneInstances, {
-  remapToInput: {
-    alpha: -1,
-    beta: 1,
-  },
+  remapToInput: createAffineTemporalRemap(-1, 1),
   visibilityWindow: NORMALIZED_TIMELINE_WINDOW,
 });

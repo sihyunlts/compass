@@ -2,21 +2,25 @@
 
 <script lang="ts">
   /**
-   * Interactive modulation-curve editor used by modulator device cards.
+   * Interactive curve editor shared by modulation and time-warp device cards.
    * Owns node editing, segment control editing, and hidden-input synchronization for form events.
    */
   import {
     buildCurveSegments,
     canSegmentCurveBendAffectShape,
     evaluateNormalizedCurveAt,
-    resolveSegmentCurvePoint,
-    sanitizeCurveNodes,
     toSegmentCurveBend,
     toSegmentCurvePoint,
     type CurvePoint,
-  } from '../../core/modulation/curve';
+  } from '../../core/curve-segments';
+  import { resolveSegmentCurvePoint } from '../../core/modulation/curve';
   import { clamp } from '../../shared/math';
-  import type { CurveNode, ModulationCurve } from '../../shared/model';
+  import type { CurveNode } from '../../shared/model';
+
+  interface EditableCurve {
+    divisions: number;
+    nodes: CurveNode[];
+  }
 
   type DragTarget =
     | { kind: 'node'; nodeId: string }
@@ -44,10 +48,22 @@
     deviceId,
     curve,
     currentProgress01 = 0,
+    hiddenInputAction = 'set-modulation-curve-nodes',
+    sanitizeNodes,
+    valueMin = -1,
+    valueMax = 1,
+    guideValue = 0,
+    wrapperClass = '',
   } = $props<{
     deviceId: string;
-    curve: ModulationCurve;
+    curve: EditableCurve;
     currentProgress01?: number;
+    hiddenInputAction?: string;
+    sanitizeNodes: (rawNodes: unknown) => CurveNode[];
+    valueMin?: number;
+    valueMax?: number;
+    guideValue?: number | null;
+    wrapperClass?: string;
   }>();
 
   let editorEl = $state<HTMLDivElement | null>(null);
@@ -96,6 +112,9 @@
   };
 
   const divisions = $derived(Math.max(2, Math.round(curve.divisions)));
+  const curveValueMin = $derived(Math.min(valueMin, valueMax));
+  const curveValueMax = $derived(Math.max(valueMin, valueMax));
+  const curveValueSpan = $derived(Math.max(curveValueMax - curveValueMin, 0.000001));
   const clampedProgress01 = $derived(
     clamp(Number.isFinite(currentProgress01) ? currentProgress01 : 0, 0, 1),
   );
@@ -104,7 +123,7 @@
   const curveSegments = $derived.by(() => buildCurveSegments(sortedNodes));
 
   const toPlotY = (value: number): number =>
-    (1 - ((value + 1) * 0.5)) * 100;
+    (1 - ((value - curveValueMin) / curveValueSpan)) * 100;
 
   const toPlotPoint = (point: CurvePoint): { x: number; y: number } => ({
     x: point.t * 100,
@@ -216,7 +235,7 @@
     && sortedNodes.some((node) => node.id === nodeId);
 
   const emitNodes = (nodes: CurveNode[]): void => {
-    localNodes = sanitizeCurveNodes(nodes);
+    localNodes = sanitizeNodes(nodes);
     if (!hiddenInputEl) {
       return;
     }
@@ -250,8 +269,16 @@
       : toSoftSnappedRatio(ratioX, [divisionRatio], rect.width);
     const snappedRatioY = options?.snapToCenterLine === false
       ? ratioY
-      : toSoftSnappedRatio(ratioY, [0.5], rect.height);
-    const v = clamp(1 - snappedRatioY * 2, -1, 1);
+      : toSoftSnappedRatio(
+        ratioY,
+        guideValue === null ? [] : [toPlotY(guideValue) / 100],
+        rect.height,
+      );
+    const v = clamp(
+      curveValueMax - snappedRatioY * curveValueSpan,
+      curveValueMin,
+      curveValueMax,
+    );
 
     return {
       t: roundCurveNumber(snappedRatioX),
@@ -435,7 +462,7 @@
       return;
     }
 
-    const nextNodes = sanitizeCurveNodes(curve.nodes);
+    const nextNodes: CurveNode[] = sanitizeNodes(curve.nodes);
     localNodes = nextNodes;
     if (!nextNodes.some((node) => node.id === selectedNodeId)) {
       selectedNodeId = nextNodes[0]?.id ?? null;
@@ -535,12 +562,12 @@
   });
 </script>
 
-<div class="curve-editor-wrap modulation-curve-control">
+<div class={`curve-editor-wrap ${wrapperClass}`.trim()}>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="curve-editor"
     bind:this={editorEl}
-    style={`--curve-divisions:${divisions};`}
+    style={`--curve-divisions:${divisions};--curve-guide-y:${guideValue === null ? '-100%' : `${toPlotY(guideValue).toFixed(3)}%`};`}
     ondblclick={handleEditorDoubleClick}
   >
     <svg viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -585,7 +612,7 @@
     bind:this={hiddenInputEl}
     type="hidden"
     value={JSON.stringify(sortedNodes)}
-    data-action="set-modulation-curve-nodes"
+    data-action={hiddenInputAction}
     data-id={deviceId}
   />
 </div>
@@ -612,10 +639,10 @@
       ),
       linear-gradient(
         to bottom,
-        transparent calc(50% - 0.5px),
-        rgb(var(--rgb-white) / 0.14) calc(50% - 0.5px),
-        rgb(var(--rgb-white) / 0.14) calc(50% + 0.5px),
-        transparent calc(50% + 0.5px)
+        transparent calc(var(--curve-guide-y, -100%) - 0.5px),
+        rgb(var(--rgb-white) / 0.14) calc(var(--curve-guide-y, -100%) - 0.5px),
+        rgb(var(--rgb-white) / 0.14) calc(var(--curve-guide-y, -100%) + 0.5px),
+        transparent calc(var(--curve-guide-y, -100%) + 0.5px)
       ),
       var(--neutral-10);
     overflow: hidden;

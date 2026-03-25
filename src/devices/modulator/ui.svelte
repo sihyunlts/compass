@@ -3,6 +3,7 @@
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
   import CurveEditor from '../../renderer/components/CurveEditor.svelte';
+  import { sanitizeCurveNodes } from '../../core/modulation/curve';
   import {
     getRendererDeviceLabel,
     getRendererModulationTargetParamDefinitions,
@@ -103,6 +104,10 @@
     <CurveEditor
       deviceId={device.id}
       curve={device.params.curve}
+      hiddenInputAction="set-modulation-curve-nodes"
+      sanitizeNodes={sanitizeCurveNodes}
+      guideValue={0}
+      wrapperClass="modulation-curve-control"
       {currentProgress01}
     />
   </div>

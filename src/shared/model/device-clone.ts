@@ -1,9 +1,7 @@
-import type { GeneratorDeviceNode, ModulationCurve } from './chain';
+import type { CurveNode, GeneratorDeviceNode, ModulationCurve, TimeWarpCurve } from './chain';
 
-const cloneCurve = (curve: ModulationCurve): ModulationCurve => ({
-  domain: curve.domain,
-  divisions: curve.divisions,
-  nodes: curve.nodes.map((node) => ({
+const cloneCurveNodes = (nodes: readonly CurveNode[]): CurveNode[] =>
+  nodes.map((node) => ({
     id: node.id,
     t: node.t,
     v: node.v,
@@ -12,7 +10,17 @@ const cloneCurve = (curve: ModulationCurve): ModulationCurve => ({
         nextCurveBend: node.nextCurveBend,
       }
       : {}),
-  })),
+  }));
+
+const cloneModulationCurve = (curve: ModulationCurve): ModulationCurve => ({
+  domain: curve.domain,
+  divisions: curve.divisions,
+  nodes: cloneCurveNodes(curve.nodes),
+});
+
+const cloneTimeWarpCurve = (curve: TimeWarpCurve): TimeWarpCurve => ({
+  divisions: curve.divisions,
+  nodes: cloneCurveNodes(curve.nodes),
 });
 
 const assertUnsupportedDeviceKind = (device: never): never => {
@@ -94,6 +102,19 @@ export const cloneDeviceNode = (
     };
   }
 
+  if (device.kind === 'timewarp') {
+    return {
+      id: device.id,
+      kind: 'timewarp',
+      enabled: device.enabled,
+      groupId: device.groupId ?? null,
+      name: device.name ?? null,
+      params: {
+        curve: cloneTimeWarpCurve(device.params.curve),
+      },
+    };
+  }
+
   if (device.kind === 'trim') {
     return {
       id: device.id,
@@ -120,7 +141,7 @@ export const cloneDeviceNode = (
             paramKey: device.params.target.paramKey,
           }
           : null,
-        curve: cloneCurve(device.params.curve),
+        curve: cloneModulationCurve(device.params.curve),
       },
     };
   }

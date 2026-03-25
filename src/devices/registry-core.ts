@@ -22,6 +22,8 @@ import { stretchDeviceControls } from './stretch/controls';
 import { stretchDeviceSchema } from './stretch/schema';
 import { symmetryDeviceControls } from './symmetry/controls';
 import { symmetryDeviceSchema } from './symmetry/schema';
+import { timeWarpDeviceControls } from './timewarp/controls';
+import { timeWarpDeviceSchema } from './timewarp/schema';
 import { trimDeviceControls } from './trim/controls';
 import { trimDeviceSchema } from './trim/schema';
 import { translateDeviceControls } from './translate/controls';
@@ -110,6 +112,11 @@ export const RENDERER_DEVICE_MANIFEST = [
     ...stretchDeviceSchema,
     controls: stretchDeviceControls,
     editor: './stretch/ui.svelte',
+  },
+  {
+    ...timeWarpDeviceSchema,
+    controls: timeWarpDeviceControls,
+    editor: './timewarp/ui.svelte',
   },
   {
     ...reverseDeviceSchema,
