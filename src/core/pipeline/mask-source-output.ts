@@ -3,8 +3,6 @@ import { buildGeneratedNotesWithRuntimeMap } from '../../domain/note-export';
 import { buildRuntimeMapDataFromButtonIndex } from '../../domain/runtime-map';
 import { TILE_COUNT } from './constants';
 import { isGeneratorNode, resolveMaskTime, splitChainByGroup } from './groups';
-import { analyzeChainOriginTimelinePolicy } from './origin-timeline-policy';
-import { normalizeNotesByOriginTimelinePolicy } from './timeline-fit';
 import type {
   GroupEvaluationContext,
   MaskTimeKind,
@@ -76,12 +74,8 @@ export const createMaskSourceOutputResolver = (): (
       sourceChain,
       context,
     );
-    const normalizedNotes = normalizeNotesByOriginTimelinePolicy(
-      notes,
-      analyzeChainOriginTimelinePolicy(sourceChain).originTimelinePolicyByGeneratorId,
-    ).notes;
-    context.cache.maskSourceOutputNotesByKey.set(cacheKey, normalizedNotes);
-    return normalizedNotes;
+    context.cache.maskSourceOutputNotesByKey.set(cacheKey, notes);
+    return notes;
   };
 
   return (
