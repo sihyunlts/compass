@@ -408,16 +408,20 @@ const main = async (): Promise<void> => {
     buttons: runtimeMap.buttons,
     buttonIndex: runtimeMap.buttonIndex,
   });
-  const frameBeats = Array.from({ length: SAMPLES_PER_BEAT }, (_, step) => step / SAMPLES_PER_BEAT);
+  const frameBeats = Array.from(
+    { length: Math.max(1, Math.round(preview.sourceTimelineEndBeat * SAMPLES_PER_BEAT)) },
+    (_, step) => step / SAMPLES_PER_BEAT,
+  );
   const sampledFrames = evaluateExactOutputFramesAtTimes(engine, frameBeats);
-  const exactFrames = evaluateExactOutputFramesAtTimes(engine, options.beats);
+  const exactFrameBeats = options.beats.map((beat) =>
+    mapNormalizedBeatToPreviewBeat(beat, preview.sourceTimelineEndBeat));
+  const exactFrames = evaluateExactOutputFramesAtTimes(engine, exactFrameBeats);
   const compareMismatches = sampledFrames
     .map((exactFrame) => {
-      const normalizedBeat = exactFrame.time;
-      const previewBeat = mapNormalizedBeatToPreviewBeat(
-        normalizedBeat,
-        preview.sourceTimelineEndBeat,
-      );
+      const previewBeat = exactFrame.time;
+      const normalizedBeat = preview.sourceTimelineEndBeat > 0
+        ? previewBeat / preview.sourceTimelineEndBeat
+        : previewBeat;
       return compareFrameSnapshots(
         normalizedBeat,
         previewBeat,
@@ -461,7 +465,8 @@ const main = async (): Promise<void> => {
     const frameDirectory = path.join(framesDirectory, `beat-${beatKey}`);
     await mkdir(frameDirectory, { recursive: true });
 
-    const polylines = evaluatePolylinesAtTime(engine, beat);
+    const exactBeat = exactFrameBeats[index];
+    const polylines = evaluatePolylinesAtTime(engine, exactBeat);
     const exactSnapshot = exactFrame
       ? resolveExactFrameSnapshot(exactFrame)
       : { activeTiles: [], activeAddresses: [] };

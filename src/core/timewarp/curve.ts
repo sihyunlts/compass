@@ -164,6 +164,8 @@ export const createSampledRemapFromTimeWarpCurve = (
 
   return {
     kind: 'sampled',
+    domainStart: 0,
+    domainEnd: 1,
     samples,
   };
 };

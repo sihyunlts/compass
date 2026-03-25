@@ -32,6 +32,24 @@ const cloneTimedNotes = <T extends TimedNoteWithOrigin>(
   notes: ReadonlyArray<T>,
 ): T[] => notes.map((note) => ({ ...note }));
 
+const resolveTimelineEndBeat = <T extends TimedNoteWithOrigin>(
+  notes: ReadonlyArray<T>,
+): number => {
+  let lastBeat = Number.NEGATIVE_INFINITY;
+
+  for (const note of notes) {
+    if (!Number.isFinite(note.startBeat) || !Number.isFinite(note.durationBeats)) {
+      continue;
+    }
+
+    lastBeat = Math.max(lastBeat, note.startBeat + Math.max(note.durationBeats, 0));
+  }
+
+  return Number.isFinite(lastBeat) && lastBeat > 0
+    ? Math.max(lastBeat, MIN_NOTE_DURATION)
+    : NORMALIZED_SOURCE_TIMELINE_END_BEAT;
+};
+
 const buildOriginWindows = <T extends TimedNoteWithOrigin>(
   notes: ReadonlyArray<T>,
 ): Map<string, OriginWindow> => {
@@ -206,7 +224,7 @@ export const normalizeNotesByOriginTimelinePolicy = <T extends TimedNoteWithOrig
 
     return {
       notes: normalizedNotes,
-      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+      sourceTimelineEndBeat: resolveTimelineEndBeat(normalizedNotes),
     };
   }
 

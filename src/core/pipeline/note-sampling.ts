@@ -16,6 +16,7 @@ export interface SampledTimedNote extends SampledOpenNoteState {
 interface CollectPitchSampledNotesOptions {
   sampleCount: number;
   endBeat: number;
+  sampleStepBeats: number;
   minimumNoteDuration: number;
   resolveActiveByPitch: (sampleBeat: number) => ReadonlyMap<number, SampledActivePitch>;
 }
@@ -51,10 +52,18 @@ export const closeSampledNote = (
 export const collectPitchSampledNotes = ({
   sampleCount,
   endBeat,
+  sampleStepBeats,
   minimumNoteDuration,
   resolveActiveByPitch,
 }: CollectPitchSampledNotesOptions): SampledTimedNote[] => {
-  if (!Number.isFinite(sampleCount) || sampleCount <= 0) {
+  if (
+    !Number.isFinite(sampleCount)
+    || sampleCount <= 0
+    || !Number.isFinite(endBeat)
+    || endBeat <= 0
+    || !Number.isFinite(sampleStepBeats)
+    || sampleStepBeats <= 0
+  ) {
     return [];
   }
 
@@ -62,7 +71,7 @@ export const collectPitchSampledNotes = ({
   const openByPitch = new Map<number, SampledOpenNoteState>();
 
   for (let step = 0; step < sampleCount; step += 1) {
-    const sampleBeat = step / sampleCount;
+    const sampleBeat = step * sampleStepBeats;
     const activeByPitch = resolveActiveByPitch(sampleBeat);
 
     for (const [pitch, open] of openByPitch.entries()) {

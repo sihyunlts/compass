@@ -34,6 +34,8 @@ export interface TemporalAffineRemap {
 
 export interface TemporalSampledRemap {
   kind: 'sampled';
+  domainStart: number;
+  domainEnd: number;
   samples: Array<number | null>;
 }
 

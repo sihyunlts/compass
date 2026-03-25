@@ -100,6 +100,13 @@ export const analyzeChainOriginTimelinePolicy = (
       originTimelinePolicyByGeneratorId.set(generator.id, 'legacy-auto-fit');
     },
     onScopedDevice(device, _deviceIndex, targetOriginIds) {
+      if (device.kind === 'color') {
+        for (const originId of targetOriginIds) {
+          originTimelinePolicyByGeneratorId.set(originId, 'preserve-authored-timeline');
+        }
+        return;
+      }
+
       if (device.kind === 'stretch' || device.kind === 'trim') {
         if (isIdentity01TemporalWindow(device.params.start, device.params.end)) {
           return;

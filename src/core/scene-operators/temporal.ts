@@ -105,8 +105,16 @@ export const evaluateTemporalRemap = (
     return remap.samples[0];
   }
 
-  const clampedT = Math.min(Math.max(t01, 0), 1);
-  const scaledIndex = clampedT * (sampleCount - 1);
+  const domainStart = remap.domainStart;
+  const domainEnd = remap.domainEnd;
+  const domainSpan = domainEnd - domainStart;
+  if (!Number.isFinite(domainSpan) || domainSpan <= 0) {
+    return null;
+  }
+
+  const clampedT = Math.min(Math.max(t01, domainStart), domainEnd);
+  const normalizedT = (clampedT - domainStart) / domainSpan;
+  const scaledIndex = normalizedT * (sampleCount - 1);
   const lowerIndex = Math.floor(scaledIndex);
   const upperIndex = Math.min(sampleCount - 1, Math.ceil(scaledIndex));
   const ratio = scaledIndex - lowerIndex;
@@ -134,6 +142,8 @@ export const resolveSceneTemporalInputTime = (
 
 const resolveSampledVisibilityWindow = (
   samples: readonly (number | null)[],
+  domainStart: number,
+  domainEnd: number,
 ): TemporalVisibilityWindow => {
   const firstVisibleIndex = samples.findIndex((sample) => sample !== null);
   if (firstVisibleIndex === -1) {
@@ -142,9 +152,10 @@ const resolveSampledVisibilityWindow = (
 
   const lastVisibleIndex = samples.findLastIndex((sample) => sample !== null);
   const sampleSpan = Math.max(samples.length - 1, 1);
+  const domainSpan = domainEnd - domainStart;
   return {
-    start: firstVisibleIndex / sampleSpan,
-    end: lastVisibleIndex / sampleSpan,
+    start: domainStart + domainSpan * (firstVisibleIndex / sampleSpan),
+    end: domainStart + domainSpan * (lastVisibleIndex / sampleSpan),
   };
 };
 
@@ -184,11 +195,25 @@ const composeSceneTemporalStateBySampling = (
     sceneTemporal.remap,
     transform.remapToInput,
   );
+  const sampleDomainStart = transform.visibilityWindow.start;
+  const sampleDomainEnd = transform.visibilityWindow.end;
+  const sampleDomainSpan = sampleDomainEnd - sampleDomainStart;
+  if (!Number.isFinite(sampleDomainSpan) || sampleDomainSpan <= 0) {
+    return {
+      remap: {
+        kind: 'sampled',
+        domainStart: sampleDomainStart,
+        domainEnd: sampleDomainEnd,
+        samples: [],
+      },
+      visibilityWindow: EMPTY_VISIBILITY_WINDOW,
+      hasAuthoredTimeline: sceneTemporal.hasAuthoredTimeline || transform.marksAuthoredTimeline === true,
+    };
+  }
+
   const samples = Array.from({ length: sampleCount }, (_, index) => {
-    const t = sampleCount <= 1 ? 0 : index / (sampleCount - 1);
-    if (!isTimeVisibleInWindow(transform.visibilityWindow, t)) {
-      return null;
-    }
+    const ratio = sampleCount <= 1 ? 0 : index / (sampleCount - 1);
+    const t = sampleDomainStart + sampleDomainSpan * ratio;
 
     const transformedT = evaluateTemporalRemap(transform.remapToInput, t);
     if (transformedT === null) {
@@ -201,9 +226,15 @@ const composeSceneTemporalStateBySampling = (
   return {
     remap: {
       kind: 'sampled',
+      domainStart: sampleDomainStart,
+      domainEnd: sampleDomainEnd,
       samples,
     },
-    visibilityWindow: resolveSampledVisibilityWindow(samples),
+    visibilityWindow: resolveSampledVisibilityWindow(
+      samples,
+      sampleDomainStart,
+      sampleDomainEnd,
+    ),
     hasAuthoredTimeline: sceneTemporal.hasAuthoredTimeline || transform.marksAuthoredTimeline === true,
   };
 };

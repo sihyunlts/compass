@@ -47,6 +47,8 @@ export const applyTimeWarpEffect = (
       remapToInput: remap.kind === 'sampled'
         ? {
             kind: 'sampled',
+            domainStart: remap.domainStart,
+            domainEnd: remap.domainEnd,
             samples: remap.samples.map((sample) => mapSampleToSourceWindow(sample, sourceWindow)),
           }
         : {
