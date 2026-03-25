@@ -184,9 +184,7 @@ const buildOutputGroupPolylinesAtTime = (
   return polylines;
 };
 
-const resolveGroupSourceOutputActiveTiles = createMaskSourceOutputResolver({
-  resolveOutputGroupSceneInstances: buildOutputGroupSceneInstances,
-});
+const resolveGroupSourceOutputActiveTiles = createMaskSourceOutputResolver();
 
 const maskSourceResolvers = createMaskSourceResolvers({
   resolveFinalSceneInstances: buildFinalSceneInstances,

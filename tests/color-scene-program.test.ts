@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { generatePreviewNotesData } from '../src/domain';
+import { buildGeneratedNotesWithRuntimeMap } from '../src/domain/note-export';
+import { getLaunchpadRuntimeMap } from '../src/domain/launchpad-model';
+import { resolveActiveTileIdsAtBeat } from '../src/domain/mask-note-filter';
+import { buildRuntimeMapDataFromButtonIndex } from '../src/domain/runtime-map';
 import { toPreviewFrameBeat } from '../src/renderer/features/preview/frame-index';
 import {
   createPreviewResultCache,
@@ -203,6 +207,135 @@ test('a time boundary on one origin does not block later scene effects on anothe
     summarizePreview(chainWithRotate),
     summarizePreview(chainWithoutRotate),
   );
+});
+
+test('mask source output follows color and time ordering', () => {
+  const createMaskedChain = (
+    sourceDevices: GeneratorChain['devices'],
+  ): GeneratorChain => ({
+    devices: [
+      createScannerGenerator('generator-a', 'group-a', 0),
+      ...sourceDevices,
+      createScannerGenerator('generator-b', 'group-b', 90),
+      {
+        id: 'mask-b',
+        kind: 'mask',
+        enabled: true,
+        groupId: 'group-b',
+        params: {
+          mode: 'include',
+          tiles: [],
+          sourceKind: 'group',
+          sourceDomain: 'activation',
+          sourceVisibility: 'show',
+          sourceId: 'group-a',
+        },
+      },
+    ],
+    groupStateById: {},
+  });
+
+  const reverseBeforeColor = summarizePreview(createMaskedChain([
+    { id: 'reverse-a', kind: 'reverse', enabled: true, groupId: 'group-a' },
+    { ...createColorDevice('color-a'), groupId: 'group-a' },
+  ]));
+  const colorBeforeReverse = summarizePreview(createMaskedChain([
+    { ...createColorDevice('color-a'), groupId: 'group-a' },
+    { id: 'reverse-a', kind: 'reverse', enabled: true, groupId: 'group-a' },
+  ]));
+
+  assert.notDeepEqual(reverseBeforeColor, colorBeforeReverse);
+});
+
+test('generator activation mask source follows color and time ordering', () => {
+  const createMaskedChain = (
+    sourceDevices: GeneratorChain['devices'],
+  ): GeneratorChain => ({
+    devices: [
+      createScannerGenerator('generator-a', 'group-a', 0),
+      ...sourceDevices,
+      createScannerGenerator('generator-b', 'group-b', 90),
+      {
+        id: 'mask-b',
+        kind: 'mask',
+        enabled: true,
+        groupId: 'group-b',
+        params: {
+          mode: 'include',
+          tiles: [],
+          sourceKind: 'generator',
+          sourceDomain: 'activation',
+          sourceVisibility: 'show',
+          sourceId: 'generator-a',
+        },
+      },
+    ],
+    groupStateById: {},
+  });
+
+  const reverseBeforeColor = summarizePreview(createMaskedChain([
+    { id: 'reverse-a', kind: 'reverse', enabled: true, groupId: 'group-a' },
+    { ...createColorDevice('color-a'), groupId: 'group-a' },
+  ]));
+  const colorBeforeReverse = summarizePreview(createMaskedChain([
+    { ...createColorDevice('color-a'), groupId: 'group-a' },
+    { id: 'reverse-a', kind: 'reverse', enabled: true, groupId: 'group-a' },
+  ]));
+
+  assert.notDeepEqual(reverseBeforeColor, colorBeforeReverse);
+});
+
+test('activation mask preserves authored consumer timing', () => {
+  const chain: GeneratorChain = {
+    devices: [
+      createScannerGenerator('generator-a', 'group-a', 0),
+      { ...createColorDevice('source-color', [20, 90]), groupId: 'group-a' },
+      createScannerGenerator('generator-b', 'group-b', 90),
+      { ...createColorDevice('consumer-color', [3, 33, 34, 35]), groupId: 'group-b' },
+      {
+        id: 'mask-b',
+        kind: 'mask',
+        enabled: true,
+        groupId: 'group-b',
+        params: {
+          mode: 'include',
+          tiles: [],
+          sourceKind: 'group',
+          sourceDomain: 'activation',
+          sourceVisibility: 'show',
+          sourceId: 'group-a',
+        },
+      },
+    ],
+    groupStateById: {},
+  };
+
+  const runtimeMap = buildRuntimeMapDataFromButtonIndex(
+    getLaunchpadRuntimeMap(LAUNCHPAD_MODEL).buttonIndex,
+  );
+  const maskIndex = chain.devices.findIndex((device) => device.id === 'mask-b');
+  const sourceChain: GeneratorChain = {
+    devices: chain.devices.slice(0, maskIndex),
+    groupStateById: chain.groupStateById,
+  };
+  const generatedSourceNotes = buildGeneratedNotesWithRuntimeMap({
+    chain: sourceChain,
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    runtimeMap,
+  }).notes.filter((note) => note.originId === 'generator-a');
+  const generatedConsumerNotes = buildGeneratedNotesWithRuntimeMap({
+    chain,
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    runtimeMap,
+  }).notes.filter((note) => note.originId === 'generator-b');
+
+  for (const beat of [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]) {
+    const sourceTiles = resolveActiveTileIdsAtBeat(generatedSourceNotes, beat, runtimeMap);
+    const consumerTiles = resolveActiveTileIdsAtBeat(generatedConsumerNotes, beat, runtimeMap);
+    for (const tile of consumerTiles) {
+      assert.ok(sourceTiles.has(tile));
+    }
+  }
 });
 
 test('multiple colors compose sequentially', () => {

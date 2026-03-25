@@ -100,16 +100,25 @@ export const analyzeChainOriginTimelinePolicy = (
       originTimelinePolicyByGeneratorId.set(generator.id, 'legacy-auto-fit');
     },
     onScopedDevice(device, _deviceIndex, targetOriginIds) {
-      if (device.kind !== 'stretch' && device.kind !== 'trim') {
+      if (device.kind === 'stretch' || device.kind === 'trim') {
+        if (isIdentity01TemporalWindow(device.params.start, device.params.end)) {
+          return;
+        }
+
+        for (const originId of targetOriginIds) {
+          originTimelinePolicyByGeneratorId.set(originId, 'preserve-authored-timeline');
+        }
         return;
       }
 
-      if (isIdentity01TemporalWindow(device.params.start, device.params.end)) {
-        return;
-      }
-
-      for (const originId of targetOriginIds) {
-        originTimelinePolicyByGeneratorId.set(originId, 'preserve-authored-timeline');
+      if (
+        device.kind === 'mask'
+        && device.params.sourceKind !== 'tiles'
+        && device.params.sourceDomain === 'activation'
+      ) {
+        for (const originId of targetOriginIds) {
+          originTimelinePolicyByGeneratorId.set(originId, 'preserve-authored-timeline');
+        }
       }
     },
   });

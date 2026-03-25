@@ -7,14 +7,19 @@ import {
   type GenerateNotesInput,
   type GeneratedNotesResult,
   type NoteGenerationState,
+  type RuntimeMapData,
 } from './note-generation-types';
 import { buildRuntimeMapData } from './runtime-map';
 
-export const buildGeneratedNotes = ({
+export const buildGeneratedNotesWithRuntimeMap = ({
   chain,
   loopLengthBeats,
-  launchpadModel,
-}: GenerateNotesInput): GeneratedNotesResult => {
+  runtimeMap,
+}: {
+  chain: GenerateNotesInput['chain'];
+  loopLengthBeats: number;
+  runtimeMap: RuntimeMapData;
+}): GeneratedNotesResult => {
   if (!Number.isFinite(loopLengthBeats) || loopLengthBeats <= 0) {
     return {
       notes: [],
@@ -34,7 +39,7 @@ export const buildGeneratedNotes = ({
   const state: NoteGenerationState = {
     chain,
     loopLengthBeats,
-    runtimeMap: buildRuntimeMapData(launchpadModel),
+    runtimeMap,
     checkpointNotesByIndex: new Map(),
     normalizedSourceNotesByKey: new Map(),
     originTimelinePolicyByCheckpointIndex: new Map([[
@@ -53,3 +58,13 @@ export const buildGeneratedNotes = ({
     sourceTimelineEndBeat: normalized.sourceTimelineEndBeat,
   };
 };
+
+export const buildGeneratedNotes = ({
+  chain,
+  loopLengthBeats,
+  launchpadModel,
+}: GenerateNotesInput): GeneratedNotesResult => buildGeneratedNotesWithRuntimeMap({
+  chain,
+  loopLengthBeats,
+  runtimeMap: buildRuntimeMapData(launchpadModel),
+});

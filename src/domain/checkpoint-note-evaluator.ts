@@ -255,7 +255,6 @@ export const evaluateCheckpointNotes = (
     checkpointChain,
   );
   const orderedOriginIds: string[] = [];
-  const deferredColorsByOriginId = new Map<string, DeferredColorOperation[]>();
   const noteStageNotesByOriginId = new Map<string, ClipNoteWithOrigin[]>();
   const sceneCheckpointNotesByIndex = new Map<number, Map<string, ClipNoteWithOrigin[]>>();
 
@@ -275,6 +274,24 @@ export const evaluateCheckpointNotes = (
         state.runtimeMap,
       ),
     );
+    const deferredSceneColorsByOriginId = new Map<string, DeferredColorOperation[]>();
+
+    const materializeDeferredSceneColorsForOrigin = (
+      originId: string,
+    ): ClipNoteWithOrigin[] => {
+      const deferred = deferredSceneColorsByOriginId.get(originId);
+      if (!deferred || deferred.length === 0) {
+        return sceneNotesByOriginId.get(originId) ?? [];
+      }
+
+      const materialized = applyDeferredColors(
+        sceneNotesByOriginId.get(originId) ?? [],
+        deferred,
+      );
+      sceneNotesByOriginId.set(originId, materialized);
+      deferredSceneColorsByOriginId.set(originId, []);
+      return materialized;
+    };
 
     walkEnabledChainOriginScopes(sceneCheckpointChain, {
       onGenerator(generator) {
@@ -288,6 +305,11 @@ export const evaluateCheckpointNotes = (
         }
 
         if (device.kind === 'color') {
+          for (const originId of targetOriginIds) {
+            const deferred = deferredSceneColorsByOriginId.get(originId) ?? [];
+            deferred.push({ device });
+            deferredSceneColorsByOriginId.set(originId, deferred);
+          }
           return;
         }
 
@@ -302,6 +324,7 @@ export const evaluateCheckpointNotes = (
         const sourceId = normalizeOptionalId(device.params.sourceId);
         if (!sourceId) {
           for (const originId of targetOriginIds) {
+            materializeDeferredSceneColorsForOrigin(originId);
             sceneNotesByOriginId.set(originId, []);
           }
           return;
@@ -325,7 +348,7 @@ export const evaluateCheckpointNotes = (
           sceneNotesByOriginId.set(
             originId,
             filterNotesByMask(
-              sceneNotesByOriginId.get(originId) ?? [],
+              materializeDeferredSceneColorsForOrigin(originId),
               device,
               state.runtimeMap,
               (beat) => resolveActiveTileIdsAtBeat(sourceNotes, beat, state.runtimeMap),
@@ -334,6 +357,17 @@ export const evaluateCheckpointNotes = (
         }
       },
     });
+
+    for (const [originId, deferred] of deferredSceneColorsByOriginId.entries()) {
+      if (deferred.length === 0) {
+        continue;
+      }
+
+      sceneNotesByOriginId.set(
+        originId,
+        applyDeferredColors(sceneNotesByOriginId.get(originId) ?? [], deferred),
+      );
+    }
 
     sceneCheckpointNotesByIndex.set(sceneEndExclusive, sceneNotesByOriginId);
     return sceneNotesByOriginId;
@@ -352,10 +386,7 @@ export const evaluateCheckpointNotes = (
       return existing;
     }
 
-    const materialized = applyDeferredColors(
-      resolveBaseNotesForOrigin(originId),
-      deferredColorsByOriginId.get(originId) ?? [],
-    );
+    const materialized = resolveBaseNotesForOrigin(originId);
     noteStageNotesByOriginId.set(originId, materialized);
     return materialized;
   };
@@ -381,12 +412,7 @@ export const evaluateCheckpointNotes = (
             if (colorProgram) {
               noteStageNotesByOriginId.set(originId, colorProgram.notes);
             }
-            continue;
           }
-
-          const deferred = deferredColorsByOriginId.get(originId) ?? [];
-          deferred.push({ device });
-          deferredColorsByOriginId.set(originId, deferred);
         }
         return;
       }
@@ -415,10 +441,7 @@ export const evaluateCheckpointNotes = (
   for (const originId of orderedOriginIds) {
     notes.push(...cloneNotes(
       noteStageNotesByOriginId.get(originId)
-      ?? applyDeferredColors(
-        resolveBaseNotesForOrigin(originId),
-        deferredColorsByOriginId.get(originId) ?? [],
-      ),
+      ?? resolveBaseNotesForOrigin(originId),
     ));
   }
   sortClipNotes(notes);

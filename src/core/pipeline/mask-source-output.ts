@@ -1,47 +1,15 @@
-import { applyNoteStageColorPrograms } from '../../devices/color/engine';
-import type { GeneratorChain, GeneratorNode } from '../../shared/model';
-import type { SceneInstance } from '../core-types';
-import { projectSceneToActivationFrame } from './active';
-import { MIN_NOTE_DURATION, SAMPLES_PER_BEAT, TILE_COUNT } from './constants';
-import { isGeneratorNode, resolveMaskTime, resolveMutedSources, splitChainByGroup } from './groups';
-import { collectPitchSampledNotes } from './note-sampling';
+import type { GeneratorChain } from '../../shared/model';
+import { buildGeneratedNotesWithRuntimeMap } from '../../domain/note-export';
+import { buildRuntimeMapDataFromButtonIndex } from '../../domain/runtime-map';
+import { TILE_COUNT } from './constants';
+import { isGeneratorNode, resolveMaskTime, splitChainByGroup } from './groups';
 import { analyzeChainOriginTimelinePolicy } from './origin-timeline-policy';
 import { normalizeNotesByOriginTimelinePolicy } from './timeline-fit';
 import type {
   GroupEvaluationContext,
-  GroupId,
   MaskTimeKind,
   TimedOutputNote,
 } from './types';
-
-interface MaskSourceOutputDependencies {
-  resolveOutputGroupSceneInstances: (
-    groupId: GroupId,
-    context: GroupEvaluationContext,
-  ) => SceneInstance[];
-}
-
-const buildGroupById = (
-  groupChains: ReadonlyArray<{ id: GroupId; devices: GeneratorChain['devices'] }>,
-): Map<GroupId, { id: GroupId; devices: GeneratorChain['devices'] }> => {
-  const groupById = new Map<GroupId, { id: GroupId; devices: GeneratorChain['devices'] }>();
-  for (const group of groupChains) {
-    groupById.set(group.id, group);
-  }
-  return groupById;
-};
-
-const buildGeneratorById = (
-  chain: GeneratorChain,
-): Map<string, GeneratorNode> => {
-  const generatorById = new Map<string, GeneratorNode>();
-  for (const device of chain.devices) {
-    if (isGeneratorNode(device)) {
-      generatorById.set(device.id, device);
-    }
-  }
-  return generatorById;
-};
 
 const buildMaskSourceCacheKey = (
   sourceGroupId: string,
@@ -62,83 +30,30 @@ const createBaseChainForMaskSource = (
   };
 };
 
-const createSourceEvaluationContext = (
-  sourceChain: GeneratorChain,
-  context: GroupEvaluationContext,
-  time: number,
-  unmutedGroupId: GroupId,
-): GroupEvaluationContext => {
-  const groupChains = splitChainByGroup(sourceChain);
-  const groupById = buildGroupById(groupChains);
-  const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(sourceChain);
-
-  if (unmutedGroupId) {
-    mutedGroupIds.delete(unmutedGroupId);
-    const sourceGroup = groupById.get(unmutedGroupId);
-    if (sourceGroup) {
-      for (const device of sourceGroup.devices) {
-        if (isGeneratorNode(device)) {
-          mutedGeneratorIds.delete(device.id);
-        }
-      }
-    }
-  }
-
-  return {
-    time,
-    timeReversed: 1 - time,
-    buttonIndex: context.buttonIndex,
-    chain: sourceChain,
-    baseChain: sourceChain,
-    groupStateById: sourceChain.groupStateById,
-    worldBounds: context.worldBounds,
-    groupChains,
-    groupById,
-    generatorById: buildGeneratorById(sourceChain),
-    mutedGroupIds,
-    mutedGeneratorIds,
-    cache: {
-      sceneInstancesByGroup: new Map(),
-      checkpointSceneInstancesByIndex: new Map(),
-      finalSceneInstances: null,
-      outputPolylinesByGroup: new Map(),
-      maskSourceOutputNotesByKey: new Map(),
-      naturalTemporalWindowByEffectOriginKey: new Map(),
-    },
-  };
-};
-
 const collectGroupOutputNotes = (
   sourceGroupId: string,
   sourceChain: GeneratorChain,
   context: GroupEvaluationContext,
-  dependencies: MaskSourceOutputDependencies,
 ): TimedOutputNote[] => {
-  const notes: TimedOutputNote[] = collectPitchSampledNotes({
-    sampleCount: SAMPLES_PER_BEAT,
-    endBeat: 1,
-    minimumNoteDuration: MIN_NOTE_DURATION,
-    resolveActiveByPitch: (sampleBeat) => {
-      const sourceContext = createSourceEvaluationContext(
-        sourceChain,
-        context,
-        sampleBeat,
-        sourceGroupId,
-      );
-      return projectSceneToActivationFrame(
-        dependencies.resolveOutputGroupSceneInstances(sourceGroupId, sourceContext),
-        sampleBeat,
-        context.buttonIndex,
-      ).activeByPitch;
-    },
-  });
+  const sourceOriginIds = new Set(
+    splitChainByGroup(sourceChain)
+      .find((group) => group.id === sourceGroupId)
+      ?.devices
+      .filter((device) => isGeneratorNode(device))
+      .map((device) => device.id) ?? [],
+  );
+  if (sourceOriginIds.size === 0) {
+    return [];
+  }
 
-  return applyNoteStageColorPrograms(sourceChain, notes, MIN_NOTE_DURATION);
+  return buildGeneratedNotesWithRuntimeMap({
+    chain: sourceChain,
+    loopLengthBeats: 1,
+    runtimeMap: buildRuntimeMapDataFromButtonIndex(context.buttonIndex),
+  }).notes.filter((note) => note.originId && sourceOriginIds.has(note.originId));
 };
 
-export const createMaskSourceOutputResolver = (
-  dependencies: MaskSourceOutputDependencies,
-): (
+export const createMaskSourceOutputResolver = (): (
   sourceGroupId: string,
   context: GroupEvaluationContext,
   timeKind: MaskTimeKind,
@@ -160,7 +75,6 @@ export const createMaskSourceOutputResolver = (
       sourceGroupId,
       sourceChain,
       context,
-      dependencies,
     );
     const normalizedNotes = normalizeNotesByOriginTimelinePolicy(
       notes,
