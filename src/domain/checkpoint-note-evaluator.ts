@@ -25,10 +25,7 @@ import {
 } from './note-generation-types';
 import { filterNotesByMask, resolveActiveTileIdsAtBeat } from './mask-note-filter';
 import {
-  applyNoteStageReverseToNotes,
-  applyNoteStageStretchToNotes,
   applyNoteStageTimeWarpToNotes,
-  applyNoteStageTrimToNotes,
 } from './note-stage-effects';
 import {
   cloneNotes,
@@ -40,18 +37,6 @@ import {
 interface DeferredColorOperation {
   device: Extract<GeneratorChain['devices'][number], { kind: 'color' }>;
 }
-
-const isNoteStageTimeEffectDevice = (
-  device: GeneratorChain['devices'][number],
-): device is Extract<
-  GeneratorChain['devices'][number],
-  { kind: 'trim' | 'stretch' | 'reverse' | 'timewarp' }
-> => (
-  device.kind === 'trim'
-  || device.kind === 'stretch'
-  || device.kind === 'reverse'
-  || device.kind === 'timewarp'
-);
 
 const buildEngine = (
   chain: GeneratorChain,
@@ -122,26 +107,6 @@ const applyDeferredColors = (
   }
 
   return current;
-};
-
-const applyNoteStageTimeEffectToNotes = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-  device: Extract<
-    GeneratorChain['devices'][number],
-    { kind: 'trim' | 'stretch' | 'reverse' | 'timewarp' }
-  >,
-): ClipNoteWithOrigin[] => {
-  if (device.kind === 'reverse') {
-    return applyNoteStageReverseToNotes(notes);
-  }
-  if (device.kind === 'timewarp') {
-    return applyNoteStageTimeWarpToNotes(notes, device.params.curve);
-  }
-  if (device.kind === 'stretch') {
-    return applyNoteStageStretchToNotes(notes, device.params.start, device.params.end);
-  }
-
-  return applyNoteStageTrimToNotes(notes, device.params.start, device.params.end);
 };
 
 const resolveSourceOriginIds = (
@@ -226,7 +191,7 @@ const resolveNoteStageBoundaryIndexByOriginId = (
         return;
       }
 
-      if (!isNoteStageTimeEffectDevice(device)) {
+      if (device.kind !== 'timewarp') {
         return;
       }
 
@@ -417,7 +382,7 @@ export const evaluateCheckpointNotes = (
         return;
       }
 
-      if (isNoteStageTimeEffectDevice(device)) {
+      if (device.kind === 'timewarp') {
         for (const originId of targetOriginIds) {
           const boundaryIndex = noteStageBoundaryIndexByOriginId.get(originId);
           if (boundaryIndex === undefined || deviceIndex < boundaryIndex) {
@@ -426,9 +391,9 @@ export const evaluateCheckpointNotes = (
 
           noteStageNotesByOriginId.set(
             originId,
-            applyNoteStageTimeEffectToNotes(
+            applyNoteStageTimeWarpToNotes(
               materializeNoteStageNotesForOrigin(originId),
-              device,
+              device.params.curve,
             ),
           );
         }

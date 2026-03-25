@@ -42,6 +42,44 @@ const createColorDevice = (
   },
 });
 
+const createReverseDevice = (
+  id = 'reverse',
+  groupId: string | null = null,
+): GeneratorChain['devices'][number] => ({
+  id,
+  kind: 'reverse',
+  enabled: true,
+  groupId,
+});
+
+const createTrimDevice = (
+  id = 'trim',
+  groupId: string | null = null,
+): GeneratorChain['devices'][number] => ({
+  id,
+  kind: 'trim',
+  enabled: true,
+  groupId,
+  params: {
+    start: 0.2,
+    end: 0.8,
+  },
+});
+
+const createStretchDevice = (
+  id = 'stretch',
+  groupId: string | null = null,
+): GeneratorChain['devices'][number] => ({
+  id,
+  kind: 'stretch',
+  enabled: true,
+  groupId,
+  params: {
+    start: 0.2,
+    end: 0.8,
+  },
+});
+
 const createTimeWarpDevice = (): GeneratorChain['devices'][number] => ({
   id: 'timewarp',
   kind: 'timewarp',
@@ -54,6 +92,25 @@ const createTimeWarpDevice = (): GeneratorChain['devices'][number] => ({
         { id: 'start', t: 0, v: 0 },
         { id: 'mid', t: 0.5, v: 1 },
         { id: 'end', t: 1, v: 0.25 },
+      ],
+    },
+  },
+});
+
+const createDebug3TimeWarpDevice = (
+  id = 'timewarp',
+): GeneratorChain['devices'][number] => ({
+  id,
+  kind: 'timewarp',
+  enabled: true,
+  groupId: null,
+  params: {
+    curve: {
+      divisions: 16,
+      nodes: [
+        { id: 'timewarp-node-start', t: 0, v: 0, nextCurveBend: 0.094912 },
+        { id: 'curve-node-fqbqn4-mn5vepl5', t: 0.375, v: 0.801514 },
+        { id: 'timewarp-node-end', t: 1, v: 1 },
       ],
     },
   },
@@ -104,17 +161,43 @@ const buildActiveVelocityByPitchFromNotes = (
   return active;
 };
 
-test('reverse before and after color differ', () => {
+test('reverse keeps legacy normalized scene timing after color', () => {
   const before = summarizePreview(createChain([
-    { id: 'reverse', kind: 'reverse', enabled: true, groupId: null },
+    createReverseDevice(),
     createColorDevice(),
   ]));
   const after = summarizePreview(createChain([
     createColorDevice(),
-    { id: 'reverse', kind: 'reverse', enabled: true, groupId: null },
+    createReverseDevice(),
   ]));
 
-  assert.notDeepEqual(before, after);
+  assert.deepEqual(before, after);
+});
+
+test('trim keeps legacy normalized scene timing after color', () => {
+  const before = summarizePreview(createChain([
+    createTrimDevice(),
+    createColorDevice(),
+  ]));
+  const after = summarizePreview(createChain([
+    createColorDevice(),
+    createTrimDevice(),
+  ]));
+
+  assert.deepEqual(before, after);
+});
+
+test('stretch keeps legacy normalized scene timing after color', () => {
+  const before = summarizePreview(createChain([
+    createStretchDevice(),
+    createColorDevice(),
+  ]));
+  const after = summarizePreview(createChain([
+    createColorDevice(),
+    createStretchDevice(),
+  ]));
+
+  assert.deepEqual(before, after);
 });
 
 test('time warp before and after color differ', () => {
@@ -130,6 +213,19 @@ test('time warp before and after color differ', () => {
   assert.notDeepEqual(before, after);
 });
 
+test('time warp uses the visible source window before trim', () => {
+  const preview = generatePreviewNotesData({
+    chain: createChain([
+      createDebug3TimeWarpDevice(),
+      { ...createTrimDevice(), params: { start: 0.5, end: 1 } },
+    ]),
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  });
+
+  assert.ok(preview.notes.length > 0);
+});
+
 test('scene effects after color still work', () => {
   const rotatePreview = generatePreviewNotesData({
     chain: createChain([
@@ -143,7 +239,7 @@ test('scene effects after color still work', () => {
     chain: createChain([
       createColorDevice(),
       { id: 'mirror', kind: 'mirror', enabled: true, groupId: null, params: { angleDeg: 45 } },
-      { id: 'trim', kind: 'trim', enabled: true, groupId: null, params: { start: 0.2, end: 0.8 } },
+      createTrimDevice(),
     ]),
     loopLengthBeats: LOOP_LENGTH_BEATS,
     launchpadModel: LAUNCHPAD_MODEL,
@@ -185,7 +281,7 @@ test('a time boundary on one origin does not block later scene effects on anothe
         id: 'color-a',
         groupId: 'group-a',
       },
-      { id: 'reverse-a', kind: 'reverse', enabled: true, groupId: 'group-a' },
+      createReverseDevice('reverse-a', 'group-a'),
     ],
     groupStateById: {},
   };
@@ -209,7 +305,7 @@ test('a time boundary on one origin does not block later scene effects on anothe
   );
 });
 
-test('mask source output follows color and time ordering', () => {
+test('mask source output follows time warp ordering', () => {
   const createMaskedChain = (
     sourceDevices: GeneratorChain['devices'],
   ): GeneratorChain => ({
@@ -235,19 +331,19 @@ test('mask source output follows color and time ordering', () => {
     groupStateById: {},
   });
 
-  const reverseBeforeColor = summarizePreview(createMaskedChain([
-    { id: 'reverse-a', kind: 'reverse', enabled: true, groupId: 'group-a' },
+  const timeWarpBeforeColor = summarizePreview(createMaskedChain([
+    { ...createTimeWarpDevice(), id: 'timewarp-a', groupId: 'group-a' },
     { ...createColorDevice('color-a'), groupId: 'group-a' },
   ]));
-  const colorBeforeReverse = summarizePreview(createMaskedChain([
+  const colorBeforeTimeWarp = summarizePreview(createMaskedChain([
     { ...createColorDevice('color-a'), groupId: 'group-a' },
-    { id: 'reverse-a', kind: 'reverse', enabled: true, groupId: 'group-a' },
+    { ...createTimeWarpDevice(), id: 'timewarp-a', groupId: 'group-a' },
   ]));
 
-  assert.notDeepEqual(reverseBeforeColor, colorBeforeReverse);
+  assert.notDeepEqual(timeWarpBeforeColor, colorBeforeTimeWarp);
 });
 
-test('generator activation mask source follows color and time ordering', () => {
+test('generator activation mask source follows time warp ordering', () => {
   const createMaskedChain = (
     sourceDevices: GeneratorChain['devices'],
   ): GeneratorChain => ({
@@ -273,16 +369,16 @@ test('generator activation mask source follows color and time ordering', () => {
     groupStateById: {},
   });
 
-  const reverseBeforeColor = summarizePreview(createMaskedChain([
-    { id: 'reverse-a', kind: 'reverse', enabled: true, groupId: 'group-a' },
+  const timeWarpBeforeColor = summarizePreview(createMaskedChain([
+    { ...createTimeWarpDevice(), id: 'timewarp-a', groupId: 'group-a' },
     { ...createColorDevice('color-a'), groupId: 'group-a' },
   ]));
-  const colorBeforeReverse = summarizePreview(createMaskedChain([
+  const colorBeforeTimeWarp = summarizePreview(createMaskedChain([
     { ...createColorDevice('color-a'), groupId: 'group-a' },
-    { id: 'reverse-a', kind: 'reverse', enabled: true, groupId: 'group-a' },
+    { ...createTimeWarpDevice(), id: 'timewarp-a', groupId: 'group-a' },
   ]));
 
-  assert.notDeepEqual(reverseBeforeColor, colorBeforeReverse);
+  assert.notDeepEqual(timeWarpBeforeColor, colorBeforeTimeWarp);
 });
 
 test('activation mask preserves authored consumer timing', () => {

@@ -25,7 +25,7 @@ const buildNaturalTemporalWindowCacheKey = (
 
 const buildSourceTemporalWindowByOriginId = (
   sceneInstances: ReadonlyArray<SceneInstance>,
-  effect: Extract<PipelineEffectNode, { kind: 'stretch' | 'trim' }>,
+  effect: Extract<PipelineEffectNode, { kind: 'stretch' | 'trim' | 'timewarp' }>,
   buttonIndex: ButtonIndex,
   effectContext: Omit<EffectApplicationContext, 'worldBounds' | 'buttonIndex' | 'sourceTemporalWindowByOriginId'> | null,
 ): Map<string, TemporalVisibilityWindow> => {
@@ -95,7 +95,11 @@ export const buildSceneInstances = (
     const effectContext = resolveEffectContext?.(device, index);
     const targetGroupId = normalizeOptionalId(device.groupId);
     if (!targetGroupId) {
-      const sourceTemporalWindowByOriginId = (device.kind === 'stretch' || device.kind === 'trim')
+      const sourceTemporalWindowByOriginId = (
+        device.kind === 'stretch'
+        || device.kind === 'trim'
+        || device.kind === 'timewarp'
+      )
         ? buildSourceTemporalWindowByOriginId(sceneInstances, device, buttonIndex, effectContext)
         : undefined;
       sceneInstances = applyPipelineEffect(sceneInstances, device, {
@@ -112,7 +116,11 @@ export const buildSceneInstances = (
       sceneInstance.originGroupId === targetGroupId);
     const unscopedInstances = sceneInstances.filter((sceneInstance) =>
       sceneInstance.originGroupId !== targetGroupId);
-    const sourceTemporalWindowByOriginId = (device.kind === 'stretch' || device.kind === 'trim')
+    const sourceTemporalWindowByOriginId = (
+      device.kind === 'stretch'
+      || device.kind === 'trim'
+      || device.kind === 'timewarp'
+    )
       ? buildSourceTemporalWindowByOriginId(scopedInstances, device, buttonIndex, effectContext)
       : undefined;
     const transformedInstances = applyPipelineEffect(scopedInstances, device, {
