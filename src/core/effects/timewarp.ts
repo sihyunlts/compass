@@ -23,6 +23,27 @@ const mapSampleToSourceWindow = (
   return sourceWindow.start + sourceSpan * sample;
 };
 
+const resolveTimeWarpWindows = (
+  sceneInstance: SceneInstance,
+  context: Pick<EffectApplicationContext, 'sourceTemporalWindowByOriginId'>,
+): {
+  inputWindow: TemporalVisibilityWindow;
+  outputWindow: TemporalVisibilityWindow;
+} => {
+  if (sceneInstance.temporal.hasAuthoredTimeline) {
+    const authoredWindow = sceneInstance.temporal.visibilityWindow;
+    return {
+      inputWindow: authoredWindow,
+      outputWindow: authoredWindow,
+    };
+  }
+
+  return {
+    inputWindow: context.sourceTemporalWindowByOriginId?.get(sceneInstance.originId) ?? NORMALIZED_TIMELINE_WINDOW,
+    outputWindow: NORMALIZED_TIMELINE_WINDOW,
+  };
+};
+
 export const applyTimeWarpEffect = (
   sceneInstances: ReadonlyArray<SceneInstance>,
   curve: TimeWarpCurve,
@@ -35,28 +56,21 @@ export const applyTimeWarpEffect = (
   const remap = createSampledRemapFromTimeWarpCurve(curve);
 
   return sceneInstances.map((sceneInstance) => {
-    const sourceWindow = sceneInstance.temporal.hasAuthoredTimeline
-      ? NORMALIZED_TIMELINE_WINDOW
-      : context.sourceTemporalWindowByOriginId?.get(sceneInstance.originId) ?? NORMALIZED_TIMELINE_WINDOW;
-    const sourceSpan = sourceWindow.end - sourceWindow.start;
-    if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
+    const { inputWindow, outputWindow } = resolveTimeWarpWindows(sceneInstance, context);
+    const sourceSpan = inputWindow.end - inputWindow.start;
+    const outputSpan = outputWindow.end - outputWindow.start;
+    if (!Number.isFinite(sourceSpan) || sourceSpan <= 0 || !Number.isFinite(outputSpan) || outputSpan <= 0) {
       return { ...sceneInstance };
     }
 
     return transformSceneInstancesTemporally([sceneInstance], {
-      remapToInput: remap.kind === 'sampled'
-        ? {
-            kind: 'sampled',
-            domainStart: remap.domainStart,
-            domainEnd: remap.domainEnd,
-            samples: remap.samples.map((sample) => mapSampleToSourceWindow(sample, sourceWindow)),
-          }
-        : {
-            kind: 'affine',
-            alpha: remap.alpha * sourceSpan,
-            beta: sourceWindow.start + sourceSpan * remap.beta,
-          },
-      visibilityWindow: NORMALIZED_TIMELINE_WINDOW,
+      remapToInput: {
+        kind: 'sampled',
+        domainStart: outputWindow.start,
+        domainEnd: outputWindow.end,
+        samples: remap.samples.map((sample) => mapSampleToSourceWindow(sample, inputWindow)),
+      },
+      visibilityWindow: outputWindow,
       marksAuthoredTimeline: true,
     })[0] ?? { ...sceneInstance };
   });
