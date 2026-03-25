@@ -64,7 +64,12 @@ const hasValidTarget = (
     return false;
   }
 
-  const targetDevice = chain.devices.find((device) => device.id === target.deviceId);
+  const targetDeviceIndex = chain.devices.findIndex((device) => device.id === target.deviceId);
+  if (targetDeviceIndex === -1) {
+    return false;
+  }
+
+  const targetDevice = chain.devices[targetDeviceIndex];
   if (!targetDevice || !isModulationTargetDeviceKind(targetDevice.kind)) {
     return false;
   }
@@ -78,7 +83,8 @@ export const reconcileGeneratorChainModulators = (
   let changed = false;
   const seenTargetKeys = new Set<string>();
 
-  for (const device of chain.devices) {
+  for (let deviceIndex = 0; deviceIndex < chain.devices.length; deviceIndex += 1) {
+    const device = chain.devices[deviceIndex];
     if (!isCurveModulatorNode(device)) {
       continue;
     }
@@ -140,7 +146,8 @@ export const collectValidatedModulationRoutes = (
   const routes: ValidatedModulationRoute[] = [];
   const seenTargetKeys = new Set<string>();
 
-  for (const device of chain.devices) {
+  for (let deviceIndex = 0; deviceIndex < chain.devices.length; deviceIndex += 1) {
+    const device = chain.devices[deviceIndex];
     if (!isCurveModulatorNode(device) || !isDeviceEffectivelyEnabled(chain, device)) {
       continue;
     }
@@ -155,7 +162,12 @@ export const collectValidatedModulationRoutes = (
       continue;
     }
 
-    const targetDevice = chain.devices.find((item) => item.id === target.deviceId);
+    const targetDeviceIndex = chain.devices.findIndex((item) => item.id === target.deviceId);
+    if (targetDeviceIndex === -1) {
+      continue;
+    }
+
+    const targetDevice = chain.devices[targetDeviceIndex];
     if (!targetDevice || !isModulationTargetDeviceKind(targetDevice.kind)) {
       continue;
     }

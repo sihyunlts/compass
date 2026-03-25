@@ -1,0 +1,251 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { generatePreviewNotesData } from '../src/domain';
+import { toPreviewFrameBeat } from '../src/renderer/features/preview/frame-index';
+import {
+  createPreviewResultCache,
+} from '../src/renderer/features/preview/result-cache';
+import type { ClipNote, GeneratorChain } from '../src/shared/model';
+
+const LOOP_LENGTH_BEATS = 4;
+const LAUNCHPAD_MODEL = 'mk3' as const;
+
+const createScannerGenerator = (
+  id = 'generator',
+  groupId: string | null = null,
+  angleDeg = 0,
+): GeneratorChain['devices'][number] => ({
+  id,
+  kind: 'scanner',
+  enabled: true,
+  groupId,
+  params: { angleDeg },
+});
+
+const createColorDevice = (
+  id = 'color',
+  velocities: number[] = [20, 100],
+): GeneratorChain['devices'][number] => ({
+  id,
+  kind: 'color',
+  enabled: true,
+  groupId: null,
+  params: {
+    velocities,
+    noteLengthPercent: 80,
+    gapPercent: 20,
+  },
+});
+
+const createTimeWarpDevice = (): GeneratorChain['devices'][number] => ({
+  id: 'timewarp',
+  kind: 'timewarp',
+  enabled: true,
+  groupId: null,
+  params: {
+    curve: {
+      divisions: 16,
+      nodes: [
+        { id: 'start', t: 0, v: 0 },
+        { id: 'mid', t: 0.5, v: 1 },
+        { id: 'end', t: 1, v: 0.25 },
+      ],
+    },
+  },
+});
+
+const createChain = (
+  devices: GeneratorChain['devices'],
+): GeneratorChain => ({
+  devices: [
+    createScannerGenerator(),
+    ...devices,
+  ],
+  groupStateById: {},
+});
+
+const summarizePreview = (
+  chain: GeneratorChain,
+): Array<{ start: number; duration: number; velocity: number; pitch: number }> =>
+  generatePreviewNotesData({
+    chain,
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  }).notes.slice(0, 16).map((note) => ({
+    start: Number(note.startBeat.toFixed(3)),
+    duration: Number(note.durationBeats.toFixed(3)),
+    velocity: note.velocity,
+    pitch: note.pitch,
+  }));
+
+const buildActiveVelocityByPitchFromNotes = (
+  notes: ReadonlyArray<ClipNote>,
+  beat: number,
+): Map<number, number> => {
+  const active = new Map<number, number>();
+
+  for (const note of notes) {
+    const noteEnd = note.startBeat + note.durationBeats;
+    if (!(note.startBeat <= beat && beat < noteEnd)) {
+      continue;
+    }
+
+    const previous = active.get(note.pitch) ?? 0;
+    if (note.velocity > previous) {
+      active.set(note.pitch, note.velocity);
+    }
+  }
+
+  return active;
+};
+
+test('reverse before and after color differ', () => {
+  const before = summarizePreview(createChain([
+    { id: 'reverse', kind: 'reverse', enabled: true, groupId: null },
+    createColorDevice(),
+  ]));
+  const after = summarizePreview(createChain([
+    createColorDevice(),
+    { id: 'reverse', kind: 'reverse', enabled: true, groupId: null },
+  ]));
+
+  assert.notDeepEqual(before, after);
+});
+
+test('time warp before and after color differ', () => {
+  const before = summarizePreview(createChain([
+    createTimeWarpDevice(),
+    createColorDevice(),
+  ]));
+  const after = summarizePreview(createChain([
+    createColorDevice(),
+    createTimeWarpDevice(),
+  ]));
+
+  assert.notDeepEqual(before, after);
+});
+
+test('scene effects after color still work', () => {
+  const rotatePreview = generatePreviewNotesData({
+    chain: createChain([
+      createColorDevice(),
+      { id: 'rotate', kind: 'rotate', enabled: true, groupId: null, params: { angleDeg: 45 } },
+    ]),
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  });
+  const mirrorTrimPreview = generatePreviewNotesData({
+    chain: createChain([
+      createColorDevice(),
+      { id: 'mirror', kind: 'mirror', enabled: true, groupId: null, params: { angleDeg: 45 } },
+      { id: 'trim', kind: 'trim', enabled: true, groupId: null, params: { start: 0.2, end: 0.8 } },
+    ]),
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  });
+  const maskedPreview = generatePreviewNotesData({
+    chain: createChain([
+      createColorDevice(),
+      {
+        id: 'mask',
+        kind: 'mask',
+        enabled: true,
+        groupId: null,
+        params: {
+          mode: 'include',
+          tiles: [],
+          sourceKind: 'tiles',
+          sourceDomain: 'scene',
+          sourceVisibility: 'show',
+          sourceId: null,
+        },
+      },
+    ]),
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  });
+
+  assert.ok(rotatePreview.notes.length > 0);
+  assert.ok(mirrorTrimPreview.notes.length > 0);
+  assert.equal(maskedPreview.notes.length, 0);
+});
+
+test('a time boundary on one origin does not block later scene effects on another origin', () => {
+  const chainWithoutRotate: GeneratorChain = {
+    devices: [
+      createScannerGenerator('generator-a', 'group-a', 0),
+      createScannerGenerator('generator-b', 'group-b', 90),
+      {
+        ...createColorDevice(),
+        id: 'color-a',
+        groupId: 'group-a',
+      },
+      { id: 'reverse-a', kind: 'reverse', enabled: true, groupId: 'group-a' },
+    ],
+    groupStateById: {},
+  };
+  const chainWithRotate: GeneratorChain = {
+    devices: [
+      ...chainWithoutRotate.devices,
+      {
+        id: 'rotate-b',
+        kind: 'rotate',
+        enabled: true,
+        groupId: 'group-b',
+        params: { angleDeg: 45 },
+      },
+    ],
+    groupStateById: {},
+  };
+
+  assert.notDeepEqual(
+    summarizePreview(chainWithRotate),
+    summarizePreview(chainWithoutRotate),
+  );
+});
+
+test('multiple colors compose sequentially', () => {
+  const doubleColor = summarizePreview(createChain([
+    createColorDevice('color-a', [20, 40]),
+    createColorDevice('color-b', [90, 120]),
+  ]));
+  const firstOnly = summarizePreview(createChain([
+    createColorDevice('color-a', [20, 40]),
+  ]));
+  const secondOnly = summarizePreview(createChain([
+    createColorDevice('color-b', [90, 120]),
+  ]));
+
+  assert.notDeepEqual(doubleColor, firstOnly);
+  assert.notDeepEqual(doubleColor, secondOnly);
+});
+
+test('preview cache activation velocities match exported note velocities', () => {
+  const chain = createChain([
+    createColorDevice(),
+    createTimeWarpDevice(),
+  ]);
+  const preview = generatePreviewNotesData({
+    chain,
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  });
+  const previewResult = createPreviewResultCache().resolve({
+    sourceChain: chain,
+    sourceKey: 'test:color-preview',
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  });
+
+  const firstActiveFrameIndex = previewResult.ledFramesByIndex.findIndex((frame) => frame.size > 0);
+  assert.notEqual(firstActiveFrameIndex, -1);
+  const beat = toPreviewFrameBeat(
+    firstActiveFrameIndex,
+    previewResult.sourceTimelineEndBeat,
+  );
+  assert.deepEqual(
+    previewResult.ledFramesByIndex[firstActiveFrameIndex],
+    buildActiveVelocityByPitchFromNotes(preview.notes, beat),
+  );
+});

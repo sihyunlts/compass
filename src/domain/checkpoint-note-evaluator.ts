@@ -17,10 +17,7 @@ import {
   type ClipNoteWithOrigin,
 } from '../devices/color/engine';
 import { normalizeOptionalId } from '../shared/normalize-id';
-import type {
-  GeneratorChain,
-  GeneratorDeviceNode,
-} from '../shared/model';
+import type { GeneratorChain } from '../shared/model';
 import {
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   type NoteGenerationState,
@@ -28,11 +25,33 @@ import {
 } from './note-generation-types';
 import { filterNotesByMask, resolveActiveTileIdsAtBeat } from './mask-note-filter';
 import {
+  applyNoteStageReverseToNotes,
+  applyNoteStageStretchToNotes,
+  applyNoteStageTimeWarpToNotes,
+  applyNoteStageTrimToNotes,
+} from './note-stage-effects';
+import {
   cloneNotes,
   filterNotesByOriginIds,
   groupNotesByOriginId,
   sortClipNotes,
 } from './note-utils';
+
+interface DeferredColorOperation {
+  device: Extract<GeneratorChain['devices'][number], { kind: 'color' }>;
+}
+
+const isNoteStageTimeEffectDevice = (
+  device: GeneratorChain['devices'][number],
+): device is Extract<
+  GeneratorChain['devices'][number],
+  { kind: 'trim' | 'stretch' | 'reverse' | 'timewarp' }
+> => (
+  device.kind === 'trim'
+  || device.kind === 'stretch'
+  || device.kind === 'reverse'
+  || device.kind === 'timewarp'
+);
 
 const buildEngine = (
   chain: GeneratorChain,
@@ -69,53 +88,6 @@ const collectRawNotesForChain = (
   return notes;
 };
 
-const applyColorToCurrentNotes = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-  device: Extract<GeneratorDeviceNode, { kind: 'color' }>,
-): ClipNoteWithOrigin[] => {
-  if (notes.length === 0) {
-    return [];
-  }
-
-  const passthrough = notes
-    .filter((note) => !note.originId)
-    .map((note) => ({ ...note }));
-  const notesByOriginId = new Map<string, ClipNoteWithOrigin[]>();
-
-  for (const note of notes) {
-    if (!note.originId) {
-      continue;
-    }
-
-    const originNotes = notesByOriginId.get(note.originId);
-    if (originNotes) {
-      originNotes.push(note);
-    } else {
-      notesByOriginId.set(note.originId, [{ ...note }]);
-    }
-  }
-
-  for (const [originId, originNotes] of notesByOriginId.entries()) {
-    const colorProgram = applyColorDeviceToNotes(
-      originNotes,
-      device,
-      MIN_NOTE_DURATION,
-    );
-    if (!colorProgram) {
-      continue;
-    }
-
-    notesByOriginId.set(originId, colorProgram.notes);
-  }
-
-  const colorized = [...passthrough];
-  for (const originNotes of notesByOriginId.values()) {
-    colorized.push(...cloneNotes(originNotes));
-  }
-  sortClipNotes(colorized);
-  return colorized;
-};
-
 const buildCheckpointChain = (
   chain: GeneratorChain,
   endExclusive: number,
@@ -128,10 +100,49 @@ const buildGeometryOnlyCheckpointChain = (
   checkpointChain: GeneratorChain,
 ): GeneratorChain => ({
   devices: checkpointChain.devices
-    .filter((device) => device.kind !== 'color')
     .filter((device) => device.kind !== 'mask' || device.params.sourceKind === 'tiles'),
   groupStateById: checkpointChain.groupStateById,
 });
+
+const applyDeferredColors = (
+  notes: ReadonlyArray<ClipNoteWithOrigin>,
+  deferredColors: ReadonlyArray<DeferredColorOperation>,
+): ClipNoteWithOrigin[] => {
+  let current = cloneNotes(notes);
+
+  for (const operation of deferredColors) {
+    const colorProgram = applyColorDeviceToNotes(
+      current,
+      operation.device,
+      MIN_NOTE_DURATION,
+    );
+    if (colorProgram) {
+      current = colorProgram.notes;
+    }
+  }
+
+  return current;
+};
+
+const applyNoteStageTimeEffectToNotes = (
+  notes: ReadonlyArray<ClipNoteWithOrigin>,
+  device: Extract<
+    GeneratorChain['devices'][number],
+    { kind: 'trim' | 'stretch' | 'reverse' | 'timewarp' }
+  >,
+): ClipNoteWithOrigin[] => {
+  if (device.kind === 'reverse') {
+    return applyNoteStageReverseToNotes(notes);
+  }
+  if (device.kind === 'timewarp') {
+    return applyNoteStageTimeWarpToNotes(notes, device.params.curve);
+  }
+  if (device.kind === 'stretch') {
+    return applyNoteStageStretchToNotes(notes, device.params.start, device.params.end);
+  }
+
+  return applyNoteStageTrimToNotes(notes, device.params.start, device.params.end);
+};
 
 const resolveSourceOriginIds = (
   state: NoteGenerationState,
@@ -196,6 +207,40 @@ const normalizeCheckpointSourceNotes = (
   return cloneNotes(normalized);
 };
 
+const resolveNoteStageBoundaryIndexByOriginId = (
+  checkpointChain: GeneratorChain,
+): Map<string, number> => {
+  const pendingColorOriginIds = new Set<string>();
+  const boundaryIndexByOriginId = new Map<string, number>();
+
+  walkEnabledChainOriginScopes(checkpointChain, {
+    onScopedDevice(device, deviceIndex, targetOriginIds) {
+      if (targetOriginIds.length === 0) {
+        return;
+      }
+
+      if (device.kind === 'color') {
+        for (const originId of targetOriginIds) {
+          pendingColorOriginIds.add(originId);
+        }
+        return;
+      }
+
+      if (!isNoteStageTimeEffectDevice(device)) {
+        return;
+      }
+
+      for (const originId of targetOriginIds) {
+        if (pendingColorOriginIds.has(originId) && !boundaryIndexByOriginId.has(originId)) {
+          boundaryIndexByOriginId.set(originId, deviceIndex);
+        }
+      }
+    },
+  });
+
+  return boundaryIndexByOriginId;
+};
+
 export const evaluateCheckpointNotes = (
   state: NoteGenerationState,
   endExclusive: number,
@@ -206,21 +251,118 @@ export const evaluateCheckpointNotes = (
   }
 
   const checkpointChain = buildCheckpointChain(state.chain, endExclusive);
-  const geometryOnlyChain = buildGeometryOnlyCheckpointChain(checkpointChain);
-  const rawNotes = collectRawNotesForChain(
-    geometryOnlyChain,
-    state.loopLengthBeats,
-    state.runtimeMap,
+  const noteStageBoundaryIndexByOriginId = resolveNoteStageBoundaryIndexByOriginId(
+    checkpointChain,
   );
-  const notesByOriginId = groupNotesByOriginId(rawNotes);
   const orderedOriginIds: string[] = [];
+  const deferredColorsByOriginId = new Map<string, DeferredColorOperation[]>();
+  const noteStageNotesByOriginId = new Map<string, ClipNoteWithOrigin[]>();
+  const sceneCheckpointNotesByIndex = new Map<number, Map<string, ClipNoteWithOrigin[]>>();
+
+  const resolveSceneCheckpointNotesByOriginId = (
+    sceneEndExclusive: number,
+  ): Map<string, ClipNoteWithOrigin[]> => {
+    const cachedSceneNotes = sceneCheckpointNotesByIndex.get(sceneEndExclusive);
+    if (cachedSceneNotes) {
+      return cachedSceneNotes;
+    }
+
+    const sceneCheckpointChain = buildCheckpointChain(state.chain, sceneEndExclusive);
+    const sceneNotesByOriginId = groupNotesByOriginId(
+      collectRawNotesForChain(
+        buildGeometryOnlyCheckpointChain(sceneCheckpointChain),
+        state.loopLengthBeats,
+        state.runtimeMap,
+      ),
+    );
+
+    walkEnabledChainOriginScopes(sceneCheckpointChain, {
+      onGenerator(generator) {
+        if (!sceneNotesByOriginId.has(generator.id)) {
+          sceneNotesByOriginId.set(generator.id, []);
+        }
+      },
+      onScopedDevice(device, deviceIndex, targetOriginIds) {
+        if (targetOriginIds.length === 0) {
+          return;
+        }
+
+        if (device.kind === 'color') {
+          return;
+        }
+
+        if (device.kind !== 'mask') {
+          return;
+        }
+
+        if (device.params.sourceKind === 'tiles') {
+          return;
+        }
+
+        const sourceId = normalizeOptionalId(device.params.sourceId);
+        if (!sourceId) {
+          for (const originId of targetOriginIds) {
+            sceneNotesByOriginId.set(originId, []);
+          }
+          return;
+        }
+
+        const sourceNotes = normalizeCheckpointSourceNotes(
+          filterNotesByOriginIds(
+            evaluateCheckpointNotes(state, deviceIndex),
+            resolveSourceOriginIds(state, device.params.sourceKind, sourceId),
+          ),
+          state,
+          deviceIndex,
+          buildNormalizedCheckpointSourceCacheKey(
+            deviceIndex,
+            device.params.sourceKind,
+            sourceId,
+          ),
+        );
+
+        for (const originId of targetOriginIds) {
+          sceneNotesByOriginId.set(
+            originId,
+            filterNotesByMask(
+              sceneNotesByOriginId.get(originId) ?? [],
+              device,
+              state.runtimeMap,
+              (beat) => resolveActiveTileIdsAtBeat(sourceNotes, beat, state.runtimeMap),
+            ),
+          );
+        }
+      },
+    });
+
+    sceneCheckpointNotesByIndex.set(sceneEndExclusive, sceneNotesByOriginId);
+    return sceneNotesByOriginId;
+  };
+
+  const resolveBaseNotesForOrigin = (originId: string): ClipNoteWithOrigin[] => {
+    const sceneEndExclusive = noteStageBoundaryIndexByOriginId.get(originId) ?? endExclusive;
+    return cloneNotes(
+      resolveSceneCheckpointNotesByOriginId(sceneEndExclusive).get(originId) ?? [],
+    );
+  };
+
+  const materializeNoteStageNotesForOrigin = (originId: string): ClipNoteWithOrigin[] => {
+    const existing = noteStageNotesByOriginId.get(originId);
+    if (existing) {
+      return existing;
+    }
+
+    const materialized = applyDeferredColors(
+      resolveBaseNotesForOrigin(originId),
+      deferredColorsByOriginId.get(originId) ?? [],
+    );
+    noteStageNotesByOriginId.set(originId, materialized);
+    return materialized;
+  };
 
   walkEnabledChainOriginScopes(checkpointChain, {
     onGenerator(generator) {
       orderedOriginIds.push(generator.id);
-      if (!notesByOriginId.has(generator.id)) {
-        notesByOriginId.set(generator.id, []);
-      }
     },
     onScopedDevice(device, deviceIndex, targetOriginIds) {
       if (targetOriginIds.length === 0) {
@@ -229,57 +371,55 @@ export const evaluateCheckpointNotes = (
 
       if (device.kind === 'color') {
         for (const originId of targetOriginIds) {
-          notesByOriginId.set(
+          const existingNoteStageNotes = noteStageNotesByOriginId.get(originId);
+          if (existingNoteStageNotes) {
+            const colorProgram = applyColorDeviceToNotes(
+              existingNoteStageNotes,
+              device,
+              MIN_NOTE_DURATION,
+            );
+            if (colorProgram) {
+              noteStageNotesByOriginId.set(originId, colorProgram.notes);
+            }
+            continue;
+          }
+
+          const deferred = deferredColorsByOriginId.get(originId) ?? [];
+          deferred.push({ device });
+          deferredColorsByOriginId.set(originId, deferred);
+        }
+        return;
+      }
+
+      if (isNoteStageTimeEffectDevice(device)) {
+        for (const originId of targetOriginIds) {
+          const boundaryIndex = noteStageBoundaryIndexByOriginId.get(originId);
+          if (boundaryIndex === undefined || deviceIndex < boundaryIndex) {
+            continue;
+          }
+
+          noteStageNotesByOriginId.set(
             originId,
-            applyColorToCurrentNotes(notesByOriginId.get(originId) ?? [], device),
+            applyNoteStageTimeEffectToNotes(
+              materializeNoteStageNotesForOrigin(originId),
+              device,
+            ),
           );
         }
         return;
-      }
-
-      if (device.kind !== 'mask' || device.params.sourceKind === 'tiles') {
-        return;
-      }
-
-      const sourceId = normalizeOptionalId(device.params.sourceId);
-      if (!sourceId) {
-        for (const originId of targetOriginIds) {
-          notesByOriginId.set(originId, []);
-        }
-        return;
-      }
-
-      const sourceNotes = normalizeCheckpointSourceNotes(
-        filterNotesByOriginIds(
-          evaluateCheckpointNotes(state, deviceIndex),
-          resolveSourceOriginIds(state, device.params.sourceKind, sourceId),
-        ),
-        state,
-        deviceIndex,
-        buildNormalizedCheckpointSourceCacheKey(
-          deviceIndex,
-          device.params.sourceKind,
-          sourceId,
-        ),
-      );
-
-      for (const originId of targetOriginIds) {
-        notesByOriginId.set(
-          originId,
-          filterNotesByMask(
-            notesByOriginId.get(originId) ?? [],
-            device,
-            state.runtimeMap,
-            (beat) => resolveActiveTileIdsAtBeat(sourceNotes, beat, state.runtimeMap),
-          ),
-        );
       }
     },
   });
 
   const notes: ClipNoteWithOrigin[] = [];
   for (const originId of orderedOriginIds) {
-    notes.push(...cloneNotes(notesByOriginId.get(originId) ?? []));
+    notes.push(...cloneNotes(
+      noteStageNotesByOriginId.get(originId)
+      ?? applyDeferredColors(
+        resolveBaseNotesForOrigin(originId),
+        deferredColorsByOriginId.get(originId) ?? [],
+      ),
+    ));
   }
   sortClipNotes(notes);
   state.checkpointNotesByIndex.set(endExclusive, notes);
