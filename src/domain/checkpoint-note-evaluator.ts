@@ -1,4 +1,4 @@
-import { MIN_NOTE_DURATION, SAMPLES_PER_BEAT } from '../core/pipeline/constants';
+import { MIN_NOTE_DURATION, NOTE_SAMPLES_PER_BEAT } from '../core/pipeline/constants';
 import { walkEnabledChainOriginScopes } from '../core/pipeline/origin-timeline-policy';
 import { collectPitchSampledNotes } from '../core/pipeline/note-sampling';
 import {
@@ -20,8 +20,8 @@ const resolveFinalOutputTimelineEndBeat = (
   engine: Parameters<typeof evaluateSceneInstancesAtTime>[0],
 ): number => {
   const analysisSampleCount = Math.max(
-    Math.round(state.loopLengthBeats * SAMPLES_PER_BEAT),
-    SAMPLES_PER_BEAT,
+    Math.round(state.loopLengthBeats * NOTE_SAMPLES_PER_BEAT),
+    NOTE_SAMPLES_PER_BEAT,
   );
   let maxEndBeat = NORMALIZED_SOURCE_TIMELINE_END_BEAT;
 
@@ -101,7 +101,7 @@ const buildRawFinalOutputNotes = (
   });
   const sourceTimelineEndBeat = resolveFinalOutputTimelineEndBeat(state, engine);
   const sampleCount = Math.ceil(
-    state.loopLengthBeats * sourceTimelineEndBeat * SAMPLES_PER_BEAT,
+    state.loopLengthBeats * sourceTimelineEndBeat * NOTE_SAMPLES_PER_BEAT,
   );
   if (!Number.isFinite(sampleCount) || sampleCount <= 0) {
     return [];
@@ -110,7 +110,7 @@ const buildRawFinalOutputNotes = (
   const notes: ClipNoteWithOrigin[] = collectPitchSampledNotes({
     sampleCount,
     endBeat: sourceTimelineEndBeat,
-    sampleStepBeats: 1 / SAMPLES_PER_BEAT,
+    sampleStepBeats: 1 / NOTE_SAMPLES_PER_BEAT,
     minimumNoteDuration: MIN_NOTE_DURATION,
     resolveActiveByPitch: (sampleBeat) =>
       evaluateExactOutputFrameAtTime(engine, sampleBeat).activationFrame.activeByPitch,

@@ -1,6 +1,6 @@
 import type { SceneInstance } from '../../core/core-types';
 import { projectSceneToActivationFrame } from '../../core/pipeline/active';
-import { SAMPLES_PER_BEAT } from '../../core/pipeline/constants';
+import { NOTE_SAMPLES_PER_BEAT } from '../../core/pipeline/constants';
 import { collectPitchSampledNotes } from '../../core/pipeline/note-sampling';
 import { composeSceneTemporalState } from '../../core/scene-operators/temporal';
 import type { ClipNote, ColorEffectNode } from '../../shared/model';
@@ -123,12 +123,15 @@ const collectSourceActivationNotes = (
   context: EffectApplicationContext,
 ): ClipNoteWithOrigin[] => {
   const sourceTimelineEndBeat = resolveSceneTimelineEndBeat(sceneInstances);
-  const sampleCount = Math.max(Math.ceil(sourceTimelineEndBeat * SAMPLES_PER_BEAT), SAMPLES_PER_BEAT);
+  const sampleCount = Math.max(
+    Math.ceil(sourceTimelineEndBeat * NOTE_SAMPLES_PER_BEAT),
+    NOTE_SAMPLES_PER_BEAT,
+  );
 
   return collectPitchSampledNotes({
     sampleCount,
     endBeat: sourceTimelineEndBeat,
-    sampleStepBeats: 1 / SAMPLES_PER_BEAT,
+    sampleStepBeats: 1 / NOTE_SAMPLES_PER_BEAT,
     minimumNoteDuration: MIN_COLOR_SEGMENT,
     resolveActiveByPitch: (sampleBeat) =>
       projectSceneToActivationFrame(sceneInstances, sampleBeat, context.buttonIndex).activeByPitch,
