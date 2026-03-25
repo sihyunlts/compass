@@ -49,6 +49,7 @@ export interface CompiledPipelineEngine {
   mutedGeneratorIds: Set<string>;
   modulation: CompiledModulationProgram;
   maskSourceOutputNotesByKey: Map<string, ReadonlyArray<TimedOutputNote>>;
+  staticFinalSceneInstances: SceneInstance[] | null;
 }
 
 export type { MaskDebugSnapshot } from './polylines';
@@ -131,6 +132,7 @@ export const compilePipelineEngine = (
     mutedGeneratorIds,
     modulation: compileModulationProgram(sourceChain),
     maskSourceOutputNotesByKey: new Map(),
+    staticFinalSceneInstances: null,
   };
 };
 
@@ -180,6 +182,17 @@ export const evaluateSceneInstancesAtTime = (
   engine: CompiledPipelineEngine,
   time01: number,
 ): SceneInstance[] => {
+  if (engine.modulation.routes.length === 0) {
+    if (engine.staticFinalSceneInstances) {
+      return engine.staticFinalSceneInstances;
+    }
+
+    const context = createEvaluationContext(engine, 0);
+    const sceneInstances = buildSceneInstancesForAllGroups(context);
+    engine.staticFinalSceneInstances = sceneInstances;
+    return sceneInstances;
+  }
+
   const context = prepareEvaluationContext(engine, time01);
   return buildSceneInstancesForAllGroups(context);
 };
