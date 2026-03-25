@@ -1,4 +1,3 @@
-import { SAMPLES_PER_BEAT } from '../core/pipeline/constants';
 import { analyzeChainOriginTimelinePolicy } from '../core/pipeline/origin-timeline-policy';
 import { normalizeNotesByOriginTimelinePolicy } from '../core/pipeline/timeline-fit';
 import { buildFinalOutputNotes } from './checkpoint-note-evaluator';
@@ -20,14 +19,6 @@ export const buildGeneratedNotesWithRuntimeMap = ({
   runtimeMap: RuntimeMapData;
 }): GeneratedNotesResult => {
   if (!Number.isFinite(loopLengthBeats) || loopLengthBeats <= 0) {
-    return {
-      notes: [],
-      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-    };
-  }
-
-  const steps = Math.round(loopLengthBeats * SAMPLES_PER_BEAT);
-  if (!Number.isFinite(steps) || steps <= 0) {
     return {
       notes: [],
       sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
