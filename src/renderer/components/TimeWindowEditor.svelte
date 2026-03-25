@@ -42,12 +42,6 @@
   const windowLengthText = $derived(
     hasValidWindow ? (visibleEnd - visibleStart).toFixed(3) : 'Invalid',
   );
-  const modeLabel = $derived(mode === 'stretch' ? 'Stretch Output' : 'Trim Output');
-  const modeHintText = $derived(
-    mode === 'stretch'
-      ? 'Full clip is placed into the selected window.'
-      : 'Selected window becomes the whole clip.',
-  );
   const normalizedPlayhead = $derived(
     clamp(Number.isFinite(currentProgress01) ? currentProgress01 : 0, 0, 1),
   );
@@ -67,10 +61,6 @@
 
 <div class="time-window-editor">
   <div class="time-window-toolbar">
-    <div class="time-window-meta">
-      <span class="field-label">{modeLabel}</span>
-      <span class="time-window-hint">{modeHintText}</span>
-    </div>
     {#if modeBadgeText}
       <span class="time-window-badge">{modeBadgeText}</span>
     {/if}
@@ -199,19 +189,6 @@
     gap: var(--gap-8);
   }
 
-  .time-window-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin-right: auto;
-  }
-
-  .time-window-hint {
-    color: var(--neutral-50);
-    font-size: var(--text-12);
-    line-height: 1.2;
-  }
-
   .time-window-badge {
     display: inline-flex;
     align-items: center;
@@ -252,16 +229,8 @@
 
   .time-window-surface {
     position: relative;
-    border: 1px solid var(--neutral-30);
-    border-radius: var(--radius-6);
-    background:
-      linear-gradient(180deg, rgb(var(--rgb-white) / 0.02), transparent),
-      var(--neutral-10);
-    padding: var(--gap-10) var(--gap-10) var(--gap-12);
 
     &.is-invalid {
-      border-color: var(--time-window-accent);
-
       .time-window-selected-span {
         opacity: 0;
       }
@@ -270,7 +239,7 @@
 
   .time-window-track {
     position: relative;
-    height: 2.25rem;
+    height: 1.75rem;
     border-radius: var(--radius-4);
     background:
       linear-gradient(180deg, rgb(var(--rgb-white) / 0.02), transparent),
@@ -376,7 +345,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--gap-8);
-    margin-top: calc(-1 * var(--gap-20));
+    margin-top: calc(-1 * var(--gap-16));
     padding-top: var(--gap-4);
   }
 
