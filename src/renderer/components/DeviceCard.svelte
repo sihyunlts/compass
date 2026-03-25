@@ -12,7 +12,8 @@
     deviceDisplayNameById = {},
     groupDisplayNameById = {},
     paletteRevision,
-    currentBeat = 0,
+    currentBeatBeats = 0,
+    currentProgress01 = 0,
     modulationReadoutById = {},
     resolvePaletteRgb,
     title,
@@ -36,7 +37,8 @@
     deviceDisplayNameById?: Record<string, string>;
     groupDisplayNameById?: Record<string, string>;
     paletteRevision: number;
-    currentBeat?: number;
+    currentBeatBeats?: number;
+    currentProgress01?: number;
     modulationReadoutById?: Record<string, string>;
     resolvePaletteRgb: (velocity: number) => string;
     title: string;
@@ -160,7 +162,8 @@
     {deviceDisplayNameById}
     {groupDisplayNameById}
     {paletteRevision}
-    {currentBeat}
+    {currentBeatBeats}
+    {currentProgress01}
     {modulationReadoutById}
     {resolvePaletteRgb}
   />

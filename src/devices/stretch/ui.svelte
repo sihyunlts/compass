@@ -9,7 +9,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'stretch' }>;
   };
 
-  let { device, currentBeat }: StretchDeviceEditorProps = $props();
+  let { device, currentProgress01 }: StretchDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -18,6 +18,6 @@
     dataAction="set-stretch-param"
     start={device.params.start}
     end={device.params.end}
-    {currentBeat}
+    {currentProgress01}
   />
 </div>

@@ -15,7 +15,8 @@ export interface RendererDeviceEditorPropsBase {
   deviceDisplayNameById?: Record<string, string>;
   groupDisplayNameById?: Record<string, string>;
   paletteRevision: number;
-  currentBeat?: number;
+  currentBeatBeats?: number;
+  currentProgress01?: number;
   modulationReadoutById?: Record<string, string>;
   resolvePaletteRgb: (velocity: number) => string;
 }

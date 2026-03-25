@@ -9,7 +9,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'trim' }>;
   };
 
-  let { device, currentBeat }: TrimDeviceEditorProps = $props();
+  let { device, currentProgress01 }: TrimDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -18,6 +18,6 @@
     dataAction="set-trim-param"
     start={device.params.start}
     end={device.params.end}
-    {currentBeat}
+    {currentProgress01}
   />
 </div>

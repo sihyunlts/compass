@@ -17,7 +17,7 @@
     device,
     devices = [] as GeneratorDeviceNode[],
     deviceDisplayNameById = {},
-    currentBeat = 0,
+    currentProgress01 = 0,
     modulationReadoutById = {},
   }: ModulatorDeviceEditorProps = $props();
 
@@ -103,7 +103,7 @@
     <CurveEditor
       deviceId={device.id}
       curve={device.params.curve}
-      currentBeat={currentBeat}
+      {currentProgress01}
     />
   </div>
 </div>

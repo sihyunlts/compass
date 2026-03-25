@@ -10,13 +10,13 @@
     dataAction,
     start,
     end,
-    currentBeat,
+    currentProgress01,
   } = $props<{
     deviceId: string;
     dataAction: string;
     start: number;
     end: number;
-    currentBeat?: number;
+    currentProgress01?: number;
   }>();
 
   let snapDivisions = $state<number>(16);
@@ -38,9 +38,9 @@
     hasValidWindow ? (visibleEnd - visibleStart).toFixed(3) : 'Invalid',
   );
   const normalizedPlayhead = $derived(
-    clamp(Number.isFinite(currentBeat) ? currentBeat : 0, 0, 1),
+    clamp(Number.isFinite(currentProgress01) ? currentProgress01 : 0, 0, 1),
   );
-  const showsPlayhead = $derived(currentBeat !== undefined && currentBeat !== null);
+  const showsPlayhead = $derived(currentProgress01 !== undefined && currentProgress01 !== null);
   const rangeStep = $derived(1 / snapDivisions);
   const ticks = $derived.by(() =>
     Array.from({ length: snapDivisions + 1 }, (_, index) => ({

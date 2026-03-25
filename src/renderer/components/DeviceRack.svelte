@@ -39,7 +39,8 @@
     chainState,
     collapsedDeviceIds = [] as string[],
     paletteRevision,
-    currentBeat = 0,
+    currentBeatBeats = 0,
+    currentProgress01 = 0,
     modulationReadoutById = {},
     resolvePaletteRgb,
     isSidebarResizing = false,
@@ -66,7 +67,8 @@
     chainState: GeneratorChain;
     collapsedDeviceIds?: string[];
     paletteRevision: number;
-    currentBeat?: number;
+    currentBeatBeats?: number;
+    currentProgress01?: number;
     modulationReadoutById?: Record<string, string>;
     resolvePaletteRgb: (velocity: number) => string;
     isSidebarResizing: boolean;
@@ -265,7 +267,8 @@
             {deviceDisplayNameById}
             {groupDisplayNameById}
             {paletteRevision}
-            {currentBeat}
+            {currentBeatBeats}
+            {currentProgress01}
             {modulationReadoutById}
             {resolvePaletteRgb}
             title={resolveDeviceDisplayName(deviceDisplayNameById, item.device.id)}
@@ -323,7 +326,8 @@
                     {deviceDisplayNameById}
                     {groupDisplayNameById}
                     {paletteRevision}
-                    {currentBeat}
+                    {currentBeatBeats}
+                    {currentProgress01}
                     {modulationReadoutById}
                     {resolvePaletteRgb}
                     title={resolveDeviceDisplayName(deviceDisplayNameById, col.device.id)}

@@ -43,11 +43,11 @@
   let {
     deviceId,
     curve,
-    currentBeat = 0,
+    currentProgress01 = 0,
   } = $props<{
     deviceId: string;
     curve: ModulationCurve;
-    currentBeat?: number;
+    currentProgress01?: number;
   }>();
 
   let editorEl = $state<HTMLDivElement | null>(null);
@@ -96,7 +96,9 @@
   };
 
   const divisions = $derived(Math.max(2, Math.round(curve.divisions)));
-  const clampedBeat = $derived(clamp(Number.isFinite(currentBeat) ? currentBeat : 0, 0, 1));
+  const clampedProgress01 = $derived(
+    clamp(Number.isFinite(currentProgress01) ? currentProgress01 : 0, 0, 1),
+  );
   const sortedNodes = $derived.by(() =>
     [...localNodes].sort((a, b) => a.t - b.t || a.id.localeCompare(b.id)));
   const curveSegments = $derived.by(() => buildCurveSegments(sortedNodes));
@@ -576,7 +578,7 @@
         ></button>
       {/each}
     </div>
-    <div class="curve-editor-playhead" style={`left:${(clampedBeat * 100).toFixed(3)}%;`}></div>
+    <div class="curve-editor-playhead" style={`left:${(clampedProgress01 * 100).toFixed(3)}%;`}></div>
   </div>
 
   <input

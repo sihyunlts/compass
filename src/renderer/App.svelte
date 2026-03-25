@@ -10,6 +10,7 @@
     RENDERER_DEVICE_GROUPS,
     type RendererDeviceKind,
   } from '../devices';
+  import { clamp } from '../shared/math';
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
   import { sanitizeSidebarWidth } from './features/editor/persistence-storage';
   import BrowserPanel from './components/BrowserPanel.svelte';
@@ -156,6 +157,15 @@
     clientWidth: 1,
   });
   let rackMiniMapContentRevision = $state(0);
+  const currentPreviewBeatBeats = $derived(playbackSession.state.currentBeat);
+  const currentPreviewProgress01 = $derived.by(() => {
+    const sourceTimelineEndBeat = previewState.sourceTimelineEndBeat;
+    if (!Number.isFinite(sourceTimelineEndBeat) || sourceTimelineEndBeat <= 0) {
+      return 0;
+    }
+
+    return clamp(currentPreviewBeatBeats / sourceTimelineEndBeat, 0, 1);
+  });
 
   const createRackBinding = (): EditorRackBinding | null => {
     if (!rackViewApi) {
@@ -438,7 +448,8 @@
           chainState={uiState.chainState}
           collapsedDeviceIds={uiState.collapsedDeviceIds}
           paletteRevision={settingsState.paletteRevision}
-          currentBeat={playbackSession.state.currentBeat}
+          currentBeatBeats={currentPreviewBeatBeats}
+          currentProgress01={currentPreviewProgress01}
           modulationReadoutById={previewState.modulationReadoutById}
           {resolvePaletteRgb}
           isSidebarResizing={uiState.isSidebarResizing}
