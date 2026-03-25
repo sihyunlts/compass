@@ -1,5 +1,8 @@
 import type { SceneInstance, TemporalVisibilityWindow } from '../core-types';
-import { createSampledRemapFromTimeWarpCurve } from '../timewarp/curve';
+import {
+  createSampledRemapFromTimeWarpCurve,
+  isIdentityTimeWarpCurve,
+} from '../timewarp/curve';
 import { NORMALIZED_TIMELINE_WINDOW, transformSceneInstancesTemporally } from '../scene-operators/temporal';
 import type { EffectApplicationContext } from '../../devices/engine-types';
 import type { TimeWarpCurve } from '../../shared/model';
@@ -25,6 +28,10 @@ export const applyTimeWarpEffect = (
   curve: TimeWarpCurve,
   context: Pick<EffectApplicationContext, 'sourceTemporalWindowByOriginId'>,
 ): SceneInstance[] => {
+  if (isIdentityTimeWarpCurve(curve)) {
+    return sceneInstances.map((sceneInstance) => ({ ...sceneInstance }));
+  }
+
   const remap = createSampledRemapFromTimeWarpCurve(curve);
 
   return sceneInstances.map((sceneInstance) => {

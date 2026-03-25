@@ -30,6 +30,24 @@ export const resolveSceneLocalTime = (
   t01: number,
 ): number | null => resolveSceneTemporalInputTime(sceneInstance.temporal, t01);
 
+export interface SceneOutputState {
+  localT: number;
+}
+
+export const resolveSceneOutputState = (
+  sceneInstance: Pick<SceneInstanceBase, 'temporal' | 'velocity'>,
+  t01: number,
+): SceneOutputState | null => {
+  const localT = resolveSceneTemporalInputTime(sceneInstance.temporal, t01);
+  if (localT === null || sceneInstance.velocity <= 0) {
+    return null;
+  }
+
+  return {
+    localT,
+  };
+};
+
 export const isSceneInstanceVisibleAtTime = (
   sceneInstance: Pick<SceneInstanceBase, 'temporal'>,
   t01: number,

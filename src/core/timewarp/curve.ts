@@ -14,6 +14,7 @@ const DEFAULT_CURVE_DIVISIONS = 16;
 const CURVE_ZERO_EPSILON = 1e-6;
 const DEFAULT_SAMPLE_MULTIPLIER = 8;
 const MIN_SAMPLE_COUNT = 33;
+const IDENTITY_TIME_WARP_EPSILON = 1e-6;
 const DEFAULT_TIME_WARP_CURVE: Readonly<TimeWarpCurve> = Object.freeze({
   divisions: DEFAULT_CURVE_DIVISIONS,
   nodes: [
@@ -165,4 +166,17 @@ export const createSampledRemapFromTimeWarpCurve = (
     kind: 'sampled',
     samples,
   };
+};
+
+export const isIdentityTimeWarpCurve = (
+  curve: TimeWarpCurve,
+): boolean => {
+  const remap = createSampledRemapFromTimeWarpCurve(curve);
+  const lastIndex = remap.samples.length - 1;
+  if (lastIndex <= 0) {
+    return true;
+  }
+
+  return remap.samples.every((sample, index) =>
+    Math.abs(sample - (index / lastIndex)) <= IDENTITY_TIME_WARP_EPSILON);
 };

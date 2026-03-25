@@ -3,7 +3,7 @@ import type { GeneratorEffectNode, GeneratorNode } from '../shared/model';
 import type { ButtonIndex } from '../core/pipeline/types';
 
 export type GeneratorDeviceKind = GeneratorNode['kind'];
-export type PipelineEffectNode = Exclude<GeneratorEffectNode, { kind: 'color' }>;
+export type PipelineEffectNode = GeneratorEffectNode;
 export type PipelineEffectKind = PipelineEffectNode['kind'];
 
 export interface GeneratorDeviceEngineHandler<

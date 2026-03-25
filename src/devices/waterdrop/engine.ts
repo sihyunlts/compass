@@ -1,6 +1,6 @@
 import { GENERATED_VELOCITY } from '../../core/pipeline/constants';
 import { buildWaterdropPolyline } from '../../core/generators/waterdrop';
-import { createSceneInstanceBase, resolveSceneLocalTime } from '../engine-utils';
+import { createSceneInstanceBase, resolveSceneOutputState } from '../engine-utils';
 import type { GeneratorDeviceEngineHandler } from '../engine-types';
 
 export const waterdropEngineHandler = {
@@ -23,15 +23,15 @@ export const waterdropEngineHandler = {
     };
   },
   buildPolyline(sceneInstance, t01, step) {
-    const localT = resolveSceneLocalTime(sceneInstance, t01);
-    if (localT === null) {
+    const outputState = resolveSceneOutputState(sceneInstance, t01);
+    if (outputState === null) {
       return null;
     }
 
     return buildWaterdropPolyline(
       sceneInstance.originId,
       sceneInstance.primitive.params,
-      localT,
+      outputState.localT,
       step,
       sceneInstance.velocity,
     );

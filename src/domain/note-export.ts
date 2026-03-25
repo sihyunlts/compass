@@ -6,7 +6,6 @@ import {
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   type GenerateNotesInput,
   type GeneratedNotesResult,
-  type NoteGenerationState,
   type RuntimeMapData,
 } from './note-generation-types';
 import { buildRuntimeMapData } from './runtime-map';
@@ -36,20 +35,12 @@ export const buildGeneratedNotesWithRuntimeMap = ({
   }
 
   const originTimelineAnalysis = analyzeChainOriginTimelinePolicy(chain);
-  const state: NoteGenerationState = {
-    chain,
-    loopLengthBeats,
-    runtimeMap,
-    checkpointNotesByIndex: new Map(),
-    normalizedSourceNotesByKey: new Map(),
-    originTimelinePolicyByCheckpointIndex: new Map([[
-      chain.devices.length,
-      originTimelineAnalysis.originTimelinePolicyByGeneratorId,
-    ]]),
-    originGroupIdByGeneratorId: originTimelineAnalysis.originGroupIdByGeneratorId,
-  };
   const normalized = normalizeNotesByOriginTimelinePolicy(
-    buildFinalOutputNotes(state),
+    buildFinalOutputNotes({
+      chain,
+      loopLengthBeats,
+      runtimeMap,
+    }),
     originTimelineAnalysis.originTimelinePolicyByGeneratorId,
   );
 

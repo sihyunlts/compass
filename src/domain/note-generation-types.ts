@@ -1,6 +1,5 @@
 import type { ClipNote, GeneratorChain, LaunchpadButton, LaunchpadModel } from '../shared/model';
 import type { ButtonIndex } from '../core/pipeline/types';
-import type { OriginTimelinePolicy } from '../core/pipeline/origin-timeline-policy';
 import type { ClipNoteWithOrigin } from '../devices/color/engine';
 
 /** Statistics summary for generated notes. */
@@ -30,10 +29,6 @@ export interface NoteGenerationState {
   chain: GeneratorChain;
   loopLengthBeats: number;
   runtimeMap: RuntimeMapData;
-  checkpointNotesByIndex: Map<number, ClipNoteWithOrigin[]>;
-  normalizedSourceNotesByKey: Map<string, ClipNoteWithOrigin[]>;
-  originTimelinePolicyByCheckpointIndex: Map<number, Map<string, OriginTimelinePolicy>>;
-  originGroupIdByGeneratorId: Map<string, string | null>;
 }
 
 export interface GeneratedNotesResult {

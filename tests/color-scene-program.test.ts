@@ -116,6 +116,24 @@ const createDebug3TimeWarpDevice = (
   },
 });
 
+const createIdentityTimeWarpDevice = (
+  id = 'timewarp',
+): GeneratorChain['devices'][number] => ({
+  id,
+  kind: 'timewarp',
+  enabled: true,
+  groupId: null,
+  params: {
+    curve: {
+      divisions: 16,
+      nodes: [
+        { id: 'timewarp-node-start', t: 0, v: 0 },
+        { id: 'timewarp-node-end', t: 1, v: 1 },
+      ],
+    },
+  },
+});
+
 const createChain = (
   devices: GeneratorChain['devices'],
 ): GeneratorChain => ({
@@ -161,7 +179,7 @@ const buildActiveVelocityByPitchFromNotes = (
   return active;
 };
 
-test('reverse keeps legacy normalized scene timing after color', () => {
+test('reverse before and after color differ', () => {
   const before = summarizePreview(createChain([
     createReverseDevice(),
     createColorDevice(),
@@ -171,10 +189,10 @@ test('reverse keeps legacy normalized scene timing after color', () => {
     createReverseDevice(),
   ]));
 
-  assert.deepEqual(before, after);
+  assert.notDeepEqual(before, after);
 });
 
-test('trim keeps legacy normalized scene timing after color', () => {
+test('trim before and after color differ', () => {
   const before = summarizePreview(createChain([
     createTrimDevice(),
     createColorDevice(),
@@ -184,10 +202,10 @@ test('trim keeps legacy normalized scene timing after color', () => {
     createTrimDevice(),
   ]));
 
-  assert.deepEqual(before, after);
+  assert.notDeepEqual(before, after);
 });
 
-test('stretch keeps legacy normalized scene timing after color', () => {
+test('stretch before and after color differ', () => {
   const before = summarizePreview(createChain([
     createStretchDevice(),
     createColorDevice(),
@@ -197,7 +215,36 @@ test('stretch keeps legacy normalized scene timing after color', () => {
     createStretchDevice(),
   ]));
 
-  assert.deepEqual(before, after);
+  assert.notDeepEqual(before, after);
+});
+
+test('color creates delayed follower bands for each pitch', () => {
+  const preview = generatePreviewNotesData({
+    chain: createChain([
+      createColorDevice('color', [3, 33, 34, 35]),
+    ]),
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  });
+  const anchorPitch = preview.notes[0]?.pitch ?? null;
+
+  assert.notEqual(anchorPitch, null);
+
+  const anchorFollowers = preview.notes
+    .filter((note) => note.pitch === anchorPitch)
+    .slice(0, 4)
+    .map((note) => ({
+      start: Number(note.startBeat.toFixed(3)),
+      velocity: note.velocity,
+    }));
+
+  assert.deepEqual(
+    anchorFollowers.map((note) => note.velocity),
+    [3, 33, 34, 35],
+  );
+  assert.ok(anchorFollowers[0].start < anchorFollowers[1].start);
+  assert.ok(anchorFollowers[1].start < anchorFollowers[2].start);
+  assert.ok(anchorFollowers[2].start < anchorFollowers[3].start);
 });
 
 test('time warp before and after color differ', () => {
@@ -211,6 +258,175 @@ test('time warp before and after color differ', () => {
   ]));
 
   assert.notDeepEqual(before, after);
+});
+
+test('identity time warp keeps normalized occupancy after color', () => {
+  const withIdentity = generatePreviewNotesData({
+    chain: createChain([
+      createColorDevice('color', [3, 33, 34, 35]),
+      createIdentityTimeWarpDevice(),
+    ]),
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  });
+  const withoutTimeWarp = generatePreviewNotesData({
+    chain: createChain([
+      createColorDevice('color', [3, 33, 34, 35]),
+    ]),
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  });
+
+  assert.deepEqual(
+    withIdentity.notes.map((note) => ({
+      start: note.startBeat,
+      duration: note.durationBeats,
+      velocity: note.velocity,
+      pitch: note.pitch,
+    })),
+    withoutTimeWarp.notes.map((note) => ({
+      start: note.startBeat,
+      duration: note.durationBeats,
+      velocity: note.velocity,
+      pitch: note.pitch,
+    })),
+  );
+  assert.equal(withIdentity.sourceTimelineEndBeat, withoutTimeWarp.sourceTimelineEndBeat);
+});
+
+test('time warp after color uses the occupied note window', () => {
+  const chain = createChain([
+    createColorDevice('color', [3, 33, 34, 35]),
+    {
+      id: 'timewarp',
+      kind: 'timewarp',
+      enabled: true,
+      groupId: null,
+      params: {
+        curve: {
+          divisions: 16,
+          nodes: [
+            { id: 'timewarp-node-start', t: 0, v: 0, nextCurveBend: 1 },
+            { id: 'timewarp-node-end', t: 1, v: 1 },
+          ],
+        },
+      },
+    },
+  ]);
+  const runtimeMap = buildRuntimeMapDataFromButtonIndex(
+    getLaunchpadRuntimeMap(LAUNCHPAD_MODEL).buttonIndex,
+  );
+  const rawNotes = buildGeneratedNotesWithRuntimeMap({
+    chain,
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    runtimeMap,
+  }).notes;
+
+  let firstBeat = Number.POSITIVE_INFINITY;
+  let lastBeat = Number.NEGATIVE_INFINITY;
+  for (const note of rawNotes) {
+    firstBeat = Math.min(firstBeat, note.startBeat);
+    lastBeat = Math.max(lastBeat, note.startBeat + note.durationBeats);
+  }
+
+  assert.ok(firstBeat <= 0.01);
+  assert.ok(lastBeat >= 0.99);
+});
+
+test('stretch after color and time warp preserves operator order', () => {
+  const colorThenTimeWarp = generatePreviewNotesData({
+    chain: createChain([
+      createColorDevice('color', [3, 33, 34, 35]),
+      {
+        id: 'timewarp',
+        kind: 'timewarp',
+        enabled: true,
+        groupId: null,
+        params: {
+          curve: {
+            divisions: 16,
+            nodes: [
+              { id: 'timewarp-node-start', t: 0, v: 0, nextCurveBend: 0.030432 },
+              { id: 'curve-node-mid', t: 0.3125, v: 0.645264, nextCurveBend: 0.022655 },
+              { id: 'timewarp-node-end', t: 1, v: 1 },
+            ],
+          },
+        },
+      },
+      { ...createStretchDevice(), params: { start: 0.5, end: 1 } },
+    ]),
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  });
+  const timeWarpThenColor = generatePreviewNotesData({
+    chain: createChain([
+      {
+        id: 'timewarp',
+        kind: 'timewarp',
+        enabled: true,
+        groupId: null,
+        params: {
+          curve: {
+            divisions: 16,
+            nodes: [
+              { id: 'timewarp-node-start', t: 0, v: 0, nextCurveBend: 0.030432 },
+              { id: 'curve-node-mid', t: 0.3125, v: 0.645264, nextCurveBend: 0.022655 },
+              { id: 'timewarp-node-end', t: 1, v: 1 },
+            ],
+          },
+        },
+      },
+      createColorDevice('color', [3, 33, 34, 35]),
+      { ...createStretchDevice(), params: { start: 0.5, end: 1 } },
+    ]),
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  });
+
+  assert.notDeepEqual(
+    colorThenTimeWarp.notes.slice(0, 64).map((note) => ({
+      start: note.startBeat,
+      duration: note.durationBeats,
+      velocity: note.velocity,
+      pitch: note.pitch,
+    })),
+    timeWarpThenColor.notes.slice(0, 64).map((note) => ({
+      start: note.startBeat,
+      duration: note.durationBeats,
+      velocity: note.velocity,
+      pitch: note.pitch,
+    })),
+  );
+});
+
+test('later scene effects still affect the same origin after color and time warp', () => {
+  const withoutRotate = generatePreviewNotesData({
+    chain: createChain([
+      createColorDevice('color', [3, 33, 34, 35]),
+      createDebug3TimeWarpDevice(),
+    ]),
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  }).notes.slice(0, 24).map((note) => ({
+    start: Number(note.startBeat.toFixed(3)),
+    velocity: note.velocity,
+    pitch: note.pitch,
+  }));
+  const withRotate = generatePreviewNotesData({
+    chain: createChain([
+      createColorDevice('color', [3, 33, 34, 35]),
+      createDebug3TimeWarpDevice(),
+      { id: 'rotate', kind: 'rotate', enabled: true, groupId: null, params: { angleDeg: 18 } },
+    ]),
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: LAUNCHPAD_MODEL,
+  }).notes.slice(0, 24).map((note) => ({
+    start: Number(note.startBeat.toFixed(3)),
+    velocity: note.velocity,
+    pitch: note.pitch,
+  }));
+
+  assert.notDeepEqual(withRotate, withoutRotate);
 });
 
 test('time warp uses the visible source window before trim', () => {
@@ -425,8 +641,16 @@ test('activation mask preserves authored consumer timing', () => {
     runtimeMap,
   }).notes.filter((note) => note.originId === 'generator-b');
 
+  const beatTolerance = 1 / (LOOP_LENGTH_BEATS * 64);
+
   for (const beat of [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]) {
-    const sourceTiles = resolveActiveTileIdsAtBeat(generatedSourceNotes, beat, runtimeMap);
+    const sourceTiles = new Set<number>();
+    for (const sampleBeat of [beat - beatTolerance, beat, beat + beatTolerance]) {
+      const clampedBeat = Math.min(1, Math.max(0, sampleBeat));
+      for (const tile of resolveActiveTileIdsAtBeat(generatedSourceNotes, clampedBeat, runtimeMap)) {
+        sourceTiles.add(tile);
+      }
+    }
     const consumerTiles = resolveActiveTileIdsAtBeat(generatedConsumerNotes, beat, runtimeMap);
     for (const tile of consumerTiles) {
       assert.ok(sourceTiles.has(tile));

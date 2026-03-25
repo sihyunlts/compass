@@ -1,5 +1,6 @@
 import type { Bounds, Polyline, SceneInstance, SceneInstanceOfKind } from '../core/core-types';
 import type { GeneratorDeviceNode, GeneratorNode } from '../shared/model';
+import { colorEngineHandler } from './color/engine';
 import { maskEngineHandler } from './mask/engine';
 import { mirrorEngineHandler } from './mirror/engine';
 import { reverseEngineHandler } from './reverse/engine';
@@ -38,6 +39,7 @@ const pipelineEffectEngineHandlers = {
   rotate: rotateEngineHandler,
   scale: scaleEngineHandler,
   translate: translateEngineHandler,
+  color: colorEngineHandler,
   trim: trimEngineHandler,
   stretch: stretchEngineHandler,
   timewarp: timeWarpEngineHandler,
