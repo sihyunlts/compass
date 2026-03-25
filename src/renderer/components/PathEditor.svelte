@@ -276,21 +276,6 @@
 </script>
 
 <div class="path-editor-wrap">
-  <div class="path-editor-toolbar">
-    <span class="field-label">Path Points</span>
-    <div class="path-editor-actions">
-      <span class="path-editor-count">{localPoints.length}</span>
-      <button
-        type="button"
-        class="path-editor-delete"
-        disabled={!canDeleteSelectedPoint}
-        onclick={deleteSelectedPoint}
-      >
-        Delete Selected
-      </button>
-    </div>
-  </div>
-
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
@@ -325,6 +310,21 @@
     {/each}
   </div>
 
+  <div class="path-editor-sidebar">
+    <span class="field-label">Path Points</span>
+    <div class="path-editor-actions">
+      <span class="path-editor-count">{localPoints.length}</span>
+      <button
+        type="button"
+        class="path-editor-delete"
+        disabled={!canDeleteSelectedPoint}
+        onclick={deleteSelectedPoint}
+      >
+        Delete Selected
+      </button>
+    </div>
+  </div>
+
   <input
     bind:this={hiddenInputEl}
     type="hidden"
@@ -337,28 +337,36 @@
 <style lang="scss">
   .path-editor {
     &-wrap {
-      display: flex;
-      flex-direction: column;
-      gap: var(--gap-6);
+      display: grid;
+      grid-template-columns: minmax(10rem, 1fr) minmax(7.5rem, auto);
+      align-items: start;
+      gap: var(--gap-8);
       min-width: 0;
     }
 
-    &-toolbar,
+    &-sidebar,
     &-actions {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      flex-direction: column;
+      align-items: stretch;
       gap: var(--gap-8);
+      min-width: 0;
+    }
+
+    &-actions {
+      align-items: stretch;
+      justify-content: flex-start;
     }
 
     &-count {
       min-width: 1.75rem;
-      text-align: right;
+      text-align: left;
       color: var(--neutral-50);
       font-size: var(--text-12);
     }
 
     &-delete {
+      width: 100%;
       appearance: none;
       border: 1px solid var(--neutral-30);
       border-radius: var(--radius-4);
