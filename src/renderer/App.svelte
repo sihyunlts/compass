@@ -5,19 +5,11 @@
    */
   import { onMount, tick } from 'svelte';
 
-  import {
-    getRendererDeviceLabel,
-    RENDERER_DEVICE_GROUPS,
-    type RendererDeviceKind,
-  } from '../devices';
   import { clamp } from '../shared/math';
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
+  import { DEVICE_BROWSER_TREE } from './features/editor/device-browser-categories';
   import { sanitizeSidebarWidth } from './features/editor/persistence-storage';
   import BrowserPanel from './components/BrowserPanel.svelte';
-  import type {
-    BrowserTreeDeviceLeafNode,
-    BrowserTreeDeviceFolderNode,
-  } from './components/browser-tree-types';
   import type { ContextMenuTarget } from './components/context-menu-types';
   import Button from './components/Button.svelte';
   import SidebarResizer from './components/SidebarResizer.svelte';
@@ -55,32 +47,6 @@
   const DEFAULT_LED_RGB = '255 166 57';
   const SETTINGS_SIDEBAR_WIDTH_PX = 320;
   const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, select, textarea, option';
-
-  const toDeviceLeafNode = (
-    kind: RendererDeviceKind,
-  ): BrowserTreeDeviceLeafNode => ({
-    kind: 'device',
-    id: `device:${kind}`,
-    label: getRendererDeviceLabel(kind),
-    deviceKind: kind,
-  });
-
-  const DEVICE_BROWSER_TREE: BrowserTreeDeviceFolderNode[] = [
-    {
-      kind: 'folder',
-      treeKind: 'device',
-      id: 'device-group:generators',
-      label: 'Generators',
-      children: RENDERER_DEVICE_GROUPS.generator.map((kind) => toDeviceLeafNode(kind)),
-    },
-    {
-      kind: 'folder',
-      treeKind: 'device',
-      id: 'device-group:effects',
-      label: 'Effects',
-      children: RENDERER_DEVICE_GROUPS.effect.map((kind) => toDeviceLeafNode(kind)),
-    },
-  ];
 
   const bridgeClient = window.compass;
   let rackViewApi: RackViewApi | null = $state(null);
