@@ -6,7 +6,12 @@ const DEFAULT_PICKER_MAX = 9;
 const DEFAULT_PICKER_STEP = 0.5;
 
 type ChainDevice = GeneratorChain['devices'][number];
-type CenterPickerDevice = Extract<ChainDevice, { kind: 'waterdrop' | 'spiral' }>;
+type CenterPointDevice = Extract<ChainDevice, {
+  params: {
+    centerX: number;
+    centerY: number;
+  };
+}>;
 
 interface CenterPickerControllerOptions {
   findDeviceById: (id: string) => ChainDevice | null;
@@ -24,8 +29,13 @@ interface CenterPickerState {
   didChange: boolean;
 }
 
-const isCenterPickerDevice = (device: ChainDevice | null): device is CenterPickerDevice => (
-  !!device && (device.kind === 'waterdrop' || device.kind === 'spiral')
+const isCenterPointDevice = (device: ChainDevice | null): device is CenterPointDevice => (
+  !!device
+  && 'params' in device
+  && typeof device.params === 'object'
+  && device.params !== null
+  && 'centerX' in device.params
+  && 'centerY' in device.params
 );
 
 const createCenterPickerState = (): CenterPickerState => ({
@@ -130,8 +140,8 @@ export class CenterPickerController {
   }
 
   public syncSelection(deviceId: string): void {
-    const device = this.findDeviceById(deviceId);
-    if (!isCenterPickerDevice(device)) {
+    const device = this.resolveCenterPointDevice(deviceId);
+    if (!device) {
       return;
     }
 
@@ -221,8 +231,8 @@ export class CenterPickerController {
       return false;
     }
 
-    const device = this.findDeviceById(id);
-    if (!isCenterPickerDevice(device)) {
+    const device = this.resolveCenterPointDevice(id);
+    if (!device) {
       return false;
     }
 
@@ -246,8 +256,8 @@ export class CenterPickerController {
       return false;
     }
 
-    const device = this.findDeviceById(id);
-    if (!isCenterPickerDevice(device)) {
+    const device = this.resolveCenterPointDevice(id);
+    if (!device) {
       return false;
     }
 
@@ -267,6 +277,11 @@ export class CenterPickerController {
     updateCenterPickerSurface(surface, midpoint, midpoint);
     this.syncSelection(id);
     return true;
+  }
+
+  private resolveCenterPointDevice(deviceId: string): CenterPointDevice | null {
+    const device = this.findDeviceById(deviceId);
+    return isCenterPointDevice(device) ? device : null;
   }
 
   private finish(shouldPersist: boolean): void {
