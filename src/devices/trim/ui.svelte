@@ -18,6 +18,7 @@
     dataAction="set-trim-param"
     start={device.params.start}
     end={device.params.end}
+    mode="trim"
     {currentProgress01}
   />
 </div>

@@ -1,5 +1,5 @@
 import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode, LaunchpadButton } from '../../shared/model';
-import type { Bounds, Polyline, SceneInstance } from '../core-types';
+import type { Bounds, Polyline, SceneInstance, TemporalVisibilityWindow } from '../core-types';
 
 export type GroupId = string | null;
 export type MaskTimeKind = 'forward' | 'reversed';
@@ -24,6 +24,7 @@ interface GroupEvaluationCache {
   finalSceneInstances: SceneInstance[] | null;
   outputPolylinesByGroup: Map<GroupId, Polyline[]>;
   maskSourceOutputNotesByKey: Map<string, ReadonlyArray<TimedOutputNote>>;
+  naturalTemporalWindowByEffectOriginKey: Map<string, TemporalVisibilityWindow | null>;
 }
 
 export interface GroupEvaluationContext {

@@ -1,4 +1,5 @@
 import { isGeneratorEngineNode } from '../../devices/engine';
+import { isIdentity01TemporalWindow } from '../scene-operators/temporal';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import type {
@@ -100,6 +101,10 @@ export const analyzeChainOriginTimelinePolicy = (
     },
     onScopedDevice(device, _deviceIndex, targetOriginIds) {
       if (device.kind !== 'stretch' && device.kind !== 'trim') {
+        return;
+      }
+
+      if (isIdentity01TemporalWindow(device.params.start, device.params.end)) {
         return;
       }
 

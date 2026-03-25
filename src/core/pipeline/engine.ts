@@ -150,14 +150,15 @@ const createEvaluationContext = (
   generatorById: engine.generatorById,
   mutedGroupIds: engine.mutedGroupIds,
   mutedGeneratorIds: engine.mutedGeneratorIds,
-  cache: {
-    sceneInstancesByGroup: new Map(),
-    checkpointSceneInstancesByIndex: new Map(),
-    finalSceneInstances: null,
-    outputPolylinesByGroup: new Map(),
-    maskSourceOutputNotesByKey: engine.maskSourceOutputNotesByKey,
-  },
-});
+    cache: {
+      sceneInstancesByGroup: new Map(),
+      checkpointSceneInstancesByIndex: new Map(),
+      finalSceneInstances: null,
+      outputPolylinesByGroup: new Map(),
+      maskSourceOutputNotesByKey: engine.maskSourceOutputNotesByKey,
+      naturalTemporalWindowByEffectOriginKey: new Map(),
+    },
+  });
 
 const prepareEvaluationContext = (
   engine: CompiledPipelineEngine,

@@ -103,6 +103,7 @@ const createSourceEvaluationContext = (
       finalSceneInstances: null,
       outputPolylinesByGroup: new Map(),
       maskSourceOutputNotesByKey: new Map(),
+      naturalTemporalWindowByEffectOriginKey: new Map(),
     },
   };
 };

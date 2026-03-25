@@ -18,6 +18,7 @@ export const createSceneInstanceBase = (
     temporal: {
       remap: { alpha: 1, beta: 0 },
       visibilityWindow: { start: 0, end: 1 },
+      hasAuthoredTimeline: false,
     },
     clipStack: [],
   };

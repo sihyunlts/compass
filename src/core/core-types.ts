@@ -39,6 +39,7 @@ export interface TemporalVisibilityWindow {
 export interface SceneTemporalState {
   remap: TemporalAffineRemap;
   visibilityWindow: TemporalVisibilityWindow;
+  hasAuthoredTimeline: boolean;
 }
 
 export interface TileUnionClipShape {

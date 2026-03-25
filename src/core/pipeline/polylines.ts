@@ -75,17 +75,27 @@ const buildSceneInstancesForChain = (
 ): SceneInstance[] => buildSceneInstances(
   chain,
   context.worldBounds,
+  context.buttonIndex,
   (effect, deviceIndex) => {
+    const baseEffectContext = {
+      naturalTemporalWindowByEffectOriginKey: context.cache.naturalTemporalWindowByEffectOriginKey,
+    };
     if (effect.kind !== 'mask') {
-      return null;
+      return baseEffectContext;
     }
 
-    return maskSourceResolvers.resolveMaskEffectContext(
+    const maskEffectContext = maskSourceResolvers.resolveMaskEffectContext(
       effect,
       context,
       resolveScopedMaskTimeKind(chain, normalizeOptionalId(effect.groupId), deviceIndex),
       deviceIndex,
     );
+    return maskEffectContext
+      ? {
+          ...baseEffectContext,
+          ...maskEffectContext,
+        }
+      : baseEffectContext;
   },
 );
 

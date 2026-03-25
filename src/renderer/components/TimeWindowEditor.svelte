@@ -4,18 +4,23 @@
   import { clamp } from '../../shared/math';
 
   const SNAP_DIVISION_OPTIONS = [4, 8, 16, 32] as const;
+  type TimeWindowEditorMode = 'stretch' | 'trim';
 
   let {
     deviceId,
     dataAction,
     start,
     end,
+    mode,
+    modeBadgeText = null,
     currentProgress01,
   } = $props<{
     deviceId: string;
     dataAction: string;
     start: number;
     end: number;
+    mode: TimeWindowEditorMode;
+    modeBadgeText?: string | null;
     currentProgress01?: number;
   }>();
 
@@ -37,6 +42,12 @@
   const windowLengthText = $derived(
     hasValidWindow ? (visibleEnd - visibleStart).toFixed(3) : 'Invalid',
   );
+  const modeLabel = $derived(mode === 'stretch' ? 'Stretch Output' : 'Trim Output');
+  const modeHintText = $derived(
+    mode === 'stretch'
+      ? 'Full clip is placed into the selected window.'
+      : 'Selected window becomes the whole clip.',
+  );
   const normalizedPlayhead = $derived(
     clamp(Number.isFinite(currentProgress01) ? currentProgress01 : 0, 0, 1),
   );
@@ -56,7 +67,13 @@
 
 <div class="time-window-editor">
   <div class="time-window-toolbar">
-    <span class="field-label">Window</span>
+    <div class="time-window-meta">
+      <span class="field-label">{modeLabel}</span>
+      <span class="time-window-hint">{modeHintText}</span>
+    </div>
+    {#if modeBadgeText}
+      <span class="time-window-badge">{modeBadgeText}</span>
+    {/if}
     <div class="time-window-snap" role="group" aria-label="Snap divisions">
       {#each SNAP_DIVISION_OPTIONS as divisions (divisions)}
         <button
@@ -78,10 +95,14 @@
 
   <div
     class="time-window-surface"
+    class:is-stretch={mode === 'stretch'}
+    class:is-trim={mode === 'trim'}
     class:is-invalid={!hasValidWindow}
     style={`--window-start:${visibleStart * 100}%;--window-end:${visibleEnd * 100}%;--playhead:${normalizedPlayhead * 100}%;`}
   >
     <div class="time-window-track" aria-hidden="true">
+      <div class="time-window-outside time-window-outside-start"></div>
+      <div class="time-window-outside time-window-outside-end"></div>
       <div class="time-window-selected-span"></div>
       {#if showsPlayhead}
         <div class="time-window-playhead"></div>
@@ -168,12 +189,38 @@
   .time-window-ruler,
   .time-window-inputs {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
   }
 
   .time-window-toolbar {
-    justify-content: space-between;
+    justify-content: flex-start;
+    align-items: center;
     gap: var(--gap-8);
+  }
+
+  .time-window-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-right: auto;
+  }
+
+  .time-window-hint {
+    color: var(--neutral-50);
+    font-size: var(--text-12);
+    line-height: 1.2;
+  }
+
+  .time-window-badge {
+    display: inline-flex;
+    align-items: center;
+    height: 1.5rem;
+    padding: 0 var(--gap-8);
+    border-radius: 999px;
+    background: rgb(var(--rgb-white) / 0.06);
+    color: var(--neutral-00);
+    font-size: var(--text-12);
+    white-space: nowrap;
   }
 
   .time-window-snap {
@@ -230,10 +277,28 @@
     overflow: hidden;
   }
 
+  .time-window-outside,
   .time-window-selected-span,
   .time-window-playhead,
   .time-window-tick {
     position: absolute;
+  }
+
+  .time-window-outside {
+    top: 0;
+    bottom: 0;
+    background: rgb(var(--rgb-black) / 0.18);
+    pointer-events: none;
+  }
+
+  .time-window-outside-start {
+    left: 0;
+    width: var(--window-start, 0%);
+  }
+
+  .time-window-outside-end {
+    left: var(--window-end, 0%);
+    right: 0;
   }
 
   .time-window-selected-span {
@@ -246,6 +311,41 @@
       linear-gradient(180deg, rgb(var(--rgb-white) / 0.14), rgb(var(--rgb-white) / 0.04)),
       var(--effect-500);
     opacity: 0.88;
+  }
+
+  .time-window-surface.is-stretch {
+    .time-window-selected-span {
+      background:
+        linear-gradient(180deg, rgb(var(--rgb-white) / 0.1), rgb(var(--rgb-white) / 0.02)),
+        var(--effect-500);
+      box-shadow:
+        inset 0 0 0 1px rgb(var(--rgb-white) / 0.12),
+        0 0 0 1px rgb(var(--rgb-black) / 0.18);
+    }
+
+    .time-window-outside {
+      background: rgb(var(--rgb-black) / 0.28);
+    }
+  }
+
+  .time-window-surface.is-trim {
+    .time-window-selected-span {
+      background:
+        repeating-linear-gradient(
+          135deg,
+          rgb(var(--rgb-white) / 0.18) 0,
+          rgb(var(--rgb-white) / 0.18) 6px,
+          rgb(var(--rgb-white) / 0.04) 6px,
+          rgb(var(--rgb-white) / 0.04) 12px
+        ),
+        linear-gradient(180deg, rgb(var(--rgb-white) / 0.12), rgb(var(--rgb-white) / 0.02)),
+        var(--effect-500);
+      opacity: 0.94;
+    }
+
+    .time-window-outside {
+      background: rgb(var(--rgb-black) / 0.12);
+    }
   }
 
   .time-window-playhead {

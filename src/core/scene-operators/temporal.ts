@@ -8,7 +8,13 @@ import type {
 export interface TemporalTransform {
   remapToInput: TemporalAffineRemap;
   visibilityWindow: TemporalVisibilityWindow;
+  marksAuthoredTimeline?: boolean;
 }
+
+const NORMALIZED_TIMELINE_WINDOW: TemporalVisibilityWindow = {
+  start: 0,
+  end: 1,
+};
 
 const EMPTY_VISIBILITY_WINDOW: TemporalVisibilityWindow = {
   start: 1,
@@ -66,6 +72,7 @@ export const composeSceneTemporalState = (
     beta: sceneTemporal.remap.alpha * transform.remapToInput.beta + sceneTemporal.remap.beta,
   },
   visibilityWindow: resolveComposedVisibilityWindow(sceneTemporal, transform),
+  hasAuthoredTimeline: sceneTemporal.hasAuthoredTimeline || transform.marksAuthoredTimeline === true,
 });
 
 export const transformSceneInstancesTemporally = (
@@ -87,24 +94,60 @@ export const isNonWrapping01TemporalWindow = (
   && end > start
 );
 
+export const isIdentity01TemporalWindow = (
+  start: number,
+  end: number,
+): boolean => isNonWrapping01TemporalWindow(start, end) && start === 0 && end === 1;
+
+const resolveSceneInstanceTemporalSourceWindow = (
+  sceneInstance: SceneInstance,
+  sourceTemporalWindowByOriginId: ReadonlyMap<string, TemporalVisibilityWindow> | undefined,
+): TemporalVisibilityWindow => {
+  if (sceneInstance.temporal.hasAuthoredTimeline) {
+    return NORMALIZED_TIMELINE_WINDOW;
+  }
+
+  return sourceTemporalWindowByOriginId?.get(sceneInstance.originId) ?? NORMALIZED_TIMELINE_WINDOW;
+};
+
 export const stretchSceneInstancesTemporally = (
   sceneInstances: ReadonlyArray<SceneInstance>,
   start: number,
   end: number,
+  sourceTemporalWindowByOriginId?: ReadonlyMap<string, TemporalVisibilityWindow>,
 ): SceneInstance[] => {
   if (!isNonWrapping01TemporalWindow(start, end)) {
     return [];
   }
 
-  return transformSceneInstancesTemporally(sceneInstances, {
-    remapToInput: {
-      alpha: end - start,
-      beta: start,
-    },
-    visibilityWindow: {
-      start: 0,
-      end: 1,
-    },
+  if (isIdentity01TemporalWindow(start, end)) {
+    return sceneInstances.map((sceneInstance) => ({ ...sceneInstance }));
+  }
+
+  return sceneInstances.map((sceneInstance) => {
+    const sourceWindow = resolveSceneInstanceTemporalSourceWindow(
+      sceneInstance,
+      sourceTemporalWindowByOriginId,
+    );
+    const sourceSpan = sourceWindow.end - sourceWindow.start;
+    if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
+      return { ...sceneInstance };
+    }
+
+    return {
+      ...sceneInstance,
+      temporal: composeSceneTemporalState(sceneInstance.temporal, {
+        remapToInput: {
+          alpha: sourceSpan / (end - start),
+          beta: sourceWindow.start - (sourceSpan * start) / (end - start),
+        },
+        visibilityWindow: {
+          start,
+          end,
+        },
+        marksAuthoredTimeline: true,
+      }),
+    };
   });
 };
 
@@ -112,20 +155,37 @@ export const trimSceneInstancesTemporally = (
   sceneInstances: ReadonlyArray<SceneInstance>,
   start: number,
   end: number,
+  sourceTemporalWindowByOriginId?: ReadonlyMap<string, TemporalVisibilityWindow>,
 ): SceneInstance[] => {
   if (!isNonWrapping01TemporalWindow(start, end)) {
     return [];
   }
 
-  return transformSceneInstancesTemporally(sceneInstances, {
-    remapToInput: {
-      alpha: 1,
-      beta: 0,
-    },
-    visibilityWindow: {
-      start,
-      end,
-    },
+  if (isIdentity01TemporalWindow(start, end)) {
+    return sceneInstances.map((sceneInstance) => ({ ...sceneInstance }));
+  }
+
+  return sceneInstances.map((sceneInstance) => {
+    const sourceWindow = resolveSceneInstanceTemporalSourceWindow(
+      sceneInstance,
+      sourceTemporalWindowByOriginId,
+    );
+    const sourceSpan = sourceWindow.end - sourceWindow.start;
+    if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
+      return { ...sceneInstance };
+    }
+
+    return {
+      ...sceneInstance,
+      temporal: composeSceneTemporalState(sceneInstance.temporal, {
+        remapToInput: {
+          alpha: sourceSpan * (end - start),
+          beta: sourceWindow.start + sourceSpan * start,
+        },
+        visibilityWindow: NORMALIZED_TIMELINE_WINDOW,
+        marksAuthoredTimeline: true,
+      }),
+    };
   });
 };
 
@@ -136,8 +196,5 @@ export const reverseSceneInstancesTemporally = (
     alpha: -1,
     beta: 1,
   },
-  visibilityWindow: {
-    start: 0,
-    end: 1,
-  },
+  visibilityWindow: NORMALIZED_TIMELINE_WINDOW,
 });

@@ -1,5 +1,6 @@
-import type { Bounds, Polyline, SceneInstance, SceneInstanceOfKind } from '../core/core-types';
+import type { Bounds, Polyline, SceneInstance, SceneInstanceOfKind, TemporalVisibilityWindow } from '../core/core-types';
 import type { GeneratorEffectNode, GeneratorNode } from '../shared/model';
+import type { ButtonIndex } from '../core/pipeline/types';
 
 export type GeneratorDeviceKind = GeneratorNode['kind'];
 export type PipelineEffectNode = Exclude<GeneratorEffectNode, { kind: 'color' }>;
@@ -27,7 +28,10 @@ export interface MutedSourceDescriptor {
 
 export interface EffectApplicationContext {
   worldBounds: Bounds;
+  buttonIndex: ButtonIndex;
   tilesOverride?: Iterable<number> | null;
+  sourceTemporalWindowByOriginId?: ReadonlyMap<string, TemporalVisibilityWindow>;
+  naturalTemporalWindowByEffectOriginKey?: Map<string, TemporalVisibilityWindow | null>;
 }
 
 export interface EffectDeviceEngineHandler<
