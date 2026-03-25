@@ -1,9 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 import {
-  generatePreviewNotesData,
-  generatePreviewStats,
-  NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+  buildGeneratorPreview,
 } from '../../../domain';
 import type { ClipNote, GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
@@ -91,24 +89,11 @@ class PreviewResultCache {
       return cached;
     }
 
-    const generatedNotes = input.preview
-      ? null
-      : generatePreviewNotesData({
-        chain: input.sourceChain,
-        loopLengthBeats: input.loopLengthBeats,
-        launchpadModel: input.launchpadModel,
-      });
-    const preview = input.preview ?? (() => {
-      const generatedPreview = generatedNotes ?? {
-        notes: [],
-        sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-      };
-      return {
-        ...generatePreviewStats(generatedPreview.notes),
-        notes: generatedPreview.notes,
-        sourceTimelineEndBeat: generatedPreview.sourceTimelineEndBeat,
-      };
-    })();
+    const preview = input.preview ?? buildGeneratorPreview({
+      chain: input.sourceChain,
+      loopLengthBeats: input.loopLengthBeats,
+      launchpadModel: input.launchpadModel,
+    });
     const entry: PreviewResultCacheEntry = {
       key,
       preview,

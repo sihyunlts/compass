@@ -1,40 +1,29 @@
-import type { ClipNote } from '../shared/model';
+import type { GeneratorPreview } from '../shared/contracts/preview/generator-preview';
 import { buildGeneratedNotes } from './note-export';
 import {
   type GenerateNotesInput,
-  type PreviewNotesData,
-  type PreviewStats,
 } from './note-generation-types';
 import { toClipNote } from './note-utils';
 
 export {
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   type GenerateNotesInput,
-  type PreviewNotesData,
-  type PreviewStats,
 } from './note-generation-types';
 
-/** Generates clip notes from one chain and one Launchpad model. */
-export const generatePreviewNotesData = ({
+/** Builds the canonical preview payload for one chain and one Launchpad model. */
+export const buildGeneratorPreview = ({
   chain,
   loopLengthBeats,
   launchpadModel,
-}: GenerateNotesInput): PreviewNotesData => {
+}: GenerateNotesInput): GeneratorPreview => {
   const generated = buildGeneratedNotes({
     chain,
     loopLengthBeats,
     launchpadModel,
   });
-
-  return {
-    notes: generated.notes.map((note) => toClipNote(note)),
-    sourceTimelineEndBeat: generated.sourceTimelineEndBeat,
-  };
-};
-
-/** Counts total notes and unique pitches (deduped by pitch value). */
-export const generatePreviewStats = (notes: ReadonlyArray<ClipNote>): PreviewStats => {
+  const notes = generated.notes.map((note) => toClipNote(note));
   const uniquePitches = new Set<number>();
+
   for (const note of notes) {
     uniquePitches.add(note.pitch);
   }
@@ -42,5 +31,7 @@ export const generatePreviewStats = (notes: ReadonlyArray<ClipNote>): PreviewSta
   return {
     noteCount: notes.length,
     uniquePitchCount: uniquePitches.size,
+    notes,
+    sourceTimelineEndBeat: generated.sourceTimelineEndBeat,
   };
 };

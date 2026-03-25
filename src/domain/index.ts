@@ -1,11 +1,8 @@
 export {
-  generatePreviewNotesData,
-  generatePreviewStats,
+  buildGeneratorPreview,
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   type GenerateNotesInput,
-  type PreviewNotesData,
-  type PreviewStats,
-} from './engine';
+} from './generator-preview';
 
 export {
   getLaunchpadRuntimeMap,

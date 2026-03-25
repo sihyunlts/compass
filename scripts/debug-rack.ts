@@ -2,8 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import {
+  buildGeneratorPreview,
   getLaunchpadRuntimeMap,
-  generatePreviewNotesData,
   resolveLaunchpadModel,
 } from '../src/domain';
 import {
@@ -399,7 +399,7 @@ const main = async (): Promise<void> => {
 
   const chain = parsed.preset.chain;
   const runtimeMap = getLaunchpadRuntimeMap(options.launchpadModel);
-  const preview = generatePreviewNotesData({
+  const preview = buildGeneratorPreview({
     chain,
     loopLengthBeats: options.loopLengthBeats,
     launchpadModel: options.launchpadModel,

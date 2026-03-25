@@ -3,18 +3,17 @@ import {
   type LaunchpadLayout,
 } from '../../core/launchpad-map';
 import {
-  generatePreviewNotesData,
-  generatePreviewStats,
+  buildGeneratorPreview,
+  resolveLaunchpadModel,
 } from '../../domain';
 import { LIVE_BRIDGE_TARGET } from '../../shared/bridge/protocol';
 import { sanitizeBridgeSettings } from '../../shared/validation/bridge-settings';
-import type { ClipNote, GeneratorChain, LaunchpadModel } from '../../shared/model';
+import type { ClipNote } from '../../shared/model';
 import type {
   GenerateAndSendRequest,
   GenerateAndSendResponse,
   RequestLiveTempoResponse,
 } from '../../shared/contracts/ipc/generator';
-import type { GeneratorPreview } from '../../shared/contracts/preview/generator-preview';
 import type {
   BridgeSettings,
   LiveBridgeNotesEnvelope,
@@ -22,8 +21,6 @@ import type {
 } from '../../shared/bridge/types';
 import { UdpLiveBridge } from '../bridge/udp-live-bridge';
 
-const DEFAULT_LAUNCHPAD_MODEL: LaunchpadModel = 'mk3';
-const SUPPORTED_LAUNCHPAD_MODELS: ReadonlyArray<LaunchpadModel> = ['mk3', 'mk2'];
 const LAUNCHPAD_LAYOUT: LaunchpadLayout = launchpadLayout;
 
 const toEnvelope = (
@@ -55,32 +52,6 @@ const toTempoRequestEnvelope = (): LiveBridgeTempoRequestEnvelope => ({
   path: LIVE_BRIDGE_TARGET.path,
 });
 
-const createPipelineNotes = (
-  chain: GeneratorChain,
-  loopLengthBeats: number,
-  launchpadModel: LaunchpadModel | undefined,
-): GeneratorPreview => {
-  const preview = generatePreviewNotesData({
-    chain,
-    loopLengthBeats,
-    launchpadModel: resolveLaunchpadModel(launchpadModel),
-  });
-
-  return {
-    ...generatePreviewStats(preview.notes),
-    notes: preview.notes,
-    sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
-  };
-};
-
-const resolveLaunchpadModel = (
-  requestedModel: LaunchpadModel | undefined,
-): LaunchpadModel => (
-  requestedModel && SUPPORTED_LAUNCHPAD_MODELS.includes(requestedModel)
-    ? requestedModel
-    : DEFAULT_LAUNCHPAD_MODEL
-);
-
 /** Coordinates domain note generation and UDP bridge delivery for the renderer. */
 export class GeneratorService {
   public constructor(private readonly bridge = new UdpLiveBridge()) {}
@@ -89,11 +60,11 @@ export class GeneratorService {
     request: GenerateAndSendRequest,
   ): Promise<GenerateAndSendResponse> {
     const bridgeSettings = sanitizeBridgeSettings(request.bridge);
-    const preview = createPipelineNotes(
-      request.chain,
-      bridgeSettings.autoCreateLengthBeats,
-      request.launchpadModel,
-    );
+    const preview = buildGeneratorPreview({
+      chain: request.chain,
+      loopLengthBeats: bridgeSettings.autoCreateLengthBeats,
+      launchpadModel: resolveLaunchpadModel(request.launchpadModel),
+    });
     const envelope = toEnvelope(
       bridgeSettings,
       preview.notes,
