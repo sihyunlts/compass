@@ -1,6 +1,6 @@
 import { analyzeChainOriginTimelinePolicy } from '../core/pipeline/origin-timeline-policy';
 import { normalizeNotesByOriginTimelinePolicy } from '../core/pipeline/timeline-fit';
-import { buildFinalOutputNotes } from './checkpoint-note-evaluator';
+import { buildFinalOutputNotes } from './final-output-notes';
 import {
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   type GenerateNotesInput,
