@@ -1,5 +1,5 @@
 import type { ClipNote } from '../shared/model';
-import type { ClipNoteWithOrigin } from '../devices/color/engine';
+import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 
 export const sortClipNotes = <T extends ClipNote>(notes: T[]): void => {
   notes.sort((left, right) =>

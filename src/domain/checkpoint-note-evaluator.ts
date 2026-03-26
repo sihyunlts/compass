@@ -6,7 +6,7 @@ import {
   evaluateSceneInstancesAtTime,
   evaluateExactOutputFrameAtTime,
 } from '../core/pipeline/engine';
-import { applyColorDeviceToNotes, type ClipNoteWithOrigin } from '../devices/color/engine';
+import { applyColorDeviceToNotes, type ClipNoteWithOrigin } from '../devices/color/color-program';
 import { isDeviceEffectivelyEnabled } from '../shared/group-state';
 import type { ColorEffectNode, GeneratorChain } from '../shared/model';
 import {
