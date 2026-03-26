@@ -26,7 +26,7 @@ import {
   buildSceneInstancesForAllGroups,
   evaluateMaskDebugSnapshot,
   type MaskDebugSnapshot,
-} from './polylines';
+} from './group-output-evaluator';
 import type {
   ButtonIndex,
   GroupChain,
@@ -52,7 +52,7 @@ export interface CompiledPipelineEngine {
   staticFinalSceneInstances: SceneInstance[] | null;
 }
 
-export type { MaskDebugSnapshot } from './polylines';
+export type { MaskDebugSnapshot } from './group-output-evaluator';
 export type { ActivationFrame, ExactOutputFrame } from './active';
 
 interface CompilePipelineEngineOptions {
