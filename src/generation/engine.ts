@@ -30,9 +30,15 @@ import type {
 } from '../shared/model';
 import { normalizeOptionalId } from '../shared/normalize-id';
 import type { RuntimeMapData } from '../domain/note-generation-types';
-import { buildLedFramesBySampleIndex, buildButtonCoordinateByAddress, buildCoordinateGroupByKey, projectTapeToNotes, rasterizeGeneratorFrame, resolveProjectedActiveTiles, toRoundedTileId } from './raster';
+import {
+  buildButtonCoordinateByAddress,
+  buildCoordinateGroupByKey,
+  projectTapeToNotes,
+  resolveProjectedActiveTiles,
+} from './launchpad-projection';
+import { rasterizeGeneratorFrame, toRoundedTileId } from './raster';
 import { addCellToFrame, cloneTape, createEmptyTape, ensureTapeFrameCount, finalizeTape } from './tape';
-import type { GeneratedFieldResult, LedCell, LedTape } from './types';
+import type { CanonicalFieldResult, LedCell, LedTape } from './types';
 
 interface TimelineWindow {
   start: number;
@@ -1309,7 +1315,7 @@ export const buildCanonicalFieldResult = (
   chain: GeneratorChain,
   runtimeMap: RuntimeMapData,
   loopLengthBeats: number,
-): GeneratedFieldResult => {
+): CanonicalFieldResult => {
   const baseChain = stripModulationDevicesFromChain(chain);
   const modulationContext = createModulationContext(chain, loopLengthBeats);
   let currentState: MutableGenerationState = {
@@ -1347,24 +1353,12 @@ export const buildCanonicalFieldResult = (
 
   const tape = finalizeTape(currentState.tape);
   const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(baseChain);
-  const ledFramesBySampleIndex = buildLedFramesBySampleIndex(
-    tape,
-    runtimeMap,
-    mutedGroupIds,
-    mutedGeneratorIds,
-  );
-  const notes = projectTapeToNotes(
-    tape,
-    runtimeMap,
-    mutedGroupIds,
-    mutedGeneratorIds,
-  );
 
   return {
     tape,
-    notes,
     sourceTimelineEndBeat: tape.timeDomainEndBeat,
     sampleStepBeats: tape.sampleStepBeats,
-    ledFramesBySampleIndex,
+    mutedGroupIds,
+    mutedGeneratorIds,
   };
 };

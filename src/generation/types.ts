@@ -1,5 +1,3 @@
-import type { ClipNoteWithOrigin } from '../devices/color/color-program';
-
 export interface LedCell {
   x: number;
   y: number;
@@ -23,10 +21,10 @@ export interface LedTape {
 
 export type LedFrameVelocityEntry = readonly [pitch: number, velocity: number];
 
-export interface GeneratedFieldResult {
+export interface CanonicalFieldResult {
   tape: LedTape;
-  notes: ClipNoteWithOrigin[];
   sourceTimelineEndBeat: number;
   sampleStepBeats: number;
-  ledFramesBySampleIndex: ReadonlyArray<ReadonlyArray<LedFrameVelocityEntry>>;
+  mutedGroupIds: ReadonlySet<string>;
+  mutedGeneratorIds: ReadonlySet<string>;
 }

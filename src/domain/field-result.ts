@@ -6,6 +6,7 @@ import {
 } from './note-generation-types';
 import { buildRuntimeMapData } from './runtime-map';
 import { buildCanonicalFieldResult } from '../generation/engine';
+import { buildLedFramesBySampleIndex, projectTapeToNotes } from '../generation/launchpad-projection';
 import type { LedFrameVelocityEntry } from '../generation/types';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 
@@ -39,11 +40,23 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
   }
 
   const generated = buildCanonicalFieldResult(chain, runtimeMap, loopLengthBeats);
+  const notes = projectTapeToNotes(
+    generated.tape,
+    runtimeMap,
+    generated.mutedGroupIds,
+    generated.mutedGeneratorIds,
+  );
+  const ledFramesBySampleIndex = buildLedFramesBySampleIndex(
+    generated.tape,
+    runtimeMap,
+    generated.mutedGroupIds,
+    generated.mutedGeneratorIds,
+  );
   return {
-    notes: generated.notes,
+    notes,
     sourceTimelineEndBeat: generated.sourceTimelineEndBeat,
     sampleStepBeats: generated.sampleStepBeats,
-    ledFramesBySampleIndex: generated.ledFramesBySampleIndex,
+    ledFramesBySampleIndex,
   };
 };
 
