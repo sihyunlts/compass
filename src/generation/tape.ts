@@ -115,6 +115,58 @@ export const addCellToFrame = (
   tape.nextWriteId += 1;
 };
 
+const compareOptionalStrings = (
+  left: string | null,
+  right: string | null,
+): number => {
+  if (left === right) {
+    return 0;
+  }
+
+  if (left === null) {
+    return -1;
+  }
+
+  if (right === null) {
+    return 1;
+  }
+
+  return left.localeCompare(right);
+};
+
+const compareTapeCells = (
+  left: LedCell,
+  right: LedCell,
+): number => {
+  if (left.writeOrder !== right.writeOrder) {
+    return left.writeOrder - right.writeOrder;
+  }
+
+  const groupOrder = compareOptionalStrings(left.originGroupId, right.originGroupId);
+  if (groupOrder !== 0) {
+    return groupOrder;
+  }
+
+  const originOrder = left.originId.localeCompare(right.originId);
+  if (originOrder !== 0) {
+    return originOrder;
+  }
+
+  if (left.y !== right.y) {
+    return left.y - right.y;
+  }
+
+  if (left.x !== right.x) {
+    return left.x - right.x;
+  }
+
+  if (left.velocity !== right.velocity) {
+    return left.velocity - right.velocity;
+  }
+
+  return 0;
+};
+
 export const finalizeTape = (
   tape: LedTape,
 ): LedTape => {
@@ -131,13 +183,22 @@ export const finalizeTape = (
     ? (lastActiveIndex + 1) * tape.sampleStepBeats
     : 1;
   const frameCount = toFrameCount(Math.max(endBeat, 1), tape.sampleStepBeats);
+  let nextWriteId = 1;
+  const frames = tape.frames.slice(0, frameCount).map((frame) => {
+    const cells = frame.cells.map(cloneCell);
+    cells.sort(compareTapeCells);
+    for (const cell of cells) {
+      cell.writeId = nextWriteId;
+      nextWriteId += 1;
+    }
+
+    return { cells };
+  });
 
   return {
     sampleStepBeats: tape.sampleStepBeats,
     timeDomainEndBeat: Math.max(endBeat, 1),
-    frames: tape.frames.slice(0, frameCount).map((frame) => ({
-      cells: frame.cells.map(cloneCell),
-    })),
-    nextWriteId: tape.nextWriteId,
+    frames,
+    nextWriteId,
   };
 };

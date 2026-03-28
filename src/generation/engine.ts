@@ -1672,21 +1672,6 @@ const createFilteredGenerationState = (
   timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
 });
 
-const renumberTapeWriteIds = (
-  tape: LedTape,
-): void => {
-  let nextWriteId = 1;
-
-  for (const frame of tape.frames) {
-    for (const cell of frame.cells) {
-      cell.writeId = nextWriteId;
-      nextWriteId += 1;
-    }
-  }
-
-  tape.nextWriteId = nextWriteId;
-};
-
 const isSameOperatorExecutionPlan = (
   left: OperatorExecutionPlan,
   right: OperatorExecutionPlan,
@@ -2065,8 +2050,6 @@ const mergeStageOutputState = (
     }
   }
 
-  renumberTapeWriteIds(mergedTape);
-
   const finalizedTape = finalizeTape(mergedTape);
   const nextTimelineStateByOriginId = cloneTimelineStateByOriginId(previousOutputState.timelineStateByOriginId);
   const affectedOriginIds = unionTargetSets(
@@ -2434,18 +2417,12 @@ const executeCompiledRackPlanFromStage = ({
     const stageExecutionPlan = resolveDeviceExecutionPlan(executionPlanByDeviceId, stage.deviceId);
     const previousOutputCheckpoint = previousCheckpointsByStageId.get(stage.stageId);
     const stageOutputScope = resolveStageOutputScope(stage, stageExecutionPlan, currentScope);
+    const canMergeScopedStageOutput = !!previousOutputCheckpoint
+      && !isGeneratorStage(stage)
+      && doesStageAffectCurrentScope(stage, currentScope)
+      && !isInvalidationScopeEmpty(stageOutputScope);
 
-    if (!previousOutputCheckpoint) {
-      currentState = applyCompiledRackStage(
-        currentState,
-        compiledPlan,
-        stage,
-        surfaceAdapter,
-        spatialAdapter,
-        modulationContext,
-        executionPlanByDeviceId,
-      );
-    } else if (!doesStageAffectCurrentScope(stage, currentScope) || isInvalidationScopeEmpty(stageOutputScope)) {
+    if (!canMergeScopedStageOutput) {
       currentState = applyCompiledRackStage(
         currentState,
         compiledPlan,
