@@ -131,16 +131,10 @@ export class GeneratorService {
       return cached.preview;
     }
 
-    const previousGenerated = this.resolvePreviousGeneratedResult(
-      sourceKey,
-      loopLengthBeats,
-      launchpadModel,
-    );
     const generated = buildGeneratedFieldResult({
       chain,
       loopLengthBeats,
       launchpadModel,
-      previousResult: previousGenerated,
     });
     const preview = toGeneratorPreview(generated);
     this.resultsByKey.set(key, {
@@ -174,35 +168,5 @@ export class GeneratorService {
         this.resultsByKey.delete(key);
       }
     }
-  }
-
-  private resolvePreviousGeneratedResult(
-    sourceKey: string,
-    loopLengthBeats: number,
-    launchpadModel: string,
-  ): GeneratedRuntimeFieldResult | null {
-    const previousSourceKey = this.latestSourceKeyByFamily.getLatestSourceKey(sourceKey);
-    if (!previousSourceKey || previousSourceKey === sourceKey) {
-      return null;
-    }
-
-    const previousKey = this.toSendResultKey(
-      previousSourceKey,
-      loopLengthBeats,
-      launchpadModel,
-    );
-    const previousEntry = this.resultsByKey.get(previousKey);
-    if (previousEntry) {
-      return previousEntry.generated;
-    }
-
-    const stalePrefix = `${previousSourceKey}:`;
-    for (const [key, entry] of this.resultsByKey.entries()) {
-      if (key.startsWith(stalePrefix)) {
-        return entry.generated;
-      }
-    }
-
-    return null;
   }
 }

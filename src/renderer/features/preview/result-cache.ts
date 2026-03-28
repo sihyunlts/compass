@@ -44,20 +44,12 @@ class PreviewResultCache {
       return cached;
     }
 
-    const previousGenerated = input.preview
-      ? undefined
-      : this.resolvePreviousGeneratedResult(
-        input.sourceKey,
-        input.loopLengthBeats,
-        input.launchpadModel,
-      );
     const generated = input.preview
       ? undefined
       : buildGeneratedFieldResult({
         chain: input.sourceChain,
         loopLengthBeats: input.loopLengthBeats,
         launchpadModel: input.launchpadModel,
-        previousResult: previousGenerated ?? null,
       });
     const preview = input.preview ?? toGeneratorPreview(generated);
     const entry: PreviewResultCacheEntry = {
@@ -122,36 +114,6 @@ class PreviewResultCache {
         this.resultsByKey.delete(key);
       }
     }
-  }
-
-  private resolvePreviousGeneratedResult(
-    sourceKey: string,
-    loopLengthBeats: number,
-    launchpadModel: LaunchpadModel,
-  ): GeneratedRuntimeFieldResult | null {
-    const previousSourceKey = this.latestSourceKeyByFamily.getLatestSourceKey(sourceKey);
-    if (!previousSourceKey || previousSourceKey === sourceKey) {
-      return null;
-    }
-
-    const previousKey = this.toPreviewResultKey(
-      previousSourceKey,
-      loopLengthBeats,
-      launchpadModel,
-    );
-    const previousEntry = this.resultsByKey.get(previousKey);
-    if (previousEntry?.generated) {
-      return previousEntry.generated;
-    }
-
-    const stalePrefix = `${previousSourceKey}:`;
-    for (const [key, entry] of this.resultsByKey.entries()) {
-      if (key.startsWith(stalePrefix) && entry.generated) {
-        return entry.generated;
-      }
-    }
-
-    return null;
   }
 }
 
