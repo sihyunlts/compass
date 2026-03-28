@@ -6,6 +6,7 @@ export interface GenerateAndSendRequest {
   chain: GeneratorChain;
   bridge: BridgeSettings;
   launchpadModel?: LaunchpadModel;
+  sourceKey?: string;
 }
 
 export interface GenerateAndSendResponse {

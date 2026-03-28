@@ -40,6 +40,7 @@ class SendFlowController {
         chain: sourceChain,
         bridge,
         launchpadModel,
+        sourceKey,
       });
 
       playbackSession.applyPreviewResult({
