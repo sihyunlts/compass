@@ -18,7 +18,7 @@ import type {
   CanonicalExecutionPlan,
 } from '../generation/analysis/types';
 import type { CompiledRackPlan } from '../generation/plan/types';
-import type { LedFrameVelocityEntry } from '../generation/types';
+import type { GenerationCheckpoint, LedFrameVelocityEntry } from '../generation/types';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 
 export interface GeneratedRuntimeFieldResult {
@@ -29,10 +29,7 @@ export interface GeneratedRuntimeFieldResult {
   analysis: CanonicalAnalysisResult;
   executionPlan: CanonicalExecutionPlan;
   compiledPlan: CompiledRackPlan | null;
-  checkpointsByStageId: Map<string, {
-    tape: import('../generation/types').LedTape;
-    timelineStateByOriginId: Map<string, { authored: boolean; window: { start: number; end: number } }>;
-  }>;
+  checkpointsByStageId: Map<string, GenerationCheckpoint>;
 }
 
 const DEFAULT_SAMPLE_STEP_BEATS = 1 / NOTE_SAMPLES_PER_BEAT;

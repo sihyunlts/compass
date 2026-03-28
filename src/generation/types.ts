@@ -25,9 +25,25 @@ export interface LedTape {
   nextWriteId: number;
 }
 
+export interface GenerationTimelineWindow {
+  start: number;
+  end: number;
+}
+
+export interface GenerationOriginTimelineState {
+  authored: boolean;
+  window: GenerationTimelineWindow;
+}
+
+export interface GenerationCheckpoint {
+  tape: LedTape;
+  timelineStateByOriginId: Map<string, GenerationOriginTimelineState>;
+}
+
 export type LedFrameVelocityEntry = readonly [pitch: number, velocity: number];
 
 export interface CanonicalFieldResult {
+  loopLengthBeats: number;
   tape: LedTape;
   sourceTimelineEndBeat: number;
   sampleStepBeats: number;
@@ -36,10 +52,7 @@ export interface CanonicalFieldResult {
   analysis: CanonicalAnalysisResult;
   executionPlan: CanonicalExecutionPlan;
   compiledPlan: CompiledRackPlan;
-  checkpointsByStageId: Map<string, {
-    tape: LedTape;
-    timelineStateByOriginId: Map<string, { authored: boolean; window: { start: number; end: number } }>;
-  }>;
+  checkpointsByStageId: Map<string, GenerationCheckpoint>;
 }
 
 export interface CanonicalSurfaceAdapter {

@@ -55,26 +55,17 @@ import type {
   CanonicalSpatialAdapter,
   CanonicalSpatialMask,
   CanonicalSurfaceAdapter,
+  GenerationCheckpoint,
+  GenerationOriginTimelineState,
+  GenerationTimelineWindow,
   LedCell,
   LedTape,
 } from './types';
 
-interface TimelineWindow {
-  start: number;
-  end: number;
-}
-
-interface OriginTimelineState {
-  authored: boolean;
-  window: TimelineWindow;
-}
+type TimelineWindow = GenerationTimelineWindow;
+type OriginTimelineState = GenerationOriginTimelineState;
 
 interface MutableGenerationState {
-  tape: LedTape;
-  timelineStateByOriginId: Map<string, OriginTimelineState>;
-}
-
-interface GenerationCheckpoint {
   tape: LedTape;
   timelineStateByOriginId: Map<string, OriginTimelineState>;
 }
@@ -1430,6 +1421,105 @@ const createGenerationCheckpoint = (
   timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
 });
 
+const createEmptyGenerationCheckpoint = (): GenerationCheckpoint => ({
+  tape: createEmptyTape(),
+  timelineStateByOriginId: new Map<string, OriginTimelineState>(),
+});
+
+const createGenerationStateFromCheckpoint = (
+  checkpoint: GenerationCheckpoint,
+): MutableGenerationState => ({
+  tape: cloneTape(checkpoint.tape),
+  timelineStateByOriginId: cloneTimelineStateByOriginId(checkpoint.timelineStateByOriginId),
+});
+
+const cloneCheckpointsByStageId = (
+  checkpointsByStageId: ReadonlyMap<string, GenerationCheckpoint>,
+): Map<string, GenerationCheckpoint> => new Map(checkpointsByStageId);
+
+const isSameBeatRange = (
+  left: BeatRange,
+  right: BeatRange,
+): boolean => left.start === right.start && left.end === right.end;
+
+const isSameSpatialRequirement = (
+  left: SpatialRequirement,
+  right: SpatialRequirement,
+): boolean => {
+  if (left === right) {
+    return true;
+  }
+
+  if (typeof left === 'string' || typeof right === 'string') {
+    return false;
+  }
+
+  return left.minX === right.minX
+    && left.maxX === right.maxX
+    && left.minY === right.minY
+    && left.maxY === right.maxY;
+};
+
+const isSameExecutionRequest = (
+  left: CanonicalExecutionRequest,
+  right: CanonicalExecutionRequest,
+): boolean => isSameSpatialRequirement(left.outputBounds, right.outputBounds)
+  && isSameBeatRange(left.timeDomain, right.timeDomain);
+
+const isSameFrameWindowRequirement = (
+  left: BeatRange | 'all' | 'none',
+  right: BeatRange | 'all' | 'none',
+): boolean => {
+  if (left === right) {
+    return true;
+  }
+
+  if (typeof left === 'string' || typeof right === 'string') {
+    return false;
+  }
+
+  return isSameBeatRange(left, right);
+};
+
+const isSameOperatorExecutionPlan = (
+  left: OperatorExecutionPlan,
+  right: OperatorExecutionPlan,
+): boolean => isSameSpatialRequirement(left.requiredOutputBounds, right.requiredOutputBounds)
+  && isSameSpatialRequirement(left.requiredInputRoi, right.requiredInputRoi)
+  && isSameSpatialRequirement(left.requiredSourceRoi, right.requiredSourceRoi)
+  && isSameFrameWindowRequirement(left.requiredFrameWindow, right.requiredFrameWindow)
+  && isSameFrameWindowRequirement(left.requiredSourceFrameWindow, right.requiredSourceFrameWindow);
+
+const findDirtyStageIndex = (
+  previousPlan: CompiledRackPlan,
+  nextPlan: CompiledRackPlan,
+  previousExecutionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
+  nextExecutionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
+): number => {
+  const sharedStageCount = Math.min(previousPlan.stages.length, nextPlan.stages.length);
+  for (let stageIndex = 0; stageIndex < sharedStageCount; stageIndex += 1) {
+    const previousStage = previousPlan.stages[stageIndex];
+    const nextStage = nextPlan.stages[stageIndex];
+    if (previousStage.reuseSignature !== nextStage.reuseSignature) {
+      return stageIndex;
+    }
+
+    const previousStageExecutionPlan = resolveDeviceExecutionPlan(
+      previousExecutionPlanByDeviceId,
+      previousStage.deviceId,
+    );
+    const nextStageExecutionPlan = resolveDeviceExecutionPlan(
+      nextExecutionPlanByDeviceId,
+      nextStage.deviceId,
+    );
+    if (!isSameOperatorExecutionPlan(previousStageExecutionPlan, nextStageExecutionPlan)) {
+      return stageIndex;
+    }
+  }
+
+  return sharedStageCount;
+};
+
 const applyEffectDevice = (
   state: MutableGenerationState,
   chain: GeneratorChain,
@@ -1596,15 +1686,45 @@ const executeCompiledRackPlan = (
 ): {
   state: MutableGenerationState;
   checkpointsByStageId: Map<string, GenerationCheckpoint>;
+} => executeCompiledRackPlanFromStage({
+  compiledPlan,
+  loopLengthBeats,
+  surfaceAdapter,
+  spatialAdapter,
+  executionPlanByDeviceId,
+  startStageIndex: 0,
+  initialCheckpoint: createEmptyGenerationCheckpoint(),
+  reusedPrefixCheckpoints: new Map<string, GenerationCheckpoint>(),
+});
+
+const executeCompiledRackPlanFromStage = ({
+  compiledPlan,
+  loopLengthBeats,
+  surfaceAdapter,
+  spatialAdapter,
+  executionPlanByDeviceId,
+  startStageIndex,
+  initialCheckpoint,
+  reusedPrefixCheckpoints,
+}: {
+  compiledPlan: CompiledRackPlan;
+  loopLengthBeats: number;
+  surfaceAdapter: CanonicalSurfaceAdapter;
+  spatialAdapter: CanonicalSpatialAdapter;
+  executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>;
+  startStageIndex: number;
+  initialCheckpoint: GenerationCheckpoint;
+  reusedPrefixCheckpoints: ReadonlyMap<string, GenerationCheckpoint>;
+}): {
+  state: MutableGenerationState;
+  checkpointsByStageId: Map<string, GenerationCheckpoint>;
 } => {
   const modulationContext = createModulationContext(compiledPlan.baseChain, loopLengthBeats);
-  let currentState: MutableGenerationState = {
-    tape: createEmptyTape(),
-    timelineStateByOriginId: new Map<string, OriginTimelineState>(),
-  };
-  const checkpointsByStageId = new Map<string, GenerationCheckpoint>();
+  let currentState = createGenerationStateFromCheckpoint(initialCheckpoint);
+  const checkpointsByStageId = cloneCheckpointsByStageId(reusedPrefixCheckpoints);
 
-  for (const stage of compiledPlan.stages) {
+  for (let stageIndex = startStageIndex; stageIndex < compiledPlan.stages.length; stageIndex += 1) {
+    const stage = compiledPlan.stages[stageIndex];
     if (
       stage.deviceKind === 'waterdrop'
       || stage.deviceKind === 'scanner'
@@ -1644,21 +1764,81 @@ export const buildCanonicalFieldResult = (
   surfaceAdapter: CanonicalSurfaceAdapter,
   spatialAdapter: CanonicalSpatialAdapter,
   executionRequest: CanonicalExecutionRequest,
+  previousResult?: CanonicalFieldResult | null,
 ): CanonicalFieldResult => {
   const compiledPlan = buildCompiledRackPlan(chain, loopLengthBeats);
   const executionPlan = buildCanonicalExecutionPlan(compiledPlan.baseChain, executionRequest);
-  const { state, checkpointsByStageId } = executeCompiledRackPlan(
-    compiledPlan,
-    loopLengthBeats,
-    surfaceAdapter,
-    spatialAdapter,
-    executionPlan.byDeviceId,
-  );
+  let executionResult: {
+    state: MutableGenerationState;
+    checkpointsByStageId: Map<string, GenerationCheckpoint>;
+  };
 
-  const tape = finalizeTape(state.tape);
+  const canReusePreviousResult = previousResult
+    && previousResult.loopLengthBeats === loopLengthBeats
+    && isSameExecutionRequest(previousResult.executionPlan.finalRequest, executionPlan.finalRequest)
+    && previousResult.compiledPlan.modulationSignature === compiledPlan.modulationSignature;
+
+  if (!canReusePreviousResult) {
+    executionResult = executeCompiledRackPlan(
+      compiledPlan,
+      loopLengthBeats,
+      surfaceAdapter,
+      spatialAdapter,
+      executionPlan.byDeviceId,
+    );
+  } else {
+    const dirtyStageIndex = findDirtyStageIndex(
+      previousResult.compiledPlan,
+      compiledPlan,
+      previousResult.executionPlan.byDeviceId,
+      executionPlan.byDeviceId,
+    );
+    const reusedPrefixCheckpoints = new Map<string, GenerationCheckpoint>();
+    let reusablePrefixComplete = true;
+
+    for (let stageIndex = 0; stageIndex < dirtyStageIndex; stageIndex += 1) {
+      const previousStage = previousResult.compiledPlan.stages[stageIndex];
+      const nextStage = compiledPlan.stages[stageIndex];
+      const checkpoint = previousResult.checkpointsByStageId.get(previousStage.stageId);
+      if (!checkpoint) {
+        reusablePrefixComplete = false;
+        break;
+      }
+      reusedPrefixCheckpoints.set(nextStage.stageId, checkpoint);
+    }
+
+    if (!reusablePrefixComplete) {
+      executionResult = executeCompiledRackPlan(
+        compiledPlan,
+        loopLengthBeats,
+        surfaceAdapter,
+        spatialAdapter,
+        executionPlan.byDeviceId,
+      );
+    } else {
+      const initialCheckpoint = dirtyStageIndex === 0
+        ? createEmptyGenerationCheckpoint()
+        : reusedPrefixCheckpoints.get(compiledPlan.stages[dirtyStageIndex - 1].stageId)
+          ?? createEmptyGenerationCheckpoint();
+
+      executionResult = executeCompiledRackPlanFromStage({
+        compiledPlan,
+        loopLengthBeats,
+        surfaceAdapter,
+        spatialAdapter,
+        executionPlanByDeviceId: executionPlan.byDeviceId,
+        startStageIndex: dirtyStageIndex,
+        initialCheckpoint,
+        reusedPrefixCheckpoints,
+      });
+    }
+  }
+
+  const tape = finalizeTape(executionResult.state.tape);
   const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(compiledPlan.baseChain);
 
   return {
+    loopLengthBeats,
     tape,
     sourceTimelineEndBeat: tape.timeDomainEndBeat,
     sampleStepBeats: tape.sampleStepBeats,
@@ -1667,6 +1847,6 @@ export const buildCanonicalFieldResult = (
     analysis: compiledPlan.analysis,
     executionPlan,
     compiledPlan,
-    checkpointsByStageId,
+    checkpointsByStageId: executionResult.checkpointsByStageId,
   };
 };
