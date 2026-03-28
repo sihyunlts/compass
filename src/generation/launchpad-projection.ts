@@ -1,11 +1,13 @@
-import { clampBounds } from '../core/geometry';
-import type { Bounds } from '../core/core-types';
-import { MIN_NOTE_DURATION, POLYLINE_STEP, THICKNESS } from '../core/pipeline/constants';
+import { MIN_NOTE_DURATION } from '../core/pipeline/constants';
 import { collectPitchSampledNotes, type SampledActivePitch } from '../core/pipeline/note-sampling';
-import type { RuntimeMapData } from '../domain/note-generation-types';
+import {
+  NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+  type RuntimeMapData,
+} from '../domain/note-generation-types';
 import { sortClipNotes } from '../domain/note-utils';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
-import type { GeneratorNode, LaunchpadButton } from '../shared/model';
+import type { LaunchpadButton } from '../shared/model';
+import type { CanonicalExecutionRequest } from './analysis/types';
 import {
   type CanonicalSpatialAdapter,
   type CanonicalSpatialMask,
@@ -84,7 +86,7 @@ const buildViewportCoordinateKeyByTileId = (
 
 const buildViewportBounds = (
   runtimeMap: RuntimeMapData['buttonIndex'],
-): Bounds | null => {
+): CanonicalExecutionRequest['outputBounds'] => {
   let minX = Number.POSITIVE_INFINITY;
   let maxX = Number.NEGATIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
@@ -98,33 +100,10 @@ const buildViewportBounds = (
   }
 
   if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
-    return null;
+    return 'none';
   }
 
   return { minX, maxX, minY, maxY };
-};
-
-const buildTemporaryScannerRenderBounds = (
-  viewportBounds: Bounds | null,
-): Bounds | null => {
-  if (!viewportBounds) {
-    return null;
-  }
-
-  // Keep scanner behavior stable during the spatial refactor until extent/ROI analysis exists.
-  const centerX = (viewportBounds.minX + viewportBounds.maxX) / 2;
-  const centerY = (viewportBounds.minY + viewportBounds.maxY) / 2;
-  const halfWidth = (viewportBounds.maxX - viewportBounds.minX) / 2;
-  const halfHeight = (viewportBounds.maxY - viewportBounds.minY) / 2;
-  const margin = THICKNESS + POLYLINE_STEP * 2;
-  const radius = Math.hypot(halfWidth, halfHeight) + margin;
-
-  return clampBounds({
-    minX: centerX - radius,
-    maxX: centerX + radius,
-    minY: centerY - radius,
-    maxY: centerY + radius,
-  });
 };
 
 const createMaskFromCoordinateKeys = (
@@ -300,13 +279,20 @@ export const createLaunchpadSurfaceAdapter = (
   };
 };
 
+export const createLaunchpadExecutionRequest = (
+  runtimeMap: RuntimeMapData,
+): CanonicalExecutionRequest => ({
+  outputBounds: buildViewportBounds(runtimeMap.buttonIndex),
+  timeDomain: {
+    start: 0,
+    end: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+  },
+});
+
 export const createLaunchpadSpatialAdapter = (
   runtimeMap: RuntimeMapData,
 ): CanonicalSpatialAdapter => {
   const coordinateKeyByTileId = buildViewportCoordinateKeyByTileId(runtimeMap.buttonIndex);
-  const temporaryScannerRenderBounds = buildTemporaryScannerRenderBounds(
-    buildViewportBounds(runtimeMap.buttonIndex),
-  );
 
   return {
     createMaskFromSceneCells: (cells) => createMaskFromCoordinateKeys(
@@ -323,7 +309,5 @@ export const createLaunchpadSpatialAdapter = (
           .filter((coordinateKey): coordinateKey is string => coordinateKey !== undefined),
       ),
     ),
-    resolveGeneratorRenderBounds: (device: GeneratorNode) =>
-      device.kind === 'scanner' ? temporaryScannerRenderBounds : null,
   };
 };

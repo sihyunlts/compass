@@ -8,11 +8,15 @@ import { buildRuntimeMapData } from './runtime-map';
 import { buildCanonicalFieldResult } from '../generation/engine';
 import {
   buildLedFramesBySampleIndex,
+  createLaunchpadExecutionRequest,
   createLaunchpadSpatialAdapter,
   createLaunchpadSurfaceAdapter,
   projectTapeToNotes,
 } from '../generation/launchpad-projection';
-import type { CanonicalAnalysisResult } from '../generation/analysis/types';
+import type {
+  CanonicalAnalysisResult,
+  CanonicalExecutionPlan,
+} from '../generation/analysis/types';
 import type { LedFrameVelocityEntry } from '../generation/types';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 
@@ -22,6 +26,7 @@ export interface GeneratedRuntimeFieldResult {
   sampleStepBeats: number;
   ledFramesBySampleIndex: ReadonlyArray<ReadonlyArray<LedFrameVelocityEntry>>;
   analysis: CanonicalAnalysisResult;
+  executionPlan: CanonicalExecutionPlan;
 }
 
 const DEFAULT_SAMPLE_STEP_BEATS = 1 / NOTE_SAMPLES_PER_BEAT;
@@ -37,6 +42,16 @@ const createEmptyFieldResult = (): GeneratedRuntimeFieldResult => ({
     finalTimeDomain: {
       start: 0,
       end: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+    },
+  },
+  executionPlan: {
+    byDeviceId: new Map(),
+    finalRequest: {
+      outputBounds: 'none',
+      timeDomain: {
+        start: 0,
+        end: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+      },
     },
   },
 });
@@ -56,11 +71,13 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
 
   const surfaceAdapter = createLaunchpadSurfaceAdapter(runtimeMap);
   const spatialAdapter = createLaunchpadSpatialAdapter(runtimeMap);
+  const executionRequest = createLaunchpadExecutionRequest(runtimeMap);
   const generated = buildCanonicalFieldResult(
     chain,
     loopLengthBeats,
     surfaceAdapter,
     spatialAdapter,
+    executionRequest,
   );
   const notes = projectTapeToNotes(
     generated.tape,
@@ -80,6 +97,7 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
     sampleStepBeats: generated.sampleStepBeats,
     ledFramesBySampleIndex,
     analysis: generated.analysis,
+    executionPlan: generated.executionPlan,
   };
 };
 

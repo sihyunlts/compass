@@ -29,7 +29,16 @@ import type {
 } from '../shared/model';
 import { normalizeOptionalId } from '../shared/normalize-id';
 import { rasterizeGeneratorFrame } from './raster';
+import {
+  containsPointInSpatialRequirement,
+} from './analysis/bounds';
+import { buildCanonicalExecutionPlan } from './analysis/execution-plan';
 import { buildCanonicalAnalysisResult } from './analysis/operators';
+import type {
+  CanonicalExecutionRequest,
+  OperatorExecutionPlan,
+  SpatialRequirement,
+} from './analysis/types';
 import { collectActivationSegments, type LedActivationSegment } from './tape-analysis';
 import { addCellToFrame, cloneTape, createEmptyTape, ensureTapeFrameCount, finalizeTape } from './tape';
 import type {
@@ -75,6 +84,24 @@ const DEFAULT_TIMELINE_WINDOW: TimelineWindow = Object.freeze({
 const EMPTY_SPATIAL_MASK: CanonicalSpatialMask = Object.freeze({
   contains: () => false,
 });
+
+const FULL_EXECUTION_BOUNDS: SpatialRequirement = 'all';
+const EMPTY_EXECUTION_PLAN: OperatorExecutionPlan = Object.freeze({
+  requiredOutputBounds: FULL_EXECUTION_BOUNDS,
+  requiredInputRoi: FULL_EXECUTION_BOUNDS,
+  requiredSourceRoi: 'none',
+});
+
+const resolveDeviceExecutionPlan = (
+  executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
+  deviceId: string,
+): OperatorExecutionPlan => executionPlanByDeviceId.get(deviceId) ?? EMPTY_EXECUTION_PLAN;
+
+const isCellWithinExecutionBounds = (
+  x: number,
+  y: number,
+  executionBounds: SpatialRequirement,
+): boolean => containsPointInSpatialRequirement(executionBounds, x, y);
 
 const cloneTimelineStateByOriginId = (
   timelineStateByOriginId: ReadonlyMap<string, OriginTimelineState>,
@@ -248,6 +275,7 @@ const applySpatialTransform = (
   targetGroupId: string | null,
   writeOrder: number,
   resolveTransformAtFrame: (frameIndex: number) => ReturnType<typeof toTranslationTransform> | null,
+  executionBounds: SpatialRequirement,
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
@@ -263,6 +291,10 @@ const applySpatialTransform = (
 
     for (const cell of targeted) {
       if (!transform) {
+        if (!isCellWithinExecutionBounds(cell.x, cell.y, executionBounds)) {
+          continue;
+        }
+
         addCellToFrame(nextTape, frameIndex, {
           x: cell.x,
           y: cell.y,
@@ -275,6 +307,10 @@ const applySpatialTransform = (
       }
 
       const point = applyAffine(transform, { x: cell.x, y: cell.y });
+      if (!isCellWithinExecutionBounds(point.x, point.y, executionBounds)) {
+        continue;
+      }
+
       addCellToFrame(nextTape, frameIndex, {
         x: point.x,
         y: point.y,
@@ -315,6 +351,7 @@ const applyMirrorHalfSymmetry = (
   effect: SymmetryEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
+  executionBounds: SpatialRequirement,
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
@@ -335,7 +372,10 @@ const applyMirrorHalfSymmetry = (
     for (const cell of targeted) {
       const sourceCoordinate = effect.params.axis === 'horizontal' ? cell.x : cell.y;
       const boundary = effect.params.axis === 'horizontal' ? COMPOSITION_CENTER.x : COMPOSITION_CENTER.y;
-      if (isWithinHalfBoundary(sourceCoordinate, boundary, keepMin)) {
+      if (
+        isWithinHalfBoundary(sourceCoordinate, boundary, keepMin)
+        && isCellWithinExecutionBounds(cell.x, cell.y, executionBounds)
+      ) {
         addCellToFrame(nextTape, frameIndex, {
           x: cell.x,
           y: cell.y,
@@ -349,6 +389,9 @@ const applyMirrorHalfSymmetry = (
       const mirrored = applyAffine(mirrorTransform, { x: cell.x, y: cell.y });
       const mirroredCoordinate = effect.params.axis === 'horizontal' ? mirrored.x : mirrored.y;
       if (!isWithinHalfBoundary(mirroredCoordinate, boundary, !keepMin)) {
+        continue;
+      }
+      if (!isCellWithinExecutionBounds(mirrored.x, mirrored.y, executionBounds)) {
         continue;
       }
 
@@ -374,6 +417,7 @@ const applyQuadMirrorSymmetry = (
   effect: SymmetryEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
+  executionBounds: SpatialRequirement,
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
@@ -412,6 +456,9 @@ const applyQuadMirrorSymmetry = (
         if (!isInQuadrant(transformed.x, transformed.y, quadrant)) {
           continue;
         }
+        if (!isCellWithinExecutionBounds(transformed.x, transformed.y, executionBounds)) {
+          continue;
+        }
 
         addCellToFrame(nextTape, frameIndex, {
           x: transformed.x,
@@ -436,6 +483,7 @@ const applyQuadPinwheelSymmetry = (
   effect: SymmetryEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
+  executionBounds: SpatialRequirement,
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
@@ -465,6 +513,9 @@ const applyQuadPinwheelSymmetry = (
         if (!isInQuadrant(transformed.x, transformed.y, quadrant)) {
           continue;
         }
+        if (!isCellWithinExecutionBounds(transformed.x, transformed.y, executionBounds)) {
+          continue;
+        }
 
         addCellToFrame(nextTape, frameIndex, {
           x: transformed.x,
@@ -489,16 +540,17 @@ const applySymmetryEffect = (
   effect: SymmetryEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
+  executionBounds: SpatialRequirement,
 ): MutableGenerationState => {
   if (effect.params.mode === 'mirror-half') {
-    return applyMirrorHalfSymmetry(state, effect, targetGroupId, writeOrder);
+    return applyMirrorHalfSymmetry(state, effect, targetGroupId, writeOrder, executionBounds);
   }
 
   if (effect.params.mode === 'quad-mirror') {
-    return applyQuadMirrorSymmetry(state, effect, targetGroupId, writeOrder);
+    return applyQuadMirrorSymmetry(state, effect, targetGroupId, writeOrder, executionBounds);
   }
 
-  return applyQuadPinwheelSymmetry(state, effect, targetGroupId, writeOrder);
+  return applyQuadPinwheelSymmetry(state, effect, targetGroupId, writeOrder, executionBounds);
 };
 
 const buildSourceCellsByOriginAndFrame = (
@@ -951,13 +1003,15 @@ const collectSourceFrameCells = (
   tape: LedTape,
   frameIndex: number,
   predicate: (cell: LedCell) => boolean,
+  sourceRoi: SpatialRequirement = FULL_EXECUTION_BOUNDS,
 ): LedCell[] => {
   if (frameIndex < 0 || frameIndex >= tape.frames.length) {
     return [];
   }
 
   return tape.frames[frameIndex].cells
-    .filter(predicate)
+    .filter((cell) =>
+      predicate(cell) && isCellWithinExecutionBounds(cell.x, cell.y, sourceRoi))
     .map((cell) => ({ ...cell }));
 };
 
@@ -970,6 +1024,7 @@ const resolveMaskSourceMask = (
   spatialAdapter: CanonicalSpatialAdapter,
   targetGroupId: string | null,
   frameIndex: number,
+  sourceRoi: SpatialRequirement,
 ): CanonicalSpatialMask => {
   if (effect.params.sourceKind === 'tiles') {
     return spatialAdapter.createMaskFromViewportTiles(effect.params.tiles);
@@ -995,6 +1050,7 @@ const resolveMaskSourceMask = (
     effect.params.sourceKind === 'group'
       ? (cell) => cell.originGroupId === sourceId
       : (cell) => cell.originId === sourceId,
+    sourceRoi,
   );
 
   if (effect.params.sourceDomain === 'scene') {
@@ -1015,6 +1071,7 @@ const applyMaskEffect = (
   consumingDeviceIndex: number,
   surfaceAdapter: CanonicalSurfaceAdapter,
   spatialAdapter: CanonicalSpatialAdapter,
+  executionPlan: OperatorExecutionPlan,
 ): MutableGenerationState => {
   const sourceTape = state.tape;
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
@@ -1031,11 +1088,16 @@ const applyMaskEffect = (
       spatialAdapter,
       targetGroupId,
       frameIndex,
+      executionPlan.requiredSourceRoi,
     );
 
     for (const cell of sourceTape.frames[frameIndex].cells) {
       if (!isTargetedCell(cell, targetGroupId)) {
         nextTape.frames[frameIndex].cells.push({ ...cell });
+        continue;
+      }
+
+      if (!isCellWithinExecutionBounds(cell.x, cell.y, executionPlan.requiredOutputBounds)) {
         continue;
       }
 
@@ -1085,6 +1147,7 @@ const applyColorEffect = (
   effect: ColorEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
+  executionBounds: SpatialRequirement,
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
@@ -1121,6 +1184,10 @@ const applyColorEffect = (
       );
 
       for (let frameIndex = startFrame; frameIndex < endFrameExclusive; frameIndex += 1) {
+        if (!isCellWithinExecutionBounds(slot.source.x, slot.source.y, executionBounds)) {
+          continue;
+        }
+
         addCellToFrame(nextTape, frameIndex, {
           x: slot.source.x,
           y: slot.source.y,
@@ -1183,8 +1250,10 @@ const applyEffectDevice = (
   surfaceAdapter: CanonicalSurfaceAdapter,
   spatialAdapter: CanonicalSpatialAdapter,
   modulationContext: ModulationContext,
+  executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
 ): MutableGenerationState => {
   const targetGroupId = normalizeOptionalId(device.groupId);
+  const executionPlan = resolveDeviceExecutionPlan(executionPlanByDeviceId, device.id);
 
   if (device.kind === 'mask') {
     return applyMaskEffect(
@@ -1196,6 +1265,7 @@ const applyEffectDevice = (
       deviceIndex,
       surfaceAdapter,
       spatialAdapter,
+      executionPlan,
     );
   }
 
@@ -1205,11 +1275,18 @@ const applyEffectDevice = (
       device,
       targetGroupId,
       deviceIndex,
+      executionPlan.requiredOutputBounds,
     );
   }
 
   if (device.kind === 'symmetry') {
-    return applySymmetryEffect(state, device, targetGroupId, deviceIndex);
+    return applySymmetryEffect(
+      state,
+      device,
+      targetGroupId,
+      deviceIndex,
+      executionPlan.requiredOutputBounds,
+    );
   }
 
   if (device.kind === 'reverse') {
@@ -1252,6 +1329,7 @@ const applyEffectDevice = (
         state.tape.sampleStepBeats,
       ) as GeneratorEffectNode,
     ),
+    executionPlan.requiredOutputBounds,
   );
 };
 
@@ -1259,12 +1337,13 @@ const applyGeneratorDevice = (
   state: MutableGenerationState,
   device: GeneratorNode,
   deviceIndex: number,
-  spatialAdapter: CanonicalSpatialAdapter,
   modulationContext: ModulationContext,
+  executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
 ): MutableGenerationState => {
   const nextTape = cloneTape(state.tape);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, 1);
+  const executionPlan = resolveDeviceExecutionPlan(executionPlanByDeviceId, device.id);
 
   for (let frameIndex = 0; frameIndex < Math.min(nextTape.frames.length, 256); frameIndex += 1) {
     rasterizeGeneratorFrame(
@@ -1277,7 +1356,7 @@ const applyGeneratorDevice = (
         nextTape.sampleStepBeats,
       ) as GeneratorNode,
       deviceIndex,
-      spatialAdapter,
+      executionPlan.requiredOutputBounds,
     );
   }
 
@@ -1298,9 +1377,11 @@ export const buildCanonicalFieldResult = (
   loopLengthBeats: number,
   surfaceAdapter: CanonicalSurfaceAdapter,
   spatialAdapter: CanonicalSpatialAdapter,
+  executionRequest: CanonicalExecutionRequest,
 ): CanonicalFieldResult => {
   const baseChain = stripModulationDevicesFromChain(chain);
   const modulationContext = createModulationContext(chain, loopLengthBeats);
+  const executionPlan = buildCanonicalExecutionPlan(baseChain, executionRequest);
   let currentState: MutableGenerationState = {
     tape: createEmptyTape(),
     timelineStateByOriginId: new Map<string, OriginTimelineState>(),
@@ -1320,8 +1401,8 @@ export const buildCanonicalFieldResult = (
         currentState,
         device,
         deviceIndex,
-        spatialAdapter,
         modulationContext,
+        executionPlan.byDeviceId,
       );
       continue;
     }
@@ -1338,6 +1419,7 @@ export const buildCanonicalFieldResult = (
       surfaceAdapter,
       spatialAdapter,
       modulationContext,
+      executionPlan.byDeviceId,
     );
   }
 
@@ -1352,5 +1434,6 @@ export const buildCanonicalFieldResult = (
     mutedGroupIds,
     mutedGeneratorIds,
     analysis,
+    executionPlan,
   };
 };

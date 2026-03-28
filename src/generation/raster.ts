@@ -6,7 +6,12 @@ import { buildSpiralPolyline } from '../core/generators/spiral';
 import { buildWaterdropPolyline } from '../core/generators/waterdrop';
 import { normalizeOptionalId } from '../shared/normalize-id';
 import type { GeneratorNode } from '../shared/model';
-import type { CanonicalSpatialAdapter, LedTape } from './types';
+import {
+  intersectSpatialRequirements,
+  toBounds,
+} from './analysis/bounds';
+import type { SpatialRequirement } from './analysis/types';
+import type { LedTape } from './types';
 import { addCellToFrame } from './tape';
 
 const RASTER_LIMIT = 4096;
@@ -20,7 +25,7 @@ const normalizeRangeEnd = (value: number): number =>
 const buildGeneratorPolyline = (
   device: GeneratorNode,
   beat01: number,
-  spatialAdapter: CanonicalSpatialAdapter,
+  executionBounds: SpatialRequirement,
 ) => {
   if (device.kind === 'waterdrop') {
     return buildWaterdropPolyline(
@@ -33,7 +38,7 @@ const buildGeneratorPolyline = (
   }
 
   if (device.kind === 'scanner') {
-    const renderBounds = spatialAdapter.resolveGeneratorRenderBounds(device);
+    const renderBounds = toBounds(executionBounds);
     if (!renderBounds) {
       return null;
     }
@@ -70,10 +75,10 @@ export const rasterizeGeneratorFrame = (
   frameIndex: number,
   device: GeneratorNode,
   writeOrder: number,
-  spatialAdapter: CanonicalSpatialAdapter,
+  executionBounds: SpatialRequirement,
 ): void => {
   const beat = frameIndex * tape.sampleStepBeats;
-  const polyline = buildGeneratorPolyline(device, Math.min(Math.max(beat, 0), 1), spatialAdapter);
+  const polyline = buildGeneratorPolyline(device, Math.min(Math.max(beat, 0), 1), executionBounds);
   if (!polyline || polyline.points.length === 0) {
     return;
   }
@@ -94,10 +99,23 @@ export const rasterizeGeneratorFrame = (
     return;
   }
 
-  const startX = normalizeRangeStart(minX - THICKNESS);
-  const endX = normalizeRangeEnd(maxX + THICKNESS);
-  const startY = normalizeRangeStart(minY - THICKNESS);
-  const endY = normalizeRangeEnd(maxY + THICKNESS);
+  const rasterBounds = toBounds(intersectSpatialRequirements(
+    {
+      minX: minX - THICKNESS,
+      maxX: maxX + THICKNESS,
+      minY: minY - THICKNESS,
+      maxY: maxY + THICKNESS,
+    },
+    executionBounds,
+  ));
+  if (!rasterBounds) {
+    return;
+  }
+
+  const startX = normalizeRangeStart(rasterBounds.minX);
+  const endX = normalizeRangeEnd(rasterBounds.maxX);
+  const startY = normalizeRangeStart(rasterBounds.minY);
+  const endY = normalizeRangeEnd(rasterBounds.maxY);
   const thicknessSq = THICKNESS * THICKNESS;
   const originGroupId = normalizeOptionalId(device.groupId);
 

@@ -25,3 +25,19 @@ export interface CanonicalAnalysisResult {
   finalOutputBounds: SpatialRequirement;
   finalTimeDomain: BeatRange;
 }
+
+export interface CanonicalExecutionRequest {
+  outputBounds: SpatialRequirement;
+  timeDomain: BeatRange;
+}
+
+export interface OperatorExecutionPlan {
+  requiredOutputBounds: SpatialRequirement;
+  requiredInputRoi: SpatialRequirement;
+  requiredSourceRoi: SpatialRequirement;
+}
+
+export interface CanonicalExecutionPlan {
+  byDeviceId: Map<string, OperatorExecutionPlan>;
+  finalRequest: CanonicalExecutionRequest;
+}

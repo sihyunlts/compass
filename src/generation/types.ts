@@ -1,6 +1,7 @@
-import type { Bounds } from '../core/core-types';
-import type { GeneratorNode } from '../shared/model';
-import type { CanonicalAnalysisResult } from './analysis/types';
+import type {
+  CanonicalAnalysisResult,
+  CanonicalExecutionPlan,
+} from './analysis/types';
 
 export interface LedCell {
   x: number;
@@ -32,6 +33,7 @@ export interface CanonicalFieldResult {
   mutedGroupIds: ReadonlySet<string>;
   mutedGeneratorIds: ReadonlySet<string>;
   analysis: CanonicalAnalysisResult;
+  executionPlan: CanonicalExecutionPlan;
 }
 
 export interface CanonicalSurfaceAdapter {
@@ -45,5 +47,4 @@ export interface CanonicalSpatialMask {
 export interface CanonicalSpatialAdapter {
   createMaskFromSceneCells(cells: ReadonlyArray<LedCell>): CanonicalSpatialMask;
   createMaskFromViewportTiles(tileIds: Iterable<number>): CanonicalSpatialMask;
-  resolveGeneratorRenderBounds(device: GeneratorNode): Bounds | null;
 }
