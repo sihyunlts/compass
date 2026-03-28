@@ -11,25 +11,36 @@ const getSourceKeyFamily = (sourceKey: string): string | null => {
 export class LatestSourceKeyFamilyCache {
   private readonly latestSourceKeyByFamily = new Map<string, string>();
 
+  public getLatestSourceKey(sourceKey: string): string | null {
+    const family = getSourceKeyFamily(sourceKey);
+    if (!family) {
+      return null;
+    }
+
+    return this.latestSourceKeyByFamily.get(family) ?? null;
+  }
+
+  public replaceLatestSourceKey(sourceKey: string): string | null {
+    const family = getSourceKeyFamily(sourceKey);
+    if (!family) {
+      return null;
+    }
+
+    const previousSourceKey = this.latestSourceKeyByFamily.get(family) ?? null;
+    this.latestSourceKeyByFamily.set(family, sourceKey);
+    return previousSourceKey !== sourceKey ? previousSourceKey : null;
+  }
+
   public evictStaleEntries(
     sourceKey: string,
     onEvict: (staleSourceKey: string) => void,
   ): void {
-    const family = getSourceKeyFamily(sourceKey);
-    if (!family) {
+    const previousSourceKey = this.replaceLatestSourceKey(sourceKey);
+    if (!previousSourceKey) {
       return;
     }
 
-    const previousSourceKey = this.latestSourceKeyByFamily.get(family);
-    if (previousSourceKey === sourceKey) {
-      return;
-    }
-
-    if (previousSourceKey) {
-      onEvict(previousSourceKey);
-    }
-
-    this.latestSourceKeyByFamily.set(family, sourceKey);
+    onEvict(previousSourceKey);
   }
 
   public reset(): void {

@@ -18,7 +18,11 @@ import type {
   CanonicalExecutionPlan,
 } from '../generation/analysis/types';
 import type { CompiledRackPlan } from '../generation/plan/types';
-import type { GenerationCheckpoint, LedFrameVelocityEntry } from '../generation/types';
+import type {
+  CanonicalFieldResult,
+  GenerationCheckpoint,
+  LedFrameVelocityEntry,
+} from '../generation/types';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 
 export interface GeneratedRuntimeFieldResult {
@@ -30,6 +34,7 @@ export interface GeneratedRuntimeFieldResult {
   executionPlan: CanonicalExecutionPlan;
   compiledPlan: CompiledRackPlan | null;
   checkpointsByStageId: Map<string, GenerationCheckpoint>;
+  canonicalResult: CanonicalFieldResult | null;
 }
 
 const DEFAULT_SAMPLE_STEP_BEATS = 1 / NOTE_SAMPLES_PER_BEAT;
@@ -59,16 +64,19 @@ const createEmptyFieldResult = (): GeneratedRuntimeFieldResult => ({
   },
   compiledPlan: null,
   checkpointsByStageId: new Map(),
+  canonicalResult: null,
 });
 
 export const buildGeneratedFieldResultWithRuntimeMap = ({
   chain,
   loopLengthBeats,
   runtimeMap,
+  previousResult,
 }: {
   chain: GenerateNotesInput['chain'];
   loopLengthBeats: number;
   runtimeMap: RuntimeMapData;
+  previousResult?: GeneratedRuntimeFieldResult | null;
 }): GeneratedRuntimeFieldResult => {
   if (!Number.isFinite(loopLengthBeats) || loopLengthBeats <= 0) {
     return createEmptyFieldResult();
@@ -83,6 +91,7 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
     surfaceAdapter,
     spatialAdapter,
     executionRequest,
+    previousResult?.canonicalResult,
   );
   const notes = projectTapeToNotes(
     generated.tape,
@@ -105,6 +114,7 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
     executionPlan: generated.executionPlan,
     compiledPlan: generated.compiledPlan,
     checkpointsByStageId: generated.checkpointsByStageId,
+    canonicalResult: generated,
   };
 };
 
@@ -112,8 +122,12 @@ export const buildGeneratedFieldResult = ({
   chain,
   loopLengthBeats,
   launchpadModel,
-}: GenerateNotesInput): GeneratedRuntimeFieldResult => buildGeneratedFieldResultWithRuntimeMap({
+  previousResult,
+}: GenerateNotesInput & {
+  previousResult?: GeneratedRuntimeFieldResult | null;
+}): GeneratedRuntimeFieldResult => buildGeneratedFieldResultWithRuntimeMap({
   chain,
   loopLengthBeats,
   runtimeMap: buildRuntimeMapData(launchpadModel),
+  previousResult,
 });

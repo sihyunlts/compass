@@ -2,8 +2,10 @@ import { SvelteMap } from 'svelte/reactivity';
 import { clamp } from '../../../shared/math';
 
 import {
-  buildGeneratorPreview,
-} from '../../../domain';
+  buildGeneratedFieldResult,
+  type GeneratedRuntimeFieldResult,
+} from '../../../domain/field-result';
+import { toGeneratorPreview } from '../../../domain/generator-preview';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
 import { EMPTY_ACTIVE_VELOCITY_BY_PITCH } from './utils';
@@ -15,6 +17,7 @@ export interface PreviewResultCacheEntry {
   sourceTimelineEndBeat: number;
   sampleStepBeats: number;
   ledFramesBySampleIndex: ReadonlyArray<ReadonlyMap<number, number>>;
+  generated?: GeneratedRuntimeFieldResult;
 }
 
 interface PreviewResultInput {
@@ -31,7 +34,6 @@ class PreviewResultCache {
   private readonly latestSourceKeyByFamily = new LatestSourceKeyFamilyCache();
 
   public resolve(input: PreviewResultInput): PreviewResultCacheEntry {
-    this.evictStaleSourceFamilyEntries(input.sourceKey);
     const key = this.toPreviewResultKey(
       input.sourceKey,
       input.loopLengthBeats,
@@ -42,19 +44,32 @@ class PreviewResultCache {
       return cached;
     }
 
-    const preview = input.preview ?? buildGeneratorPreview({
-      chain: input.sourceChain,
-      loopLengthBeats: input.loopLengthBeats,
-      launchpadModel: input.launchpadModel,
-    });
+    const previousGenerated = input.preview
+      ? undefined
+      : this.resolvePreviousGeneratedResult(
+        input.sourceKey,
+        input.loopLengthBeats,
+        input.launchpadModel,
+      );
+    const generated = input.preview
+      ? undefined
+      : buildGeneratedFieldResult({
+        chain: input.sourceChain,
+        loopLengthBeats: input.loopLengthBeats,
+        launchpadModel: input.launchpadModel,
+        previousResult: previousGenerated ?? null,
+      });
+    const preview = input.preview ?? toGeneratorPreview(generated);
     const entry: PreviewResultCacheEntry = {
       key,
       preview,
       sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
       sampleStepBeats: preview.sampleStepBeats,
       ledFramesBySampleIndex: preview.ledFramesBySampleIndex.map((frame) => new Map<number, number>(frame)),
+      generated,
     };
     this.resultsByKey.set(key, entry);
+    this.evictStaleSourceFamilyEntries(input.sourceKey);
     return entry;
   }
 
@@ -96,14 +111,47 @@ class PreviewResultCache {
   }
 
   private evictStaleSourceFamilyEntries(sourceKey: string): void {
-    this.latestSourceKeyByFamily.evictStaleEntries(sourceKey, (staleSourceKey) => {
-      const stalePrefix = `${staleSourceKey}:`;
-      for (const key of this.resultsByKey.keys()) {
-        if (key.startsWith(stalePrefix)) {
-          this.resultsByKey.delete(key);
-        }
+    const staleSourceKey = this.latestSourceKeyByFamily.replaceLatestSourceKey(sourceKey);
+    if (!staleSourceKey) {
+      return;
+    }
+
+    const stalePrefix = `${staleSourceKey}:`;
+    for (const key of this.resultsByKey.keys()) {
+      if (key.startsWith(stalePrefix)) {
+        this.resultsByKey.delete(key);
       }
-    });
+    }
+  }
+
+  private resolvePreviousGeneratedResult(
+    sourceKey: string,
+    loopLengthBeats: number,
+    launchpadModel: LaunchpadModel,
+  ): GeneratedRuntimeFieldResult | null {
+    const previousSourceKey = this.latestSourceKeyByFamily.getLatestSourceKey(sourceKey);
+    if (!previousSourceKey || previousSourceKey === sourceKey) {
+      return null;
+    }
+
+    const previousKey = this.toPreviewResultKey(
+      previousSourceKey,
+      loopLengthBeats,
+      launchpadModel,
+    );
+    const previousEntry = this.resultsByKey.get(previousKey);
+    if (previousEntry?.generated) {
+      return previousEntry.generated;
+    }
+
+    const stalePrefix = `${previousSourceKey}:`;
+    for (const [key, entry] of this.resultsByKey.entries()) {
+      if (key.startsWith(stalePrefix) && entry.generated) {
+        return entry.generated;
+      }
+    }
+
+    return null;
   }
 }
 

@@ -1,5 +1,8 @@
 import type { GeneratorPreview } from '../shared/contracts/preview/generator-preview';
-import { buildGeneratedFieldResult } from './field-result';
+import {
+  buildGeneratedFieldResult,
+  type GeneratedRuntimeFieldResult,
+} from './field-result';
 import {
   type GenerateNotesInput,
 } from './note-generation-types';
@@ -10,17 +13,9 @@ export {
   type GenerateNotesInput,
 } from './note-generation-types';
 
-/** Builds the canonical preview payload for one chain and one Launchpad model. */
-export const buildGeneratorPreview = ({
-  chain,
-  loopLengthBeats,
-  launchpadModel,
-}: GenerateNotesInput): GeneratorPreview => {
-  const generated = buildGeneratedFieldResult({
-    chain,
-    loopLengthBeats,
-    launchpadModel,
-  });
+export const toGeneratorPreview = (
+  generated: GeneratedRuntimeFieldResult,
+): GeneratorPreview => {
   const notes = generated.notes.map((note) => toClipNote(note));
   const uniquePitches = new Set<number>();
 
@@ -36,4 +31,18 @@ export const buildGeneratorPreview = ({
     sampleStepBeats: generated.sampleStepBeats,
     ledFramesBySampleIndex: generated.ledFramesBySampleIndex,
   };
+};
+
+/** Builds the canonical preview payload for one chain and one Launchpad model. */
+export const buildGeneratorPreview = ({
+  chain,
+  loopLengthBeats,
+  launchpadModel,
+}: GenerateNotesInput): GeneratorPreview => {
+  const generated = buildGeneratedFieldResult({
+    chain,
+    loopLengthBeats,
+    launchpadModel,
+  });
+  return toGeneratorPreview(generated);
 };
