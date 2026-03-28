@@ -1,11 +1,8 @@
-import { analyzeChainOriginTimelinePolicy } from '../core/pipeline/origin-timeline-policy';
-import { normalizeNotesByOriginTimelinePolicy } from '../core/pipeline/timeline-fit';
-import { buildFinalOutputNotes } from './final-output-notes';
-import {
-  NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-  type GenerateNotesInput,
-  type GeneratedNotesResult,
-  type RuntimeMapData,
+import { buildGeneratedFieldResultWithRuntimeMap } from './field-result';
+import type {
+  GenerateNotesInput,
+  GeneratedNotesResult,
+  RuntimeMapData,
 } from './note-generation-types';
 import { buildRuntimeMapData } from './runtime-map';
 
@@ -18,26 +15,15 @@ export const buildGeneratedNotesWithRuntimeMap = ({
   loopLengthBeats: number;
   runtimeMap: RuntimeMapData;
 }): GeneratedNotesResult => {
-  if (!Number.isFinite(loopLengthBeats) || loopLengthBeats <= 0) {
-    return {
-      notes: [],
-      sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-    };
-  }
-
-  const originTimelineAnalysis = analyzeChainOriginTimelinePolicy(chain);
-  const normalized = normalizeNotesByOriginTimelinePolicy(
-    buildFinalOutputNotes({
-      chain,
-      loopLengthBeats,
-      runtimeMap,
-    }),
-    originTimelineAnalysis.originTimelinePolicyByGeneratorId,
-  );
+  const generated = buildGeneratedFieldResultWithRuntimeMap({
+    chain,
+    loopLengthBeats,
+    runtimeMap,
+  });
 
   return {
-    notes: normalized.notes,
-    sourceTimelineEndBeat: normalized.sourceTimelineEndBeat,
+    notes: generated.notes,
+    sourceTimelineEndBeat: generated.sourceTimelineEndBeat,
   };
 };
 

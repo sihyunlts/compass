@@ -1,5 +1,5 @@
 import type { GeneratorPreview } from '../shared/contracts/preview/generator-preview';
-import { buildGeneratedNotes } from './note-export';
+import { buildGeneratedFieldResult } from './field-result';
 import {
   type GenerateNotesInput,
 } from './note-generation-types';
@@ -16,7 +16,7 @@ export const buildGeneratorPreview = ({
   loopLengthBeats,
   launchpadModel,
 }: GenerateNotesInput): GeneratorPreview => {
-  const generated = buildGeneratedNotes({
+  const generated = buildGeneratedFieldResult({
     chain,
     loopLengthBeats,
     launchpadModel,
@@ -33,5 +33,7 @@ export const buildGeneratorPreview = ({
     uniquePitchCount: uniquePitches.size,
     notes,
     sourceTimelineEndBeat: generated.sourceTimelineEndBeat,
+    sampleStepBeats: generated.sampleStepBeats,
+    ledFramesBySampleIndex: generated.ledFramesBySampleIndex,
   };
 };

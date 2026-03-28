@@ -1,15 +1,11 @@
 import { SvelteMap } from 'svelte/reactivity';
+import { clamp } from '../../../shared/math';
 
 import {
   buildGeneratorPreview,
 } from '../../../domain';
 import type { ClipNote, GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
-import {
-  PREVIEW_FRAME_COUNT,
-  toPreviewFrameBeat,
-  toPreviewFrameIndex,
-} from './frame-index';
 import { EMPTY_ACTIVE_VELOCITY_BY_PITCH } from './utils';
 import { LatestSourceKeyFamilyCache } from './source-key-cache';
 
@@ -17,7 +13,8 @@ export interface PreviewResultCacheEntry {
   key: string;
   preview: GeneratorPreview;
   sourceTimelineEndBeat: number;
-  ledFramesByIndex: ReadonlyArray<ReadonlyMap<number, number>>;
+  sampleStepBeats: number;
+  ledFramesBySampleIndex: ReadonlyArray<ReadonlyMap<number, number>>;
 }
 
 interface PreviewResultInput {
@@ -64,12 +61,30 @@ const buildLedFrameAtBeat = (
 const buildLedFramesFromNotes = (
   notes: ReadonlyArray<ClipNote>,
   sourceTimelineEndBeat: number,
-): ReadonlyArray<ReadonlyMap<number, number>> => Array.from(
-  { length: PREVIEW_FRAME_COUNT },
-  (_, index) => buildLedFrameAtBeat(
-    notes,
-    toPreviewFrameBeat(index, sourceTimelineEndBeat),
-  ),
+  sampleStepBeats: number,
+): ReadonlyArray<ReadonlyMap<number, number>> => {
+  const safeSourceTimelineEndBeat = Number.isFinite(sourceTimelineEndBeat) && sourceTimelineEndBeat > 0
+    ? sourceTimelineEndBeat
+    : 1;
+  const safeSampleStepBeats = Number.isFinite(sampleStepBeats) && sampleStepBeats > 0
+    ? sampleStepBeats
+    : 1 / 256;
+  const sampleCount = Math.max(Math.ceil(safeSourceTimelineEndBeat / safeSampleStepBeats), 1);
+
+  return Array.from({ length: sampleCount }, (_, sampleIndex) =>
+    buildLedFrameAtBeat(notes, sampleIndex * safeSampleStepBeats));
+};
+
+const buildLedFramesFromPreview = (
+  preview: GeneratorPreview,
+): ReadonlyArray<ReadonlyMap<number, number>> => (
+  Array.isArray(preview.ledFramesBySampleIndex) && preview.ledFramesBySampleIndex.length > 0
+    ? preview.ledFramesBySampleIndex.map((frame) => new Map<number, number>(frame))
+    : buildLedFramesFromNotes(
+        preview.notes,
+        preview.sourceTimelineEndBeat,
+        preview.sampleStepBeats,
+      )
 );
 
 class PreviewResultCache {
@@ -98,10 +113,8 @@ class PreviewResultCache {
       key,
       preview,
       sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
-      ledFramesByIndex: buildLedFramesFromNotes(
-        preview.notes,
-        preview.sourceTimelineEndBeat,
-      ),
+      sampleStepBeats: preview.sampleStepBeats,
+      ledFramesBySampleIndex: buildLedFramesFromPreview(preview),
     };
     this.resultsByKey.set(key, entry);
     return entry;
@@ -124,12 +137,16 @@ class PreviewResultCache {
     previewResult: PreviewResultCacheEntry | null,
     beat: number,
   ): ReadonlyMap<number, number> {
-    if (!previewResult || previewResult.ledFramesByIndex.length === 0) {
+    if (!previewResult || previewResult.ledFramesBySampleIndex.length === 0) {
       return EMPTY_ACTIVE_VELOCITY_BY_PITCH;
     }
 
-    const frameIndex = toPreviewFrameIndex(beat, previewResult.sourceTimelineEndBeat);
-    return previewResult.ledFramesByIndex[frameIndex] ?? EMPTY_ACTIVE_VELOCITY_BY_PITCH;
+    const frameIndex = clamp(
+      Math.floor(beat / previewResult.sampleStepBeats),
+      0,
+      previewResult.ledFramesBySampleIndex.length - 1,
+    );
+    return previewResult.ledFramesBySampleIndex[frameIndex] ?? EMPTY_ACTIVE_VELOCITY_BY_PITCH;
   }
 
   private toPreviewResultKey(
