@@ -1,5 +1,6 @@
-import { MIN_NOTE_DURATION } from '../core/pipeline/constants';
+import { MIN_NOTE_DURATION, THICKNESS } from '../core/pipeline/constants';
 import { collectPitchSampledNotes, type SampledActivePitch } from '../core/pipeline/note-sampling';
+import { applyAffine, COMPOSITION_BOUNDS, distanceToPolylineSquared } from '../core/geometry';
 import {
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   type RuntimeMapData,
@@ -7,13 +8,15 @@ import {
 import { sortClipNotes } from '../domain/note-utils';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 import type { LaunchpadButton } from '../shared/model';
+import { createSpatialBounds } from './analysis/bounds';
 import type { CanonicalExecutionRequest } from './analysis/types';
 import {
   type CanonicalSpatialAdapter,
   type CanonicalSpatialMask,
-  type LedCell,
+  type GeometryMask,
+  type GeometryStroke,
+  type GeometryTimeline,
   type LedFrameVelocityEntry,
-  type LedTape,
 } from './types';
 import { toRoundedCoordinateKey } from './coordinates';
 
@@ -23,9 +26,16 @@ interface CoordinateGroup {
   buttons: ReadonlyArray<LaunchpadButton>;
 }
 
+interface WinnerStroke {
+  stroke: GeometryStroke;
+  velocity: number;
+  originId: string;
+}
+
 const TILE_MIN = 0;
 const TILE_MAX = 9;
 const TILE_COUNT = 10;
+const DEFAULT_EVALUATION_PADDING = 24;
 
 const toViewportTileId = (
   x: number,
@@ -83,28 +93,6 @@ const buildViewportCoordinateKeyByTileId = (
   return coordinateKeyByTileId;
 };
 
-const buildViewportBounds = (
-  runtimeMap: RuntimeMapData['buttonIndex'],
-): CanonicalExecutionRequest['outputBounds'] => {
-  let minX = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-
-  for (const group of runtimeMap.groups) {
-    if (group.x < minX) minX = group.x;
-    if (group.x > maxX) maxX = group.x;
-    if (group.y < minY) minY = group.y;
-    if (group.y > maxY) maxY = group.y;
-  }
-
-  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
-    return 'none';
-  }
-
-  return { minX, maxX, minY, maxY };
-};
-
 const createMaskFromCoordinateKeys = (
   coordinateKeys: ReadonlySet<string>,
 ): CanonicalSpatialMask => ({
@@ -114,56 +102,78 @@ const createMaskFromCoordinateKeys = (
   },
 });
 
-const isVisibleCell = (
-  cell: LedCell,
+const isVisibleStroke = (
+  stroke: GeometryStroke,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): boolean => {
-  if (mutedGeneratorIds.has(cell.originId)) {
+  if (mutedGeneratorIds.has(stroke.polyline.originId)) {
     return false;
   }
 
-  return !(cell.originGroupId && mutedGroupIds.has(cell.originGroupId));
+  return !(stroke.originGroupId && mutedGroupIds.has(stroke.originGroupId));
 };
 
+const isPointInsideMasks = (
+  masks: ReadonlyArray<GeometryMask>,
+  x: number,
+  y: number,
+): boolean => masks.every((mask) => {
+  const localPoint = applyAffine(mask.inverseTransform, { x, y });
+  return mask.contains(localPoint.x, localPoint.y);
+});
+
+const isStrokeActiveAtCoordinate = (
+  stroke: GeometryStroke,
+  x: number,
+  y: number,
+): boolean => (
+  isPointInsideMasks(stroke.masks, x, y)
+  && distanceToPolylineSquared({ x, y }, stroke.polyline) <= THICKNESS * THICKNESS
+);
+
 const resolveWinnerByCoordinate = (
-  cells: ReadonlyArray<LedCell>,
+  strokes: ReadonlyArray<GeometryStroke>,
   coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
-): Map<string, LedCell> => {
-  const winnerByCoordinate = new Map<string, LedCell>();
+): Map<string, WinnerStroke> => {
+  const winnerByCoordinate = new Map<string, WinnerStroke>();
 
-  for (const cell of cells) {
-    if (!isVisibleCell(cell, mutedGroupIds, mutedGeneratorIds)) {
-      continue;
-    }
+  for (const [coordinateKey, coordinateGroup] of coordinateGroupByKey.entries()) {
+    for (const stroke of strokes) {
+      if (!isVisibleStroke(stroke, mutedGroupIds, mutedGeneratorIds)) {
+        continue;
+      }
+      if (!isStrokeActiveAtCoordinate(stroke, coordinateGroup.x, coordinateGroup.y)) {
+        continue;
+      }
 
-    const coordinateKey = toRoundedCoordinateKey(cell.x, cell.y);
-    if (!coordinateKey || !coordinateGroupByKey.has(coordinateKey)) {
-      continue;
-    }
-
-    const currentWinner = winnerByCoordinate.get(coordinateKey);
-    if (!currentWinner
-      || cell.writeOrder > currentWinner.writeOrder
-      || (cell.writeOrder === currentWinner.writeOrder && cell.writeId > currentWinner.writeId)) {
-      winnerByCoordinate.set(coordinateKey, cell);
+      const currentWinner = winnerByCoordinate.get(coordinateKey);
+      if (!currentWinner
+        || stroke.writeOrder > currentWinner.stroke.writeOrder
+        || (stroke.writeOrder === currentWinner.stroke.writeOrder && stroke.writeId > currentWinner.stroke.writeId)) {
+        winnerByCoordinate.set(coordinateKey, {
+          stroke,
+          velocity: stroke.polyline.velocity,
+          originId: stroke.polyline.originId,
+        });
+      }
     }
   }
 
   return winnerByCoordinate;
 };
 
-export const resolveActiveByPitchFromFrameCells = (
-  cells: ReadonlyArray<LedCell>,
+export const resolveActiveByPitchFromFrameStrokes = (
+  strokes: ReadonlyArray<GeometryStroke>,
   coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
   mutedGroupIds: ReadonlySet<string> = new Set<string>(),
   mutedGeneratorIds: ReadonlySet<string> = new Set<string>(),
 ): Map<number, SampledActivePitch> => {
   const activeByPitch = new Map<number, SampledActivePitch>();
   const winnerByCoordinate = resolveWinnerByCoordinate(
-    cells,
+    strokes,
     coordinateGroupByKey,
     mutedGroupIds,
     mutedGeneratorIds,
@@ -191,29 +201,17 @@ export const resolveActiveByPitchFromFrameCells = (
   return activeByPitch;
 };
 
-const resolveActivationMaskCoordinateKeys = (
-  cells: ReadonlyArray<LedCell>,
-  coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
-): Set<string> => new Set(
-  resolveWinnerByCoordinate(
-    cells,
-    coordinateGroupByKey,
-    new Set<string>(),
-    new Set<string>(),
-  ).keys(),
-);
-
 export const buildLedFramesBySampleIndex = (
-  tape: LedTape,
+  timeline: GeometryTimeline,
   runtimeMap: RuntimeMapData,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): ReadonlyArray<ReadonlyArray<LedFrameVelocityEntry>> => {
   const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
 
-  return tape.frames.map((frame) => Array.from(
-    resolveActiveByPitchFromFrameCells(
-      frame.cells,
+  return timeline.frames.map((frame) => Array.from(
+    resolveActiveByPitchFromFrameStrokes(
+      frame.strokes,
       coordinateGroupByKey,
       mutedGroupIds,
       mutedGeneratorIds,
@@ -221,8 +219,8 @@ export const buildLedFramesBySampleIndex = (
   ).map(([pitch, info]) => [pitch, info.velocity] as const));
 };
 
-export const projectTapeToNotes = (
-  tape: LedTape,
+export const projectTimelineToNotes = (
+  timeline: GeometryTimeline,
   runtimeMap: RuntimeMapData,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
@@ -230,17 +228,17 @@ export const projectTapeToNotes = (
   const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
 
   const notes = collectPitchSampledNotes({
-    sampleCount: tape.frames.length,
-    endBeat: tape.timeDomainEndBeat,
-    sampleStepBeats: tape.sampleStepBeats,
+    sampleCount: timeline.frames.length,
+    endBeat: timeline.timeDomainEndBeat,
+    sampleStepBeats: timeline.sampleStepBeats,
     minimumNoteDuration: MIN_NOTE_DURATION,
     resolveActiveByPitch: (sampleBeat) => {
       const frameIndex = Math.min(
-        Math.max(Math.floor(sampleBeat / tape.sampleStepBeats), 0),
-        Math.max(tape.frames.length - 1, 0),
+        Math.max(Math.floor(sampleBeat / timeline.sampleStepBeats), 0),
+        Math.max(timeline.frames.length - 1, 0),
       );
-      return resolveActiveByPitchFromFrameCells(
-        tape.frames[frameIndex]?.cells ?? [],
+      return resolveActiveByPitchFromFrameStrokes(
+        timeline.frames[frameIndex]?.strokes ?? [],
         coordinateGroupByKey,
         mutedGroupIds,
         mutedGeneratorIds,
@@ -252,10 +250,13 @@ export const projectTapeToNotes = (
   return notes;
 };
 
-export const createLaunchpadExecutionRequest = (
-  runtimeMap: RuntimeMapData,
-): CanonicalExecutionRequest => ({
-  outputBounds: buildViewportBounds(runtimeMap.buttonIndex),
+export const createLaunchpadExecutionRequest = (): CanonicalExecutionRequest => ({
+  outputBounds: createSpatialBounds(
+    COMPOSITION_BOUNDS.minX - DEFAULT_EVALUATION_PADDING,
+    COMPOSITION_BOUNDS.maxX + DEFAULT_EVALUATION_PADDING,
+    COMPOSITION_BOUNDS.minY - DEFAULT_EVALUATION_PADDING,
+    COMPOSITION_BOUNDS.maxY + DEFAULT_EVALUATION_PADDING,
+  ),
   timeDomain: {
     start: 0,
     end: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
@@ -265,26 +266,15 @@ export const createLaunchpadExecutionRequest = (
 export const createLaunchpadSpatialAdapter = (
   runtimeMap: RuntimeMapData,
 ): CanonicalSpatialAdapter => {
-  const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
   const coordinateKeyByTileId = buildViewportCoordinateKeyByTileId(runtimeMap.buttonIndex);
 
   return {
-    createMaskFromSceneCells: (cells) => createMaskFromCoordinateKeys(
-      new Set(
-        cells
-          .map((cell) => toRoundedCoordinateKey(cell.x, cell.y))
-          .filter((coordinateKey): coordinateKey is string => coordinateKey !== null),
-      ),
-    ),
     createMaskFromViewportTiles: (tileIds) => createMaskFromCoordinateKeys(
       new Set(
         Array.from(tileIds)
           .map((tileId) => coordinateKeyByTileId.get(tileId))
           .filter((coordinateKey): coordinateKey is string => coordinateKey !== undefined),
       ),
-    ),
-    createMaskFromActivationCells: (cells) => createMaskFromCoordinateKeys(
-      resolveActivationMaskCoordinateKeys(cells, coordinateGroupByKey),
     ),
   };
 };

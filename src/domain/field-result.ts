@@ -10,7 +10,7 @@ import {
   buildLedFramesBySampleIndex,
   createLaunchpadExecutionRequest,
   createLaunchpadSpatialAdapter,
-  projectTapeToNotes,
+  projectTimelineToNotes,
 } from '../generation/launchpad-projection';
 import type {
   CanonicalAnalysisResult,
@@ -74,21 +74,21 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
   }
 
   const spatialAdapter = createLaunchpadSpatialAdapter(runtimeMap);
-  const executionRequest = createLaunchpadExecutionRequest(runtimeMap);
+  const executionRequest = createLaunchpadExecutionRequest();
   const generated = buildCanonicalFieldResult(
     chain,
     loopLengthBeats,
     spatialAdapter,
     executionRequest,
   );
-  const notes = projectTapeToNotes(
-    generated.tape,
+  const notes = projectTimelineToNotes(
+    generated.timeline,
     runtimeMap,
     generated.mutedGroupIds,
     generated.mutedGeneratorIds,
   );
   const ledFramesBySampleIndex = buildLedFramesBySampleIndex(
-    generated.tape,
+    generated.timeline,
     runtimeMap,
     generated.mutedGroupIds,
     generated.mutedGeneratorIds,

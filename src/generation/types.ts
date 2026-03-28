@@ -1,27 +1,31 @@
+import type { AffineTransform, Polyline } from '../core/core-types';
 import type {
   CanonicalAnalysisResult,
   CanonicalExecutionPlan,
 } from './analysis/types';
 import type { CompiledRackPlan } from './plan/types';
 
-export interface LedCell {
-  x: number;
-  y: number;
-  velocity: number;
-  originId: string;
+export interface GeometryMask {
+  contains(x: number, y: number): boolean;
+  inverseTransform: AffineTransform;
+}
+
+export interface GeometryStroke {
+  polyline: Polyline;
   originGroupId: string | null;
   writeOrder: number;
   writeId: number;
+  masks: GeometryMask[];
 }
 
-export interface LedFrame {
-  cells: LedCell[];
+export interface GeometryFrame {
+  strokes: GeometryStroke[];
 }
 
-export interface LedTape {
+export interface GeometryTimeline {
   sampleStepBeats: number;
   timeDomainEndBeat: number;
-  frames: LedFrame[];
+  frames: GeometryFrame[];
   nextWriteId: number;
 }
 
@@ -39,7 +43,7 @@ export type LedFrameVelocityEntry = readonly [pitch: number, velocity: number];
 
 export interface CanonicalFieldResult {
   loopLengthBeats: number;
-  tape: LedTape;
+  timeline: GeometryTimeline;
   sourceTimelineEndBeat: number;
   sampleStepBeats: number;
   mutedGroupIds: ReadonlySet<string>;
@@ -54,7 +58,5 @@ export interface CanonicalSpatialMask {
 }
 
 export interface CanonicalSpatialAdapter {
-  createMaskFromSceneCells(cells: ReadonlyArray<LedCell>): CanonicalSpatialMask;
-  createMaskFromActivationCells(cells: ReadonlyArray<LedCell>): CanonicalSpatialMask;
   createMaskFromViewportTiles(tileIds: Iterable<number>): CanonicalSpatialMask;
 }
