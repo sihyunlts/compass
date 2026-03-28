@@ -1,6 +1,8 @@
 import type {
   CanonicalAnalysisResult,
   CanonicalExecutionPlan,
+  BeatRange,
+  SpatialRequirement,
 } from './analysis/types';
 import type { CompiledRackPlan } from './plan/types';
 
@@ -38,6 +40,16 @@ export interface GenerationOriginTimelineState {
 export interface GenerationCheckpoint {
   tape: LedTape;
   timelineStateByOriginId: Map<string, GenerationOriginTimelineState>;
+}
+
+export type GenerationInvalidationTargetSet = ReadonlySet<string> | 'all';
+export type GenerationInvalidationFrameWindow = BeatRange | 'all' | 'none';
+
+export interface GenerationInvalidationScope {
+  affectedOriginIds: GenerationInvalidationTargetSet;
+  affectedGroupIds: GenerationInvalidationTargetSet;
+  outputBounds: SpatialRequirement;
+  frameWindow: GenerationInvalidationFrameWindow;
 }
 
 export type LedFrameVelocityEntry = readonly [pitch: number, velocity: number];
