@@ -55,12 +55,13 @@ import {
 } from './timeline-analysis';
 import {
   addStrokeToFrame,
-  cloneStroke,
-  cloneTimeline,
+  beginTimelineStage,
+  completeTimelineStage,
   createEmptyTimeline,
   createIdentityMask,
   ensureTimelineFrameCount,
   finalizeTimeline,
+  setFrameStrokes,
   toFrameWindow,
   type FrameWindow,
 } from './timeline';
@@ -214,7 +215,7 @@ const splitFrameStrokesByTarget = (
     if (isTargetedStroke(stroke, targetGroupId)) {
       targeted.push(stroke);
     } else {
-      untargeted.push(cloneStroke(stroke));
+      untargeted.push(stroke);
     }
   }
 
@@ -222,6 +223,50 @@ const splitFrameStrokesByTarget = (
     targeted,
     untargeted,
   };
+};
+
+const takeTargetedStrokesFromFrame = (
+  timeline: GeometryTimeline,
+  frameIndex: number,
+  targetGroupId: string | null,
+): GeometryStroke[] => {
+  const { targeted, untargeted } = splitFrameStrokesByTarget(
+    timeline.frames[frameIndex]?.strokes ?? [],
+    targetGroupId,
+  );
+
+  if (targeted.length > 0) {
+    setFrameStrokes(timeline, frameIndex, untargeted);
+  }
+
+  return targeted;
+};
+
+const forEachTargetedFrame = (
+  timeline: GeometryTimeline,
+  sourceFrameCount: number,
+  targetGroupId: string | null,
+  frameWindow: FrameWindow,
+  visit: (frameIndex: number, targeted: ReadonlyArray<GeometryStroke>) => void,
+): void => {
+  for (let frameIndex = 0; frameIndex < sourceFrameCount; frameIndex += 1) {
+    const targeted = takeTargetedStrokesFromFrame(timeline, frameIndex, targetGroupId);
+    if (targeted.length === 0 || !isFrameWithinWindow(frameIndex, frameWindow)) {
+      continue;
+    }
+
+    visit(frameIndex, targeted);
+  }
+};
+
+const stripTargetedFrames = (
+  timeline: GeometryTimeline,
+  sourceFrameCount: number,
+  targetGroupId: string | null,
+): void => {
+  for (let frameIndex = 0; frameIndex < sourceFrameCount; frameIndex += 1) {
+    takeTargetedStrokesFromFrame(timeline, frameIndex, targetGroupId);
+  }
 };
 
 const buildTargetOriginIds = (
@@ -376,35 +421,22 @@ const applySpatialTransform = (
   resolveTransformAtFrame: (frameIndex: number) => ReturnType<typeof toTranslationTransform> | null,
   requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
-  const nextTimeline = createEmptyTimeline(state.timeline.sampleStepBeats, state.timeline.timeDomainEndBeat);
-  nextTimeline.nextWriteId = state.timeline.nextWriteId;
-  ensureTimelineFrameCount(nextTimeline, state.timeline.timeDomainEndBeat);
+  const nextTimeline = beginTimelineStage(state.timeline);
   const frameWindow = resolveFrameWindow(
     requiredFrameWindow,
     state.timeline.sampleStepBeats,
     state.timeline.frames.length,
   );
 
-  for (let frameIndex = 0; frameIndex < state.timeline.frames.length; frameIndex += 1) {
+  forEachTargetedFrame(nextTimeline, state.timeline.frames.length, targetGroupId, frameWindow, (frameIndex, targeted) => {
     const transform = resolveTransformAtFrame(frameIndex);
-    const { targeted, untargeted } = splitFrameStrokesByTarget(
-      state.timeline.frames[frameIndex].strokes,
-      targetGroupId,
-    );
-    nextTimeline.frames[frameIndex].strokes.push(...untargeted);
-
-    if (!isFrameWithinWindow(frameIndex, frameWindow)) {
-      continue;
-    }
-
     for (const stroke of targeted) {
       addStrokeToFrame(nextTimeline, frameIndex, transformStroke(stroke, transform, writeOrder));
     }
-  }
+  });
 
-  nextTimeline.timeDomainEndBeat = state.timeline.timeDomainEndBeat;
   return {
-    timeline: finalizeTimeline(nextTimeline),
+    timeline: completeTimelineStage(nextTimeline),
     timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
   };
 };
@@ -433,9 +465,7 @@ const applyMirrorHalfSymmetry = (
   writeOrder: number,
   requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
-  const nextTimeline = createEmptyTimeline(state.timeline.sampleStepBeats, state.timeline.timeDomainEndBeat);
-  nextTimeline.nextWriteId = state.timeline.nextWriteId;
-  ensureTimelineFrameCount(nextTimeline, state.timeline.timeDomainEndBeat);
+  const nextTimeline = beginTimelineStage(state.timeline);
   const frameWindow = resolveFrameWindow(
     requiredFrameWindow,
     state.timeline.sampleStepBeats,
@@ -448,17 +478,7 @@ const applyMirrorHalfSymmetry = (
   const mirrorTransform = toAxisMirrorTransformAt(effect.params.axis, COMPOSITION_CENTER);
   const boundary = effect.params.axis === 'horizontal' ? COMPOSITION_CENTER.x : COMPOSITION_CENTER.y;
 
-  for (let frameIndex = 0; frameIndex < state.timeline.frames.length; frameIndex += 1) {
-    const { targeted, untargeted } = splitFrameStrokesByTarget(
-      state.timeline.frames[frameIndex].strokes,
-      targetGroupId,
-    );
-    nextTimeline.frames[frameIndex].strokes.push(...untargeted);
-
-    if (!isFrameWithinWindow(frameIndex, frameWindow)) {
-      continue;
-    }
-
+  forEachTargetedFrame(nextTimeline, state.timeline.frames.length, targetGroupId, frameWindow, (frameIndex, targeted) => {
     for (const stroke of targeted) {
       const sourceHalfMask = createIdentityMask((x, y) => isWithinHalfBoundary(
         effect.params.axis === 'horizontal' ? x : y,
@@ -481,10 +501,10 @@ const applyMirrorHalfSymmetry = (
         masks: [...mirroredStroke.masks, mirroredHalfMask],
       });
     }
-  }
+  });
 
   return {
-    timeline: finalizeTimeline(nextTimeline),
+    timeline: completeTimelineStage(nextTimeline),
     timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
   };
 };
@@ -496,9 +516,7 @@ const applyQuadMirrorSymmetry = (
   writeOrder: number,
   requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
-  const nextTimeline = createEmptyTimeline(state.timeline.sampleStepBeats, state.timeline.timeDomainEndBeat);
-  nextTimeline.nextWriteId = state.timeline.nextWriteId;
-  ensureTimelineFrameCount(nextTimeline, state.timeline.timeDomainEndBeat);
+  const nextTimeline = beginTimelineStage(state.timeline);
   const frameWindow = resolveFrameWindow(
     requiredFrameWindow,
     state.timeline.sampleStepBeats,
@@ -509,17 +527,7 @@ const applyQuadMirrorSymmetry = (
   const sourceKeepMinX = effect.params.sourceAnchor === 'bl' || effect.params.sourceAnchor === 'tl';
   const sourceKeepMinY = effect.params.sourceAnchor === 'bl' || effect.params.sourceAnchor === 'br';
 
-  for (let frameIndex = 0; frameIndex < state.timeline.frames.length; frameIndex += 1) {
-    const { targeted, untargeted } = splitFrameStrokesByTarget(
-      state.timeline.frames[frameIndex].strokes,
-      targetGroupId,
-    );
-    nextTimeline.frames[frameIndex].strokes.push(...untargeted);
-
-    if (!isFrameWithinWindow(frameIndex, frameWindow)) {
-      continue;
-    }
-
+  forEachTargetedFrame(nextTimeline, state.timeline.frames.length, targetGroupId, frameWindow, (frameIndex, targeted) => {
     for (const stroke of targeted) {
       for (const quadrant of quadrants) {
         const targetKeepMinX = quadrant === 'bl' || quadrant === 'tl';
@@ -544,10 +552,10 @@ const applyQuadMirrorSymmetry = (
         });
       }
     }
-  }
+  });
 
   return {
-    timeline: finalizeTimeline(nextTimeline),
+    timeline: completeTimelineStage(nextTimeline),
     timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
   };
 };
@@ -559,9 +567,7 @@ const applyQuadPinwheelSymmetry = (
   writeOrder: number,
   requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
-  const nextTimeline = createEmptyTimeline(state.timeline.sampleStepBeats, state.timeline.timeDomainEndBeat);
-  nextTimeline.nextWriteId = state.timeline.nextWriteId;
-  ensureTimelineFrameCount(nextTimeline, state.timeline.timeDomainEndBeat);
+  const nextTimeline = beginTimelineStage(state.timeline);
   const frameWindow = resolveFrameWindow(
     requiredFrameWindow,
     state.timeline.sampleStepBeats,
@@ -571,17 +577,7 @@ const applyQuadPinwheelSymmetry = (
   const quadrants: ReadonlyArray<SymmetryEffectNode['params']['sourceAnchor']> = ['bl', 'br', 'tr', 'tl'];
   const sourceIndex = quadrants.findIndex((quadrant) => quadrant === effect.params.sourceAnchor);
 
-  for (let frameIndex = 0; frameIndex < state.timeline.frames.length; frameIndex += 1) {
-    const { targeted, untargeted } = splitFrameStrokesByTarget(
-      state.timeline.frames[frameIndex].strokes,
-      targetGroupId,
-    );
-    nextTimeline.frames[frameIndex].strokes.push(...untargeted);
-
-    if (!isFrameWithinWindow(frameIndex, frameWindow)) {
-      continue;
-    }
-
+  forEachTargetedFrame(nextTimeline, state.timeline.frames.length, targetGroupId, frameWindow, (frameIndex, targeted) => {
     for (const stroke of targeted) {
       for (let targetIndex = 0; targetIndex < quadrants.length; targetIndex += 1) {
         const quadrant = quadrants[targetIndex];
@@ -596,10 +592,10 @@ const applyQuadPinwheelSymmetry = (
         });
       }
     }
-  }
+  });
 
   return {
-    timeline: finalizeTimeline(nextTimeline),
+    timeline: completeTimelineStage(nextTimeline),
     timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
   };
 };
@@ -731,26 +727,14 @@ const applyTemporalRemap = (
     }
   }
   const outputEndBeat = outputFrameCount * state.timeline.sampleStepBeats;
-  const nextTimeline = createEmptyTimeline(state.timeline.sampleStepBeats, outputEndBeat);
-  nextTimeline.nextWriteId = state.timeline.nextWriteId;
-  ensureTimelineFrameCount(nextTimeline, outputEndBeat);
+  const nextTimeline = beginTimelineStage(state.timeline, outputEndBeat);
   const frameWindow = resolveFrameWindow(
     requiredFrameWindow,
     state.timeline.sampleStepBeats,
     nextTimeline.frames.length,
   );
 
-  for (let frameIndex = 0; frameIndex < state.timeline.frames.length; frameIndex += 1) {
-    for (const stroke of state.timeline.frames[frameIndex].strokes) {
-      if (isTargetedStroke(stroke, targetGroupId)) {
-        continue;
-      }
-
-      if (frameIndex < nextTimeline.frames.length) {
-        nextTimeline.frames[frameIndex].strokes.push(cloneStroke(stroke));
-      }
-    }
-  }
+  stripTargetedFrames(nextTimeline, Math.min(state.timeline.frames.length, nextTimeline.frames.length), targetGroupId);
 
   const sourceStrokesByOriginAndFrame = buildSourceStrokesByOriginAndFrame(state.timeline, targetGroupId);
   for (const [originId, remap] of remaps.entries()) {
@@ -784,8 +768,8 @@ const applyTemporalRemap = (
     }
   }
 
-  const finalizedTimeline = finalizeTimeline(nextTimeline);
-  const occupiedWindowByOriginId = buildOccupiedWindowByOriginId(finalizedTimeline);
+  const sealedTimeline = completeTimelineStage(nextTimeline);
+  const occupiedWindowByOriginId = buildOccupiedWindowByOriginId(sealedTimeline);
   const nextTimelineStateByOriginId = cloneTimelineStateByOriginId(state.timelineStateByOriginId);
   for (const [originId, remap] of remaps.entries()) {
     const occupiedWindow = occupiedWindowByOriginId.get(originId)
@@ -801,7 +785,7 @@ const applyTemporalRemap = (
   }
 
   return {
-    timeline: finalizedTimeline,
+    timeline: sealedTimeline,
     timelineStateByOriginId: nextTimelineStateByOriginId,
   };
 };
@@ -1183,16 +1167,14 @@ const applyMaskEffect = (
   executionPlan: OperatorExecutionPlan,
 ): MutableGenerationState => {
   const sourceTimeline = state.timeline;
-  const nextTimeline = createEmptyTimeline(state.timeline.sampleStepBeats, state.timeline.timeDomainEndBeat);
-  nextTimeline.nextWriteId = state.timeline.nextWriteId;
-  ensureTimelineFrameCount(nextTimeline, state.timeline.timeDomainEndBeat);
+  const nextTimeline = beginTimelineStage(state.timeline);
   const targetFrameWindow = resolveFrameWindow(
     executionPlan.requiredFrameWindow,
     state.timeline.sampleStepBeats,
     sourceTimeline.frames.length,
   );
 
-  for (let frameIndex = 0; frameIndex < sourceTimeline.frames.length; frameIndex += 1) {
+  forEachTargetedFrame(nextTimeline, sourceTimeline.frames.length, targetGroupId, targetFrameWindow, (frameIndex, targeted) => {
     const mask = resolveMaskSourceMask(
       sourceTimeline,
       chain,
@@ -1203,16 +1185,7 @@ const applyMaskEffect = (
       frameIndex,
     );
 
-    for (const stroke of sourceTimeline.frames[frameIndex].strokes) {
-      if (!isTargetedStroke(stroke, targetGroupId)) {
-        nextTimeline.frames[frameIndex].strokes.push(cloneStroke(stroke));
-        continue;
-      }
-
-      if (!isFrameWithinWindow(frameIndex, targetFrameWindow)) {
-        continue;
-      }
-
+    for (const stroke of targeted) {
       addStrokeToFrame(nextTimeline, frameIndex, {
         ...cloneStrokeWithWriteOrder(stroke, writeOrder),
         masks: [
@@ -1223,10 +1196,10 @@ const applyMaskEffect = (
         ],
       });
     }
-  }
+  });
 
   return {
-    timeline: finalizeTimeline(nextTimeline),
+    timeline: completeTimelineStage(nextTimeline),
     timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
   };
 };
@@ -1256,8 +1229,7 @@ const applyColorEffect = (
   writeOrder: number,
   requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
-  const nextTimeline = createEmptyTimeline(state.timeline.sampleStepBeats, state.timeline.timeDomainEndBeat);
-  nextTimeline.nextWriteId = state.timeline.nextWriteId;
+  const nextTimeline = beginTimelineStage(state.timeline);
   const colorConfig = buildColorConfig(effect);
   const frameWindow = resolveFrameWindow(
     requiredFrameWindow,
@@ -1271,15 +1243,7 @@ const applyColorEffect = (
     ),
   );
 
-  for (let frameIndex = 0; frameIndex < state.timeline.frames.length; frameIndex += 1) {
-    for (const stroke of state.timeline.frames[frameIndex].strokes) {
-      if (isTargetedStroke(stroke, targetGroupId)) {
-        continue;
-      }
-
-      nextTimeline.frames[frameIndex].strokes.push(cloneStroke(stroke));
-    }
-  }
+  stripTargetedFrames(nextTimeline, state.timeline.frames.length, targetGroupId);
 
   for (const [originId, sourceSegments] of targetSegmentsByOriginId.entries()) {
     const slots = planColorProgramSlots(sourceSegments, colorConfig);
@@ -1316,7 +1280,7 @@ const applyColorEffect = (
   }
 
   return {
-    timeline: finalizeTimeline(nextTimeline),
+    timeline: completeTimelineStage(nextTimeline),
     timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
   };
 };
@@ -1349,13 +1313,6 @@ const resolveEffectTransform = (
 
   return null;
 };
-
-const cloneGenerationState = (
-  state: MutableGenerationState,
-): MutableGenerationState => ({
-  timeline: cloneTimeline(state.timeline),
-  timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
-});
 
 const isGeneratorStage = (
   stage: CompiledRackStage,
@@ -1414,7 +1371,7 @@ const applyEffectDevice = (
     const remaps = buildReverseRemaps(state, targetGroupId, executionPlan.requiredFrameWindow);
     return remaps.size > 0
       ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex, executionPlan.requiredFrameWindow)
-      : cloneGenerationState(state);
+      : state;
   }
 
   if (device.kind === 'trim') {
@@ -1427,7 +1384,7 @@ const applyEffectDevice = (
     );
     return remaps.size > 0
       ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex, executionPlan.requiredFrameWindow)
-      : cloneGenerationState(state);
+      : state;
   }
 
   if (device.kind === 'stretch') {
@@ -1440,7 +1397,7 @@ const applyEffectDevice = (
     );
     return remaps.size > 0
       ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex, executionPlan.requiredFrameWindow)
-      : cloneGenerationState(state);
+      : state;
   }
 
   if (device.kind === 'timewarp') {
@@ -1452,7 +1409,7 @@ const applyEffectDevice = (
     );
     return remaps.size > 0
       ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex, executionPlan.requiredFrameWindow)
-      : cloneGenerationState(state);
+      : state;
   }
 
   return applySpatialTransform(
@@ -1479,8 +1436,7 @@ const applyGeneratorDevice = (
 ): MutableGenerationState => {
   const device = stage.device as GeneratorNode;
   const deviceIndex = stage.stageIndex;
-  const nextTimeline = cloneTimeline(state.timeline);
-  nextTimeline.nextWriteId = state.timeline.nextWriteId;
+  const nextTimeline = beginTimelineStage(state.timeline);
   ensureTimelineFrameCount(nextTimeline, 1);
   const executionPlan = resolveDeviceExecutionPlan(executionPlanByDeviceId, device.id);
   const frameWindow = resolveFrameWindow(
@@ -1511,7 +1467,7 @@ const applyGeneratorDevice = (
   });
 
   return {
-    timeline: finalizeTimeline(nextTimeline),
+    timeline: completeTimelineStage(nextTimeline),
     timelineStateByOriginId: nextTimelineStateByOriginId,
   };
 };
