@@ -12,6 +12,7 @@ import {
   createLaunchpadSurfaceAdapter,
   projectTapeToNotes,
 } from '../generation/launchpad-projection';
+import type { CanonicalAnalysisResult } from '../generation/analysis/types';
 import type { LedFrameVelocityEntry } from '../generation/types';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 
@@ -20,6 +21,7 @@ export interface GeneratedRuntimeFieldResult {
   sourceTimelineEndBeat: number;
   sampleStepBeats: number;
   ledFramesBySampleIndex: ReadonlyArray<ReadonlyArray<LedFrameVelocityEntry>>;
+  analysis: CanonicalAnalysisResult;
 }
 
 const DEFAULT_SAMPLE_STEP_BEATS = 1 / NOTE_SAMPLES_PER_BEAT;
@@ -29,6 +31,14 @@ const createEmptyFieldResult = (): GeneratedRuntimeFieldResult => ({
   sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   sampleStepBeats: DEFAULT_SAMPLE_STEP_BEATS,
   ledFramesBySampleIndex: [[]],
+  analysis: {
+    byDeviceId: new Map(),
+    finalOutputBounds: 'none',
+    finalTimeDomain: {
+      start: 0,
+      end: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
+    },
+  },
 });
 
 export const buildGeneratedFieldResultWithRuntimeMap = ({
@@ -69,6 +79,7 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
     sourceTimelineEndBeat: generated.sourceTimelineEndBeat,
     sampleStepBeats: generated.sampleStepBeats,
     ledFramesBySampleIndex,
+    analysis: generated.analysis,
   };
 };
 

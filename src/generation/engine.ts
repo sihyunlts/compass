@@ -29,6 +29,7 @@ import type {
 } from '../shared/model';
 import { normalizeOptionalId } from '../shared/normalize-id';
 import { rasterizeGeneratorFrame } from './raster';
+import { buildCanonicalAnalysisResult } from './analysis/operators';
 import { collectActivationSegments, type LedActivationSegment } from './tape-analysis';
 import { addCellToFrame, cloneTape, createEmptyTape, ensureTapeFrameCount, finalizeTape } from './tape';
 import type {
@@ -1342,6 +1343,7 @@ export const buildCanonicalFieldResult = (
 
   const tape = finalizeTape(currentState.tape);
   const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(baseChain);
+  const analysis = buildCanonicalAnalysisResult(baseChain);
 
   return {
     tape,
@@ -1349,5 +1351,6 @@ export const buildCanonicalFieldResult = (
     sampleStepBeats: tape.sampleStepBeats,
     mutedGroupIds,
     mutedGeneratorIds,
+    analysis,
   };
 };

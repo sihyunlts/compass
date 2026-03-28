@@ -1,5 +1,6 @@
 import type { Bounds } from '../core/core-types';
 import type { GeneratorNode } from '../shared/model';
+import type { CanonicalAnalysisResult } from './analysis/types';
 
 export interface LedCell {
   x: number;
@@ -30,6 +31,7 @@ export interface CanonicalFieldResult {
   sampleStepBeats: number;
   mutedGroupIds: ReadonlySet<string>;
   mutedGeneratorIds: ReadonlySet<string>;
+  analysis: CanonicalAnalysisResult;
 }
 
 export interface CanonicalSurfaceAdapter {
