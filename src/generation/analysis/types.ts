@@ -35,6 +35,8 @@ export interface OperatorExecutionPlan {
   requiredOutputBounds: SpatialRequirement;
   requiredInputRoi: SpatialRequirement;
   requiredSourceRoi: SpatialRequirement;
+  requiredFrameWindow: BeatRange | 'all';
+  requiredSourceFrameWindow: BeatRange | 'all' | 'none';
 }
 
 export interface CanonicalExecutionPlan {

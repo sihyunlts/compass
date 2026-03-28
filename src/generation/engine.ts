@@ -35,12 +35,21 @@ import {
 import { buildCanonicalExecutionPlan } from './analysis/execution-plan';
 import { buildCanonicalAnalysisResult } from './analysis/operators';
 import type {
+  BeatRange,
   CanonicalExecutionRequest,
   OperatorExecutionPlan,
   SpatialRequirement,
 } from './analysis/types';
 import { collectActivationSegments, type LedActivationSegment } from './tape-analysis';
-import { addCellToFrame, cloneTape, createEmptyTape, ensureTapeFrameCount, finalizeTape } from './tape';
+import {
+  addCellToFrame,
+  cloneTape,
+  createEmptyTape,
+  ensureTapeFrameCount,
+  finalizeTape,
+  toFrameWindow,
+  type FrameWindow,
+} from './tape';
 import type {
   CanonicalFieldResult,
   CanonicalSpatialAdapter,
@@ -90,6 +99,8 @@ const EMPTY_EXECUTION_PLAN: OperatorExecutionPlan = Object.freeze({
   requiredOutputBounds: FULL_EXECUTION_BOUNDS,
   requiredInputRoi: FULL_EXECUTION_BOUNDS,
   requiredSourceRoi: 'none',
+  requiredFrameWindow: 'all',
+  requiredSourceFrameWindow: 'none',
 });
 
 const resolveDeviceExecutionPlan = (
@@ -102,6 +113,33 @@ const isCellWithinExecutionBounds = (
   y: number,
   executionBounds: SpatialRequirement,
 ): boolean => containsPointInSpatialRequirement(executionBounds, x, y);
+
+const resolveFrameWindow = (
+  requirement: BeatRange | 'all' | 'none',
+  sampleStepBeats: number,
+  frameCount: number,
+): FrameWindow => {
+  if (requirement === 'all') {
+    return {
+      startFrame: 0,
+      endFrameExclusive: frameCount,
+    };
+  }
+
+  if (requirement === 'none') {
+    return {
+      startFrame: 0,
+      endFrameExclusive: 0,
+    };
+  }
+
+  return toFrameWindow(requirement, sampleStepBeats, frameCount);
+};
+
+const isFrameWithinWindow = (
+  frameIndex: number,
+  window: FrameWindow,
+): boolean => frameIndex >= window.startFrame && frameIndex < window.endFrameExclusive;
 
 const cloneTimelineStateByOriginId = (
   timelineStateByOriginId: ReadonlyMap<string, OriginTimelineState>,
@@ -276,10 +314,16 @@ const applySpatialTransform = (
   writeOrder: number,
   resolveTransformAtFrame: (frameIndex: number) => ReturnType<typeof toTranslationTransform> | null,
   executionBounds: SpatialRequirement,
+  requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, state.tape.timeDomainEndBeat);
+  const frameWindow = resolveFrameWindow(
+    requiredFrameWindow,
+    state.tape.sampleStepBeats,
+    state.tape.frames.length,
+  );
 
   for (let frameIndex = 0; frameIndex < state.tape.frames.length; frameIndex += 1) {
     const transform = resolveTransformAtFrame(frameIndex);
@@ -288,6 +332,10 @@ const applySpatialTransform = (
       targetGroupId,
     );
     nextTape.frames[frameIndex].cells.push(...untargeted);
+
+    if (!isFrameWithinWindow(frameIndex, frameWindow)) {
+      continue;
+    }
 
     for (const cell of targeted) {
       if (!transform) {
@@ -352,10 +400,16 @@ const applyMirrorHalfSymmetry = (
   targetGroupId: string | null,
   writeOrder: number,
   executionBounds: SpatialRequirement,
+  requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, state.tape.timeDomainEndBeat);
+  const frameWindow = resolveFrameWindow(
+    requiredFrameWindow,
+    state.tape.sampleStepBeats,
+    state.tape.frames.length,
+  );
 
   const keepMin = effect.params.axis === 'horizontal'
     ? effect.params.sourceAnchor === 'bl' || effect.params.sourceAnchor === 'tl'
@@ -368,6 +422,10 @@ const applyMirrorHalfSymmetry = (
       targetGroupId,
     );
     nextTape.frames[frameIndex].cells.push(...untargeted);
+
+    if (!isFrameWithinWindow(frameIndex, frameWindow)) {
+      continue;
+    }
 
     for (const cell of targeted) {
       const sourceCoordinate = effect.params.axis === 'horizontal' ? cell.x : cell.y;
@@ -418,10 +476,16 @@ const applyQuadMirrorSymmetry = (
   targetGroupId: string | null,
   writeOrder: number,
   executionBounds: SpatialRequirement,
+  requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, state.tape.timeDomainEndBeat);
+  const frameWindow = resolveFrameWindow(
+    requiredFrameWindow,
+    state.tape.sampleStepBeats,
+    state.tape.frames.length,
+  );
 
   const quadrants: ReadonlyArray<SymmetryEffectNode['params']['sourceAnchor']> = ['bl', 'br', 'tr', 'tl'];
   const sourceKeepMinX = effect.params.sourceAnchor === 'bl' || effect.params.sourceAnchor === 'tl';
@@ -433,6 +497,10 @@ const applyQuadMirrorSymmetry = (
       targetGroupId,
     );
     nextTape.frames[frameIndex].cells.push(...untargeted);
+
+    if (!isFrameWithinWindow(frameIndex, frameWindow)) {
+      continue;
+    }
 
     for (const cell of targeted) {
       for (const quadrant of quadrants) {
@@ -484,10 +552,16 @@ const applyQuadPinwheelSymmetry = (
   targetGroupId: string | null,
   writeOrder: number,
   executionBounds: SpatialRequirement,
+  requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, state.tape.timeDomainEndBeat);
+  const frameWindow = resolveFrameWindow(
+    requiredFrameWindow,
+    state.tape.sampleStepBeats,
+    state.tape.frames.length,
+  );
 
   const quadrants: ReadonlyArray<SymmetryEffectNode['params']['sourceAnchor']> = ['bl', 'br', 'tr', 'tl'];
   const sourceIndex = quadrants.findIndex((quadrant) => quadrant === effect.params.sourceAnchor);
@@ -498,6 +572,10 @@ const applyQuadPinwheelSymmetry = (
       targetGroupId,
     );
     nextTape.frames[frameIndex].cells.push(...untargeted);
+
+    if (!isFrameWithinWindow(frameIndex, frameWindow)) {
+      continue;
+    }
 
     for (const cell of targeted) {
       for (let targetIndex = 0; targetIndex < quadrants.length; targetIndex += 1) {
@@ -541,16 +619,38 @@ const applySymmetryEffect = (
   targetGroupId: string | null,
   writeOrder: number,
   executionBounds: SpatialRequirement,
+  requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
   if (effect.params.mode === 'mirror-half') {
-    return applyMirrorHalfSymmetry(state, effect, targetGroupId, writeOrder, executionBounds);
+    return applyMirrorHalfSymmetry(
+      state,
+      effect,
+      targetGroupId,
+      writeOrder,
+      executionBounds,
+      requiredFrameWindow,
+    );
   }
 
   if (effect.params.mode === 'quad-mirror') {
-    return applyQuadMirrorSymmetry(state, effect, targetGroupId, writeOrder, executionBounds);
+    return applyQuadMirrorSymmetry(
+      state,
+      effect,
+      targetGroupId,
+      writeOrder,
+      executionBounds,
+      requiredFrameWindow,
+    );
   }
 
-  return applyQuadPinwheelSymmetry(state, effect, targetGroupId, writeOrder, executionBounds);
+  return applyQuadPinwheelSymmetry(
+    state,
+    effect,
+    targetGroupId,
+    writeOrder,
+    executionBounds,
+    requiredFrameWindow,
+  );
 };
 
 const buildSourceCellsByOriginAndFrame = (
@@ -630,6 +730,7 @@ const applyTemporalRemap = (
   targetGroupId: string | null,
   remaps: ReadonlyMap<string, OriginTemporalRemap>,
   writeOrder: number,
+  requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
   const passthroughEndBeat = resolvePassthroughEndBeat(state.tape, targetGroupId);
   const passthroughFrameCount = Math.max(
@@ -646,6 +747,11 @@ const applyTemporalRemap = (
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, outputEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, outputEndBeat);
+  const frameWindow = resolveFrameWindow(
+    requiredFrameWindow,
+    state.tape.sampleStepBeats,
+    nextTape.frames.length,
+  );
 
   for (let frameIndex = 0; frameIndex < state.tape.frames.length; frameIndex += 1) {
     for (const cell of state.tape.frames[frameIndex].cells) {
@@ -671,6 +777,10 @@ const applyTemporalRemap = (
       frameIndex < Math.min(remap.sourceFrameIndexByOutputFrame.length, nextTape.frames.length);
       frameIndex += 1
     ) {
+      if (!isFrameWithinWindow(frameIndex, frameWindow)) {
+        continue;
+      }
+
       const sourceFrameIndex = remap.sourceFrameIndexByOutputFrame[frameIndex];
       if (sourceFrameIndex === null || sourceFrameIndex === undefined) {
         continue;
@@ -719,10 +829,16 @@ const applyTemporalRemap = (
 const buildReverseRemaps = (
   state: MutableGenerationState,
   targetGroupId: string | null,
+  requiredFrameWindow: BeatRange | 'all',
 ): Map<string, OriginTemporalRemap> => {
   const remaps = new Map<string, OriginTemporalRemap>();
   const occupiedWindowByOriginId = buildOccupiedWindowByOriginId(state.tape);
   const outputFrameCount = resolveTemporalOutputFrameCount(state, targetGroupId);
+  const frameWindow = resolveFrameWindow(
+    requiredFrameWindow,
+    state.tape.sampleStepBeats,
+    outputFrameCount,
+  );
 
   for (const originId of buildTargetOriginIds(state.tape, targetGroupId)) {
     const timelineState = state.timelineStateByOriginId.get(originId);
@@ -750,6 +866,10 @@ const buildReverseRemaps = (
     const sourceFrameIndexByOutputFrame: Array<number | null> = Array.from(
       { length: outputFrameCount },
       (_, frameIndex) => {
+        if (!isFrameWithinWindow(frameIndex, frameWindow)) {
+          return null;
+        }
+
         const outputBeat = frameIndex * state.tape.sampleStepBeats;
         if (outputBeat < outputWindow.start || outputBeat >= outputWindow.end) {
           return null;
@@ -783,10 +903,16 @@ const buildTrimRemaps = (
   effect: TrimEffectNode,
   targetGroupId: string | null,
   modulationContext: ModulationContext,
+  requiredFrameWindow: BeatRange | 'all',
 ): Map<string, OriginTemporalRemap> => {
   const remaps = new Map<string, OriginTemporalRemap>();
   const occupiedWindowByOriginId = buildOccupiedWindowByOriginId(state.tape);
   const outputFrameCount = resolveTemporalOutputFrameCount(state, targetGroupId);
+  const frameWindow = resolveFrameWindow(
+    requiredFrameWindow,
+    state.tape.sampleStepBeats,
+    outputFrameCount,
+  );
 
   for (const originId of buildTargetOriginIds(state.tape, targetGroupId)) {
     const timelineState = state.timelineStateByOriginId.get(originId);
@@ -811,6 +937,10 @@ const buildTrimRemaps = (
     const sourceFrameIndexByOutputFrame: Array<number | null> = Array.from(
       { length: outputFrameCount },
       (_, frameIndex) => {
+        if (!isFrameWithinWindow(frameIndex, frameWindow)) {
+          return null;
+        }
+
         const outputBeat = frameIndex * state.tape.sampleStepBeats;
         if (outputBeat < outputWindow.start || outputBeat >= outputWindow.end) {
           return null;
@@ -853,10 +983,16 @@ const buildStretchRemaps = (
   effect: StretchEffectNode,
   targetGroupId: string | null,
   modulationContext: ModulationContext,
+  requiredFrameWindow: BeatRange | 'all',
 ): Map<string, OriginTemporalRemap> => {
   const remaps = new Map<string, OriginTemporalRemap>();
   const occupiedWindowByOriginId = buildOccupiedWindowByOriginId(state.tape);
   const outputFrameCount = resolveTemporalOutputFrameCount(state, targetGroupId);
+  const frameWindow = resolveFrameWindow(
+    requiredFrameWindow,
+    state.tape.sampleStepBeats,
+    outputFrameCount,
+  );
 
   for (const originId of buildTargetOriginIds(state.tape, targetGroupId)) {
     const sourceWindow = resolveSourceWindow(
@@ -872,6 +1008,10 @@ const buildStretchRemaps = (
     const sourceFrameIndexByOutputFrame: Array<number | null> = Array.from(
       { length: outputFrameCount },
       (_, frameIndex) => {
+        if (!isFrameWithinWindow(frameIndex, frameWindow)) {
+          return null;
+        }
+
         const outputBeat = frameIndex * state.tape.sampleStepBeats;
         const deviceAtFrame = resolveModulatedDeviceAtFrame(
           modulationContext,
@@ -913,6 +1053,7 @@ const buildTimeWarpRemaps = (
   state: MutableGenerationState,
   effect: TimeWarpEffectNode,
   targetGroupId: string | null,
+  requiredFrameWindow: BeatRange | 'all',
 ): Map<string, OriginTemporalRemap> => {
   const remaps = new Map<string, OriginTemporalRemap>();
   if (isIdentityTimeWarpCurve(effect.params.curve)) {
@@ -922,6 +1063,11 @@ const buildTimeWarpRemaps = (
   const remap = createSampledRemapFromTimeWarpCurve(effect.params.curve);
   const occupiedWindowByOriginId = buildOccupiedWindowByOriginId(state.tape);
   const outputFrameCount = resolveTemporalOutputFrameCount(state, targetGroupId);
+  const frameWindow = resolveFrameWindow(
+    requiredFrameWindow,
+    state.tape.sampleStepBeats,
+    outputFrameCount,
+  );
 
   for (const originId of buildTargetOriginIds(state.tape, targetGroupId)) {
     const timelineState = state.timelineStateByOriginId.get(originId);
@@ -946,6 +1092,10 @@ const buildTimeWarpRemaps = (
     const sourceFrameIndexByOutputFrame: Array<number | null> = Array.from(
       { length: outputFrameCount },
       (_, frameIndex) => {
+        if (!isFrameWithinWindow(frameIndex, frameWindow)) {
+          return null;
+        }
+
         const outputBeat = frameIndex * state.tape.sampleStepBeats;
         if (outputBeat < outputWindow.start || outputBeat >= outputWindow.end) {
           return null;
@@ -1077,6 +1227,16 @@ const applyMaskEffect = (
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, state.tape.timeDomainEndBeat);
+  const targetFrameWindow = resolveFrameWindow(
+    executionPlan.requiredFrameWindow,
+    state.tape.sampleStepBeats,
+    sourceTape.frames.length,
+  );
+  const sourceFrameWindow = resolveFrameWindow(
+    executionPlan.requiredSourceFrameWindow,
+    state.tape.sampleStepBeats,
+    sourceTape.frames.length,
+  );
 
   for (let frameIndex = 0; frameIndex < sourceTape.frames.length; frameIndex += 1) {
     const mask = resolveMaskSourceMask(
@@ -1088,12 +1248,18 @@ const applyMaskEffect = (
       spatialAdapter,
       targetGroupId,
       frameIndex,
-      executionPlan.requiredSourceRoi,
+      isFrameWithinWindow(frameIndex, sourceFrameWindow)
+        ? executionPlan.requiredSourceRoi
+        : 'none',
     );
 
     for (const cell of sourceTape.frames[frameIndex].cells) {
       if (!isTargetedCell(cell, targetGroupId)) {
         nextTape.frames[frameIndex].cells.push({ ...cell });
+        continue;
+      }
+
+      if (!isFrameWithinWindow(frameIndex, targetFrameWindow)) {
         continue;
       }
 
@@ -1148,10 +1314,16 @@ const applyColorEffect = (
   targetGroupId: string | null,
   writeOrder: number,
   executionBounds: SpatialRequirement,
+  requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
   const colorConfig = buildColorConfig(effect);
+  const frameWindow = resolveFrameWindow(
+    requiredFrameWindow,
+    state.tape.sampleStepBeats,
+    state.tape.frames.length,
+  );
   const targetSegmentsByOriginId = groupActivationSegmentsByOriginId(
     collectActivationSegments(
       state.tape,
@@ -1184,6 +1356,10 @@ const applyColorEffect = (
       );
 
       for (let frameIndex = startFrame; frameIndex < endFrameExclusive; frameIndex += 1) {
+        if (!isFrameWithinWindow(frameIndex, frameWindow)) {
+          continue;
+        }
+
         if (!isCellWithinExecutionBounds(slot.source.x, slot.source.y, executionBounds)) {
           continue;
         }
@@ -1276,6 +1452,7 @@ const applyEffectDevice = (
       targetGroupId,
       deviceIndex,
       executionPlan.requiredOutputBounds,
+      executionPlan.requiredFrameWindow,
     );
   }
 
@@ -1286,34 +1463,52 @@ const applyEffectDevice = (
       targetGroupId,
       deviceIndex,
       executionPlan.requiredOutputBounds,
+      executionPlan.requiredFrameWindow,
     );
   }
 
   if (device.kind === 'reverse') {
-    const remaps = buildReverseRemaps(state, targetGroupId);
+    const remaps = buildReverseRemaps(state, targetGroupId, executionPlan.requiredFrameWindow);
     return remaps.size > 0
-      ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex)
+      ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex, executionPlan.requiredFrameWindow)
       : cloneGenerationState(state);
   }
 
   if (device.kind === 'trim') {
-    const remaps = buildTrimRemaps(state, device, targetGroupId, modulationContext);
+    const remaps = buildTrimRemaps(
+      state,
+      device,
+      targetGroupId,
+      modulationContext,
+      executionPlan.requiredFrameWindow,
+    );
     return remaps.size > 0
-      ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex)
+      ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex, executionPlan.requiredFrameWindow)
       : cloneGenerationState(state);
   }
 
   if (device.kind === 'stretch') {
-    const remaps = buildStretchRemaps(state, device, targetGroupId, modulationContext);
+    const remaps = buildStretchRemaps(
+      state,
+      device,
+      targetGroupId,
+      modulationContext,
+      executionPlan.requiredFrameWindow,
+    );
     return remaps.size > 0
-      ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex)
+      ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex, executionPlan.requiredFrameWindow)
       : cloneGenerationState(state);
   }
 
   if (device.kind === 'timewarp') {
-    const remaps = buildTimeWarpRemaps(state, device, targetGroupId);
+    const remaps = buildTimeWarpRemaps(
+      state,
+      device,
+      targetGroupId,
+      executionPlan.requiredFrameWindow,
+    );
     return remaps.size > 0
-      ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex)
+      ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex, executionPlan.requiredFrameWindow)
       : cloneGenerationState(state);
   }
 
@@ -1330,6 +1525,7 @@ const applyEffectDevice = (
       ) as GeneratorEffectNode,
     ),
     executionPlan.requiredOutputBounds,
+    executionPlan.requiredFrameWindow,
   );
 };
 
@@ -1344,8 +1540,13 @@ const applyGeneratorDevice = (
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, 1);
   const executionPlan = resolveDeviceExecutionPlan(executionPlanByDeviceId, device.id);
+  const frameWindow = resolveFrameWindow(
+    executionPlan.requiredFrameWindow,
+    nextTape.sampleStepBeats,
+    nextTape.frames.length,
+  );
 
-  for (let frameIndex = 0; frameIndex < Math.min(nextTape.frames.length, 256); frameIndex += 1) {
+  for (let frameIndex = frameWindow.startFrame; frameIndex < frameWindow.endFrameExclusive; frameIndex += 1) {
     rasterizeGeneratorFrame(
       nextTape,
       frameIndex,

@@ -1,4 +1,5 @@
 import { NOTE_SAMPLES_PER_BEAT } from '../core/pipeline/constants';
+import type { BeatRange } from './analysis/types';
 import type { LedCell, LedTape } from './types';
 
 export const DEFAULT_SAMPLE_STEP_BEATS = 1 / NOTE_SAMPLES_PER_BEAT;
@@ -65,6 +66,40 @@ export const clampFrameIndex = (
   }
 
   return Math.min(Math.max(frameIndex, 0), frameCount - 1);
+};
+
+export interface FrameWindow {
+  startFrame: number;
+  endFrameExclusive: number;
+}
+
+export const toFrameWindow = (
+  range: BeatRange,
+  sampleStepBeats: number,
+  frameCount: number,
+): FrameWindow => {
+  if (!Number.isFinite(sampleStepBeats) || sampleStepBeats <= 0 || frameCount <= 0) {
+    return {
+      startFrame: 0,
+      endFrameExclusive: 0,
+    };
+  }
+
+  const safeStart = Number.isFinite(range.start) ? Math.max(range.start, 0) : 0;
+  const safeEnd = Number.isFinite(range.end) ? Math.max(range.end, safeStart) : safeStart;
+  const startFrame = Math.min(
+    Math.max(Math.floor(safeStart / sampleStepBeats), 0),
+    frameCount,
+  );
+  const endFrameExclusive = Math.min(
+    Math.max(Math.ceil(safeEnd / sampleStepBeats), startFrame),
+    frameCount,
+  );
+
+  return {
+    startFrame,
+    endFrameExclusive,
+  };
 };
 
 export const addCellToFrame = (

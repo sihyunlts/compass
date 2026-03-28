@@ -9,6 +9,7 @@ import {
 } from '../../core/geometry';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import type {
+  BeatRange,
   CanonicalExecutionPlan,
   CanonicalExecutionRequest,
   OperatorExecutionPlan,
@@ -24,6 +25,73 @@ import type {
 } from '../../shared/model';
 
 const NONE_REQUIREMENT: SpatialRequirement = 'none';
+const NONE_TIME_WINDOW = 'none' as const;
+const ALL_TIME_WINDOW = 'all' as const;
+
+const clampBeatRange = (
+  range: BeatRange,
+): BeatRange => {
+  const start = Number.isFinite(range.start) ? range.start : 0;
+  const end = Number.isFinite(range.end) ? range.end : start;
+  return {
+    start: Math.max(start, 0),
+    end: Math.max(end, Math.max(start, 0)),
+  };
+};
+
+const intersectBeatRanges = (
+  left: BeatRange,
+  right: BeatRange,
+): BeatRange => ({
+  start: Math.max(left.start, right.start),
+  end: Math.max(Math.max(left.start, right.start), Math.min(left.end, right.end)),
+});
+
+const mergeTargetedFrameWindow = (
+  groupId: string | null | undefined,
+  requiredOutputWindow: BeatRange | 'all',
+  requiredInputWindow: BeatRange | 'all',
+): BeatRange | 'all' => {
+  if (requiredOutputWindow === 'all' || requiredInputWindow === 'all') {
+    return ALL_TIME_WINDOW;
+  }
+
+  if (!isGroupTargetedEffect(groupId)) {
+    return requiredInputWindow;
+  }
+
+  return {
+    start: Math.min(requiredOutputWindow.start, requiredInputWindow.start),
+    end: Math.max(requiredOutputWindow.end, requiredInputWindow.end),
+  };
+};
+
+const remapTrimInputWindow = (
+  requiredOutputWindow: BeatRange,
+  trimWindow: BeatRange,
+): BeatRange => {
+  if (trimWindow.end <= trimWindow.start) {
+    return trimWindow;
+  }
+
+  return intersectBeatRanges(requiredOutputWindow, trimWindow);
+};
+
+const remapStretchInputWindow = (
+  requiredOutputWindow: BeatRange,
+  stretchWindow: BeatRange,
+): BeatRange => {
+  const visibleWindow = intersectBeatRanges(requiredOutputWindow, stretchWindow);
+  const span = stretchWindow.end - stretchWindow.start;
+  if (!Number.isFinite(span) || span <= 0) {
+    return { start: 0, end: 0 };
+  }
+
+  return {
+    start: Math.max((visibleWindow.start - stretchWindow.start) / span, 0),
+    end: Math.max((visibleWindow.end - stretchWindow.start) / span, 0),
+  };
+};
 
 const isGroupTargetedEffect = (
   groupId: string | null | undefined,
@@ -155,12 +223,15 @@ const buildSpatialInputRoi = (
 const buildOperatorExecutionPlan = (
   device: GeneratorDeviceNode,
   requiredOutputBounds: SpatialRequirement,
+  requiredFrameWindow: BeatRange | 'all',
 ): OperatorExecutionPlan => {
   if (device.kind === 'modulator') {
     return {
       requiredOutputBounds,
       requiredInputRoi: requiredOutputBounds,
       requiredSourceRoi: NONE_REQUIREMENT,
+      requiredFrameWindow: requiredFrameWindow,
+      requiredSourceFrameWindow: NONE_TIME_WINDOW,
     };
   }
 
@@ -174,6 +245,8 @@ const buildOperatorExecutionPlan = (
       requiredOutputBounds,
       requiredInputRoi: NONE_REQUIREMENT,
       requiredSourceRoi: NONE_REQUIREMENT,
+      requiredFrameWindow,
+      requiredSourceFrameWindow: NONE_TIME_WINDOW,
     };
   }
 
@@ -187,6 +260,8 @@ const buildOperatorExecutionPlan = (
       requiredOutputBounds,
       requiredInputRoi,
       requiredSourceRoi: NONE_REQUIREMENT,
+      requiredFrameWindow: ALL_TIME_WINDOW,
+      requiredSourceFrameWindow: NONE_TIME_WINDOW,
     };
   }
 
@@ -202,28 +277,85 @@ const buildOperatorExecutionPlan = (
       requiredSourceRoi: device.params.sourceKind === 'tiles'
         ? NONE_REQUIREMENT
         : requiredOutputBounds,
+      requiredFrameWindow,
+      requiredSourceFrameWindow: device.params.sourceKind === 'tiles'
+        ? NONE_TIME_WINDOW
+        : requiredFrameWindow,
     };
   }
 
-  if (
-    device.kind === 'reverse'
-    || device.kind === 'trim'
-    || device.kind === 'stretch'
-    || device.kind === 'timewarp'
-  ) {
+  if (device.kind === 'reverse') {
     return {
       requiredOutputBounds,
       requiredInputRoi: mergeTargetedInputRoi(device.groupId, requiredOutputBounds, requiredOutputBounds),
       requiredSourceRoi: NONE_REQUIREMENT,
+      requiredFrameWindow: ALL_TIME_WINDOW,
+      requiredSourceFrameWindow: NONE_TIME_WINDOW,
     };
   }
 
-  const spatialInputRoi = buildSpatialInputRoi(device, requiredOutputBounds);
-  if (spatialInputRoi) {
+  if (device.kind === 'trim') {
+    const trimWindow = clampBeatRange({
+      start: device.params.start,
+      end: device.params.end,
+    });
+    const requiredInputWindow = requiredFrameWindow === 'all'
+      ? ALL_TIME_WINDOW
+      : remapTrimInputWindow(requiredFrameWindow, trimWindow);
     return {
       requiredOutputBounds,
-      requiredInputRoi: mergeTargetedInputRoi(device.groupId, requiredOutputBounds, spatialInputRoi),
+      requiredInputRoi: mergeTargetedInputRoi(device.groupId, requiredOutputBounds, requiredOutputBounds),
       requiredSourceRoi: NONE_REQUIREMENT,
+      requiredFrameWindow: requiredInputWindow,
+      requiredSourceFrameWindow: NONE_TIME_WINDOW,
+    };
+  }
+
+  if (device.kind === 'stretch') {
+    const stretchWindow = clampBeatRange({
+      start: device.params.start,
+      end: device.params.end,
+    });
+    const requiredInputWindow = requiredFrameWindow === 'all'
+      ? ALL_TIME_WINDOW
+      : remapStretchInputWindow(requiredFrameWindow, stretchWindow);
+    return {
+      requiredOutputBounds,
+      requiredInputRoi: mergeTargetedInputRoi(device.groupId, requiredOutputBounds, requiredOutputBounds),
+      requiredSourceRoi: NONE_REQUIREMENT,
+      requiredFrameWindow: requiredInputWindow,
+      requiredSourceFrameWindow: NONE_TIME_WINDOW,
+    };
+  }
+
+  if (device.kind === 'timewarp') {
+    return {
+      requiredOutputBounds,
+      requiredInputRoi: mergeTargetedInputRoi(device.groupId, requiredOutputBounds, requiredOutputBounds),
+      requiredSourceRoi: NONE_REQUIREMENT,
+      requiredFrameWindow: ALL_TIME_WINDOW,
+      requiredSourceFrameWindow: NONE_TIME_WINDOW,
+    };
+  }
+
+  if (
+    device.kind === 'translate'
+    || device.kind === 'rotate'
+    || device.kind === 'scale'
+    || device.kind === 'mirror'
+    || device.kind === 'symmetry'
+  ) {
+    const spatialInputRoi = buildSpatialInputRoi(device, requiredOutputBounds);
+    return {
+      requiredOutputBounds,
+      requiredInputRoi: mergeTargetedInputRoi(
+        device.groupId,
+        requiredOutputBounds,
+        spatialInputRoi ?? requiredOutputBounds,
+      ),
+      requiredSourceRoi: NONE_REQUIREMENT,
+      requiredFrameWindow,
+      requiredSourceFrameWindow: NONE_TIME_WINDOW,
     };
   }
 
@@ -231,6 +363,8 @@ const buildOperatorExecutionPlan = (
     requiredOutputBounds,
     requiredInputRoi: requiredOutputBounds,
     requiredSourceRoi: NONE_REQUIREMENT,
+    requiredFrameWindow,
+    requiredSourceFrameWindow: NONE_TIME_WINDOW,
   };
 };
 
@@ -240,6 +374,7 @@ export const buildCanonicalExecutionPlan = (
 ): CanonicalExecutionPlan => {
   const byDeviceId = new Map<string, OperatorExecutionPlan>();
   let currentRequiredOutputBounds = executionRequest.outputBounds;
+  let currentRequiredFrameWindow: BeatRange | 'all' = clampBeatRange(executionRequest.timeDomain);
 
   for (let index = chain.devices.length - 1; index >= 0; index -= 1) {
     const device = chain.devices[index];
@@ -247,7 +382,11 @@ export const buildCanonicalExecutionPlan = (
       continue;
     }
 
-    const devicePlan = buildOperatorExecutionPlan(device, currentRequiredOutputBounds);
+    const devicePlan = buildOperatorExecutionPlan(
+      device,
+      currentRequiredOutputBounds,
+      currentRequiredFrameWindow,
+    );
     byDeviceId.set(device.id, devicePlan);
 
     if (
@@ -260,6 +399,11 @@ export const buildCanonicalExecutionPlan = (
     }
 
     currentRequiredOutputBounds = devicePlan.requiredInputRoi;
+    currentRequiredFrameWindow = mergeTargetedFrameWindow(
+      device.groupId,
+      currentRequiredFrameWindow,
+      devicePlan.requiredFrameWindow,
+    );
   }
 
   return {
