@@ -13,7 +13,7 @@ import {
   planColorProgramSlots,
   type ClipNoteWithOrigin,
 } from '../devices/color/color-program';
-import { doesDeviceToggleTimelineParity } from '../devices/engine';
+import { doesDeviceToggleTimelineParity } from '../devices/timeline-parity';
 import { isDeviceEffectivelyEnabled } from '../shared/group-state';
 import { cloneDeviceNode } from '../shared/model';
 import type {

@@ -1,10 +1,4 @@
-import {
-  isGeneratorEngineNode,
-  isPipelineEffectNode,
-  resolveEffectMutedSource,
-  type PipelineEffectNode,
-} from '../../devices/engine';
-import type { GeneratorChain, GeneratorDeviceNode, GeneratorNode } from '../../shared/model';
+import type { GeneratorChain, GeneratorDeviceNode, GeneratorEffectNode, GeneratorNode } from '../../shared/model';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import type {
@@ -15,12 +9,31 @@ import type {
 } from './types';
 
 export const isGeneratorNode = (device: GeneratorDeviceNode): device is GeneratorNode => (
-  isGeneratorEngineNode(device)
+  device.kind === 'waterdrop'
+  || device.kind === 'scanner'
+  || device.kind === 'spiral'
+  || device.kind === 'path'
 );
 
-export const isEffectNode = (device: GeneratorDeviceNode): device is PipelineEffectNode => (
-  isPipelineEffectNode(device)
+export const isEffectNode = (device: GeneratorDeviceNode): device is GeneratorEffectNode => (
+  !isGeneratorNode(device) && device.kind !== 'modulator'
 );
+
+const resolveEffectMutedSource = (
+  device: GeneratorDeviceNode,
+): { kind: 'group' | 'generator'; sourceId: string } | null => {
+  if (device.kind !== 'mask' || device.params.sourceVisibility === 'show') {
+    return null;
+  }
+
+  const sourceKind = device.params.sourceKind;
+  if (sourceKind !== 'group' && sourceKind !== 'generator') {
+    return null;
+  }
+
+  const sourceId = normalizeOptionalId(device.params.sourceId);
+  return sourceId ? { kind: sourceKind, sourceId } : null;
+};
 
 export const splitChainByGroup = (chain: GeneratorChain): GroupChain[] => {
   const groups: GroupChain[] = [];

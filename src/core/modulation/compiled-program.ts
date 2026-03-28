@@ -1,4 +1,4 @@
-import { doesDeviceToggleTimelineParity } from '../../devices/engine';
+import { doesDeviceToggleTimelineParity } from '../../devices/timeline-parity';
 import { readNumericDeviceParam, writeNumericDeviceParam } from '../../devices/modulation';
 import type { GeneratorChain, GeneratorDeviceNode, ModulationCurve } from '../../shared/model';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';

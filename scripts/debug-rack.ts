@@ -6,19 +6,8 @@ import {
   getLaunchpadRuntimeMap,
   resolveLaunchpadModel,
 } from '../src/domain';
-import {
-  compilePipelineEngine,
-  evaluateExactOutputFramesAtTimes,
-  evaluateMaskDebugAtTime,
-  evaluatePolylinesAtTime,
-} from '../src/core/pipeline/engine';
-import {
-  SAMPLES_PER_BEAT,
-  TILE_COUNT,
-} from '../src/core/pipeline/constants';
-import type { Polyline } from '../src/core/core-types';
-import type { ExactOutputFrame } from '../src/core/pipeline/engine';
-import type { ClipNote, LaunchpadButton, LaunchpadModel, MaskEffectNode } from '../src/shared/model';
+import { TILE_COUNT } from '../src/core/pipeline/constants';
+import type { ClipNote, LaunchpadButton, LaunchpadModel } from '../src/shared/model';
 import { parsePresetFileText } from '../src/shared/presets';
 
 interface CliOptions {
@@ -29,14 +18,6 @@ interface CliOptions {
   launchpadModel: LaunchpadModel;
 }
 
-interface SerializablePolyline {
-  originId: string;
-  velocity: number;
-  closed: boolean;
-  clipCount: number;
-  points: Array<{ x: number; y: number }>;
-}
-
 interface ActiveAddressSnapshot {
   address: string;
   pitch: number;
@@ -44,29 +25,9 @@ interface ActiveAddressSnapshot {
   velocity: number;
 }
 
-interface ComparableFrameSnapshot {
+interface FrameSnapshot {
   activeTiles: Array<{ tileId: number; x: number; y: number }>;
   activeAddresses: ActiveAddressSnapshot[];
-}
-
-interface CompareMismatchSnapshot {
-  normalizedBeat: number;
-  previewBeat: number;
-  exact: ComparableFrameSnapshot;
-  preview: ComparableFrameSnapshot;
-  tileDiff: {
-    exactOnly: number[];
-    previewOnly: number[];
-  };
-  addressDiff: {
-    exactOnly: string[];
-    previewOnly: string[];
-    velocityMismatches: Array<{
-      address: string;
-      exactVelocity: number;
-      previewVelocity: number;
-    }>;
-  };
 }
 
 const DEFAULT_BEATS = [0, 0.25, 0.5, 0.75];
@@ -76,7 +37,7 @@ const printUsage = (): void => {
     [
       'Usage: npm run debug:rack -- <rack-path> [--out <dir>] [--beats 0,0.25,0.5,0.75] [--loop-length 1] [--model mk3|mk2]',
       '',
-      'Outputs notes and beat snapshots for one rack preset.',
+      'Outputs canonical preview notes and beat snapshots for one rack preset.',
       '',
     ].join('\n'),
   );
@@ -169,27 +130,6 @@ const parseCliOptions = (argv: string[]): CliOptions | null => {
   };
 };
 
-const round = (value: number, digits = 4): number => Number(value.toFixed(digits));
-
-const serializePolylines = (
-  polylines: ReadonlyArray<Polyline>,
-): SerializablePolyline[] => polylines.map((polyline) => ({
-  originId: polyline.originId,
-  velocity: polyline.velocity,
-  closed: polyline.closed,
-  clipCount: polyline.clipStack.length,
-  points: polyline.points.map((point) => ({
-    x: round(point.x, 3),
-    y: round(point.y, 3),
-  })),
-}));
-
-const toTileCoordinates = (tileId: number): { tileId: number; x: number; y: number } => ({
-  tileId,
-  x: tileId % TILE_COUNT,
-  y: Math.floor(tileId / TILE_COUNT),
-});
-
 const isNoteActiveAtBeat = (
   note: ClipNote,
   beat: number,
@@ -197,49 +137,27 @@ const isNoteActiveAtBeat = (
 
 const toAddressKey = (channel: number, pitch: number): string => `${channel}:${pitch}`;
 
-const mapNormalizedBeatToPreviewBeat = (
-  normalizedBeat: number,
-  sourceTimelineEndBeat: number,
-): number => normalizedBeat * sourceTimelineEndBeat;
+const toTileCoordinates = (tileId: number): { tileId: number; x: number; y: number } => ({
+  tileId,
+  x: tileId % TILE_COUNT,
+  y: Math.floor(tileId / TILE_COUNT),
+});
 
 const sortAddresses = (
   left: ActiveAddressSnapshot,
   right: ActiveAddressSnapshot,
 ): number => left.pitch - right.pitch || left.channel - right.channel;
 
-const buildComparableFrameSnapshot = (
-  activeTiles: ReadonlySet<number>,
-  activeAddresses: ReadonlyMap<string, ActiveAddressSnapshot>,
-): ComparableFrameSnapshot => ({
-  activeTiles: Array.from(activeTiles)
-    .sort((left, right) => left - right)
-    .map((tileId) => toTileCoordinates(tileId)),
-  activeAddresses: Array.from(activeAddresses.values()).sort(sortAddresses),
-});
+const mapNormalizedBeatToPreviewBeat = (
+  normalizedBeat: number,
+  sourceTimelineEndBeat: number,
+): number => normalizedBeat * sourceTimelineEndBeat;
 
-const resolveExactFrameSnapshot = (
-  frame: ExactOutputFrame,
-): ComparableFrameSnapshot => {
-  const activeAddresses = new Map<string, ActiveAddressSnapshot>();
-
-  for (const [pitch, info] of frame.activationFrame.activeByPitch.entries()) {
-    const address = toAddressKey(info.channel, pitch);
-    activeAddresses.set(address, {
-      address,
-      pitch,
-      channel: info.channel,
-      velocity: info.velocity,
-    });
-  }
-
-  return buildComparableFrameSnapshot(frame.activationFrame.activeTiles, activeAddresses);
-};
-
-const resolvePreviewFrameAtBeat = (
+const buildFrameSnapshotAtBeat = (
   notes: ReadonlyArray<ClipNote>,
   buttons: ReadonlyArray<LaunchpadButton>,
   beat: number,
-): ComparableFrameSnapshot => {
+): FrameSnapshot => {
   const activeTiles = new Set<number>();
   const activeByAddress = new Map<string, ActiveAddressSnapshot>();
 
@@ -254,8 +172,8 @@ const resolvePreviewFrameAtBeat = (
       activeByAddress.set(addressKey, {
         address: addressKey,
         pitch: note.pitch,
-        velocity: note.velocity,
         channel: note.channel,
+        velocity: note.velocity,
       });
     }
   }
@@ -272,63 +190,11 @@ const resolvePreviewFrameAtBeat = (
     }
   }
 
-  return buildComparableFrameSnapshot(activeTiles, activeByAddress);
-};
-
-const compareFrameSnapshots = (
-  normalizedBeat: number,
-  previewBeat: number,
-  exact: ComparableFrameSnapshot,
-  preview: ComparableFrameSnapshot,
-): CompareMismatchSnapshot | null => {
-  const exactTileIds = new Set(exact.activeTiles.map((tile) => tile.tileId));
-  const previewTileIds = new Set(preview.activeTiles.map((tile) => tile.tileId));
-  const exactAddresses = new Map(exact.activeAddresses.map((address) => [address.address, address]));
-  const previewAddresses = new Map(preview.activeAddresses.map((address) => [address.address, address]));
-
-  const tileExactOnly = Array.from(exactTileIds).filter((tileId) => !previewTileIds.has(tileId));
-  const tilePreviewOnly = Array.from(previewTileIds).filter((tileId) => !exactTileIds.has(tileId));
-  const addressExactOnly = Array.from(exactAddresses.keys()).filter((address) => !previewAddresses.has(address));
-  const addressPreviewOnly = Array.from(previewAddresses.keys()).filter((address) => !exactAddresses.has(address));
-  const velocityMismatches = Array.from(exactAddresses.entries())
-    .flatMap(([address, exactAddress]) => {
-      const previewAddress = previewAddresses.get(address);
-      if (!previewAddress || previewAddress.velocity === exactAddress.velocity) {
-        return [];
-      }
-
-      return [{
-        address,
-        exactVelocity: exactAddress.velocity,
-        previewVelocity: previewAddress.velocity,
-      }];
-    })
-    .sort((left, right) => left.address.localeCompare(right.address));
-
-  if (
-    tileExactOnly.length === 0
-    && tilePreviewOnly.length === 0
-    && addressExactOnly.length === 0
-    && addressPreviewOnly.length === 0
-    && velocityMismatches.length === 0
-  ) {
-    return null;
-  }
-
   return {
-    normalizedBeat,
-    previewBeat,
-    exact,
-    preview,
-    tileDiff: {
-      exactOnly: tileExactOnly.sort((left, right) => left - right),
-      previewOnly: tilePreviewOnly.sort((left, right) => left - right),
-    },
-    addressDiff: {
-      exactOnly: addressExactOnly.sort(),
-      previewOnly: addressPreviewOnly.sort(),
-      velocityMismatches,
-    },
+    activeTiles: Array.from(activeTiles)
+      .sort((left, right) => left - right)
+      .map((tileId) => toTileCoordinates(tileId)),
+    activeAddresses: Array.from(activeByAddress.values()).sort(sortAddresses),
   };
 };
 
@@ -337,43 +203,6 @@ const writeJson = async (
   value: unknown,
 ): Promise<void> => {
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-};
-
-const writeMaskDebugBeat = async (
-  outputDirectory: string,
-  maskDevice: MaskEffectNode,
-  beat: number,
-  engine: ReturnType<typeof compilePipelineEngine>,
-): Promise<void> => {
-  const snapshot = evaluateMaskDebugAtTime(engine, maskDevice.id, beat);
-  if (!snapshot) {
-    return;
-  }
-
-  const beatDirectory = path.join(
-    outputDirectory,
-    'masks',
-    maskDevice.id,
-    `beat-${beat.toFixed(3)}`,
-  );
-  await mkdir(beatDirectory, { recursive: true });
-
-  const sourceActiveTiles = Array.from(snapshot.sourceActiveTiles)
-    .sort((left, right) => left - right)
-    .map((tileId) => toTileCoordinates(tileId));
-
-  await writeJson(path.join(beatDirectory, 'meta.json'), {
-    maskDeviceId: snapshot.maskDeviceId,
-    consumingGroupId: snapshot.consumingGroupId,
-    sourceKind: snapshot.sourceKind,
-    sourceDomain: snapshot.sourceDomain,
-    sourceId: snapshot.sourceId,
-    timeKind: snapshot.timeKind,
-  });
-  await writeJson(path.join(beatDirectory, 'source-polylines.json'), serializePolylines(snapshot.sourcePolylines));
-  await writeJson(path.join(beatDirectory, 'source-active-tiles.json'), sourceActiveTiles);
-  await writeJson(path.join(beatDirectory, 'consumer-before-mask-polylines.json'), serializePolylines(snapshot.consumerPolylinesBeforeMask));
-  await writeJson(path.join(beatDirectory, 'consumer-after-mask-polylines.json'), serializePolylines(snapshot.consumerPolylinesAfterMask));
 };
 
 const main = async (): Promise<void> => {
@@ -404,111 +233,47 @@ const main = async (): Promise<void> => {
     loopLengthBeats: options.loopLengthBeats,
     launchpadModel: options.launchpadModel,
   });
-  const engine = compilePipelineEngine(chain, {
-    buttons: runtimeMap.buttons,
-    buttonIndex: runtimeMap.buttonIndex,
-  });
-  const frameBeats = Array.from(
-    { length: Math.max(1, Math.round(preview.sourceTimelineEndBeat * SAMPLES_PER_BEAT)) },
-    (_, step) => step / SAMPLES_PER_BEAT,
-  );
-  const sampledFrames = evaluateExactOutputFramesAtTimes(engine, frameBeats);
-  const exactFrameBeats = options.beats.map((beat) =>
-    mapNormalizedBeatToPreviewBeat(beat, preview.sourceTimelineEndBeat));
-  const exactFrames = evaluateExactOutputFramesAtTimes(engine, exactFrameBeats);
-  const compareMismatches = sampledFrames
-    .map((exactFrame) => {
-      const previewBeat = exactFrame.time;
-      const normalizedBeat = preview.sourceTimelineEndBeat > 0
-        ? previewBeat / preview.sourceTimelineEndBeat
-        : previewBeat;
-      return compareFrameSnapshots(
-        normalizedBeat,
-        previewBeat,
-        resolveExactFrameSnapshot(exactFrame),
-        resolvePreviewFrameAtBeat(preview.notes, runtimeMap.buttons, previewBeat),
-      );
-    })
-    .filter((mismatch): mismatch is CompareMismatchSnapshot => mismatch !== null);
 
   await writeJson(path.join(outputDirectory, 'notes.json'), {
     notes: preview.notes,
     sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
+    sampleStepBeats: preview.sampleStepBeats,
+    ledFrameCount: preview.ledFramesBySampleIndex.length,
   });
 
-  await writeJson(path.join(outputDirectory, 'compare-summary.json'), {
-    samplesPerBeat: SAMPLES_PER_BEAT,
+  const activitySummary = preview.ledFramesBySampleIndex.map((_, frameIndex) => {
+    const beat = frameIndex * preview.sampleStepBeats;
+    const frame = buildFrameSnapshotAtBeat(preview.notes, runtimeMap.buttons, beat);
+    return {
+      beat,
+      activeTileCount: frame.activeTiles.length,
+      activeAddressCount: frame.activeAddresses.length,
+    };
+  });
+
+  await writeJson(path.join(outputDirectory, 'activity-summary.json'), {
     sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
-    totalSampleCount: frameBeats.length,
-    mismatchSampleCount: compareMismatches.length,
-    firstMismatchBeat: compareMismatches[0]?.normalizedBeat ?? null,
-    mismatchBeats: compareMismatches.map((mismatch) => mismatch.normalizedBeat),
-    firstMismatch: compareMismatches[0] ?? null,
+    sampleStepBeats: preview.sampleStepBeats,
+    nonEmptyFrames: activitySummary.filter((frame) => frame.activeTileCount > 0),
   });
 
   const framesDirectory = path.join(outputDirectory, 'frames');
   await mkdir(framesDirectory, { recursive: true });
 
-  const activitySummary = sampledFrames.map((frame) => ({
-    beat: frame.time,
-    activeTileCount: frame.activationFrame.activeTiles.size,
-  }));
-  await writeJson(path.join(outputDirectory, 'activity-summary.json'), {
-    samplesPerBeat: SAMPLES_PER_BEAT,
-    nonEmptyFrames: activitySummary.filter((frame) => frame.activeTileCount > 0),
-  });
-
-  for (let index = 0; index < options.beats.length; index += 1) {
-    const beat = options.beats[index];
-    const exactFrame = exactFrames[index];
-    const beatKey = beat.toFixed(3);
-    const frameDirectory = path.join(framesDirectory, `beat-${beatKey}`);
-    await mkdir(frameDirectory, { recursive: true });
-
-    const exactBeat = exactFrameBeats[index];
-    const polylines = evaluatePolylinesAtTime(engine, exactBeat);
-    const exactSnapshot = exactFrame
-      ? resolveExactFrameSnapshot(exactFrame)
-      : { activeTiles: [], activeAddresses: [] };
-
-    await writeJson(path.join(frameDirectory, 'active-tiles.json'), exactSnapshot.activeTiles);
-    await writeJson(path.join(frameDirectory, 'active-pitches.json'), exactSnapshot.activeAddresses);
-    await writeJson(path.join(frameDirectory, 'polylines.json'), serializePolylines(polylines));
-  }
-
-  const previewFramesDirectory = path.join(outputDirectory, 'preview-frames');
-  await mkdir(previewFramesDirectory, { recursive: true });
-  const previewActivitySummary = options.beats.map((beat) => {
-    const previewBeat = mapNormalizedBeatToPreviewBeat(beat, preview.sourceTimelineEndBeat);
-    const frame = resolvePreviewFrameAtBeat(preview.notes, runtimeMap.buttons, previewBeat);
-    return {
-      beat,
-      previewBeat,
-      activeTileCount: frame.activeTiles.length,
-    };
-  });
-  await writeJson(path.join(outputDirectory, 'preview-activity-summary.json'), {
-    sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
-    frames: previewActivitySummary,
-  });
-
   for (const beat of options.beats) {
     const previewBeat = mapNormalizedBeatToPreviewBeat(beat, preview.sourceTimelineEndBeat);
-    const beatKey = beat.toFixed(3);
-    const frameDirectory = path.join(previewFramesDirectory, `beat-${beatKey}`);
+    const frameDirectory = path.join(framesDirectory, `beat-${beat.toFixed(3)}`);
     await mkdir(frameDirectory, { recursive: true });
 
-    const frame = resolvePreviewFrameAtBeat(preview.notes, runtimeMap.buttons, previewBeat);
+    const frame = buildFrameSnapshotAtBeat(preview.notes, runtimeMap.buttons, previewBeat);
     await writeJson(path.join(frameDirectory, 'active-tiles.json'), frame.activeTiles);
     await writeJson(path.join(frameDirectory, 'active-pitches.json'), frame.activeAddresses);
-  }
-
-  const maskDevices = chain.devices.filter((device): device is MaskEffectNode =>
-    device.kind === 'mask' && device.enabled);
-  for (const maskDevice of maskDevices) {
-    for (const beat of options.beats) {
-      await writeMaskDebugBeat(outputDirectory, maskDevice, beat, engine);
-    }
+    await writeJson(path.join(frameDirectory, 'meta.json'), {
+      normalizedBeat: beat,
+      previewBeat,
+      sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
+      sampleStepBeats: preview.sampleStepBeats,
+    });
   }
 
   await writeJson(path.join(outputDirectory, 'summary.json'), {
@@ -519,12 +284,12 @@ const main = async (): Promise<void> => {
     beats: options.beats,
     warning: parsed.warning ?? null,
     noteCount: preview.notes.length,
+    ledFrameCount: preview.ledFramesBySampleIndex.length,
+    sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
+    sampleStepBeats: preview.sampleStepBeats,
     deviceCount: chain.devices.length,
     groupCount: new Set(chain.devices.map((device) => device.groupId ?? null)).size,
-    maskDeviceIds: maskDevices.map((device) => device.id),
     nonEmptyFrameCount: activitySummary.filter((frame) => frame.activeTileCount > 0).length,
-    compareMismatchSampleCount: compareMismatches.length,
-    compareFirstMismatchBeat: compareMismatches[0]?.normalizedBeat ?? null,
     outputDirectory,
     deviceOrder: chain.devices.map((device, deviceIndex) => ({
       index: deviceIndex,
