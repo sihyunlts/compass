@@ -1,11 +1,20 @@
-import { MIN_NOTE_DURATION } from '../core/pipeline/constants';
+import { clampBounds } from '../core/geometry';
+import type { Bounds } from '../core/core-types';
+import { MIN_NOTE_DURATION, POLYLINE_STEP, THICKNESS } from '../core/pipeline/constants';
 import { collectPitchSampledNotes, type SampledActivePitch } from '../core/pipeline/note-sampling';
 import type { RuntimeMapData } from '../domain/note-generation-types';
 import { sortClipNotes } from '../domain/note-utils';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
-import type { LaunchpadButton } from '../shared/model';
-import type { CanonicalSurfaceAdapter, LedCell, LedFrameVelocityEntry, LedTape } from './types';
-import { toRoundedCoordinateKey, toRoundedTileId } from './raster';
+import type { GeneratorNode, LaunchpadButton } from '../shared/model';
+import {
+  type CanonicalSpatialAdapter,
+  type CanonicalSpatialMask,
+  type CanonicalSurfaceAdapter,
+  type LedCell,
+  type LedFrameVelocityEntry,
+  type LedTape,
+} from './types';
+import { toRoundedCoordinateKey } from './coordinates';
 
 interface CoordinateGroup {
   x: number;
@@ -13,18 +22,47 @@ interface CoordinateGroup {
   buttons: ReadonlyArray<LaunchpadButton>;
 }
 
+const TILE_MIN = 0;
+const TILE_MAX = 9;
+const TILE_COUNT = 10;
+
+const toViewportTileId = (
+  x: number,
+  y: number,
+): number | null => {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return null;
+  }
+
+  const tileX = Math.round(x);
+  const tileY = Math.round(y);
+  if (tileX < TILE_MIN || tileX > TILE_MAX || tileY < TILE_MIN || tileY > TILE_MAX) {
+    return null;
+  }
+
+  return tileY * TILE_COUNT + tileX;
+};
+
 const buildCoordinateGroupByKey = (
   runtimeMap: RuntimeMapData['buttonIndex'],
-): Map<string, CoordinateGroup> => new Map(
-  runtimeMap.groups.map((group) => [
-    `${group.x},${group.y}`,
-    {
+): Map<string, CoordinateGroup> => {
+  const coordinateGroupByKey = new Map<string, CoordinateGroup>();
+
+  for (const group of runtimeMap.groups) {
+    const coordinateKey = toRoundedCoordinateKey(group.x, group.y);
+    if (!coordinateKey) {
+      continue;
+    }
+
+    coordinateGroupByKey.set(coordinateKey, {
       x: group.x,
       y: group.y,
       buttons: group.buttons,
-    },
-  ]),
-);
+    });
+  }
+
+  return coordinateGroupByKey;
+};
 
 const buildButtonCoordinateByAddress = (
   buttons: ReadonlyArray<LaunchpadButton>,
@@ -44,6 +82,78 @@ const buildButtonCoordinateByAddress = (
 
   return coordinates;
 };
+
+const buildViewportCoordinateKeyByTileId = (
+  runtimeMap: RuntimeMapData['buttonIndex'],
+): Map<number, string> => {
+  const coordinateKeyByTileId = new Map<number, string>();
+
+  for (const group of runtimeMap.groups) {
+    const tileId = toViewportTileId(group.x, group.y);
+    const coordinateKey = toRoundedCoordinateKey(group.x, group.y);
+    if (tileId === null || !coordinateKey) {
+      continue;
+    }
+
+    coordinateKeyByTileId.set(tileId, coordinateKey);
+  }
+
+  return coordinateKeyByTileId;
+};
+
+const buildViewportBounds = (
+  runtimeMap: RuntimeMapData['buttonIndex'],
+): Bounds | null => {
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const group of runtimeMap.groups) {
+    if (group.x < minX) minX = group.x;
+    if (group.x > maxX) maxX = group.x;
+    if (group.y < minY) minY = group.y;
+    if (group.y > maxY) maxY = group.y;
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
+    return null;
+  }
+
+  return { minX, maxX, minY, maxY };
+};
+
+const buildTemporaryScannerRenderBounds = (
+  viewportBounds: Bounds | null,
+): Bounds | null => {
+  if (!viewportBounds) {
+    return null;
+  }
+
+  // Keep scanner behavior stable during the spatial refactor until extent/ROI analysis exists.
+  const centerX = (viewportBounds.minX + viewportBounds.maxX) / 2;
+  const centerY = (viewportBounds.minY + viewportBounds.maxY) / 2;
+  const halfWidth = (viewportBounds.maxX - viewportBounds.minX) / 2;
+  const halfHeight = (viewportBounds.maxY - viewportBounds.minY) / 2;
+  const margin = THICKNESS + POLYLINE_STEP * 2;
+  const radius = Math.hypot(halfWidth, halfHeight) + margin;
+
+  return clampBounds({
+    minX: centerX - radius,
+    maxX: centerX + radius,
+    minY: centerY - radius,
+    maxY: centerY + radius,
+  });
+};
+
+const createMaskFromCoordinateKeys = (
+  coordinateKeys: ReadonlySet<string>,
+): CanonicalSpatialMask => ({
+  contains: (x, y) => {
+    const coordinateKey = toRoundedCoordinateKey(x, y);
+    return coordinateKey !== null && coordinateKeys.has(coordinateKey);
+  },
+});
 
 const filterTapeToOrigin = (
   tape: LedTape,
@@ -150,7 +260,7 @@ export const resolveProjectedActiveTiles = (
       continue;
     }
 
-    const tileId = toRoundedTileId(coordinateGroup.x, coordinateGroup.y);
+    const tileId = toViewportTileId(coordinateGroup.x, coordinateGroup.y);
     if (tileId !== null) {
       tiles.add(tileId);
     }
@@ -225,5 +335,33 @@ export const createLaunchpadSurfaceAdapter = (
     ),
     resolveNoteCoordinate: (note) =>
       buttonCoordinateByAddress.get(`${note.channel}:${note.pitch}`) ?? null,
+  };
+};
+
+export const createLaunchpadSpatialAdapter = (
+  runtimeMap: RuntimeMapData,
+): CanonicalSpatialAdapter => {
+  const coordinateKeyByTileId = buildViewportCoordinateKeyByTileId(runtimeMap.buttonIndex);
+  const temporaryScannerRenderBounds = buildTemporaryScannerRenderBounds(
+    buildViewportBounds(runtimeMap.buttonIndex),
+  );
+
+  return {
+    createMaskFromSceneCells: (cells) => createMaskFromCoordinateKeys(
+      new Set(
+        cells
+          .map((cell) => toRoundedCoordinateKey(cell.x, cell.y))
+          .filter((coordinateKey): coordinateKey is string => coordinateKey !== null),
+      ),
+    ),
+    createMaskFromViewportTiles: (tileIds) => createMaskFromCoordinateKeys(
+      new Set(
+        Array.from(tileIds)
+          .map((tileId) => coordinateKeyByTileId.get(tileId))
+          .filter((coordinateKey): coordinateKey is string => coordinateKey !== undefined),
+      ),
+    ),
+    resolveGeneratorRenderBounds: (device: GeneratorNode) =>
+      device.kind === 'scanner' ? temporaryScannerRenderBounds : null,
   };
 };

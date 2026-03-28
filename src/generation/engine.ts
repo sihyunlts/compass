@@ -29,9 +29,16 @@ import type {
   TrimEffectNode,
 } from '../shared/model';
 import { normalizeOptionalId } from '../shared/normalize-id';
-import { rasterizeGeneratorFrame, toRoundedTileId } from './raster';
+import { rasterizeGeneratorFrame } from './raster';
 import { addCellToFrame, cloneTape, createEmptyTape, ensureTapeFrameCount, finalizeTape } from './tape';
-import type { CanonicalFieldResult, CanonicalSurfaceAdapter, LedCell, LedTape } from './types';
+import type {
+  CanonicalFieldResult,
+  CanonicalSpatialAdapter,
+  CanonicalSpatialMask,
+  CanonicalSurfaceAdapter,
+  LedCell,
+  LedTape,
+} from './types';
 
 interface TimelineWindow {
   start: number;
@@ -62,6 +69,10 @@ interface OriginTemporalRemap {
 const DEFAULT_TIMELINE_WINDOW: TimelineWindow = Object.freeze({
   start: 0,
   end: 1,
+});
+
+const EMPTY_SPATIAL_MASK: CanonicalSpatialMask = Object.freeze({
+  contains: () => false,
 });
 
 const cloneTimelineStateByOriginId = (
@@ -949,22 +960,23 @@ const collectSourceFrameCells = (
     .map((cell) => ({ ...cell }));
 };
 
-const resolveMaskSourceTiles = (
+const resolveMaskSourceMask = (
   tape: LedTape,
   chain: GeneratorChain,
   effect: MaskEffectNode,
   consumingDeviceIndex: number,
   surfaceAdapter: CanonicalSurfaceAdapter,
+  spatialAdapter: CanonicalSpatialAdapter,
   targetGroupId: string | null,
   frameIndex: number,
-): Set<number> => {
+): CanonicalSpatialMask => {
   if (effect.params.sourceKind === 'tiles') {
-    return new Set(effect.params.tiles);
+    return spatialAdapter.createMaskFromViewportTiles(effect.params.tiles);
   }
 
   const sourceId = normalizeOptionalId(effect.params.sourceId);
   if (!sourceId) {
-    return new Set<number>();
+    return EMPTY_SPATIAL_MASK;
   }
 
   const isTimeReversed = resolveMaskSourceTimeReversed(
@@ -985,17 +997,12 @@ const resolveMaskSourceTiles = (
   );
 
   if (effect.params.sourceDomain === 'scene') {
-    const tiles = new Set<number>();
-    for (const cell of sourceCells) {
-      const tileId = toRoundedTileId(cell.x, cell.y);
-      if (tileId !== null) {
-        tiles.add(tileId);
-      }
-    }
-    return tiles;
+    return spatialAdapter.createMaskFromSceneCells(sourceCells);
   }
 
-  return surfaceAdapter.projectActivationTiles(sourceCells);
+  return spatialAdapter.createMaskFromViewportTiles(
+    surfaceAdapter.projectActivationTiles(sourceCells),
+  );
 };
 
 const applyMaskEffect = (
@@ -1006,18 +1013,20 @@ const applyMaskEffect = (
   writeOrder: number,
   consumingDeviceIndex: number,
   surfaceAdapter: CanonicalSurfaceAdapter,
+  spatialAdapter: CanonicalSpatialAdapter,
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, state.tape.timeDomainEndBeat);
 
   for (let frameIndex = 0; frameIndex < state.tape.frames.length; frameIndex += 1) {
-    const maskTiles = resolveMaskSourceTiles(
+    const mask = resolveMaskSourceMask(
       state.tape,
       chain,
       effect,
       consumingDeviceIndex,
       surfaceAdapter,
+      spatialAdapter,
       targetGroupId,
       frameIndex,
     );
@@ -1028,12 +1037,7 @@ const applyMaskEffect = (
         continue;
       }
 
-      const tileId = toRoundedTileId(cell.x, cell.y);
-      if (tileId === null) {
-        continue;
-      }
-
-      const isIncluded = maskTiles.has(tileId);
+      const isIncluded = mask.contains(cell.x, cell.y);
       const shouldKeep = effect.params.mode === 'include' ? isIncluded : !isIncluded;
       if (!shouldKeep) {
         continue;
@@ -1179,6 +1183,7 @@ const applyEffectDevice = (
   device: GeneratorEffectNode,
   deviceIndex: number,
   surfaceAdapter: CanonicalSurfaceAdapter,
+  spatialAdapter: CanonicalSpatialAdapter,
   modulationContext: ModulationContext,
 ): MutableGenerationState => {
   const targetGroupId = normalizeOptionalId(device.groupId);
@@ -1192,6 +1197,7 @@ const applyEffectDevice = (
       deviceIndex,
       deviceIndex,
       surfaceAdapter,
+      spatialAdapter,
     );
   }
 
@@ -1256,6 +1262,7 @@ const applyGeneratorDevice = (
   state: MutableGenerationState,
   device: GeneratorNode,
   deviceIndex: number,
+  spatialAdapter: CanonicalSpatialAdapter,
   modulationContext: ModulationContext,
 ): MutableGenerationState => {
   const nextTape = cloneTape(state.tape);
@@ -1273,6 +1280,7 @@ const applyGeneratorDevice = (
         nextTape.sampleStepBeats,
       ) as GeneratorNode,
       deviceIndex,
+      spatialAdapter,
     );
   }
 
@@ -1292,6 +1300,7 @@ export const buildCanonicalFieldResult = (
   chain: GeneratorChain,
   loopLengthBeats: number,
   surfaceAdapter: CanonicalSurfaceAdapter,
+  spatialAdapter: CanonicalSpatialAdapter,
 ): CanonicalFieldResult => {
   const baseChain = stripModulationDevicesFromChain(chain);
   const modulationContext = createModulationContext(chain, loopLengthBeats);
@@ -1310,7 +1319,13 @@ export const buildCanonicalFieldResult = (
       || device.kind === 'scanner'
       || device.kind === 'spiral'
       || device.kind === 'path') {
-      currentState = applyGeneratorDevice(currentState, device, deviceIndex, modulationContext);
+      currentState = applyGeneratorDevice(
+        currentState,
+        device,
+        deviceIndex,
+        spatialAdapter,
+        modulationContext,
+      );
       continue;
     }
 
@@ -1324,6 +1339,7 @@ export const buildCanonicalFieldResult = (
       device,
       deviceIndex,
       surfaceAdapter,
+      spatialAdapter,
       modulationContext,
     );
   }

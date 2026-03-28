@@ -1,4 +1,6 @@
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
+import type { Bounds } from '../core/core-types';
+import type { GeneratorNode } from '../shared/model';
 
 export interface LedCell {
   x: number;
@@ -35,4 +37,14 @@ export interface CanonicalSurfaceAdapter {
   projectActivationTiles(cells: ReadonlyArray<LedCell>): Set<number>;
   projectOriginNotes(tape: LedTape, originId: string): ClipNoteWithOrigin[];
   resolveNoteCoordinate(note: Pick<ClipNoteWithOrigin, 'channel' | 'pitch'>): { x: number; y: number } | null;
+}
+
+export interface CanonicalSpatialMask {
+  contains(x: number, y: number): boolean;
+}
+
+export interface CanonicalSpatialAdapter {
+  createMaskFromSceneCells(cells: ReadonlyArray<LedCell>): CanonicalSpatialMask;
+  createMaskFromViewportTiles(tileIds: Iterable<number>): CanonicalSpatialMask;
+  resolveGeneratorRenderBounds(device: GeneratorNode): Bounds | null;
 }

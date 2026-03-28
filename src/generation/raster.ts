@@ -1,4 +1,4 @@
-import { GENERATED_VELOCITY, POLYLINE_STEP, THICKNESS, buildWorldBounds } from '../core/pipeline/constants';
+import { GENERATED_VELOCITY, POLYLINE_STEP, THICKNESS } from '../core/pipeline/constants';
 import { distanceToPolylineSquared } from '../core/geometry';
 import { buildPathPolyline } from '../core/generators/path';
 import { buildScannerPolyline } from '../core/generators/scanner';
@@ -6,41 +6,10 @@ import { buildSpiralPolyline } from '../core/generators/spiral';
 import { buildWaterdropPolyline } from '../core/generators/waterdrop';
 import { normalizeOptionalId } from '../shared/normalize-id';
 import type { GeneratorNode } from '../shared/model';
-import type { LedTape } from './types';
+import type { CanonicalSpatialAdapter, LedTape } from './types';
 import { addCellToFrame } from './tape';
 
-const TILE_MIN = 0;
-const TILE_MAX = 9;
-const TILE_COUNT = 10;
 const RASTER_LIMIT = 4096;
-
-export const toRoundedCoordinateKey = (
-  x: number,
-  y: number,
-): string | null => {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    return null;
-  }
-
-  return `${Math.round(x)},${Math.round(y)}`;
-};
-
-export const toRoundedTileId = (
-  x: number,
-  y: number,
-): number | null => {
-  if (!Number.isFinite(x) || !Number.isFinite(y)) {
-    return null;
-  }
-
-  const tileX = Math.round(x);
-  const tileY = Math.round(y);
-  if (tileX < TILE_MIN || tileX > TILE_MAX || tileY < TILE_MIN || tileY > TILE_MAX) {
-    return null;
-  }
-
-  return tileY * TILE_COUNT + tileX;
-};
 
 const normalizeRangeStart = (value: number): number =>
   Math.max(Math.floor(value), -RASTER_LIMIT);
@@ -51,6 +20,7 @@ const normalizeRangeEnd = (value: number): number =>
 const buildGeneratorPolyline = (
   device: GeneratorNode,
   beat01: number,
+  spatialAdapter: CanonicalSpatialAdapter,
 ) => {
   if (device.kind === 'waterdrop') {
     return buildWaterdropPolyline(
@@ -63,13 +33,18 @@ const buildGeneratorPolyline = (
   }
 
   if (device.kind === 'scanner') {
+    const renderBounds = spatialAdapter.resolveGeneratorRenderBounds(device);
+    if (!renderBounds) {
+      return null;
+    }
+
     return buildScannerPolyline(
       device.id,
       device.params,
       beat01,
       POLYLINE_STEP,
       GENERATED_VELOCITY,
-      buildWorldBounds(),
+      renderBounds,
     );
   }
 
@@ -95,9 +70,10 @@ export const rasterizeGeneratorFrame = (
   frameIndex: number,
   device: GeneratorNode,
   writeOrder: number,
+  spatialAdapter: CanonicalSpatialAdapter,
 ): void => {
   const beat = frameIndex * tape.sampleStepBeats;
-  const polyline = buildGeneratorPolyline(device, Math.min(Math.max(beat, 0), 1));
+  const polyline = buildGeneratorPolyline(device, Math.min(Math.max(beat, 0), 1), spatialAdapter);
   if (!polyline || polyline.points.length === 0) {
     return;
   }

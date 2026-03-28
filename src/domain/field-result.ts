@@ -8,6 +8,7 @@ import { buildRuntimeMapData } from './runtime-map';
 import { buildCanonicalFieldResult } from '../generation/engine';
 import {
   buildLedFramesBySampleIndex,
+  createLaunchpadSpatialAdapter,
   createLaunchpadSurfaceAdapter,
   projectTapeToNotes,
 } from '../generation/launchpad-projection';
@@ -44,7 +45,13 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
   }
 
   const surfaceAdapter = createLaunchpadSurfaceAdapter(runtimeMap);
-  const generated = buildCanonicalFieldResult(chain, loopLengthBeats, surfaceAdapter);
+  const spatialAdapter = createLaunchpadSpatialAdapter(runtimeMap);
+  const generated = buildCanonicalFieldResult(
+    chain,
+    loopLengthBeats,
+    surfaceAdapter,
+    spatialAdapter,
+  );
   const notes = projectTapeToNotes(
     generated.tape,
     runtimeMap,
