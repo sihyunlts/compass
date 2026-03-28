@@ -1,8 +1,4 @@
 import { NOTE_SAMPLES_PER_BEAT } from '../core/pipeline/constants';
-import { compileModulationProgram } from '../core/modulation/compiled-program';
-import { analyzeChainOriginTimelinePolicy } from '../core/pipeline/origin-timeline-policy';
-import { normalizeNotesByOriginTimelinePolicy } from '../core/pipeline/timeline-fit';
-import { buildFinalOutputNotes } from './final-output-notes';
 import {
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   type GenerateNotesInput,
@@ -10,7 +6,6 @@ import {
 } from './note-generation-types';
 import { buildRuntimeMapData } from './runtime-map';
 import { buildCanonicalFieldResult } from '../generation/engine';
-import { buildLedFramesBySampleIndexFromNotes } from '../generation/raster';
 import type { LedFrameVelocityEntry } from '../generation/types';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 
@@ -27,47 +22,8 @@ const createEmptyFieldResult = (): GeneratedRuntimeFieldResult => ({
   notes: [],
   sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   sampleStepBeats: DEFAULT_SAMPLE_STEP_BEATS,
-  ledFramesBySampleIndex: buildLedFramesBySampleIndexFromNotes(
-    [],
-    NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-    DEFAULT_SAMPLE_STEP_BEATS,
-  ),
+  ledFramesBySampleIndex: [[]],
 });
-
-const buildLegacyGeneratedFieldResultWithRuntimeMap = ({
-  chain,
-  loopLengthBeats,
-  runtimeMap,
-}: {
-  chain: GenerateNotesInput['chain'];
-  loopLengthBeats: number;
-  runtimeMap: RuntimeMapData;
-}): GeneratedRuntimeFieldResult => {
-  const originTimelineAnalysis = analyzeChainOriginTimelinePolicy(chain);
-  const normalized = normalizeNotesByOriginTimelinePolicy(
-    buildFinalOutputNotes({
-      chain,
-      loopLengthBeats,
-      runtimeMap,
-    }),
-    originTimelineAnalysis.originTimelinePolicyByGeneratorId,
-  );
-
-  return {
-    notes: normalized.notes,
-    sourceTimelineEndBeat: normalized.sourceTimelineEndBeat,
-    sampleStepBeats: DEFAULT_SAMPLE_STEP_BEATS,
-    ledFramesBySampleIndex: buildLedFramesBySampleIndexFromNotes(
-      normalized.notes,
-      normalized.sourceTimelineEndBeat,
-      DEFAULT_SAMPLE_STEP_BEATS,
-    ),
-  };
-};
-
-const shouldUseLegacyFieldResult = (
-  chain: GenerateNotesInput['chain'],
-): boolean => compileModulationProgram(chain).routes.length > 0;
 
 export const buildGeneratedFieldResultWithRuntimeMap = ({
   chain,
@@ -82,15 +38,7 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
     return createEmptyFieldResult();
   }
 
-  if (shouldUseLegacyFieldResult(chain)) {
-    return buildLegacyGeneratedFieldResultWithRuntimeMap({
-      chain,
-      loopLengthBeats,
-      runtimeMap,
-    });
-  }
-
-  const generated = buildCanonicalFieldResult(chain, runtimeMap);
+  const generated = buildCanonicalFieldResult(chain, runtimeMap, loopLengthBeats);
   return {
     notes: generated.notes,
     sourceTimelineEndBeat: generated.sourceTimelineEndBeat,

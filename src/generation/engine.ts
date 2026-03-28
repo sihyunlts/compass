@@ -1,4 +1,9 @@
 import { composeAffine, COMPOSITION_CENTER, applyAffine, toAxisMirrorTransformAt, toMirrorTransformAt, toRotateTransformAt, toScaleTransformAt, toTranslationTransform } from '../core/geometry';
+import {
+  applyModulationProgramToChain,
+  compileModulationProgram,
+  type CompiledModulationProgram,
+} from '../core/modulation/compiled-program';
 import { resolveMutedSources } from '../core/pipeline/groups';
 import { stripModulationDevicesFromChain } from '../core/modulation/routing';
 import { evaluateTemporalRemap } from '../core/scene-operators/temporal';
@@ -10,9 +15,11 @@ import {
 } from '../devices/color/color-program';
 import { doesDeviceToggleTimelineParity } from '../devices/engine';
 import { isDeviceEffectivelyEnabled } from '../shared/group-state';
+import { cloneDeviceNode } from '../shared/model';
 import type {
   ColorEffectNode,
   GeneratorChain,
+  GeneratorDeviceNode,
   GeneratorEffectNode,
   GeneratorNode,
   MaskEffectNode,
@@ -42,10 +49,15 @@ interface MutableGenerationState {
   timelineStateByOriginId: Map<string, OriginTimelineState>;
 }
 
-interface OriginTemporalMapping {
-  outputWindow: TimelineWindow;
-  mapOutputBeatToSourceBeat: (beat: number) => number | null;
-  nextTimelineState: OriginTimelineState;
+interface ModulationContext {
+  loopLengthBeats: number;
+  program: CompiledModulationProgram;
+  deviceByFrameKey: Map<string, GeneratorDeviceNode>;
+}
+
+interface OriginTemporalRemap {
+  nextTimelineAuthored: boolean;
+  sourceFrameIndexByOutputFrame: ReadonlyArray<number | null>;
 }
 
 const DEFAULT_TIMELINE_WINDOW: TimelineWindow = Object.freeze({
@@ -67,6 +79,47 @@ const cloneTimelineStateByOriginId = (
     },
   ]),
 );
+
+const createModulationContext = (
+  chain: GeneratorChain,
+  loopLengthBeats: number,
+): ModulationContext => ({
+  loopLengthBeats,
+  program: compileModulationProgram(chain),
+  deviceByFrameKey: new Map<string, GeneratorDeviceNode>(),
+});
+
+const resolveModulatedDeviceAtFrame = <T extends GeneratorDeviceNode>(
+  context: ModulationContext,
+  device: T,
+  frameIndex: number,
+  sampleStepBeats: number,
+): T => {
+  if (context.program.routes.length === 0) {
+    return device;
+  }
+
+  const cacheKey = `${device.id}:${frameIndex}`;
+  const cached = context.deviceByFrameKey.get(cacheKey);
+  if (cached) {
+    return cached as T;
+  }
+
+  const snapshot = cloneDeviceNode(device) as T;
+  applyModulationProgramToChain(
+    context.program,
+    {
+      devices: [snapshot],
+      groupStateById: {},
+    },
+    new Map<string, GeneratorDeviceNode>([[snapshot.id, snapshot]]),
+    frameIndex * sampleStepBeats,
+    context.loopLengthBeats,
+    { wrap: true },
+  );
+  context.deviceByFrameKey.set(cacheKey, snapshot);
+  return snapshot;
+};
 
 const isTargetedCell = (
   cell: LedCell,
@@ -183,20 +236,14 @@ const applySpatialTransform = (
   state: MutableGenerationState,
   targetGroupId: string | null,
   writeOrder: number,
-  transform: ReturnType<typeof toTranslationTransform> | null,
+  resolveTransformAtFrame: (frameIndex: number) => ReturnType<typeof toTranslationTransform> | null,
 ): MutableGenerationState => {
-  if (!transform) {
-    return {
-      tape: cloneTape(state.tape),
-      timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
-    };
-  }
-
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, state.tape.timeDomainEndBeat);
 
   for (let frameIndex = 0; frameIndex < state.tape.frames.length; frameIndex += 1) {
+    const transform = resolveTransformAtFrame(frameIndex);
     const { targeted, untargeted } = splitFrameCellsByTarget(
       state.tape.frames[frameIndex].cells,
       targetGroupId,
@@ -204,6 +251,18 @@ const applySpatialTransform = (
     nextTape.frames[frameIndex].cells.push(...untargeted);
 
     for (const cell of targeted) {
+      if (!transform) {
+        addCellToFrame(nextTape, frameIndex, {
+          x: cell.x,
+          y: cell.y,
+          velocity: cell.velocity,
+          originId: cell.originId,
+          originGroupId: cell.originGroupId,
+          writeOrder,
+        });
+        continue;
+      }
+
       const point = applyAffine(transform, { x: cell.x, y: cell.y });
       addCellToFrame(nextTape, frameIndex, {
         x: point.x,
@@ -462,29 +521,65 @@ const buildSourceCellsByOriginAndFrame = (
   return cellsByOriginId;
 };
 
-const buildTemporalMappingsOutputEndBeat = (
-  passthroughEndBeat: number,
-  mappings: ReadonlyMap<string, OriginTemporalMapping>,
+const resolveTemporalOutputFrameCount = (
+  state: MutableGenerationState,
+  targetGroupId: string | null,
 ): number => {
-  let maxEndBeat = passthroughEndBeat;
+  let maxEndBeat = state.tape.timeDomainEndBeat;
+  const occupiedWindowByOriginId = buildOccupiedWindowByOriginId(state.tape);
 
-  for (const mapping of mappings.values()) {
-    if (mapping.outputWindow.end > maxEndBeat) {
-      maxEndBeat = mapping.outputWindow.end;
+  for (const originId of buildTargetOriginIds(state.tape, targetGroupId)) {
+    const sourceWindow = resolveSourceWindow(
+      originId,
+      state.timelineStateByOriginId,
+      occupiedWindowByOriginId,
+    );
+    if (sourceWindow.end > maxEndBeat) {
+      maxEndBeat = sourceWindow.end;
+    }
+
+    const timelineState = state.timelineStateByOriginId.get(originId);
+    if (timelineState && timelineState.window.end > maxEndBeat) {
+      maxEndBeat = timelineState.window.end;
     }
   }
 
-  return Math.max(maxEndBeat, 1);
+  return Math.max(Math.ceil(maxEndBeat / state.tape.sampleStepBeats), 1);
 };
+
+const toSourceFrameIndex = (
+  beat: number,
+  tape: LedTape,
+): number => {
+  const frameCount = Math.max(tape.frames.length, 1);
+  return Math.min(
+    Math.max(Math.floor(beat / tape.sampleStepBeats), 0),
+    frameCount - 1,
+  );
+};
+
+const hasMappedSourceFrame = (
+  sourceFrameIndexByOutputFrame: ReadonlyArray<number | null>,
+): boolean => sourceFrameIndexByOutputFrame.some((frameIndex) => frameIndex !== null);
 
 const applyTemporalRemap = (
   state: MutableGenerationState,
   targetGroupId: string | null,
-  mappings: ReadonlyMap<string, OriginTemporalMapping>,
+  remaps: ReadonlyMap<string, OriginTemporalRemap>,
   writeOrder: number,
 ): MutableGenerationState => {
   const passthroughEndBeat = resolvePassthroughEndBeat(state.tape, targetGroupId);
-  const outputEndBeat = buildTemporalMappingsOutputEndBeat(passthroughEndBeat, mappings);
+  const passthroughFrameCount = Math.max(
+    Math.ceil(passthroughEndBeat / state.tape.sampleStepBeats),
+    1,
+  );
+  let outputFrameCount = passthroughFrameCount;
+  for (const remap of remaps.values()) {
+    if (remap.sourceFrameIndexByOutputFrame.length > outputFrameCount) {
+      outputFrameCount = remap.sourceFrameIndexByOutputFrame.length;
+    }
+  }
+  const outputEndBeat = outputFrameCount * state.tape.sampleStepBeats;
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, outputEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, outputEndBeat);
@@ -502,34 +597,22 @@ const applyTemporalRemap = (
   }
 
   const sourceCellsByOriginAndFrame = buildSourceCellsByOriginAndFrame(state.tape, targetGroupId);
-  for (const [originId, mapping] of mappings.entries()) {
-    const outputSpan = mapping.outputWindow.end - mapping.outputWindow.start;
-    if (!Number.isFinite(outputSpan) || outputSpan <= 0) {
-      continue;
-    }
-
+  for (const [originId, remap] of remaps.entries()) {
     const sourceCellsByFrame = sourceCellsByOriginAndFrame.get(originId);
     if (!sourceCellsByFrame) {
       continue;
     }
 
-    const startFrame = Math.max(Math.floor(mapping.outputWindow.start / nextTape.sampleStepBeats), 0);
-    const endFrameExclusive = Math.min(
-      Math.ceil(mapping.outputWindow.end / nextTape.sampleStepBeats),
-      nextTape.frames.length,
-    );
-
-    for (let frameIndex = startFrame; frameIndex < endFrameExclusive; frameIndex += 1) {
-      const outputBeat = frameIndex * nextTape.sampleStepBeats;
-      const sourceBeat = mapping.mapOutputBeatToSourceBeat(outputBeat);
-      if (sourceBeat === null || !Number.isFinite(sourceBeat)) {
+    for (
+      let frameIndex = 0;
+      frameIndex < Math.min(remap.sourceFrameIndexByOutputFrame.length, nextTape.frames.length);
+      frameIndex += 1
+    ) {
+      const sourceFrameIndex = remap.sourceFrameIndexByOutputFrame[frameIndex];
+      if (sourceFrameIndex === null || sourceFrameIndex === undefined) {
         continue;
       }
 
-      const sourceFrameIndex = Math.min(
-        Math.max(Math.floor(sourceBeat / state.tape.sampleStepBeats), 0),
-        Math.max(state.tape.frames.length - 1, 0),
-      );
       const sourceCells = sourceCellsByFrame.get(sourceFrameIndex);
       if (!sourceCells || sourceCells.length === 0) {
         continue;
@@ -548,29 +631,35 @@ const applyTemporalRemap = (
     }
   }
 
+  const finalizedTape = finalizeTape(nextTape);
+  const occupiedWindowByOriginId = buildOccupiedWindowByOriginId(finalizedTape);
   const nextTimelineStateByOriginId = cloneTimelineStateByOriginId(state.timelineStateByOriginId);
-  for (const [originId, mapping] of mappings.entries()) {
+  for (const [originId, remap] of remaps.entries()) {
+    const occupiedWindow = occupiedWindowByOriginId.get(originId)
+      ?? state.timelineStateByOriginId.get(originId)?.window
+      ?? DEFAULT_TIMELINE_WINDOW;
     nextTimelineStateByOriginId.set(originId, {
-      authored: mapping.nextTimelineState.authored,
+      authored: remap.nextTimelineAuthored,
       window: {
-        start: mapping.nextTimelineState.window.start,
-        end: mapping.nextTimelineState.window.end,
+        start: occupiedWindow.start,
+        end: occupiedWindow.end,
       },
     });
   }
 
   return {
-    tape: finalizeTape(nextTape),
+    tape: finalizedTape,
     timelineStateByOriginId: nextTimelineStateByOriginId,
   };
 };
 
-const buildReverseMappings = (
+const buildReverseRemaps = (
   state: MutableGenerationState,
   targetGroupId: string | null,
-): Map<string, OriginTemporalMapping> => {
-  const mappings = new Map<string, OriginTemporalMapping>();
+): Map<string, OriginTemporalRemap> => {
+  const remaps = new Map<string, OriginTemporalRemap>();
   const occupiedWindowByOriginId = buildOccupiedWindowByOriginId(state.tape);
+  const outputFrameCount = resolveTemporalOutputFrameCount(state, targetGroupId);
 
   for (const originId of buildTargetOriginIds(state.tape, targetGroupId)) {
     const timelineState = state.timelineStateByOriginId.get(originId);
@@ -595,9 +684,10 @@ const buildReverseMappings = (
       continue;
     }
 
-    mappings.set(originId, {
-      outputWindow,
-      mapOutputBeatToSourceBeat: (outputBeat) => {
+    const sourceFrameIndexByOutputFrame: Array<number | null> = Array.from(
+      { length: outputFrameCount },
+      (_, frameIndex) => {
+        const outputBeat = frameIndex * state.tape.sampleStepBeats;
         if (outputBeat < outputWindow.start || outputBeat >= outputWindow.end) {
           return null;
         }
@@ -606,31 +696,35 @@ const buildReverseMappings = (
           Math.max(((outputBeat + state.tape.sampleStepBeats) - outputWindow.start) / outputSpan, 0),
           1,
         );
-        return sourceWindow.start + sourceSpan * (1 - normalizedEnd);
+        return toSourceFrameIndex(
+          sourceWindow.start + sourceSpan * (1 - normalizedEnd),
+          state.tape,
+        );
       },
-      nextTimelineState: {
-        authored: timelineState?.authored === true,
-        window: outputWindow,
-      },
+    );
+    if (!hasMappedSourceFrame(sourceFrameIndexByOutputFrame)) {
+      continue;
+    }
+
+    remaps.set(originId, {
+      nextTimelineAuthored: timelineState?.authored === true,
+      sourceFrameIndexByOutputFrame,
     });
   }
 
-  return mappings;
+  return remaps;
 };
 
-const buildTrimMappings = (
+const buildTrimRemaps = (
   state: MutableGenerationState,
   effect: TrimEffectNode,
   targetGroupId: string | null,
-): Map<string, OriginTemporalMapping> => {
-  const mappings = new Map<string, OriginTemporalMapping>();
-  const start = effect.params.start;
-  const end = effect.params.end;
-  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 1 || end <= start) {
-    return mappings;
-  }
-
+  modulationContext: ModulationContext,
+): Map<string, OriginTemporalRemap> => {
+  const remaps = new Map<string, OriginTemporalRemap>();
   const occupiedWindowByOriginId = buildOccupiedWindowByOriginId(state.tape);
+  const outputFrameCount = resolveTemporalOutputFrameCount(state, targetGroupId);
+
   for (const originId of buildTargetOriginIds(state.tape, targetGroupId)) {
     const timelineState = state.timelineStateByOriginId.get(originId);
     const sourceWindow = resolveSourceWindow(
@@ -651,45 +745,56 @@ const buildTrimMappings = (
       continue;
     }
 
-    mappings.set(originId, {
-      outputWindow,
-      mapOutputBeatToSourceBeat: (outputBeat) => {
+    const sourceFrameIndexByOutputFrame: Array<number | null> = Array.from(
+      { length: outputFrameCount },
+      (_, frameIndex) => {
+        const outputBeat = frameIndex * state.tape.sampleStepBeats;
         if (outputBeat < outputWindow.start || outputBeat >= outputWindow.end) {
           return null;
         }
 
+        const deviceAtFrame = resolveModulatedDeviceAtFrame(
+          modulationContext,
+          effect,
+          frameIndex,
+          state.tape.sampleStepBeats,
+        );
+        const start = deviceAtFrame.params.start;
+        const end = deviceAtFrame.params.end;
+        if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 1 || end <= start) {
+          return null;
+        }
+
         const normalized = (outputBeat - outputWindow.start) / outputSpan;
-        return sourceWindow.start + sourceSpan * (start + normalized * (end - start));
+        return toSourceFrameIndex(
+          sourceWindow.start + sourceSpan * (start + normalized * (end - start)),
+          state.tape,
+        );
       },
-      nextTimelineState: {
-        authored: true,
-        window: outputWindow,
-      },
+    );
+    if (!hasMappedSourceFrame(sourceFrameIndexByOutputFrame)) {
+      continue;
+    }
+
+    remaps.set(originId, {
+      nextTimelineAuthored: true,
+      sourceFrameIndexByOutputFrame,
     });
   }
 
-  return mappings;
+  return remaps;
 };
 
-const buildStretchMappings = (
+const buildStretchRemaps = (
   state: MutableGenerationState,
   effect: StretchEffectNode,
   targetGroupId: string | null,
-): Map<string, OriginTemporalMapping> => {
-  const mappings = new Map<string, OriginTemporalMapping>();
-  const start = effect.params.start;
-  const end = effect.params.end;
-  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 1 || end <= start) {
-    return mappings;
-  }
-
-  const outputWindow: TimelineWindow = { start, end };
-  const outputSpan = outputWindow.end - outputWindow.start;
-  if (!Number.isFinite(outputSpan) || outputSpan <= 0) {
-    return mappings;
-  }
-
+  modulationContext: ModulationContext,
+): Map<string, OriginTemporalRemap> => {
+  const remaps = new Map<string, OriginTemporalRemap>();
   const occupiedWindowByOriginId = buildOccupiedWindowByOriginId(state.tape);
+  const outputFrameCount = resolveTemporalOutputFrameCount(state, targetGroupId);
+
   for (const originId of buildTargetOriginIds(state.tape, targetGroupId)) {
     const sourceWindow = resolveSourceWindow(
       originId,
@@ -701,38 +806,59 @@ const buildStretchMappings = (
       continue;
     }
 
-    mappings.set(originId, {
-      outputWindow,
-      mapOutputBeatToSourceBeat: (outputBeat) => {
-        if (outputBeat < outputWindow.start || outputBeat >= outputWindow.end) {
+    const sourceFrameIndexByOutputFrame: Array<number | null> = Array.from(
+      { length: outputFrameCount },
+      (_, frameIndex) => {
+        const outputBeat = frameIndex * state.tape.sampleStepBeats;
+        const deviceAtFrame = resolveModulatedDeviceAtFrame(
+          modulationContext,
+          effect,
+          frameIndex,
+          state.tape.sampleStepBeats,
+        );
+        const start = deviceAtFrame.params.start;
+        const end = deviceAtFrame.params.end;
+        if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 1 || end <= start) {
           return null;
         }
 
-        const normalized = (outputBeat - outputWindow.start) / outputSpan;
-        return sourceWindow.start + sourceSpan * normalized;
+        if (outputBeat < start || outputBeat >= end) {
+          return null;
+        }
+
+        const normalized = (outputBeat - start) / (end - start);
+        return toSourceFrameIndex(
+          sourceWindow.start + sourceSpan * normalized,
+          state.tape,
+        );
       },
-      nextTimelineState: {
-        authored: true,
-        window: outputWindow,
-      },
+    );
+    if (!hasMappedSourceFrame(sourceFrameIndexByOutputFrame)) {
+      continue;
+    }
+
+    remaps.set(originId, {
+      nextTimelineAuthored: true,
+      sourceFrameIndexByOutputFrame,
     });
   }
 
-  return mappings;
+  return remaps;
 };
 
-const buildTimeWarpMappings = (
+const buildTimeWarpRemaps = (
   state: MutableGenerationState,
   effect: TimeWarpEffectNode,
   targetGroupId: string | null,
-): Map<string, OriginTemporalMapping> => {
-  const mappings = new Map<string, OriginTemporalMapping>();
+): Map<string, OriginTemporalRemap> => {
+  const remaps = new Map<string, OriginTemporalRemap>();
   if (isIdentityTimeWarpCurve(effect.params.curve)) {
-    return mappings;
+    return remaps;
   }
 
   const remap = createSampledRemapFromTimeWarpCurve(effect.params.curve);
   const occupiedWindowByOriginId = buildOccupiedWindowByOriginId(state.tape);
+  const outputFrameCount = resolveTemporalOutputFrameCount(state, targetGroupId);
 
   for (const originId of buildTargetOriginIds(state.tape, targetGroupId)) {
     const timelineState = state.timelineStateByOriginId.get(originId);
@@ -754,29 +880,37 @@ const buildTimeWarpMappings = (
       continue;
     }
 
-    mappings.set(originId, {
-      outputWindow,
-      mapOutputBeatToSourceBeat: (outputBeat) => {
+    const sourceFrameIndexByOutputFrame: Array<number | null> = Array.from(
+      { length: outputFrameCount },
+      (_, frameIndex) => {
+        const outputBeat = frameIndex * state.tape.sampleStepBeats;
         if (outputBeat < outputWindow.start || outputBeat >= outputWindow.end) {
           return null;
         }
 
         const normalized = (outputBeat - outputWindow.start) / outputSpan;
-        const remapped = evaluateTemporalRemap(remap, normalized);
-        if (remapped === null || !Number.isFinite(remapped)) {
+        const remappedBeat = evaluateTemporalRemap(remap, normalized);
+        if (remappedBeat === null || !Number.isFinite(remappedBeat)) {
           return null;
         }
 
-        return sourceWindow.start + sourceSpan * remapped;
+        return toSourceFrameIndex(
+          sourceWindow.start + sourceSpan * remappedBeat,
+          state.tape,
+        );
       },
-      nextTimelineState: {
-        authored: true,
-        window: outputWindow,
-      },
+    );
+    if (!hasMappedSourceFrame(sourceFrameIndexByOutputFrame)) {
+      continue;
+    }
+
+    remaps.set(originId, {
+      nextTimelineAuthored: true,
+      sourceFrameIndexByOutputFrame,
     });
   }
 
-  return mappings;
+  return remaps;
 };
 
 const resolveMaskSourceTimeReversed = (
@@ -1049,12 +1183,20 @@ const resolveEffectTransform = (
   return null;
 };
 
+const cloneGenerationState = (
+  state: MutableGenerationState,
+): MutableGenerationState => ({
+  tape: cloneTape(state.tape),
+  timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
+});
+
 const applyEffectDevice = (
   state: MutableGenerationState,
   chain: GeneratorChain,
   device: GeneratorEffectNode,
   deviceIndex: number,
   runtimeMap: RuntimeMapData,
+  modulationContext: ModulationContext,
 ): MutableGenerationState => {
   const targetGroupId = normalizeOptionalId(device.groupId);
 
@@ -1085,50 +1227,45 @@ const applyEffectDevice = (
   }
 
   if (device.kind === 'reverse') {
-    const mappings = buildReverseMappings(state, targetGroupId);
-    return mappings.size > 0
-      ? applyTemporalRemap(state, targetGroupId, mappings, deviceIndex)
-      : {
-          tape: cloneTape(state.tape),
-          timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
-        };
+    const remaps = buildReverseRemaps(state, targetGroupId);
+    return remaps.size > 0
+      ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex)
+      : cloneGenerationState(state);
   }
 
   if (device.kind === 'trim') {
-    const mappings = buildTrimMappings(state, device, targetGroupId);
-    return mappings.size > 0
-      ? applyTemporalRemap(state, targetGroupId, mappings, deviceIndex)
-      : {
-          tape: cloneTape(state.tape),
-          timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
-        };
+    const remaps = buildTrimRemaps(state, device, targetGroupId, modulationContext);
+    return remaps.size > 0
+      ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex)
+      : cloneGenerationState(state);
   }
 
   if (device.kind === 'stretch') {
-    const mappings = buildStretchMappings(state, device, targetGroupId);
-    return mappings.size > 0
-      ? applyTemporalRemap(state, targetGroupId, mappings, deviceIndex)
-      : {
-          tape: cloneTape(state.tape),
-          timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
-        };
+    const remaps = buildStretchRemaps(state, device, targetGroupId, modulationContext);
+    return remaps.size > 0
+      ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex)
+      : cloneGenerationState(state);
   }
 
   if (device.kind === 'timewarp') {
-    const mappings = buildTimeWarpMappings(state, device, targetGroupId);
-    return mappings.size > 0
-      ? applyTemporalRemap(state, targetGroupId, mappings, deviceIndex)
-      : {
-          tape: cloneTape(state.tape),
-          timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
-        };
+    const remaps = buildTimeWarpRemaps(state, device, targetGroupId);
+    return remaps.size > 0
+      ? applyTemporalRemap(state, targetGroupId, remaps, deviceIndex)
+      : cloneGenerationState(state);
   }
 
   return applySpatialTransform(
     state,
     targetGroupId,
     deviceIndex,
-    resolveEffectTransform(device),
+    (frameIndex) => resolveEffectTransform(
+      resolveModulatedDeviceAtFrame(
+        modulationContext,
+        device,
+        frameIndex,
+        state.tape.sampleStepBeats,
+      ) as GeneratorEffectNode,
+    ),
   );
 };
 
@@ -1136,13 +1273,24 @@ const applyGeneratorDevice = (
   state: MutableGenerationState,
   device: GeneratorNode,
   deviceIndex: number,
+  modulationContext: ModulationContext,
 ): MutableGenerationState => {
   const nextTape = cloneTape(state.tape);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, 1);
 
   for (let frameIndex = 0; frameIndex < Math.min(nextTape.frames.length, 256); frameIndex += 1) {
-    rasterizeGeneratorFrame(nextTape, frameIndex, device, deviceIndex);
+    rasterizeGeneratorFrame(
+      nextTape,
+      frameIndex,
+      resolveModulatedDeviceAtFrame(
+        modulationContext,
+        device,
+        frameIndex,
+        nextTape.sampleStepBeats,
+      ) as GeneratorNode,
+      deviceIndex,
+    );
   }
 
   const nextTimelineStateByOriginId = cloneTimelineStateByOriginId(state.timelineStateByOriginId);
@@ -1160,8 +1308,10 @@ const applyGeneratorDevice = (
 export const buildCanonicalFieldResult = (
   chain: GeneratorChain,
   runtimeMap: RuntimeMapData,
+  loopLengthBeats: number,
 ): GeneratedFieldResult => {
   const baseChain = stripModulationDevicesFromChain(chain);
+  const modulationContext = createModulationContext(chain, loopLengthBeats);
   let currentState: MutableGenerationState = {
     tape: createEmptyTape(),
     timelineStateByOriginId: new Map<string, OriginTimelineState>(),
@@ -1177,7 +1327,7 @@ export const buildCanonicalFieldResult = (
       || device.kind === 'scanner'
       || device.kind === 'spiral'
       || device.kind === 'path') {
-      currentState = applyGeneratorDevice(currentState, device, deviceIndex);
+      currentState = applyGeneratorDevice(currentState, device, deviceIndex, modulationContext);
       continue;
     }
 
@@ -1191,6 +1341,7 @@ export const buildCanonicalFieldResult = (
       device,
       deviceIndex,
       runtimeMap,
+      modulationContext,
     );
   }
 
