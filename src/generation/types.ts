@@ -1,4 +1,3 @@
-import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 import type { Bounds } from '../core/core-types';
 import type { GeneratorNode } from '../shared/model';
 
@@ -35,8 +34,6 @@ export interface CanonicalFieldResult {
 
 export interface CanonicalSurfaceAdapter {
   projectActivationTiles(cells: ReadonlyArray<LedCell>): Set<number>;
-  projectOriginNotes(tape: LedTape, originId: string): ClipNoteWithOrigin[];
-  resolveNoteCoordinate(note: Pick<ClipNoteWithOrigin, 'channel' | 'pitch'>): { x: number; y: number } | null;
 }
 
 export interface CanonicalSpatialMask {

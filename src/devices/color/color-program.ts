@@ -16,8 +16,13 @@ interface ColorProgramTiming {
   gapDuration: number;
 }
 
-export interface PlannedColorSlot {
-  sourceNote: ClipNoteWithOrigin;
+export interface TimedColorSource {
+  startBeat: number;
+  endBeat: number;
+}
+
+export interface PlannedColorSlot<T extends TimedColorSource = TimedColorSource> {
+  source: T;
   velocity: number;
   offset: number;
   startBeat: number;
@@ -29,13 +34,6 @@ const DEFAULT_COLOR_NOTE_LENGTH_PERCENT = DEFAULT_COLOR_PARAMS.noteLengthPercent
 const MIN_COLOR_SEGMENT = 1e-4;
 
 const sortNumbersAscending = (left: number, right: number): number => left - right;
-
-const sortClipNotes = <T extends ClipNote>(notes: T[]): void => {
-  notes.sort((left, right) =>
-    left.startBeat - right.startBeat
-    || left.pitch - right.pitch
-    || left.channel - right.channel);
-};
 
 const sanitizeColorVelocities = (velocities: readonly number[]): number[] => {
   const sanitized = velocities
@@ -109,15 +107,15 @@ const resolveColorProgramTiming = (
   };
 };
 
-const resolveSourceSpan = (
-  sourceNotes: ReadonlyArray<ClipNoteWithOrigin>,
+const resolveSourceSpan = <T extends TimedColorSource>(
+  sourceSegments: ReadonlyArray<T>,
 ): number | null => {
   let sourceStart = Number.POSITIVE_INFINITY;
   let sourceEnd = Number.NEGATIVE_INFINITY;
 
-  for (const note of sourceNotes) {
-    sourceStart = Math.min(sourceStart, note.startBeat);
-    sourceEnd = Math.max(sourceEnd, note.startBeat + Math.max(note.durationBeats, 0));
+  for (const sourceSegment of sourceSegments) {
+    sourceStart = Math.min(sourceStart, sourceSegment.startBeat);
+    sourceEnd = Math.max(sourceEnd, sourceSegment.endBeat);
   }
 
   return Number.isFinite(sourceStart) && Number.isFinite(sourceEnd) && sourceEnd > sourceStart
@@ -125,20 +123,20 @@ const resolveSourceSpan = (
     : null;
 };
 
-export const planColorProgramSlots = (
-  sourceNotes: ReadonlyArray<ClipNoteWithOrigin>,
+export const planColorProgramSlots = <T extends TimedColorSource>(
+  sourceSegments: ReadonlyArray<T>,
   colorConfig: ColorDeviceConfig,
-): PlannedColorSlot[] => {
-  if (sourceNotes.length === 0) {
+): PlannedColorSlot<T>[] => {
+  if (sourceSegments.length === 0) {
     return [];
   }
 
   const referenceDuration = resolveMedianDuration(
-    sourceNotes
-      .map((note) => note.durationBeats)
+    sourceSegments
+      .map((sourceSegment) => sourceSegment.endBeat - sourceSegment.startBeat)
       .filter((duration) => Number.isFinite(duration) && duration > 0),
   );
-  const sourceSpan = resolveSourceSpan(sourceNotes);
+  const sourceSpan = resolveSourceSpan(sourceSegments);
   if (referenceDuration === null || sourceSpan === null) {
     return [];
   }
@@ -148,18 +146,18 @@ export const planColorProgramSlots = (
     return [];
   }
 
-  const slots: PlannedColorSlot[] = [];
-  for (const sourceNote of sourceNotes) {
+  const slots: PlannedColorSlot<T>[] = [];
+  for (const source of sourceSegments) {
     for (let slotIndex = 0; slotIndex < colorConfig.velocities.length; slotIndex += 1) {
       const offset = slotIndex * (timing.segmentLength + timing.gapDuration);
-      const startBeat = sourceNote.startBeat + offset;
+      const startBeat = source.startBeat + offset;
       const endBeat = startBeat + timing.segmentLength;
       if (!Number.isFinite(startBeat) || !Number.isFinite(endBeat) || endBeat <= startBeat) {
         continue;
       }
 
       slots.push({
-        sourceNote,
+        source,
         velocity: colorConfig.velocities[slotIndex],
         offset,
         startBeat,
@@ -169,72 +167,4 @@ export const planColorProgramSlots = (
   }
 
   return slots;
-};
-
-const groupNotesByOriginId = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-): Map<string, ClipNoteWithOrigin[]> => {
-  const notesByOriginId = new Map<string, ClipNoteWithOrigin[]>();
-
-  for (const note of notes) {
-    if (!note.originId) {
-      continue;
-    }
-
-    const existing = notesByOriginId.get(note.originId);
-    if (existing) {
-      existing.push(note);
-      continue;
-    }
-
-    notesByOriginId.set(note.originId, [note]);
-  }
-
-  return notesByOriginId;
-};
-
-const buildNominalColorProgram = (
-  sourceNotes: ReadonlyArray<ClipNoteWithOrigin>,
-  colorConfig: ColorDeviceConfig,
-  minimumNoteDuration: number,
-): ClipNoteWithOrigin[] => planColorProgramSlots(sourceNotes, colorConfig).map((slot) => ({
-  pitch: slot.sourceNote.pitch,
-  channel: slot.sourceNote.channel,
-  startBeat: slot.startBeat,
-  durationBeats: Math.max(slot.endBeat - slot.startBeat, minimumNoteDuration),
-  velocity: slot.velocity,
-  originId: slot.sourceNote.originId,
-}));
-
-export const applyColorDeviceToNotes = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-  device: ColorEffectNode,
-  minimumNoteDuration: number,
-  targetOriginIds?: ReadonlySet<string>,
-): ClipNoteWithOrigin[] => {
-  if (notes.length === 0) {
-    return [];
-  }
-
-  const passthrough: ClipNoteWithOrigin[] = [];
-  const targetNotes: ClipNoteWithOrigin[] = [];
-  for (const note of notes) {
-    if (
-      !note.originId
-      || (targetOriginIds && !targetOriginIds.has(note.originId))
-    ) {
-      passthrough.push({ ...note });
-      continue;
-    }
-
-    targetNotes.push(note);
-  }
-
-  const colorConfig = buildColorConfig(device);
-  const colorized = Array.from(groupNotesByOriginId(targetNotes).values()).flatMap((originNotes) =>
-    buildNominalColorProgram(originNotes, colorConfig, minimumNoteDuration));
-
-  const output = [...passthrough, ...colorized];
-  sortClipNotes(output);
-  return output;
 };

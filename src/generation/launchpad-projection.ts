@@ -64,25 +64,6 @@ const buildCoordinateGroupByKey = (
   return coordinateGroupByKey;
 };
 
-const buildButtonCoordinateByAddress = (
-  buttons: ReadonlyArray<LaunchpadButton>,
-): Map<string, { x: number; y: number }> => {
-  const coordinates = new Map<string, { x: number; y: number }>();
-
-  for (const button of buttons) {
-    if (button.output.kind !== 'note') {
-      continue;
-    }
-
-    coordinates.set(`${button.output.channel}:${button.output.number}`, {
-      x: button.x,
-      y: button.y,
-    });
-  }
-
-  return coordinates;
-};
-
 const buildViewportCoordinateKeyByTileId = (
   runtimeMap: RuntimeMapData['buttonIndex'],
 ): Map<number, string> => {
@@ -153,16 +134,6 @@ const createMaskFromCoordinateKeys = (
     const coordinateKey = toRoundedCoordinateKey(x, y);
     return coordinateKey !== null && coordinateKeys.has(coordinateKey);
   },
-});
-
-const filterTapeToOrigin = (
-  tape: LedTape,
-  originId: string,
-): LedTape => ({
-  ...tape,
-  frames: tape.frames.map((frame) => ({
-    cells: frame.cells.filter((cell) => cell.originId === originId),
-  })),
 });
 
 const isVisibleCell = (
@@ -322,19 +293,10 @@ export const createLaunchpadSurfaceAdapter = (
   runtimeMap: RuntimeMapData,
 ): CanonicalSurfaceAdapter => {
   const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
-  const buttonCoordinateByAddress = buildButtonCoordinateByAddress(runtimeMap.buttons);
 
   return {
     projectActivationTiles: (cells) =>
       resolveProjectedActiveTiles(cells, coordinateGroupByKey),
-    projectOriginNotes: (tape, originId) => projectTapeToNotes(
-      filterTapeToOrigin(tape, originId),
-      runtimeMap,
-      new Set<string>(),
-      new Set<string>(),
-    ),
-    resolveNoteCoordinate: (note) =>
-      buttonCoordinateByAddress.get(`${note.channel}:${note.pitch}`) ?? null,
   };
 };
 

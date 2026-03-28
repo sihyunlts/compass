@@ -11,7 +11,6 @@ import { createSampledRemapFromTimeWarpCurve, isIdentityTimeWarpCurve } from '..
 import {
   buildColorConfig,
   planColorProgramSlots,
-  type ClipNoteWithOrigin,
 } from '../devices/color/color-program';
 import { doesDeviceToggleTimelineParity } from '../devices/timeline-parity';
 import { isDeviceEffectivelyEnabled } from '../shared/group-state';
@@ -30,6 +29,7 @@ import type {
 } from '../shared/model';
 import { normalizeOptionalId } from '../shared/normalize-id';
 import { rasterizeGeneratorFrame } from './raster';
+import { collectActivationSegments, type LedActivationSegment } from './tape-analysis';
 import { addCellToFrame, cloneTape, createEmptyTape, ensureTapeFrameCount, finalizeTape } from './tape';
 import type {
   CanonicalFieldResult,
@@ -961,7 +961,7 @@ const collectSourceFrameCells = (
 };
 
 const resolveMaskSourceMask = (
-  tape: LedTape,
+  sourceTape: LedTape,
   chain: GeneratorChain,
   effect: MaskEffectNode,
   consumingDeviceIndex: number,
@@ -985,11 +985,11 @@ const resolveMaskSourceMask = (
     consumingDeviceIndex,
   );
   const resolvedFrameIndex = isTimeReversed
-    ? Math.max(tape.frames.length - 1 - frameIndex, 0)
+    ? Math.max(sourceTape.frames.length - 1 - frameIndex, 0)
     : frameIndex;
 
   const sourceCells = collectSourceFrameCells(
-    tape,
+    sourceTape,
     resolvedFrameIndex,
     effect.params.sourceKind === 'group'
       ? (cell) => cell.originGroupId === sourceId
@@ -1015,13 +1015,14 @@ const applyMaskEffect = (
   surfaceAdapter: CanonicalSurfaceAdapter,
   spatialAdapter: CanonicalSpatialAdapter,
 ): MutableGenerationState => {
+  const sourceTape = state.tape;
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, state.tape.timeDomainEndBeat);
 
-  for (let frameIndex = 0; frameIndex < state.tape.frames.length; frameIndex += 1) {
+  for (let frameIndex = 0; frameIndex < sourceTape.frames.length; frameIndex += 1) {
     const mask = resolveMaskSourceMask(
-      state.tape,
+      sourceTape,
       chain,
       effect,
       consumingDeviceIndex,
@@ -1031,7 +1032,7 @@ const applyMaskEffect = (
       frameIndex,
     );
 
-    for (const cell of state.tape.frames[frameIndex].cells) {
+    for (const cell of sourceTape.frames[frameIndex].cells) {
       if (!isTargetedCell(cell, targetGroupId)) {
         nextTape.frames[frameIndex].cells.push({ ...cell });
         continue;
@@ -1060,24 +1061,22 @@ const applyMaskEffect = (
   };
 };
 
-const collectNotesForOrigin = (
-  tape: LedTape,
-  originId: string,
-  surfaceAdapter: CanonicalSurfaceAdapter,
-): ClipNoteWithOrigin[] => surfaceAdapter.projectOriginNotes(tape, originId);
+const groupActivationSegmentsByOriginId = (
+  segments: ReadonlyArray<LedActivationSegment>,
+): Map<string, LedActivationSegment[]> => {
+  const segmentsByOriginId = new Map<string, LedActivationSegment[]>();
 
-const resolveOriginGroupId = (
-  tape: LedTape,
-  originId: string,
-): string | null => {
-  for (const frame of tape.frames) {
-    const matchingCell = frame.cells.find((cell) => cell.originId === originId);
-    if (matchingCell) {
-      return matchingCell.originGroupId;
+  for (const segment of segments) {
+    const existingSegments = segmentsByOriginId.get(segment.originId);
+    if (existingSegments) {
+      existingSegments.push(segment);
+      continue;
     }
+
+    segmentsByOriginId.set(segment.originId, [segment]);
   }
 
-  return null;
+  return segmentsByOriginId;
 };
 
 const applyColorEffect = (
@@ -1085,11 +1084,16 @@ const applyColorEffect = (
   effect: ColorEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
-  surfaceAdapter: CanonicalSurfaceAdapter,
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
-  const targetOriginIds = buildTargetOriginIds(state.tape, targetGroupId);
+  const colorConfig = buildColorConfig(effect);
+  const targetSegmentsByOriginId = groupActivationSegmentsByOriginId(
+    collectActivationSegments(
+      state.tape,
+      (cell) => isTargetedCell(cell, targetGroupId),
+    ),
+  );
 
   for (let frameIndex = 0; frameIndex < state.tape.frames.length; frameIndex += 1) {
     for (const cell of state.tape.frames[frameIndex].cells) {
@@ -1101,20 +1105,13 @@ const applyColorEffect = (
     }
   }
 
-  for (const originId of targetOriginIds) {
-    const originNotes = collectNotesForOrigin(state.tape, originId, surfaceAdapter);
-    const slots = planColorProgramSlots(originNotes, buildColorConfig(effect));
+  for (const [originId, sourceSegments] of targetSegmentsByOriginId.entries()) {
+    const slots = planColorProgramSlots(sourceSegments, colorConfig);
     if (slots.length === 0) {
       continue;
     }
 
-    const originGroupId = resolveOriginGroupId(state.tape, originId);
     for (const slot of slots) {
-      const coordinate = surfaceAdapter.resolveNoteCoordinate(slot.sourceNote);
-      if (!coordinate) {
-        continue;
-      }
-
       ensureTapeFrameCount(nextTape, slot.endBeat);
       const startFrame = Math.max(Math.floor(slot.startBeat / nextTape.sampleStepBeats), 0);
       const endFrameExclusive = Math.min(
@@ -1124,11 +1121,11 @@ const applyColorEffect = (
 
       for (let frameIndex = startFrame; frameIndex < endFrameExclusive; frameIndex += 1) {
         addCellToFrame(nextTape, frameIndex, {
-          x: coordinate.x,
-          y: coordinate.y,
+          x: slot.source.x,
+          y: slot.source.y,
           velocity: slot.velocity,
           originId,
-          originGroupId,
+          originGroupId: slot.source.originGroupId,
           writeOrder,
         });
       }
@@ -1207,7 +1204,6 @@ const applyEffectDevice = (
       device,
       targetGroupId,
       deviceIndex,
-      surfaceAdapter,
     );
   }
 
