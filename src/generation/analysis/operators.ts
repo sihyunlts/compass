@@ -6,7 +6,6 @@ import {
   toScaleTransformAt,
   toTranslationTransform,
 } from '../../core/geometry';
-import { POLYLINE_STEP, THICKNESS } from '../../core/pipeline/constants';
 import { isIdentityTimeWarpCurve } from '../../core/timewarp/curve';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import type { BeatRange } from './types';
@@ -102,19 +101,6 @@ const mergeTargetedTimeDomain = (
     : transformed
 );
 
-const resolveTemporaryScannerRenderBounds = (): SpatialRequirement => {
-  const center = COMPOSITION_CENTER;
-  const halfDiagonal = Math.hypot(center.x, center.y);
-  const margin = THICKNESS + POLYLINE_STEP * 2;
-  const radius = halfDiagonal + margin;
-  return createSpatialBounds(
-    center.x - radius,
-    center.x + radius,
-    center.y - radius,
-    center.y + radius,
-  );
-};
-
 const buildGeneratorAnalysis = (
   device: GeneratorNode,
 ): OperatorAnalysis => {
@@ -134,7 +120,7 @@ const buildGeneratorAnalysis = (
 
   if (device.kind === 'scanner') {
     return createOperatorAnalysis({
-      outputBounds: resolveTemporaryScannerRenderBounds(),
+      outputBounds: 'all',
       inputRoi: 'none',
       framesNeeded: 'current',
     });

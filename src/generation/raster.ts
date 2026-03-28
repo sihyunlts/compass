@@ -23,9 +23,8 @@ const normalizeRangeEnd = (value: number): number =>
   Math.min(Math.ceil(value), RASTER_LIMIT);
 
 const buildGeneratorPolyline = (
-  device: GeneratorNode,
+  device: Exclude<GeneratorNode, Extract<GeneratorNode, { kind: 'scanner' }>>,
   beat01: number,
-  executionBounds: SpatialRequirement,
 ) => {
   if (device.kind === 'waterdrop') {
     return buildWaterdropPolyline(
@@ -34,22 +33,6 @@ const buildGeneratorPolyline = (
       beat01,
       POLYLINE_STEP,
       GENERATED_VELOCITY,
-    );
-  }
-
-  if (device.kind === 'scanner') {
-    const renderBounds = toBounds(executionBounds);
-    if (!renderBounds) {
-      return null;
-    }
-
-    return buildScannerPolyline(
-      device.id,
-      device.params,
-      beat01,
-      POLYLINE_STEP,
-      GENERATED_VELOCITY,
-      renderBounds,
     );
   }
 
@@ -70,6 +53,27 @@ const buildGeneratorPolyline = (
   );
 };
 
+const buildScannerGeneratorPolyline = (
+  device: Extract<GeneratorNode, { kind: 'scanner' }>,
+  beat01: number,
+  executionBounds: SpatialRequirement,
+) => {
+  const renderBounds = toBounds(executionBounds);
+  if (!renderBounds) {
+    return null;
+  }
+
+  // Scanner geometry is defined only inside the requested output extent.
+  return buildScannerPolyline(
+    device.id,
+    device.params,
+    beat01,
+    POLYLINE_STEP,
+    GENERATED_VELOCITY,
+    renderBounds,
+  );
+};
+
 export const rasterizeGeneratorFrame = (
   tape: LedTape,
   frameIndex: number,
@@ -78,7 +82,9 @@ export const rasterizeGeneratorFrame = (
   executionBounds: SpatialRequirement,
 ): void => {
   const beat = frameIndex * tape.sampleStepBeats;
-  const polyline = buildGeneratorPolyline(device, Math.min(Math.max(beat, 0), 1), executionBounds);
+  const polyline = device.kind === 'scanner'
+    ? buildScannerGeneratorPolyline(device, Math.min(Math.max(beat, 0), 1), executionBounds)
+    : buildGeneratorPolyline(device, Math.min(Math.max(beat, 0), 1));
   if (!polyline || polyline.points.length === 0) {
     return;
   }
