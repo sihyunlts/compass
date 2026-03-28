@@ -57,7 +57,6 @@ import type {
   CanonicalFieldResult,
   CanonicalSpatialAdapter,
   CanonicalSpatialMask,
-  CanonicalSurfaceAdapter,
   GenerationCheckpoint,
   GenerationInvalidationScope,
   GenerationInvalidationTargetSet,
@@ -1171,7 +1170,6 @@ const resolveMaskSourceMask = (
   chain: GeneratorChain,
   effect: MaskEffectNode,
   consumingDeviceIndex: number,
-  surfaceAdapter: CanonicalSurfaceAdapter,
   spatialAdapter: CanonicalSpatialAdapter,
   targetGroupId: string | null,
   frameIndex: number,
@@ -1208,9 +1206,7 @@ const resolveMaskSourceMask = (
     return spatialAdapter.createMaskFromSceneCells(sourceCells);
   }
 
-  return spatialAdapter.createMaskFromViewportTiles(
-    surfaceAdapter.projectActivationTiles(sourceCells),
-  );
+  return spatialAdapter.createMaskFromActivationCells(sourceCells);
 };
 
 const applyMaskEffect = (
@@ -1220,7 +1216,6 @@ const applyMaskEffect = (
   targetGroupId: string | null,
   writeOrder: number,
   consumingDeviceIndex: number,
-  surfaceAdapter: CanonicalSurfaceAdapter,
   spatialAdapter: CanonicalSpatialAdapter,
   executionPlan: OperatorExecutionPlan,
 ): MutableGenerationState => {
@@ -1245,7 +1240,6 @@ const applyMaskEffect = (
       chain,
       effect,
       consumingDeviceIndex,
-      surfaceAdapter,
       spatialAdapter,
       targetGroupId,
       frameIndex,
@@ -2181,7 +2175,6 @@ const applyEffectDevice = (
   state: MutableGenerationState,
   chain: GeneratorChain,
   stage: CompiledRackStage,
-  surfaceAdapter: CanonicalSurfaceAdapter,
   spatialAdapter: CanonicalSpatialAdapter,
   modulationContext: ModulationContext,
   executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
@@ -2199,7 +2192,6 @@ const applyEffectDevice = (
       targetGroupId,
       deviceIndex,
       deviceIndex,
-      surfaceAdapter,
       spatialAdapter,
       executionPlan,
     );
@@ -2338,7 +2330,6 @@ const applyCompiledRackStage = (
   state: MutableGenerationState,
   compiledPlan: CompiledRackPlan,
   stage: CompiledRackStage,
-  surfaceAdapter: CanonicalSurfaceAdapter,
   spatialAdapter: CanonicalSpatialAdapter,
   modulationContext: ModulationContext,
   executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
@@ -2353,7 +2344,6 @@ const applyCompiledRackStage = (
       state,
       compiledPlan.baseChain,
       stage,
-      surfaceAdapter,
       spatialAdapter,
       modulationContext,
       executionPlanByDeviceId,
@@ -2362,7 +2352,6 @@ const applyCompiledRackStage = (
 const executeCompiledRackPlan = (
   compiledPlan: CompiledRackPlan,
   loopLengthBeats: number,
-  surfaceAdapter: CanonicalSurfaceAdapter,
   spatialAdapter: CanonicalSpatialAdapter,
   executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
 ): {
@@ -2371,7 +2360,6 @@ const executeCompiledRackPlan = (
 } => executeCompiledRackPlanFromStage({
   compiledPlan,
   loopLengthBeats,
-  surfaceAdapter,
   spatialAdapter,
   executionPlanByDeviceId,
   startStageIndex: 0,
@@ -2384,7 +2372,6 @@ const executeCompiledRackPlan = (
 const executeCompiledRackPlanFromStage = ({
   compiledPlan,
   loopLengthBeats,
-  surfaceAdapter,
   spatialAdapter,
   executionPlanByDeviceId,
   startStageIndex,
@@ -2395,7 +2382,6 @@ const executeCompiledRackPlanFromStage = ({
 }: {
   compiledPlan: CompiledRackPlan;
   loopLengthBeats: number;
-  surfaceAdapter: CanonicalSurfaceAdapter;
   spatialAdapter: CanonicalSpatialAdapter;
   executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>;
   startStageIndex: number;
@@ -2427,7 +2413,6 @@ const executeCompiledRackPlanFromStage = ({
         currentState,
         compiledPlan,
         stage,
-        surfaceAdapter,
         spatialAdapter,
         modulationContext,
         executionPlanByDeviceId,
@@ -2446,7 +2431,6 @@ const executeCompiledRackPlanFromStage = ({
         scopedInputState,
         compiledPlan,
         stage,
-        surfaceAdapter,
         spatialAdapter,
         modulationContext,
         scopedExecutionPlanByDeviceId,
@@ -2473,7 +2457,6 @@ const executeCompiledRackPlanFromStage = ({
 export const buildCanonicalFieldResult = (
   chain: GeneratorChain,
   loopLengthBeats: number,
-  surfaceAdapter: CanonicalSurfaceAdapter,
   spatialAdapter: CanonicalSpatialAdapter,
   executionRequest: CanonicalExecutionRequest,
   previousResult?: CanonicalFieldResult | null,
@@ -2494,7 +2477,6 @@ export const buildCanonicalFieldResult = (
     executionResult = executeCompiledRackPlan(
       compiledPlan,
       loopLengthBeats,
-      surfaceAdapter,
       spatialAdapter,
       executionPlan.byDeviceId,
     );
@@ -2523,7 +2505,6 @@ export const buildCanonicalFieldResult = (
       executionResult = executeCompiledRackPlan(
         compiledPlan,
         loopLengthBeats,
-        surfaceAdapter,
         spatialAdapter,
         executionPlan.byDeviceId,
       );
@@ -2558,7 +2539,6 @@ export const buildCanonicalFieldResult = (
       executionResult = executeCompiledRackPlanFromStage({
         compiledPlan,
         loopLengthBeats,
-        surfaceAdapter,
         spatialAdapter,
         executionPlanByDeviceId: executionPlan.byDeviceId,
         startStageIndex: dirtyStageIndex,

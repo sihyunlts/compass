@@ -11,7 +11,6 @@ import type { CanonicalExecutionRequest } from './analysis/types';
 import {
   type CanonicalSpatialAdapter,
   type CanonicalSpatialMask,
-  type CanonicalSurfaceAdapter,
   type LedCell,
   type LedFrameVelocityEntry,
   type LedTape,
@@ -192,32 +191,17 @@ export const resolveActiveByPitchFromFrameCells = (
   return activeByPitch;
 };
 
-export const resolveProjectedActiveTiles = (
+const resolveActivationMaskCoordinateKeys = (
   cells: ReadonlyArray<LedCell>,
   coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
-): Set<number> => {
-  const tiles = new Set<number>();
-  const winnerByCoordinate = resolveWinnerByCoordinate(
+): Set<string> => new Set(
+  resolveWinnerByCoordinate(
     cells,
     coordinateGroupByKey,
     new Set<string>(),
     new Set<string>(),
-  );
-
-  for (const coordinateKey of winnerByCoordinate.keys()) {
-    const coordinateGroup = coordinateGroupByKey.get(coordinateKey);
-    if (!coordinateGroup) {
-      continue;
-    }
-
-    const tileId = toViewportTileId(coordinateGroup.x, coordinateGroup.y);
-    if (tileId !== null) {
-      tiles.add(tileId);
-    }
-  }
-
-  return tiles;
-};
+  ).keys(),
+);
 
 export const buildLedFramesBySampleIndex = (
   tape: LedTape,
@@ -268,17 +252,6 @@ export const projectTapeToNotes = (
   return notes;
 };
 
-export const createLaunchpadSurfaceAdapter = (
-  runtimeMap: RuntimeMapData,
-): CanonicalSurfaceAdapter => {
-  const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
-
-  return {
-    projectActivationTiles: (cells) =>
-      resolveProjectedActiveTiles(cells, coordinateGroupByKey),
-  };
-};
-
 export const createLaunchpadExecutionRequest = (
   runtimeMap: RuntimeMapData,
 ): CanonicalExecutionRequest => ({
@@ -292,6 +265,7 @@ export const createLaunchpadExecutionRequest = (
 export const createLaunchpadSpatialAdapter = (
   runtimeMap: RuntimeMapData,
 ): CanonicalSpatialAdapter => {
+  const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
   const coordinateKeyByTileId = buildViewportCoordinateKeyByTileId(runtimeMap.buttonIndex);
 
   return {
@@ -308,6 +282,9 @@ export const createLaunchpadSpatialAdapter = (
           .map((tileId) => coordinateKeyByTileId.get(tileId))
           .filter((coordinateKey): coordinateKey is string => coordinateKey !== undefined),
       ),
+    ),
+    createMaskFromActivationCells: (cells) => createMaskFromCoordinateKeys(
+      resolveActivationMaskCoordinateKeys(cells, coordinateGroupByKey),
     ),
   };
 };

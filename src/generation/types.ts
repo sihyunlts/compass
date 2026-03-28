@@ -67,15 +67,12 @@ export interface CanonicalFieldResult {
   checkpointsByStageId: Map<string, GenerationCheckpoint>;
 }
 
-export interface CanonicalSurfaceAdapter {
-  projectActivationTiles(cells: ReadonlyArray<LedCell>): Set<number>;
-}
-
 export interface CanonicalSpatialMask {
   contains(x: number, y: number): boolean;
 }
 
 export interface CanonicalSpatialAdapter {
   createMaskFromSceneCells(cells: ReadonlyArray<LedCell>): CanonicalSpatialMask;
+  createMaskFromActivationCells(cells: ReadonlyArray<LedCell>): CanonicalSpatialMask;
   createMaskFromViewportTiles(tileIds: Iterable<number>): CanonicalSpatialMask;
 }

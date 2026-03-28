@@ -10,7 +10,6 @@ import {
   buildLedFramesBySampleIndex,
   createLaunchpadExecutionRequest,
   createLaunchpadSpatialAdapter,
-  createLaunchpadSurfaceAdapter,
   projectTapeToNotes,
 } from '../generation/launchpad-projection';
 import type {
@@ -82,13 +81,11 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
     return createEmptyFieldResult();
   }
 
-  const surfaceAdapter = createLaunchpadSurfaceAdapter(runtimeMap);
   const spatialAdapter = createLaunchpadSpatialAdapter(runtimeMap);
   const executionRequest = createLaunchpadExecutionRequest(runtimeMap);
   const generated = buildCanonicalFieldResult(
     chain,
     loopLengthBeats,
-    surfaceAdapter,
     spatialAdapter,
     executionRequest,
     previousResult?.canonicalResult,
