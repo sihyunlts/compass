@@ -1,3 +1,5 @@
+import type { ClipNoteWithOrigin } from '../devices/color/color-program';
+
 export interface LedCell {
   x: number;
   y: number;
@@ -27,4 +29,10 @@ export interface CanonicalFieldResult {
   sampleStepBeats: number;
   mutedGroupIds: ReadonlySet<string>;
   mutedGeneratorIds: ReadonlySet<string>;
+}
+
+export interface CanonicalSurfaceAdapter {
+  projectActivationTiles(cells: ReadonlyArray<LedCell>): Set<number>;
+  projectOriginNotes(tape: LedTape, originId: string): ClipNoteWithOrigin[];
+  resolveNoteCoordinate(note: Pick<ClipNoteWithOrigin, 'channel' | 'pitch'>): { x: number; y: number } | null;
 }

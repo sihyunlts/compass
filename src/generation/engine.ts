@@ -29,16 +29,9 @@ import type {
   TrimEffectNode,
 } from '../shared/model';
 import { normalizeOptionalId } from '../shared/normalize-id';
-import type { RuntimeMapData } from '../domain/note-generation-types';
-import {
-  buildButtonCoordinateByAddress,
-  buildCoordinateGroupByKey,
-  projectTapeToNotes,
-  resolveProjectedActiveTiles,
-} from './launchpad-projection';
 import { rasterizeGeneratorFrame, toRoundedTileId } from './raster';
 import { addCellToFrame, cloneTape, createEmptyTape, ensureTapeFrameCount, finalizeTape } from './tape';
-import type { CanonicalFieldResult, LedCell, LedTape } from './types';
+import type { CanonicalFieldResult, CanonicalSurfaceAdapter, LedCell, LedTape } from './types';
 
 interface TimelineWindow {
   start: number;
@@ -961,7 +954,7 @@ const resolveMaskSourceTiles = (
   chain: GeneratorChain,
   effect: MaskEffectNode,
   consumingDeviceIndex: number,
-  runtimeMap: RuntimeMapData,
+  surfaceAdapter: CanonicalSurfaceAdapter,
   targetGroupId: string | null,
   frameIndex: number,
 ): Set<number> => {
@@ -1002,10 +995,7 @@ const resolveMaskSourceTiles = (
     return tiles;
   }
 
-  return resolveProjectedActiveTiles(
-    sourceCells,
-    buildCoordinateGroupByKey(runtimeMap.buttonIndex),
-  );
+  return surfaceAdapter.projectActivationTiles(sourceCells);
 };
 
 const applyMaskEffect = (
@@ -1015,7 +1005,7 @@ const applyMaskEffect = (
   targetGroupId: string | null,
   writeOrder: number,
   consumingDeviceIndex: number,
-  runtimeMap: RuntimeMapData,
+  surfaceAdapter: CanonicalSurfaceAdapter,
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
@@ -1027,7 +1017,7 @@ const applyMaskEffect = (
       chain,
       effect,
       consumingDeviceIndex,
-      runtimeMap,
+      surfaceAdapter,
       targetGroupId,
       frameIndex,
     );
@@ -1069,18 +1059,8 @@ const applyMaskEffect = (
 const collectNotesForOrigin = (
   tape: LedTape,
   originId: string,
-  runtimeMap: RuntimeMapData,
-): ClipNoteWithOrigin[] => projectTapeToNotes(
-  {
-    ...tape,
-    frames: tape.frames.map((frame) => ({
-      cells: frame.cells.filter((cell) => cell.originId === originId),
-    })),
-  },
-  runtimeMap,
-  new Set<string>(),
-  new Set<string>(),
-);
+  surfaceAdapter: CanonicalSurfaceAdapter,
+): ClipNoteWithOrigin[] => surfaceAdapter.projectOriginNotes(tape, originId);
 
 const resolveOriginGroupId = (
   tape: LedTape,
@@ -1101,12 +1081,11 @@ const applyColorEffect = (
   effect: ColorEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
-  runtimeMap: RuntimeMapData,
+  surfaceAdapter: CanonicalSurfaceAdapter,
 ): MutableGenerationState => {
   const nextTape = createEmptyTape(state.tape.sampleStepBeats, state.tape.timeDomainEndBeat);
   nextTape.nextWriteId = state.tape.nextWriteId;
   const targetOriginIds = buildTargetOriginIds(state.tape, targetGroupId);
-  const buttonCoordinateByAddress = buildButtonCoordinateByAddress(runtimeMap.buttons);
 
   for (let frameIndex = 0; frameIndex < state.tape.frames.length; frameIndex += 1) {
     for (const cell of state.tape.frames[frameIndex].cells) {
@@ -1119,7 +1098,7 @@ const applyColorEffect = (
   }
 
   for (const originId of targetOriginIds) {
-    const originNotes = collectNotesForOrigin(state.tape, originId, runtimeMap);
+    const originNotes = collectNotesForOrigin(state.tape, originId, surfaceAdapter);
     const slots = planColorProgramSlots(originNotes, buildColorConfig(effect));
     if (slots.length === 0) {
       continue;
@@ -1127,9 +1106,7 @@ const applyColorEffect = (
 
     const originGroupId = resolveOriginGroupId(state.tape, originId);
     for (const slot of slots) {
-      const coordinate = buttonCoordinateByAddress.get(
-        `${slot.sourceNote.channel}:${slot.sourceNote.pitch}`,
-      );
+      const coordinate = surfaceAdapter.resolveNoteCoordinate(slot.sourceNote);
       if (!coordinate) {
         continue;
       }
@@ -1201,7 +1178,7 @@ const applyEffectDevice = (
   chain: GeneratorChain,
   device: GeneratorEffectNode,
   deviceIndex: number,
-  runtimeMap: RuntimeMapData,
+  surfaceAdapter: CanonicalSurfaceAdapter,
   modulationContext: ModulationContext,
 ): MutableGenerationState => {
   const targetGroupId = normalizeOptionalId(device.groupId);
@@ -1214,7 +1191,7 @@ const applyEffectDevice = (
       targetGroupId,
       deviceIndex,
       deviceIndex,
-      runtimeMap,
+      surfaceAdapter,
     );
   }
 
@@ -1224,7 +1201,7 @@ const applyEffectDevice = (
       device,
       targetGroupId,
       deviceIndex,
-      runtimeMap,
+      surfaceAdapter,
     );
   }
 
@@ -1313,8 +1290,8 @@ const applyGeneratorDevice = (
 
 export const buildCanonicalFieldResult = (
   chain: GeneratorChain,
-  runtimeMap: RuntimeMapData,
   loopLengthBeats: number,
+  surfaceAdapter: CanonicalSurfaceAdapter,
 ): CanonicalFieldResult => {
   const baseChain = stripModulationDevicesFromChain(chain);
   const modulationContext = createModulationContext(chain, loopLengthBeats);
@@ -1346,7 +1323,7 @@ export const buildCanonicalFieldResult = (
       baseChain,
       device,
       deviceIndex,
-      runtimeMap,
+      surfaceAdapter,
       modulationContext,
     );
   }

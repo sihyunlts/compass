@@ -6,7 +6,11 @@ import {
 } from './note-generation-types';
 import { buildRuntimeMapData } from './runtime-map';
 import { buildCanonicalFieldResult } from '../generation/engine';
-import { buildLedFramesBySampleIndex, projectTapeToNotes } from '../generation/launchpad-projection';
+import {
+  buildLedFramesBySampleIndex,
+  createLaunchpadSurfaceAdapter,
+  projectTapeToNotes,
+} from '../generation/launchpad-projection';
 import type { LedFrameVelocityEntry } from '../generation/types';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 
@@ -39,7 +43,8 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
     return createEmptyFieldResult();
   }
 
-  const generated = buildCanonicalFieldResult(chain, runtimeMap, loopLengthBeats);
+  const surfaceAdapter = createLaunchpadSurfaceAdapter(runtimeMap);
+  const generated = buildCanonicalFieldResult(chain, loopLengthBeats, surfaceAdapter);
   const notes = projectTapeToNotes(
     generated.tape,
     runtimeMap,

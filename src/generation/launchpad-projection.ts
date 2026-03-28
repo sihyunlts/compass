@@ -4,7 +4,7 @@ import type { RuntimeMapData } from '../domain/note-generation-types';
 import { sortClipNotes } from '../domain/note-utils';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 import type { LaunchpadButton } from '../shared/model';
-import type { LedCell, LedFrameVelocityEntry, LedTape } from './types';
+import type { CanonicalSurfaceAdapter, LedCell, LedFrameVelocityEntry, LedTape } from './types';
 import { toRoundedCoordinateKey, toRoundedTileId } from './raster';
 
 interface CoordinateGroup {
@@ -13,7 +13,7 @@ interface CoordinateGroup {
   buttons: ReadonlyArray<LaunchpadButton>;
 }
 
-export const buildCoordinateGroupByKey = (
+const buildCoordinateGroupByKey = (
   runtimeMap: RuntimeMapData['buttonIndex'],
 ): Map<string, CoordinateGroup> => new Map(
   runtimeMap.groups.map((group) => [
@@ -26,7 +26,7 @@ export const buildCoordinateGroupByKey = (
   ]),
 );
 
-export const buildButtonCoordinateByAddress = (
+const buildButtonCoordinateByAddress = (
   buttons: ReadonlyArray<LaunchpadButton>,
 ): Map<string, { x: number; y: number }> => {
   const coordinates = new Map<string, { x: number; y: number }>();
@@ -44,6 +44,16 @@ export const buildButtonCoordinateByAddress = (
 
   return coordinates;
 };
+
+const filterTapeToOrigin = (
+  tape: LedTape,
+  originId: string,
+): LedTape => ({
+  ...tape,
+  frames: tape.frames.map((frame) => ({
+    cells: frame.cells.filter((cell) => cell.originId === originId),
+  })),
+});
 
 const isVisibleCell = (
   cell: LedCell,
@@ -196,4 +206,24 @@ export const projectTapeToNotes = (
 
   sortClipNotes(notes);
   return notes;
+};
+
+export const createLaunchpadSurfaceAdapter = (
+  runtimeMap: RuntimeMapData,
+): CanonicalSurfaceAdapter => {
+  const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
+  const buttonCoordinateByAddress = buildButtonCoordinateByAddress(runtimeMap.buttons);
+
+  return {
+    projectActivationTiles: (cells) =>
+      resolveProjectedActiveTiles(cells, coordinateGroupByKey),
+    projectOriginNotes: (tape, originId) => projectTapeToNotes(
+      filterTapeToOrigin(tape, originId),
+      runtimeMap,
+      new Set<string>(),
+      new Set<string>(),
+    ),
+    resolveNoteCoordinate: (note) =>
+      buttonCoordinateByAddress.get(`${note.channel}:${note.pitch}`) ?? null,
+  };
 };
