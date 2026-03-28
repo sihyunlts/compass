@@ -5,7 +5,6 @@ import {
   type CompiledModulationProgram,
 } from '../core/modulation/compiled-program';
 import { resolveMutedSources } from '../core/pipeline/groups';
-import { stripModulationDevicesFromChain } from '../core/modulation/routing';
 import { evaluateTemporalRemap } from '../core/scene-operators/temporal';
 import { createSampledRemapFromTimeWarpCurve, isIdentityTimeWarpCurve } from '../core/timewarp/curve';
 import {
@@ -33,7 +32,8 @@ import {
   containsPointInSpatialRequirement,
 } from './analysis/bounds';
 import { buildCanonicalExecutionPlan } from './analysis/execution-plan';
-import { buildCanonicalAnalysisResult } from './analysis/operators';
+import { buildCompiledRackPlan } from './plan/compile';
+import type { CompiledRackPlan, CompiledRackStage } from './plan/types';
 import type {
   BeatRange,
   CanonicalExecutionRequest,
@@ -70,6 +70,11 @@ interface OriginTimelineState {
 }
 
 interface MutableGenerationState {
+  tape: LedTape;
+  timelineStateByOriginId: Map<string, OriginTimelineState>;
+}
+
+interface GenerationCheckpoint {
   tape: LedTape;
   timelineStateByOriginId: Map<string, OriginTimelineState>;
 }
@@ -1418,16 +1423,24 @@ const cloneGenerationState = (
   timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
 });
 
+const createGenerationCheckpoint = (
+  state: MutableGenerationState,
+): GenerationCheckpoint => ({
+  tape: cloneTape(finalizeTape(state.tape)),
+  timelineStateByOriginId: cloneTimelineStateByOriginId(state.timelineStateByOriginId),
+});
+
 const applyEffectDevice = (
   state: MutableGenerationState,
   chain: GeneratorChain,
-  device: GeneratorEffectNode,
-  deviceIndex: number,
+  stage: CompiledRackStage,
   surfaceAdapter: CanonicalSurfaceAdapter,
   spatialAdapter: CanonicalSpatialAdapter,
   modulationContext: ModulationContext,
   executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
 ): MutableGenerationState => {
+  const device = stage.device as GeneratorEffectNode;
+  const deviceIndex = stage.stageIndex;
   const targetGroupId = normalizeOptionalId(device.groupId);
   const executionPlan = resolveDeviceExecutionPlan(executionPlanByDeviceId, device.id);
 
@@ -1531,11 +1544,12 @@ const applyEffectDevice = (
 
 const applyGeneratorDevice = (
   state: MutableGenerationState,
-  device: GeneratorNode,
-  deviceIndex: number,
+  stage: CompiledRackStage,
   modulationContext: ModulationContext,
   executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
 ): MutableGenerationState => {
+  const device = stage.device as GeneratorNode;
+  const deviceIndex = stage.stageIndex;
   const nextTape = cloneTape(state.tape);
   nextTape.nextWriteId = state.tape.nextWriteId;
   ensureTapeFrameCount(nextTape, 1);
@@ -1573,6 +1587,57 @@ const applyGeneratorDevice = (
   };
 };
 
+const executeCompiledRackPlan = (
+  compiledPlan: CompiledRackPlan,
+  loopLengthBeats: number,
+  surfaceAdapter: CanonicalSurfaceAdapter,
+  spatialAdapter: CanonicalSpatialAdapter,
+  executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
+): {
+  state: MutableGenerationState;
+  checkpointsByStageId: Map<string, GenerationCheckpoint>;
+} => {
+  const modulationContext = createModulationContext(compiledPlan.baseChain, loopLengthBeats);
+  let currentState: MutableGenerationState = {
+    tape: createEmptyTape(),
+    timelineStateByOriginId: new Map<string, OriginTimelineState>(),
+  };
+  const checkpointsByStageId = new Map<string, GenerationCheckpoint>();
+
+  for (const stage of compiledPlan.stages) {
+    if (
+      stage.deviceKind === 'waterdrop'
+      || stage.deviceKind === 'scanner'
+      || stage.deviceKind === 'spiral'
+      || stage.deviceKind === 'path'
+    ) {
+      currentState = applyGeneratorDevice(
+        currentState,
+        stage,
+        modulationContext,
+        executionPlanByDeviceId,
+      );
+    } else {
+      currentState = applyEffectDevice(
+        currentState,
+        compiledPlan.baseChain,
+        stage,
+        surfaceAdapter,
+        spatialAdapter,
+        modulationContext,
+        executionPlanByDeviceId,
+      );
+    }
+
+    checkpointsByStageId.set(stage.stageId, createGenerationCheckpoint(currentState));
+  }
+
+  return {
+    state: currentState,
+    checkpointsByStageId,
+  };
+};
+
 export const buildCanonicalFieldResult = (
   chain: GeneratorChain,
   loopLengthBeats: number,
@@ -1580,53 +1645,18 @@ export const buildCanonicalFieldResult = (
   spatialAdapter: CanonicalSpatialAdapter,
   executionRequest: CanonicalExecutionRequest,
 ): CanonicalFieldResult => {
-  const baseChain = stripModulationDevicesFromChain(chain);
-  const modulationContext = createModulationContext(chain, loopLengthBeats);
-  const executionPlan = buildCanonicalExecutionPlan(baseChain, executionRequest);
-  let currentState: MutableGenerationState = {
-    tape: createEmptyTape(),
-    timelineStateByOriginId: new Map<string, OriginTimelineState>(),
-  };
+  const compiledPlan = buildCompiledRackPlan(chain, loopLengthBeats);
+  const executionPlan = buildCanonicalExecutionPlan(compiledPlan.baseChain, executionRequest);
+  const { state, checkpointsByStageId } = executeCompiledRackPlan(
+    compiledPlan,
+    loopLengthBeats,
+    surfaceAdapter,
+    spatialAdapter,
+    executionPlan.byDeviceId,
+  );
 
-  for (let deviceIndex = 0; deviceIndex < baseChain.devices.length; deviceIndex += 1) {
-    const device = baseChain.devices[deviceIndex];
-    if (!isDeviceEffectivelyEnabled(baseChain, device)) {
-      continue;
-    }
-
-    if (device.kind === 'waterdrop'
-      || device.kind === 'scanner'
-      || device.kind === 'spiral'
-      || device.kind === 'path') {
-      currentState = applyGeneratorDevice(
-        currentState,
-        device,
-        deviceIndex,
-        modulationContext,
-        executionPlan.byDeviceId,
-      );
-      continue;
-    }
-
-    if (device.kind === 'modulator') {
-      continue;
-    }
-
-    currentState = applyEffectDevice(
-      currentState,
-      baseChain,
-      device,
-      deviceIndex,
-      surfaceAdapter,
-      spatialAdapter,
-      modulationContext,
-      executionPlan.byDeviceId,
-    );
-  }
-
-  const tape = finalizeTape(currentState.tape);
-  const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(baseChain);
-  const analysis = buildCanonicalAnalysisResult(baseChain);
+  const tape = finalizeTape(state.tape);
+  const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(compiledPlan.baseChain);
 
   return {
     tape,
@@ -1634,7 +1664,9 @@ export const buildCanonicalFieldResult = (
     sampleStepBeats: tape.sampleStepBeats,
     mutedGroupIds,
     mutedGeneratorIds,
-    analysis,
+    analysis: compiledPlan.analysis,
     executionPlan,
+    compiledPlan,
+    checkpointsByStageId,
   };
 };

@@ -2,6 +2,7 @@ import type {
   CanonicalAnalysisResult,
   CanonicalExecutionPlan,
 } from './analysis/types';
+import type { CompiledRackPlan } from './plan/types';
 
 export interface LedCell {
   x: number;
@@ -34,6 +35,11 @@ export interface CanonicalFieldResult {
   mutedGeneratorIds: ReadonlySet<string>;
   analysis: CanonicalAnalysisResult;
   executionPlan: CanonicalExecutionPlan;
+  compiledPlan: CompiledRackPlan;
+  checkpointsByStageId: Map<string, {
+    tape: LedTape;
+    timelineStateByOriginId: Map<string, { authored: boolean; window: { start: number; end: number } }>;
+  }>;
 }
 
 export interface CanonicalSurfaceAdapter {
