@@ -43,6 +43,21 @@ const cloneMask = (mask: GeometryMask): GeometryMask => ({
   inverseTransform: { ...mask.inverseTransform },
 });
 
+const cloneStroke = (stroke: GeometryStroke): GeometryStroke => ({
+  polyline: {
+    ...stroke.polyline,
+    points: stroke.polyline.points.map((point) => ({ ...point })),
+    clipStack: stroke.polyline.clipStack.map((clip) => ({
+      ...clip,
+      inverseTransform: { ...clip.inverseTransform },
+    })),
+  },
+  originGroupId: stroke.originGroupId,
+  writeOrder: stroke.writeOrder,
+  writeId: stroke.writeId,
+  masks: stroke.masks.map(cloneMask),
+});
+
 const isTimelineStageBuffer = (
   timeline: GeometryTimeline | TimelineStageBuffer,
 ): timeline is TimelineStageBuffer => 'sourceFrames' in timeline;
@@ -182,6 +197,16 @@ export const addStrokeToFrame = (
     masks: stroke.masks?.map(cloneMask) ?? [],
   });
   timeline.nextWriteId += 1;
+};
+
+export const addExistingStrokeToFrame = (
+  timeline: GeometryTimeline | TimelineStageBuffer,
+  frameIndex: number,
+  stroke: GeometryStroke,
+): void => {
+  const writableFrame = getWritableFrame(timeline, frameIndex);
+  writableFrame.strokes.push(cloneStroke(stroke));
+  timeline.nextWriteId = Math.max(timeline.nextWriteId, stroke.writeId + 1);
 };
 
 export const completeTimelineStage = (

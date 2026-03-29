@@ -47,8 +47,11 @@ export interface TemporalVisibilityWindow {
 }
 
 export interface SceneTemporalState {
+  /** Pending temporal transform relative to the current baked source timeline. */
   remap: TemporalRemap;
+  /** Placement window that should be preserved when the pending transform is baked. */
   visibilityWindow: TemporalVisibilityWindow;
+  /** True while authored placement is still pending and has not been baked into geometry. */
   hasAuthoredTimeline: boolean;
 }
 

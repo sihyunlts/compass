@@ -8,7 +8,7 @@ import { buildRuntimeMapData } from './runtime-map';
 import { buildCanonicalFieldResult } from '../generation/engine';
 import {
   createLaunchpadExecutionRequest,
-  createLaunchpadSpatialAdapter,
+  createLaunchpadOutputAdapter,
   projectTimelineToNotes,
 } from '../generation/launchpad-projection';
 import type {
@@ -19,7 +19,6 @@ import type { CompiledRackPlan } from '../generation/plan/types';
 import type {
   LedFrameVelocityEntry,
 } from '../generation/types';
-import type { GenerationOriginTimelineState } from '../generation/types';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 
 export interface GeneratedRuntimeFieldResult {
@@ -34,79 +33,15 @@ export interface GeneratedRuntimeFieldResult {
 
 const DEFAULT_SAMPLE_STEP_BEATS = 1 / NOTE_SAMPLES_PER_BEAT;
 
-const groupNotesByOriginId = (
+const scaleNotesToLoopLength = (
   notes: ReadonlyArray<ClipNoteWithOrigin>,
-): Map<string, ClipNoteWithOrigin[]> => {
-  const notesByOriginId = new Map<string, ClipNoteWithOrigin[]>();
-
-  for (const note of notes) {
-    if (!note.originId) {
-      continue;
-    }
-
-    const existing = notesByOriginId.get(note.originId);
-    if (existing) {
-      existing.push(note);
-      continue;
-    }
-
-    notesByOriginId.set(note.originId, [note]);
-  }
-
-  return notesByOriginId;
-};
-
-const normalizeNotesToFixedLoop = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-  timelineStateByOriginId: ReadonlyMap<string, GenerationOriginTimelineState>,
   loopLengthBeats: number,
 ): ClipNoteWithOrigin[] => {
-  const notesByOriginId = groupNotesByOriginId(notes);
-
-  return notes.map((note) => {
-    const originId = note.originId;
-    if (!originId) {
-      return {
-        ...note,
-        startBeat: note.startBeat * loopLengthBeats,
-        durationBeats: note.durationBeats * loopLengthBeats,
-      };
-    }
-
-    const timelineState = timelineStateByOriginId.get(originId);
-    const shouldPreservePlacement = timelineState?.authored === true;
-    const originNotes = notesByOriginId.get(originId) ?? [];
-
-    if (shouldPreservePlacement || originNotes.length === 0) {
-      return {
-        ...note,
-        startBeat: note.startBeat * loopLengthBeats,
-        durationBeats: note.durationBeats * loopLengthBeats,
-      };
-    }
-
-    let minStartBeat = Number.POSITIVE_INFINITY;
-    let maxEndBeat = Number.NEGATIVE_INFINITY;
-    for (const originNote of originNotes) {
-      minStartBeat = Math.min(minStartBeat, originNote.startBeat);
-      maxEndBeat = Math.max(maxEndBeat, originNote.startBeat + originNote.durationBeats);
-    }
-
-    const visibleSpan = maxEndBeat - minStartBeat;
-    if (!Number.isFinite(visibleSpan) || visibleSpan <= 0) {
-      return {
-        ...note,
-        startBeat: note.startBeat * loopLengthBeats,
-        durationBeats: note.durationBeats * loopLengthBeats,
-      };
-    }
-
-    return {
-      ...note,
-      startBeat: ((note.startBeat - minStartBeat) / visibleSpan) * loopLengthBeats,
-      durationBeats: (note.durationBeats / visibleSpan) * loopLengthBeats,
-    };
-  });
+  return notes.map((note) => ({
+    ...note,
+    startBeat: note.startBeat * loopLengthBeats,
+    durationBeats: note.durationBeats * loopLengthBeats,
+  }));
 };
 
 const buildLedFramesFromNotes = (
@@ -174,12 +109,12 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
     return createEmptyFieldResult();
   }
 
-  const spatialAdapter = createLaunchpadSpatialAdapter(runtimeMap);
+  const outputAdapter = createLaunchpadOutputAdapter(runtimeMap);
   const executionRequest = createLaunchpadExecutionRequest();
   const generated = buildCanonicalFieldResult(
     chain,
     loopLengthBeats,
-    spatialAdapter,
+    outputAdapter,
     executionRequest,
   );
   const notes = projectTimelineToNotes(
@@ -188,20 +123,16 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
     generated.mutedGroupIds,
     generated.mutedGeneratorIds,
   );
-  const normalizedNotes = normalizeNotesToFixedLoop(
-    notes,
-    generated.timelineStateByOriginId,
-    loopLengthBeats,
-  );
+  const scaledNotes = scaleNotesToLoopLength(notes, loopLengthBeats);
   const frameCount = Math.max(generated.timeline.frames.length, 1);
   const sampleStepBeats = loopLengthBeats / frameCount;
   const ledFramesBySampleIndex = buildLedFramesFromNotes(
-    normalizedNotes,
+    scaledNotes,
     frameCount,
     sampleStepBeats,
   );
   return {
-    notes: normalizedNotes,
+    notes: scaledNotes,
     sourceTimelineEndBeat: loopLengthBeats,
     sampleStepBeats,
     ledFramesBySampleIndex,

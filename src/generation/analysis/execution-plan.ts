@@ -39,14 +39,6 @@ const clampBeatRange = (
   };
 };
 
-const intersectBeatRanges = (
-  left: BeatRange,
-  right: BeatRange,
-): BeatRange => ({
-  start: Math.max(left.start, right.start),
-  end: Math.max(Math.max(left.start, right.start), Math.min(left.end, right.end)),
-});
-
 const mergeTargetedFrameWindow = (
   groupId: string | null | undefined,
   requiredOutputWindow: BeatRange | 'all',
@@ -63,41 +55,6 @@ const mergeTargetedFrameWindow = (
   return {
     start: Math.min(requiredOutputWindow.start, requiredInputWindow.start),
     end: Math.max(requiredOutputWindow.end, requiredInputWindow.end),
-  };
-};
-
-const remapTrimInputWindow = (
-  requiredOutputWindow: BeatRange,
-  trimWindow: BeatRange,
-): BeatRange => {
-  const outputWindow = intersectBeatRanges(
-    clampBeatRange(requiredOutputWindow),
-    { start: 0, end: 1 },
-  );
-  const span = trimWindow.end - trimWindow.start;
-  if (!Number.isFinite(span) || span <= 0) {
-    return { start: trimWindow.start, end: trimWindow.start };
-  }
-
-  return {
-    start: trimWindow.start + outputWindow.start * span,
-    end: trimWindow.start + outputWindow.end * span,
-  };
-};
-
-const remapStretchInputWindow = (
-  requiredOutputWindow: BeatRange,
-  stretchWindow: BeatRange,
-): BeatRange => {
-  const visibleWindow = intersectBeatRanges(requiredOutputWindow, stretchWindow);
-  const span = stretchWindow.end - stretchWindow.start;
-  if (!Number.isFinite(span) || span <= 0) {
-    return { start: 0, end: 0 };
-  }
-
-  return {
-    start: Math.max((visibleWindow.start - stretchWindow.start) / span, 0),
-    end: Math.max((visibleWindow.end - stretchWindow.start) / span, 0),
   };
 };
 
@@ -253,7 +210,7 @@ const buildOperatorExecutionPlan = (
       requiredOutputBounds,
       requiredInputRoi: NONE_REQUIREMENT,
       requiredSourceRoi: NONE_REQUIREMENT,
-      requiredFrameWindow,
+      requiredFrameWindow: ALL_TIME_WINDOW,
       requiredSourceFrameWindow: NONE_TIME_WINDOW,
     };
   }
@@ -285,10 +242,10 @@ const buildOperatorExecutionPlan = (
       requiredSourceRoi: device.params.sourceKind === 'tiles'
         ? NONE_REQUIREMENT
         : requiredOutputBounds,
-      requiredFrameWindow,
+      requiredFrameWindow: ALL_TIME_WINDOW,
       requiredSourceFrameWindow: device.params.sourceKind === 'tiles'
         ? NONE_TIME_WINDOW
-        : requiredFrameWindow,
+        : ALL_TIME_WINDOW,
     };
   }
 
@@ -303,35 +260,21 @@ const buildOperatorExecutionPlan = (
   }
 
   if (device.kind === 'trim') {
-    const trimWindow = clampBeatRange({
-      start: device.params.start,
-      end: device.params.end,
-    });
-    const requiredInputWindow = requiredFrameWindow === 'all'
-      ? ALL_TIME_WINDOW
-      : remapTrimInputWindow(requiredFrameWindow, trimWindow);
     return {
       requiredOutputBounds,
       requiredInputRoi: mergeTargetedInputRoi(device.groupId, requiredOutputBounds, requiredOutputBounds),
       requiredSourceRoi: NONE_REQUIREMENT,
-      requiredFrameWindow: requiredInputWindow,
+      requiredFrameWindow: ALL_TIME_WINDOW,
       requiredSourceFrameWindow: NONE_TIME_WINDOW,
     };
   }
 
   if (device.kind === 'stretch') {
-    const stretchWindow = clampBeatRange({
-      start: device.params.start,
-      end: device.params.end,
-    });
-    const requiredInputWindow = requiredFrameWindow === 'all'
-      ? ALL_TIME_WINDOW
-      : remapStretchInputWindow(requiredFrameWindow, stretchWindow);
     return {
       requiredOutputBounds,
       requiredInputRoi: mergeTargetedInputRoi(device.groupId, requiredOutputBounds, requiredOutputBounds),
       requiredSourceRoi: NONE_REQUIREMENT,
-      requiredFrameWindow: requiredInputWindow,
+      requiredFrameWindow: ALL_TIME_WINDOW,
       requiredSourceFrameWindow: NONE_TIME_WINDOW,
     };
   }
@@ -362,7 +305,7 @@ const buildOperatorExecutionPlan = (
         spatialInputRoi ?? requiredOutputBounds,
       ),
       requiredSourceRoi: NONE_REQUIREMENT,
-      requiredFrameWindow,
+      requiredFrameWindow: ALL_TIME_WINDOW,
       requiredSourceFrameWindow: NONE_TIME_WINDOW,
     };
   }
@@ -371,7 +314,7 @@ const buildOperatorExecutionPlan = (
     requiredOutputBounds,
     requiredInputRoi: requiredOutputBounds,
     requiredSourceRoi: NONE_REQUIREMENT,
-    requiredFrameWindow,
+    requiredFrameWindow: ALL_TIME_WINDOW,
     requiredSourceFrameWindow: NONE_TIME_WINDOW,
   };
 };

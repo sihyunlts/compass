@@ -1,4 +1,4 @@
-import type { AffineTransform, Polyline } from '../core/core-types';
+import type { AffineTransform, Polyline, SceneTemporalState } from '../core/core-types';
 import type {
   CanonicalAnalysisResult,
   CanonicalExecutionPlan,
@@ -35,8 +35,10 @@ export interface GenerationTimelineWindow {
 }
 
 export interface GenerationOriginTimelineState {
-  authored: boolean;
-  window: GenerationTimelineWindow;
+  /** Observed note-output occupancy from the most recent baked timeline. */
+  observedWindow: GenerationTimelineWindow;
+  /** Pending temporal intent relative to the current baked source timeline. */
+  temporal: SceneTemporalState;
 }
 
 export type LedFrameVelocityEntry = readonly [pitch: number, velocity: number];
@@ -58,6 +60,12 @@ export interface CanonicalSpatialMask {
   contains(x: number, y: number): boolean;
 }
 
-export interface CanonicalSpatialAdapter {
+export interface CanonicalOutputAdapter {
   createMaskFromViewportTiles(tileIds: Iterable<number>): CanonicalSpatialMask;
+  /** Returns observed note-output occupancy per origin after projection and muting. */
+  buildVisibleWindowByOriginId(
+    timeline: GeometryTimeline,
+    mutedGroupIds: ReadonlySet<string>,
+    mutedGeneratorIds: ReadonlySet<string>,
+  ): ReadonlyMap<string, GenerationTimelineWindow>;
 }

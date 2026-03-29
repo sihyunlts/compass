@@ -11,11 +11,12 @@ import type { LaunchpadButton } from '../shared/model';
 import { createSpatialBounds } from './analysis/bounds';
 import type { CanonicalExecutionRequest } from './analysis/types';
 import {
-  type CanonicalSpatialAdapter,
+  type CanonicalOutputAdapter,
   type CanonicalSpatialMask,
   type GeometryMask,
   type GeometryStroke,
   type GeometryTimeline,
+  type GenerationTimelineWindow,
 } from './types';
 import { toRoundedCoordinateKey } from './coordinates';
 
@@ -101,6 +102,10 @@ const createMaskFromCoordinateKeys = (
   },
 });
 
+const hasNoteOutput = (
+  coordinateGroup: CoordinateGroup,
+): boolean => coordinateGroup.buttons.some((button) => button.output.kind === 'note');
+
 const isVisibleStroke = (
   stroke: GeometryStroke,
   mutedGroupIds: ReadonlySet<string>,
@@ -162,6 +167,51 @@ const resolveWinnerByCoordinate = (
   }
 
   return winnerByCoordinate;
+};
+
+const buildVisibleWindowByOriginId = (
+  timeline: GeometryTimeline,
+  coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
+  mutedGroupIds: ReadonlySet<string>,
+  mutedGeneratorIds: ReadonlySet<string>,
+): ReadonlyMap<string, GenerationTimelineWindow> => {
+  const windowByOriginId = new Map<string, GenerationTimelineWindow>();
+
+  for (let frameIndex = 0; frameIndex < timeline.frames.length; frameIndex += 1) {
+    const frameStartBeat = frameIndex * timeline.sampleStepBeats;
+    const frameEndBeat = frameStartBeat + timeline.sampleStepBeats;
+    const winnerByCoordinate = resolveWinnerByCoordinate(
+      timeline.frames[frameIndex]?.strokes ?? [],
+      coordinateGroupByKey,
+      mutedGroupIds,
+      mutedGeneratorIds,
+    );
+
+    for (const [coordinateKey, winner] of winnerByCoordinate.entries()) {
+      const coordinateGroup = coordinateGroupByKey.get(coordinateKey);
+      if (!coordinateGroup || !hasNoteOutput(coordinateGroup)) {
+        continue;
+      }
+
+      const existing = windowByOriginId.get(winner.originId);
+      if (existing) {
+        if (frameStartBeat < existing.start) {
+          existing.start = frameStartBeat;
+        }
+        if (frameEndBeat > existing.end) {
+          existing.end = frameEndBeat;
+        }
+        continue;
+      }
+
+      windowByOriginId.set(winner.originId, {
+        start: frameStartBeat,
+        end: frameEndBeat,
+      });
+    }
+  }
+
+  return windowByOriginId;
 };
 
 export const resolveActiveByPitchFromFrameStrokes = (
@@ -244,9 +294,10 @@ export const createLaunchpadExecutionRequest = (): CanonicalExecutionRequest => 
   },
 });
 
-export const createLaunchpadSpatialAdapter = (
+export const createLaunchpadOutputAdapter = (
   runtimeMap: RuntimeMapData,
-): CanonicalSpatialAdapter => {
+): CanonicalOutputAdapter => {
+  const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
   const coordinateKeyByTileId = buildViewportCoordinateKeyByTileId(runtimeMap.buttonIndex);
 
   return {
@@ -256,6 +307,12 @@ export const createLaunchpadSpatialAdapter = (
           .map((tileId) => coordinateKeyByTileId.get(tileId))
           .filter((coordinateKey): coordinateKey is string => coordinateKey !== undefined),
       ),
+    ),
+    buildVisibleWindowByOriginId: (timeline, mutedGroupIds, mutedGeneratorIds) => buildVisibleWindowByOriginId(
+      timeline,
+      coordinateGroupByKey,
+      mutedGroupIds,
+      mutedGeneratorIds,
     ),
   };
 };

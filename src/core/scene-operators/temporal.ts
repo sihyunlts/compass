@@ -33,6 +33,41 @@ const createAffineTemporalRemap = (
   beta,
 });
 
+const cloneTemporalRemap = (
+  remap: TemporalRemap,
+): TemporalRemap => remap.kind === 'affine'
+  ? {
+      kind: 'affine',
+      alpha: remap.alpha,
+      beta: remap.beta,
+    }
+  : {
+      kind: 'sampled',
+      domainStart: remap.domainStart,
+      domainEnd: remap.domainEnd,
+      samples: [...remap.samples],
+    };
+
+export const createIdentitySceneTemporalState = (): SceneTemporalState => ({
+  remap: createAffineTemporalRemap(1, 0),
+  visibilityWindow: {
+    start: NORMALIZED_TIMELINE_WINDOW.start,
+    end: NORMALIZED_TIMELINE_WINDOW.end,
+  },
+  hasAuthoredTimeline: false,
+});
+
+export const cloneSceneTemporalState = (
+  sceneTemporal: SceneTemporalState,
+): SceneTemporalState => ({
+  remap: cloneTemporalRemap(sceneTemporal.remap),
+  visibilityWindow: {
+    start: sceneTemporal.visibilityWindow.start,
+    end: sceneTemporal.visibilityWindow.end,
+  },
+  hasAuthoredTimeline: sceneTemporal.hasAuthoredTimeline,
+});
+
 const intersectVisibilityWindows = (
   left: TemporalVisibilityWindow,
   right: TemporalVisibilityWindow,
@@ -289,6 +324,36 @@ const resolveSceneInstanceTemporalSourceWindow = (
   return sourceTemporalWindowByOriginId?.get(sceneInstance.originId) ?? NORMALIZED_TIMELINE_WINDOW;
 };
 
+const createNormalizedTrimTransform = (
+  sourceWindow: TemporalVisibilityWindow,
+  start: number,
+  end: number,
+): TemporalTransform => {
+  const sourceSpan = sourceWindow.end - sourceWindow.start;
+
+  return {
+    remapToInput: createAffineTemporalRemap(
+      sourceSpan * (end - start),
+      sourceWindow.start + sourceSpan * start,
+    ),
+    visibilityWindow: { ...NORMALIZED_TIMELINE_WINDOW },
+    marksAuthoredTimeline: true,
+  };
+};
+
+const createPlacementPreservingReverseTransform = (
+  placementWindow: TemporalVisibilityWindow,
+): TemporalTransform => ({
+  remapToInput: createAffineTemporalRemap(
+    -1,
+    placementWindow.start + placementWindow.end,
+  ),
+  visibilityWindow: {
+    start: placementWindow.start,
+    end: placementWindow.end,
+  },
+});
+
 export const stretchSceneInstancesTemporally = (
   sceneInstances: ReadonlyArray<SceneInstance>,
   start: number,
@@ -356,21 +421,20 @@ export const trimSceneInstancesTemporally = (
 
     return {
       ...sceneInstance,
-      temporal: composeSceneTemporalState(sceneInstance.temporal, {
-        remapToInput: createAffineTemporalRemap(
-          sourceSpan * (end - start),
-          sourceWindow.start + sourceSpan * start,
-        ),
-        visibilityWindow: NORMALIZED_TIMELINE_WINDOW,
-        marksAuthoredTimeline: true,
-      }),
+      temporal: composeSceneTemporalState(
+        sceneInstance.temporal,
+        createNormalizedTrimTransform(sourceWindow, start, end),
+      ),
     };
   });
 };
 
 export const reverseSceneInstancesTemporally = (
   sceneInstances: ReadonlyArray<SceneInstance>,
-): SceneInstance[] => transformSceneInstancesTemporally(sceneInstances, {
-  remapToInput: createAffineTemporalRemap(-1, 1),
-  visibilityWindow: NORMALIZED_TIMELINE_WINDOW,
-});
+): SceneInstance[] => sceneInstances.map((sceneInstance) => ({
+  ...sceneInstance,
+  temporal: composeSceneTemporalState(
+    sceneInstance.temporal,
+    createPlacementPreservingReverseTransform(sceneInstance.temporal.visibilityWindow),
+  ),
+}));
