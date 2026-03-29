@@ -335,11 +335,11 @@ const createMaterializedTemporalState = (
 });
 
 const createModulationContext = (
-  chain: GeneratorChain,
+  modulationChain: GeneratorChain,
   loopLengthBeats: number,
 ): ModulationContext => ({
   loopLengthBeats,
-  program: compileModulationProgram(chain),
+  program: compileModulationProgram(modulationChain),
   deviceByFrameKey: new Map<string, GeneratorDeviceNode>(),
 });
 
@@ -2065,13 +2065,14 @@ const applyCompiledRackStage = (
 
 const executeCompiledRackPlan = (
   compiledPlan: CompiledRackPlan,
+  modulationChain: GeneratorChain,
   loopLengthBeats: number,
   outputAdapter: CanonicalOutputAdapter,
   executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): MutableGenerationState => {
-  const modulationContext = createModulationContext(compiledPlan.baseChain, loopLengthBeats);
+  const modulationContext = createModulationContext(modulationChain, loopLengthBeats);
   let currentState: MutableGenerationState = {
     timeline: createEmptyTimeline(),
     timelineStateByOriginId: new Map<string, OriginTimelineState>(),
@@ -2115,6 +2116,7 @@ export const buildCanonicalFieldResult = (
   const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(compiledPlan.baseChain);
   const executionState = executeCompiledRackPlan(
     compiledPlan,
+    chain,
     loopLengthBeats,
     outputAdapter,
     executionPlan.byDeviceId,
