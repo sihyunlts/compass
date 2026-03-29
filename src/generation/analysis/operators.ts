@@ -291,30 +291,21 @@ const buildTemporalEffectAnalysis = (
   }
 
   if (device.kind === 'trim') {
-    const transformedTimeDomain = clampTimeDomain(
-      upstream.timeDomain,
-      device.params.start,
-      device.params.end,
-    );
     return createOperatorAnalysis({
       outputBounds: upstream.outputBounds,
       inputRoi: upstream.outputBounds,
       framesNeeded: 'timeline',
-      timeDomain: mergeTargetedTimeDomain(device.groupId, upstream.timeDomain, transformedTimeDomain),
+      timeDomain: mergeTargetedTimeDomain(device.groupId, upstream.timeDomain, upstream.timeDomain),
       isIdentity: device.params.start === 0 && device.params.end === 1,
     });
   }
 
   if (device.kind === 'stretch') {
-    const transformedTimeDomain = {
-      start: device.params.start,
-      end: device.params.end,
-    };
     return createOperatorAnalysis({
       outputBounds: upstream.outputBounds,
       inputRoi: upstream.outputBounds,
       framesNeeded: 'timeline',
-      timeDomain: mergeTargetedTimeDomain(device.groupId, upstream.timeDomain, transformedTimeDomain),
+      timeDomain: mergeTargetedTimeDomain(device.groupId, upstream.timeDomain, upstream.timeDomain),
       isIdentity: device.params.start === 0 && device.params.end === 1,
     });
   }
@@ -331,15 +322,6 @@ const buildTemporalEffectAnalysis = (
 
   return null;
 };
-
-const clampTimeDomain = (
-  upstream: BeatRange,
-  start: number,
-  end: number,
-): BeatRange => ({
-  start: Math.max(upstream.start, start),
-  end: Math.min(upstream.end, end),
-});
 
 const buildMaskAnalysis = (
   device: MaskEffectNode,

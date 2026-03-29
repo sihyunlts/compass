@@ -70,11 +70,19 @@ const remapTrimInputWindow = (
   requiredOutputWindow: BeatRange,
   trimWindow: BeatRange,
 ): BeatRange => {
-  if (trimWindow.end <= trimWindow.start) {
-    return trimWindow;
+  const outputWindow = intersectBeatRanges(
+    clampBeatRange(requiredOutputWindow),
+    { start: 0, end: 1 },
+  );
+  const span = trimWindow.end - trimWindow.start;
+  if (!Number.isFinite(span) || span <= 0) {
+    return { start: trimWindow.start, end: trimWindow.start };
   }
 
-  return intersectBeatRanges(requiredOutputWindow, trimWindow);
+  return {
+    start: trimWindow.start + outputWindow.start * span,
+    end: trimWindow.start + outputWindow.end * span,
+  };
 };
 
 const remapStretchInputWindow = (
