@@ -326,6 +326,14 @@ const clampSceneTemporalStateToFixedLoop = (
   visibilityWindow: clampTimelineWindowToFixedLoop(sceneTemporal.visibilityWindow),
 });
 
+const createMaterializedTemporalState = (
+  visibilityWindow: TimelineWindow,
+): SceneTemporalState => ({
+  remap: createAffineTemporalRemap(1, 0),
+  visibilityWindow: cloneTimelineWindow(visibilityWindow),
+  hasAuthoredTimeline: false,
+});
+
 const createModulationContext = (
   chain: GeneratorChain,
   loopLengthBeats: number,
@@ -1136,32 +1144,27 @@ const buildPendingTemporalMaterializationRemaps = (
 
     const placementWindow = resolveOutputWindow(timelineState);
     const placementSpan = placementWindow.end - placementWindow.start;
-    if (!Number.isFinite(placementSpan) || placementSpan <= 0) {
-      continue;
-    }
+    const sourceFrameIndexByOutputFrame: Array<number | null> = !Number.isFinite(placementSpan) || placementSpan <= 0
+      ? Array.from({ length: outputFrameCount }, () => null)
+      : Array.from(
+          { length: outputFrameCount },
+          (_, frameIndex) => {
+            const outputBeat = frameIndex * state.timeline.sampleStepBeats;
+            if (outputBeat < placementWindow.start || outputBeat >= placementWindow.end) {
+              return null;
+            }
 
-    const sourceFrameIndexByOutputFrame: Array<number | null> = Array.from(
-      { length: outputFrameCount },
-      (_, frameIndex) => {
-        const outputBeat = frameIndex * state.timeline.sampleStepBeats;
-        if (outputBeat < placementWindow.start || outputBeat >= placementWindow.end) {
-          return null;
-        }
+            const sourceBeat = evaluateTemporalRemap(timelineState.temporal.remap, outputBeat);
+            if (sourceBeat === null || !Number.isFinite(sourceBeat)) {
+              return null;
+            }
 
-        const sourceBeat = evaluateTemporalRemap(timelineState.temporal.remap, outputBeat);
-        if (sourceBeat === null || !Number.isFinite(sourceBeat)) {
-          return null;
-        }
-
-        return toSourceFrameIndex(sourceBeat, state.timeline);
-      },
-    );
-    if (!hasMappedSourceFrame(sourceFrameIndexByOutputFrame)) {
-      continue;
-    }
+            return toSourceFrameIndex(sourceBeat, state.timeline);
+          },
+        );
 
     remaps.set(originId, {
-      nextTemporal: createIdentitySceneTemporalState(),
+      nextTemporal: createMaterializedTemporalState(placementWindow),
       sourceFrameIndexByOutputFrame,
       writeOrder: state.pendingTemporalWriteOrderByOriginId.get(originId) ?? 0,
     });
@@ -1197,13 +1200,7 @@ const buildTimelineStateAfterTemporalMaterialization = (
         return cloneSceneTemporalState(previous?.temporal ?? createIdentitySceneTemporalState());
       }
 
-      return {
-        remap: createAffineTemporalRemap(1, 0),
-        visibilityWindow: isWindowEmpty(observedWindow)
-          ? cloneTimelineWindow(previous.temporal.visibilityWindow)
-          : cloneTimelineWindow(observedWindow),
-        hasAuthoredTimeline: false,
-      };
+      return createMaterializedTemporalState(observedWindow);
     },
   );
 };
@@ -1425,17 +1422,7 @@ const buildTrimRemaps = (
   state,
   targetGroupId,
   requiredFrameWindow,
-  (originId, timelineState, frameWindow) => {
-    const sourceWindow = resolveSourceWindow(state.timelineStateByOriginId, originId);
-    if (!sourceWindow) {
-      return null;
-    }
-
-    const sourceSpan = sourceWindow.end - sourceWindow.start;
-    if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
-      return null;
-    }
-
+  (_originId, timelineState, frameWindow) => {
     return resolveLastModulatedTemporalState(
       state,
       effect,
@@ -1450,7 +1437,7 @@ const buildTrimRemaps = (
 
         return composeSceneTemporalState(
           timelineState?.temporal ?? createIdentitySceneTemporalState(),
-          buildNormalizedTrimTransform(sourceWindow, start, end),
+          buildNormalizedTrimTransform(DEFAULT_TIMELINE_WINDOW, start, end),
         );
       },
     );
