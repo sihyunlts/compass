@@ -48,6 +48,7 @@ export interface CanonicalFieldResult {
   sampleStepBeats: number;
   mutedGroupIds: ReadonlySet<string>;
   mutedGeneratorIds: ReadonlySet<string>;
+  timelineStateByOriginId: ReadonlyMap<string, GenerationOriginTimelineState>;
   analysis: CanonicalAnalysisResult;
   executionPlan: CanonicalExecutionPlan;
   compiledPlan: CompiledRackPlan;

@@ -934,7 +934,7 @@ const buildTrimRemaps = (
     }
 
     remaps.set(originId, {
-      nextTimelineAuthored: true,
+      nextTimelineAuthored: false,
       sourceFrameIndexByOutputFrame,
     });
   }
@@ -1082,7 +1082,7 @@ const buildTimeWarpRemaps = (
     }
 
     remaps.set(originId, {
-      nextTimelineAuthored: true,
+      nextTimelineAuthored: timelineState?.authored === true,
       sourceFrameIndexByOutputFrame,
     });
   }
@@ -1541,12 +1541,13 @@ export const buildCanonicalFieldResult = (
   return {
     loopLengthBeats,
     timeline,
-    sourceTimelineEndBeat: timeline.timeDomainEndBeat,
+    sourceTimelineEndBeat: loopLengthBeats,
     sampleStepBeats: timeline.sampleStepBeats,
     mutedGroupIds,
     mutedGeneratorIds,
     analysis: compiledPlan.analysis,
     executionPlan,
     compiledPlan,
+    timelineStateByOriginId: executionState.timelineStateByOriginId,
   };
 };

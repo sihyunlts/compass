@@ -196,28 +196,22 @@ export const completeTimelineStage = (
 export const finalizeTimeline = (
   timeline: GeometryTimeline,
 ): GeometryTimeline => {
-  let lastActiveIndex = -1;
+  const endBeat = Math.max(timeline.timeDomainEndBeat, 1);
+  const frameCount = toFrameCount(endBeat, timeline.sampleStepBeats);
 
-  for (let index = timeline.frames.length - 1; index >= 0; index -= 1) {
-    if (timeline.frames[index].strokes.length > 0) {
-      lastActiveIndex = index;
-      break;
-    }
-  }
-
-  const endBeat = lastActiveIndex >= 0
-    ? (lastActiveIndex + 1) * timeline.sampleStepBeats
-    : 1;
-  const frameCount = toFrameCount(Math.max(endBeat, 1), timeline.sampleStepBeats);
-
-  if (frameCount === timeline.frames.length && Math.max(endBeat, 1) === timeline.timeDomainEndBeat) {
+  if (frameCount === timeline.frames.length) {
     return timeline;
   }
 
   return {
     sampleStepBeats: timeline.sampleStepBeats,
-    timeDomainEndBeat: Math.max(endBeat, 1),
-    frames: timeline.frames.slice(0, frameCount),
+    timeDomainEndBeat: endBeat,
+    frames: timeline.frames.length > frameCount
+      ? timeline.frames.slice(0, frameCount)
+      : [
+          ...timeline.frames,
+          ...createEmptyFrames(frameCount - timeline.frames.length),
+        ],
     nextWriteId: timeline.nextWriteId,
   };
 };

@@ -16,7 +16,6 @@ import {
   type GeometryMask,
   type GeometryStroke,
   type GeometryTimeline,
-  type LedFrameVelocityEntry,
 } from './types';
 import { toRoundedCoordinateKey } from './coordinates';
 
@@ -199,24 +198,6 @@ export const resolveActiveByPitchFromFrameStrokes = (
   }
 
   return activeByPitch;
-};
-
-export const buildLedFramesBySampleIndex = (
-  timeline: GeometryTimeline,
-  runtimeMap: RuntimeMapData,
-  mutedGroupIds: ReadonlySet<string>,
-  mutedGeneratorIds: ReadonlySet<string>,
-): ReadonlyArray<ReadonlyArray<LedFrameVelocityEntry>> => {
-  const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
-
-  return timeline.frames.map((frame) => Array.from(
-    resolveActiveByPitchFromFrameStrokes(
-      frame.strokes,
-      coordinateGroupByKey,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    ).entries(),
-  ).map(([pitch, info]) => [pitch, info.velocity] as const));
 };
 
 export const projectTimelineToNotes = (
