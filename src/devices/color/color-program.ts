@@ -16,6 +16,11 @@ interface ColorProgramTiming {
   gapDuration: number;
 }
 
+interface TimedWindow {
+  startBeat: number;
+  endBeat: number;
+}
+
 export interface TimedColorSource {
   startBeat: number;
   endBeat: number;
@@ -110,17 +115,60 @@ const resolveColorProgramTiming = (
 const resolveSourceSpan = <T extends TimedColorSource>(
   sourceSegments: ReadonlyArray<T>,
 ): number | null => {
-  let sourceStart = Number.POSITIVE_INFINITY;
-  let sourceEnd = Number.NEGATIVE_INFINITY;
+  const sourceWindow = resolveTimedWindow(sourceSegments);
+  return sourceWindow ? sourceWindow.endBeat - sourceWindow.startBeat : null;
+};
 
-  for (const sourceSegment of sourceSegments) {
-    sourceStart = Math.min(sourceStart, sourceSegment.startBeat);
-    sourceEnd = Math.max(sourceEnd, sourceSegment.endBeat);
+const resolveTimedWindow = <T extends TimedColorSource>(
+  segments: ReadonlyArray<T>,
+): TimedWindow | null => {
+  let startBeat = Number.POSITIVE_INFINITY;
+  let endBeat = Number.NEGATIVE_INFINITY;
+
+  for (const segment of segments) {
+    startBeat = Math.min(startBeat, segment.startBeat);
+    endBeat = Math.max(endBeat, segment.endBeat);
   }
 
-  return Number.isFinite(sourceStart) && Number.isFinite(sourceEnd) && sourceEnd > sourceStart
-    ? sourceEnd - sourceStart
+  return Number.isFinite(startBeat) && Number.isFinite(endBeat) && endBeat > startBeat
+    ? { startBeat, endBeat }
     : null;
+};
+
+const normalizeSlotsToSourceWindow = <T extends TimedColorSource>(
+  slots: ReadonlyArray<PlannedColorSlot<T>>,
+  sourceWindow: TimedWindow,
+): PlannedColorSlot<T>[] => {
+  const slotWindow = resolveTimedWindow(slots);
+  if (!slotWindow) {
+    return [];
+  }
+
+  const sourceSpan = sourceWindow.endBeat - sourceWindow.startBeat;
+  const slotSpan = slotWindow.endBeat - slotWindow.startBeat;
+  if (
+    slotWindow.startBeat >= sourceWindow.startBeat
+    && slotWindow.endBeat <= sourceWindow.endBeat
+  ) {
+    return [...slots];
+  }
+  if (!Number.isFinite(sourceSpan) || sourceSpan <= 0 || !Number.isFinite(slotSpan) || slotSpan <= 0) {
+    return [...slots];
+  }
+
+  return slots.map((slot) => {
+    const normalizedStart = sourceWindow.startBeat
+      + (((slot.startBeat - slotWindow.startBeat) / slotSpan) * sourceSpan);
+    const normalizedEnd = sourceWindow.startBeat
+      + (((slot.endBeat - slotWindow.startBeat) / slotSpan) * sourceSpan);
+
+    return {
+      ...slot,
+      offset: normalizedStart - slot.source.startBeat,
+      startBeat: normalizedStart,
+      endBeat: normalizedEnd,
+    };
+  });
 };
 
 export const planColorProgramSlots = <T extends TimedColorSource>(
@@ -136,8 +184,9 @@ export const planColorProgramSlots = <T extends TimedColorSource>(
       .map((sourceSegment) => sourceSegment.endBeat - sourceSegment.startBeat)
       .filter((duration) => Number.isFinite(duration) && duration > 0),
   );
+  const sourceWindow = resolveTimedWindow(sourceSegments);
   const sourceSpan = resolveSourceSpan(sourceSegments);
-  if (referenceDuration === null || sourceSpan === null) {
+  if (referenceDuration === null || sourceSpan === null || sourceWindow === null) {
     return [];
   }
 
@@ -166,5 +215,5 @@ export const planColorProgramSlots = <T extends TimedColorSource>(
     }
   }
 
-  return slots;
+  return normalizeSlotsToSourceWindow(slots, sourceWindow);
 };
