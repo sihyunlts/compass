@@ -311,23 +311,6 @@ export const projectActivePitchesToNotes = (
   return notes;
 };
 
-export const projectTimelineToNotes = (
-  timeline: GeometryTimeline,
-  runtimeMap: RuntimeMapData,
-  mutedGroupIds: ReadonlySet<string>,
-  mutedGeneratorIds: ReadonlySet<string>,
-): ClipNoteWithOrigin[] => {
-  return projectActivePitchesToNotes(
-    projectTimelineToActivePitchesBySampleIndex(
-      timeline,
-      runtimeMap,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    ),
-    timeline,
-  );
-};
-
 export const createLaunchpadExecutionRequest = (): CanonicalExecutionRequest => ({
   outputBounds: createSpatialBounds(
     COMPOSITION_BOUNDS.minX - DEFAULT_EVALUATION_PADDING,

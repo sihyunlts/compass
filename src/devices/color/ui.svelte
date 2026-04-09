@@ -11,19 +11,19 @@
     end: number,
   ): ReadonlyArray<number> => {
     const rowCount = 8;
-    const bandColumnCount = 4;
-    const bandSize = rowCount * bandColumnCount;
+    const columnGroupWidth = 4;
+    const columnGroupSize = rowCount * columnGroupWidth;
     const gridColumnCount = 8;
     const valueCount = end - start + 1;
     const topDownOrdered = new Array<number>(valueCount);
 
     for (let index = 0; index < valueCount; index += 1) {
-      const bandIndex = Math.floor(index / bandSize);
-      const indexWithinBand = index % bandSize;
-      const rowFromBottom = Math.floor(indexWithinBand / bandColumnCount);
-      const columnWithinBand = indexWithinBand % bandColumnCount;
+      const columnGroupIndex = Math.floor(index / columnGroupSize);
+      const indexWithinColumnGroup = index % columnGroupSize;
+      const rowFromBottom = Math.floor(indexWithinColumnGroup / columnGroupWidth);
+      const columnWithinGroup = indexWithinColumnGroup % columnGroupWidth;
       const rowFromTop = (rowCount - 1) - rowFromBottom;
-      const column = (bandIndex * bandColumnCount) + columnWithinBand;
+      const column = (columnGroupIndex * columnGroupWidth) + columnWithinGroup;
       const visualIndex = (rowFromTop * gridColumnCount) + column;
       topDownOrdered[visualIndex] = start + index;
     }
