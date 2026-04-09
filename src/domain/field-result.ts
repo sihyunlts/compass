@@ -7,9 +7,10 @@ import {
 import { buildRuntimeMapData } from './runtime-map';
 import { buildCanonicalFieldResult } from '../generation/engine';
 import {
+  projectActivePitchesToNotes,
+  projectTimelineToActivePitchesBySampleIndex,
   createLaunchpadExecutionRequest,
   createLaunchpadOutputAdapter,
-  projectTimelineToNotes,
 } from '../generation/launchpad-projection';
 import type {
   CanonicalAnalysisResult,
@@ -44,31 +45,11 @@ const scaleNotesToLoopLength = (
   }));
 };
 
-const buildLedFramesFromNotes = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-  frameCount: number,
-  sampleStepBeats: number,
-): ReadonlyArray<ReadonlyArray<LedFrameVelocityEntry>> => Array.from(
-  { length: Math.max(frameCount, 1) },
-  (_, frameIndex) => {
-    const frameStartBeat = frameIndex * sampleStepBeats;
-    const frameEndBeat = frameStartBeat + sampleStepBeats;
-    const activeByPitch = new Map<number, number>();
-
-    for (const note of notes) {
-      const noteEndBeat = note.startBeat + note.durationBeats;
-      if (note.startBeat >= frameEndBeat || noteEndBeat <= frameStartBeat) {
-        continue;
-      }
-
-      activeByPitch.set(note.pitch, note.velocity);
-    }
-
-    return Array.from(activeByPitch.entries()).map(
-      ([pitch, velocity]) => [pitch, velocity] as const,
-    );
-  },
-);
+const toLedFramesFromActivePitches = (
+  activeByPitchFrames: ReadonlyArray<ReadonlyMap<number, { velocity: number }>>,
+): ReadonlyArray<ReadonlyArray<LedFrameVelocityEntry>> => activeByPitchFrames.map((frame) => (
+  Array.from(frame.entries()).map(([pitch, active]) => [pitch, active.velocity] as const)
+));
 
 const createEmptyFieldResult = (): GeneratedRuntimeFieldResult => ({
   notes: [],
@@ -117,20 +98,19 @@ export const buildGeneratedFieldResultWithRuntimeMap = ({
     outputAdapter,
     executionRequest,
   );
-  const notes = projectTimelineToNotes(
+  const activeByPitchFrames = projectTimelineToActivePitchesBySampleIndex(
     generated.timeline,
     runtimeMap,
     generated.mutedGroupIds,
     generated.mutedGeneratorIds,
   );
-  const scaledNotes = scaleNotesToLoopLength(notes, loopLengthBeats);
-  const frameCount = Math.max(generated.timeline.frames.length, 1);
-  const sampleStepBeats = loopLengthBeats / frameCount;
-  const ledFramesBySampleIndex = buildLedFramesFromNotes(
-    scaledNotes,
-    frameCount,
-    sampleStepBeats,
+  const notes = projectActivePitchesToNotes(
+    activeByPitchFrames,
+    generated.timeline,
   );
+  const scaledNotes = scaleNotesToLoopLength(notes, loopLengthBeats);
+  const sampleStepBeats = loopLengthBeats / Math.max(generated.timeline.frames.length, 1);
+  const ledFramesBySampleIndex = toLedFramesFromActivePitches(activeByPitchFrames);
   return {
     notes: scaledNotes,
     sourceTimelineEndBeat: loopLengthBeats,

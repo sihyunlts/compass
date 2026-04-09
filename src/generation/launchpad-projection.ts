@@ -106,6 +106,8 @@ const hasNoteOutput = (
   coordinateGroup: CoordinateGroup,
 ): boolean => coordinateGroup.buttons.some((button) => button.output.kind === 'note');
 
+const EMPTY_ACTIVE_BY_PITCH = new Map<number, SampledActivePitch>();
+
 const isVisibleStroke = (
   stroke: GeometryStroke,
   mutedGroupIds: ReadonlySet<string>,
@@ -250,35 +252,59 @@ export const resolveActiveByPitchFromFrameStrokes = (
   return activeByPitch;
 };
 
-export const projectTimelineToNotes = (
+export const projectTimelineToActivePitchesBySampleIndex = (
   timeline: GeometryTimeline,
   runtimeMap: RuntimeMapData,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
-): ClipNoteWithOrigin[] => {
+): ReadonlyArray<ReadonlyMap<number, SampledActivePitch>> => {
   const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
 
+  return timeline.frames.map((frame) => resolveActiveByPitchFromFrameStrokes(
+    frame.strokes,
+    coordinateGroupByKey,
+    mutedGroupIds,
+    mutedGeneratorIds,
+  ));
+};
+
+export const projectActivePitchesToNotes = (
+  activeByPitchFrames: ReadonlyArray<ReadonlyMap<number, SampledActivePitch>>,
+  timeline: Pick<GeometryTimeline, 'timeDomainEndBeat' | 'sampleStepBeats'>,
+): ClipNoteWithOrigin[] => {
   const notes = collectPitchSampledNotes({
-    sampleCount: timeline.frames.length,
+    sampleCount: activeByPitchFrames.length,
     endBeat: timeline.timeDomainEndBeat,
     sampleStepBeats: timeline.sampleStepBeats,
     minimumNoteDuration: MIN_NOTE_DURATION,
     resolveActiveByPitch: (sampleBeat) => {
       const frameIndex = Math.min(
         Math.max(Math.floor(sampleBeat / timeline.sampleStepBeats), 0),
-        Math.max(timeline.frames.length - 1, 0),
+        Math.max(activeByPitchFrames.length - 1, 0),
       );
-      return resolveActiveByPitchFromFrameStrokes(
-        timeline.frames[frameIndex]?.strokes ?? [],
-        coordinateGroupByKey,
-        mutedGroupIds,
-        mutedGeneratorIds,
-      );
+      return activeByPitchFrames[frameIndex] ?? EMPTY_ACTIVE_BY_PITCH;
     },
   });
 
   sortClipNotes(notes);
   return notes;
+};
+
+export const projectTimelineToNotes = (
+  timeline: GeometryTimeline,
+  runtimeMap: RuntimeMapData,
+  mutedGroupIds: ReadonlySet<string>,
+  mutedGeneratorIds: ReadonlySet<string>,
+): ClipNoteWithOrigin[] => {
+  return projectActivePitchesToNotes(
+    projectTimelineToActivePitchesBySampleIndex(
+      timeline,
+      runtimeMap,
+      mutedGroupIds,
+      mutedGeneratorIds,
+    ),
+    timeline,
+  );
 };
 
 export const createLaunchpadExecutionRequest = (): CanonicalExecutionRequest => ({
