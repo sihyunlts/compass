@@ -8,7 +8,6 @@ import {
 } from '../../domain';
 import {
   buildGeneratedFieldResult,
-  type GeneratedRuntimeFieldResult,
 } from '../../domain/field-result';
 import { LIVE_BRIDGE_TARGET } from '../../shared/bridge/protocol';
 import { sanitizeBridgeSettings } from '../../shared/validation/bridge-settings';
@@ -31,9 +30,6 @@ const LAUNCHPAD_LAYOUT: LaunchpadLayout = launchpadLayout;
 interface SendResultCacheEntry {
   key: string;
   preview: GenerateAndSendResponse['preview'];
-  generated: GeneratedRuntimeFieldResult;
-  sourceTimelineEndBeat: number;
-  sampleStepBeats: number;
 }
 
 const toEnvelope = (
@@ -140,9 +136,6 @@ export class GeneratorService {
     this.resultsByKey.set(key, {
       key,
       preview,
-      generated,
-      sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
-      sampleStepBeats: preview.sampleStepBeats,
     });
     this.evictStaleSourceFamilyEntries(sourceKey);
     return preview;

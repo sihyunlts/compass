@@ -3,7 +3,6 @@ import { clamp } from '../../../shared/math';
 
 import {
   buildGeneratedFieldResult,
-  type GeneratedRuntimeFieldResult,
 } from '../../../domain/field-result';
 import { toGeneratorPreview } from '../../../domain/generator-preview';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
@@ -17,7 +16,6 @@ export interface PreviewResultCacheEntry {
   sourceTimelineEndBeat: number;
   sampleStepBeats: number;
   ledFramesBySampleIndex: ReadonlyArray<ReadonlyMap<number, number>>;
-  generated?: GeneratedRuntimeFieldResult;
 }
 
 interface PreviewResultInput {
@@ -58,7 +56,6 @@ class PreviewResultCache {
       sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
       sampleStepBeats: preview.sampleStepBeats,
       ledFramesBySampleIndex: preview.ledFramesBySampleIndex.map((frame) => new Map<number, number>(frame)),
-      generated,
     };
     this.resultsByKey.set(key, entry);
     this.evictStaleSourceFamilyEntries(input.sourceKey);
