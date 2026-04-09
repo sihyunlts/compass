@@ -31,6 +31,8 @@ import { createSampledRemapFromTimeWarpCurve, isIdentityTimeWarpCurve } from '..
 import {
   buildColorConfig,
   planColorProgramSlots,
+  type PlannedColorSlot,
+  type TimedColorSource,
 } from '../devices/color/color-program';
 import { doesDeviceToggleTimelineParity } from '../devices/timeline-parity';
 import { isDeviceEffectivelyEnabled } from '../shared/group-state';
@@ -568,6 +570,25 @@ const cloneStrokeWithWriteOrder = (
   masks: stroke.masks.map(cloneMask),
 });
 
+const cloneStrokeWithVelocityAndWriteOrder = (
+  stroke: GeometryStroke,
+  velocity: number,
+  writeOrder: number,
+): Omit<GeometryStroke, 'writeId'> => ({
+  polyline: {
+    ...stroke.polyline,
+    velocity,
+    points: stroke.polyline.points.map((point) => ({ ...point })),
+    clipStack: stroke.polyline.clipStack.map((clip) => ({
+      ...clip,
+      inverseTransform: { ...clip.inverseTransform },
+    })),
+  },
+  originGroupId: stroke.originGroupId,
+  writeOrder,
+  masks: stroke.masks.map(cloneMask),
+});
+
 const transformStroke = (
   stroke: GeometryStroke,
   transform: ReturnType<typeof toTranslationTransform> | null,
@@ -963,6 +984,49 @@ const toSourceFrameIndex = (
     frameCount - 1,
   );
 };
+
+const resolveColorSlotSourceEndBeat = <T extends TimedColorSource>(
+  slot: PlannedColorSlot<T>,
+): number => {
+  const slotDuration = slot.endBeat - slot.startBeat;
+  if (!Number.isFinite(slotDuration) || slotDuration <= 0) {
+    return slot.source.startBeat;
+  }
+
+  return Math.min(slot.source.endBeat, slot.source.startBeat + slotDuration);
+};
+
+const resolveColorSlotSourceFrameWindow = <T extends TimedColorSource>(
+  slot: PlannedColorSlot<T>,
+  timeline: GeometryTimeline,
+): FrameWindow => toFrameWindow(
+  {
+    start: slot.source.startBeat,
+    end: resolveColorSlotSourceEndBeat(slot),
+  },
+  timeline.sampleStepBeats,
+  timeline.frames.length,
+);
+
+const resolveColorSlotDestinationFrameWindow = <T extends TimedColorSource>(
+  slot: PlannedColorSlot<T>,
+  timeline: GeometryTimeline,
+): FrameWindow => toFrameWindow(
+  {
+    start: slot.startBeat,
+    end: slot.endBeat,
+  },
+  timeline.sampleStepBeats,
+  timeline.frames.length,
+);
+
+const resolveColorDestinationFrameIndex = (
+  sourceFrameIndex: number,
+  slotOffset: number,
+  sampleStepBeats: number,
+): number => Math.floor(
+  ((sourceFrameIndex * sampleStepBeats) + slotOffset) / sampleStepBeats,
+);
 
 const hasMappedSourceFrame = (
   sourceFrameIndexByOutputFrame: ReadonlyArray<number | null>,
@@ -1662,19 +1726,69 @@ const applyMaskEffect = (
   };
 };
 
+interface ColorTimingSegment extends TimedColorSource {
+  originId: string;
+}
+
 const groupActivationSegmentsByOriginId = (
   segments: ReadonlyArray<GeometryActivationSegment>,
-): Map<string, GeometryActivationSegment[]> => {
-  const segmentsByOriginId = new Map<string, GeometryActivationSegment[]>();
+): Map<string, ColorTimingSegment[]> => {
+  const rawSegmentsByOriginId = new Map<string, ColorTimingSegment[]>();
 
   for (const segment of segments) {
-    const existingSegments = segmentsByOriginId.get(segment.originId);
-    if (existingSegments) {
-      existingSegments.push(segment);
+    if (
+      !Number.isFinite(segment.startBeat)
+      || !Number.isFinite(segment.endBeat)
+      || segment.endBeat <= segment.startBeat
+    ) {
       continue;
     }
 
-    segmentsByOriginId.set(segment.originId, [segment]);
+    const existingSegments = rawSegmentsByOriginId.get(segment.originId);
+    if (existingSegments) {
+      existingSegments.push({
+        originId: segment.originId,
+        startBeat: segment.startBeat,
+        endBeat: segment.endBeat,
+      });
+      continue;
+    }
+
+    rawSegmentsByOriginId.set(segment.originId, [{
+      originId: segment.originId,
+      startBeat: segment.startBeat,
+      endBeat: segment.endBeat,
+    }]);
+  }
+
+  const segmentsByOriginId = new Map<string, ColorTimingSegment[]>();
+  for (const [originId, rawSegments] of rawSegmentsByOriginId.entries()) {
+    if (rawSegments.length === 0) {
+      continue;
+    }
+
+    const orderedSegments = [...rawSegments].sort((left, right) => (
+      left.startBeat - right.startBeat || left.endBeat - right.endBeat
+    ));
+    const mergedSegments: ColorTimingSegment[] = [];
+
+    for (const currentSegment of orderedSegments) {
+      const previousSegment = mergedSegments[mergedSegments.length - 1];
+      if (!previousSegment || currentSegment.startBeat > previousSegment.endBeat + TIMELINE_WINDOW_EPSILON) {
+        mergedSegments.push({
+          originId,
+          startBeat: currentSegment.startBeat,
+          endBeat: currentSegment.endBeat,
+        });
+        continue;
+      }
+
+      previousSegment.endBeat = Math.max(previousSegment.endBeat, currentSegment.endBeat);
+    }
+
+    if (mergedSegments.length > 0) {
+      segmentsByOriginId.set(originId, mergedSegments);
+    }
   }
 
   return segmentsByOriginId;
@@ -1703,10 +1817,19 @@ const applyColorEffect = (
       (stroke) => isTargetedStroke(stroke, targetGroupId),
     ),
   );
+  const sourceStrokesByOriginAndFrame = buildSourceStrokesByOriginAndFrame(
+    state.timeline,
+    new Set(targetSegmentsByOriginId.keys()),
+  );
 
   stripTargetedFrames(nextTimeline, state.timeline.frames.length, targetGroupId);
 
   for (const [originId, sourceSegments] of targetSegmentsByOriginId.entries()) {
+    const sourceStrokesByFrame = sourceStrokesByOriginAndFrame.get(originId);
+    if (!sourceStrokesByFrame) {
+      continue;
+    }
+
     const slots = planColorProgramSlots(sourceSegments, colorConfig);
     if (slots.length === 0) {
       continue;
@@ -1714,28 +1837,38 @@ const applyColorEffect = (
 
     for (const slot of slots) {
       ensureTimelineFrameCount(nextTimeline, slot.endBeat);
-      const startFrame = Math.max(Math.floor(slot.startBeat / nextTimeline.sampleStepBeats), 0);
-      const endFrameExclusive = Math.min(
-        Math.ceil(slot.endBeat / nextTimeline.sampleStepBeats),
-        nextTimeline.frames.length,
-      );
+      const sourceFrameWindow = resolveColorSlotSourceFrameWindow(slot, state.timeline);
+      const destinationFrameWindow = resolveColorSlotDestinationFrameWindow(slot, nextTimeline);
 
-      for (let frameIndex = startFrame; frameIndex < endFrameExclusive; frameIndex += 1) {
-        if (!isFrameWithinWindow(frameIndex, frameWindow)) {
+      for (
+        let sourceFrameIndex = sourceFrameWindow.startFrame;
+        sourceFrameIndex < sourceFrameWindow.endFrameExclusive;
+        sourceFrameIndex += 1
+      ) {
+        const destinationFrameIndex = resolveColorDestinationFrameIndex(
+          sourceFrameIndex,
+          slot.offset,
+          nextTimeline.sampleStepBeats,
+        );
+        if (
+          !isFrameWithinWindow(destinationFrameIndex, frameWindow)
+          || !isFrameWithinWindow(destinationFrameIndex, destinationFrameWindow)
+        ) {
           continue;
         }
 
-        addStrokeToFrame(nextTimeline, frameIndex, {
-          polyline: {
-            points: [{ x: slot.source.x, y: slot.source.y }],
-            closed: false,
-            originId,
-            velocity: slot.velocity,
-            clipStack: [],
-          },
-          originGroupId: slot.source.originGroupId,
-          writeOrder,
-        });
+        const sourceStrokes = sourceStrokesByFrame.get(sourceFrameIndex);
+        if (!sourceStrokes || sourceStrokes.length === 0) {
+          continue;
+        }
+
+        for (const stroke of sourceStrokes) {
+          addStrokeToFrame(
+            nextTimeline,
+            destinationFrameIndex,
+            cloneStrokeWithVelocityAndWriteOrder(stroke, slot.velocity, writeOrder),
+          );
+        }
       }
     }
   }
