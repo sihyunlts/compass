@@ -926,6 +926,15 @@ const buildSourceStrokesByOriginAndFrame = (
   return strokesByOriginId;
 };
 
+const buildSourceFrameIndexesByOriginId = (
+  sourceStrokesByOriginAndFrame: ReadonlyMap<string, ReadonlyMap<number, ReadonlyArray<GeometryStroke>>>,
+): Map<string, number[]> => new Map(
+  Array.from(sourceStrokesByOriginAndFrame.entries(), ([originId, frameMap]) => [
+    originId,
+    Array.from(frameMap.keys()),
+  ]),
+);
+
 const splitFrameStrokesByOriginIds = (
   strokes: ReadonlyArray<GeometryStroke>,
   targetOriginIds: ReadonlySet<string>,
@@ -1821,12 +1830,16 @@ const applyColorEffect = (
     state.timeline,
     new Set(targetSegmentsByOriginId.keys()),
   );
+  const sourceFrameIndexesByOriginId = buildSourceFrameIndexesByOriginId(
+    sourceStrokesByOriginAndFrame,
+  );
 
   stripTargetedFrames(nextTimeline, state.timeline.frames.length, targetGroupId);
 
   for (const [originId, sourceSegments] of targetSegmentsByOriginId.entries()) {
     const sourceStrokesByFrame = sourceStrokesByOriginAndFrame.get(originId);
-    if (!sourceStrokesByFrame) {
+    const sourceFrameIndexes = sourceFrameIndexesByOriginId.get(originId);
+    if (!sourceStrokesByFrame || !sourceFrameIndexes || sourceFrameIndexes.length === 0) {
       continue;
     }
 
@@ -1840,11 +1853,14 @@ const applyColorEffect = (
       const sourceFrameWindow = resolveColorSlotSourceFrameWindow(slot, state.timeline);
       const destinationFrameWindow = resolveColorSlotDestinationFrameWindow(slot, nextTimeline);
 
-      for (
-        let sourceFrameIndex = sourceFrameWindow.startFrame;
-        sourceFrameIndex < sourceFrameWindow.endFrameExclusive;
-        sourceFrameIndex += 1
-      ) {
+      for (const sourceFrameIndex of sourceFrameIndexes) {
+        if (sourceFrameIndex < sourceFrameWindow.startFrame) {
+          continue;
+        }
+        if (sourceFrameIndex >= sourceFrameWindow.endFrameExclusive) {
+          break;
+        }
+
         const destinationFrameIndex = resolveColorDestinationFrameIndex(
           sourceFrameIndex,
           slot.offset,

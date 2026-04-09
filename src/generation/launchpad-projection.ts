@@ -144,13 +144,23 @@ const resolveWinnerByCoordinate = (
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): Map<string, WinnerStroke> => {
+  if (strokes.length === 0 || coordinateGroupByKey.size === 0) {
+    return new Map<string, WinnerStroke>();
+  }
+
+  const visibleStrokes = strokes.filter((stroke) => isVisibleStroke(
+    stroke,
+    mutedGroupIds,
+    mutedGeneratorIds,
+  ));
+  if (visibleStrokes.length === 0) {
+    return new Map<string, WinnerStroke>();
+  }
+
   const winnerByCoordinate = new Map<string, WinnerStroke>();
 
   for (const [coordinateKey, coordinateGroup] of coordinateGroupByKey.entries()) {
-    for (const stroke of strokes) {
-      if (!isVisibleStroke(stroke, mutedGroupIds, mutedGeneratorIds)) {
-        continue;
-      }
+    for (const stroke of visibleStrokes) {
       if (!isStrokeActiveAtCoordinate(stroke, coordinateGroup.x, coordinateGroup.y)) {
         continue;
       }
@@ -180,10 +190,15 @@ const buildVisibleWindowByOriginId = (
   const windowByOriginId = new Map<string, GenerationTimelineWindow>();
 
   for (let frameIndex = 0; frameIndex < timeline.frames.length; frameIndex += 1) {
+    const frameStrokes = timeline.frames[frameIndex]?.strokes ?? [];
+    if (frameStrokes.length === 0) {
+      continue;
+    }
+
     const frameStartBeat = frameIndex * timeline.sampleStepBeats;
     const frameEndBeat = frameStartBeat + timeline.sampleStepBeats;
     const winnerByCoordinate = resolveWinnerByCoordinate(
-      timeline.frames[frameIndex]?.strokes ?? [],
+      frameStrokes,
       coordinateGroupByKey,
       mutedGroupIds,
       mutedGeneratorIds,
@@ -260,12 +275,18 @@ export const projectTimelineToActivePitchesBySampleIndex = (
 ): ReadonlyArray<ReadonlyMap<number, SampledActivePitch>> => {
   const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
 
-  return timeline.frames.map((frame) => resolveActiveByPitchFromFrameStrokes(
-    frame.strokes,
-    coordinateGroupByKey,
-    mutedGroupIds,
-    mutedGeneratorIds,
-  ));
+  return timeline.frames.map((frame) => {
+    if (frame.strokes.length === 0) {
+      return EMPTY_ACTIVE_BY_PITCH;
+    }
+
+    return resolveActiveByPitchFromFrameStrokes(
+      frame.strokes,
+      coordinateGroupByKey,
+      mutedGroupIds,
+      mutedGeneratorIds,
+    );
+  });
 };
 
 export const projectActivePitchesToNotes = (
