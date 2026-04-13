@@ -94,6 +94,7 @@ out/
 
 # Agents
 AGENTS.md
+docs/
 
 # Temporary files
 tmp/
