@@ -85,9 +85,9 @@ class PlaybackScheduler {
 
     const delta = now - this.lastFrameTs;
     this.lastFrameTs = now;
-    this.currentBeat += delta / this.options.getLoopMs();
-
     const endBeat = this.resolveLoopEndBeat();
+    this.currentBeat += (delta / this.options.getLoopMs()) * endBeat;
+
     if (this.currentBeat >= endBeat) {
       if (this.options.isLoopEnabled()) {
         this.currentBeat %= endBeat;
