@@ -189,10 +189,12 @@ const buildOperatorExecutionPlan = (
   device: GeneratorDeviceNode,
   requiredOutputBounds: SpatialRequirement,
   requiredFrameWindow: BeatRange | 'all',
+  generatorOutputBounds: SpatialRequirement,
 ): OperatorExecutionPlan => {
   if (device.kind === 'modulator') {
     return {
       requiredOutputBounds,
+      generatorOutputBounds,
       requiredInputRoi: requiredOutputBounds,
       requiredSourceRoi: NONE_REQUIREMENT,
       requiredFrameWindow: requiredFrameWindow,
@@ -208,6 +210,7 @@ const buildOperatorExecutionPlan = (
   ) {
     return {
       requiredOutputBounds,
+      generatorOutputBounds,
       requiredInputRoi: NONE_REQUIREMENT,
       requiredSourceRoi: NONE_REQUIREMENT,
       requiredFrameWindow: ALL_TIME_WINDOW,
@@ -223,6 +226,7 @@ const buildOperatorExecutionPlan = (
     );
     return {
       requiredOutputBounds,
+      generatorOutputBounds,
       requiredInputRoi,
       requiredSourceRoi: NONE_REQUIREMENT,
       requiredFrameWindow: ALL_TIME_WINDOW,
@@ -238,6 +242,7 @@ const buildOperatorExecutionPlan = (
     );
     return {
       requiredOutputBounds,
+      generatorOutputBounds,
       requiredInputRoi,
       requiredSourceRoi: device.params.sourceKind === 'tiles'
         ? NONE_REQUIREMENT
@@ -252,6 +257,7 @@ const buildOperatorExecutionPlan = (
   if (device.kind === 'reverse') {
     return {
       requiredOutputBounds,
+      generatorOutputBounds,
       requiredInputRoi: mergeTargetedInputRoi(device.groupId, requiredOutputBounds, requiredOutputBounds),
       requiredSourceRoi: NONE_REQUIREMENT,
       requiredFrameWindow: ALL_TIME_WINDOW,
@@ -262,6 +268,7 @@ const buildOperatorExecutionPlan = (
   if (device.kind === 'trim') {
     return {
       requiredOutputBounds,
+      generatorOutputBounds,
       requiredInputRoi: mergeTargetedInputRoi(device.groupId, requiredOutputBounds, requiredOutputBounds),
       requiredSourceRoi: NONE_REQUIREMENT,
       requiredFrameWindow: ALL_TIME_WINDOW,
@@ -272,6 +279,7 @@ const buildOperatorExecutionPlan = (
   if (device.kind === 'stretch') {
     return {
       requiredOutputBounds,
+      generatorOutputBounds,
       requiredInputRoi: mergeTargetedInputRoi(device.groupId, requiredOutputBounds, requiredOutputBounds),
       requiredSourceRoi: NONE_REQUIREMENT,
       requiredFrameWindow: ALL_TIME_WINDOW,
@@ -282,6 +290,7 @@ const buildOperatorExecutionPlan = (
   if (device.kind === 'timewarp') {
     return {
       requiredOutputBounds,
+      generatorOutputBounds,
       requiredInputRoi: mergeTargetedInputRoi(device.groupId, requiredOutputBounds, requiredOutputBounds),
       requiredSourceRoi: NONE_REQUIREMENT,
       requiredFrameWindow: ALL_TIME_WINDOW,
@@ -299,6 +308,7 @@ const buildOperatorExecutionPlan = (
     const spatialInputRoi = buildSpatialInputRoi(device, requiredOutputBounds);
     return {
       requiredOutputBounds,
+      generatorOutputBounds,
       requiredInputRoi: mergeTargetedInputRoi(
         device.groupId,
         requiredOutputBounds,
@@ -312,6 +322,7 @@ const buildOperatorExecutionPlan = (
 
   return {
     requiredOutputBounds,
+    generatorOutputBounds,
     requiredInputRoi: requiredOutputBounds,
     requiredSourceRoi: NONE_REQUIREMENT,
     requiredFrameWindow: ALL_TIME_WINDOW,
@@ -337,6 +348,7 @@ export const buildCanonicalExecutionPlan = (
       device,
       currentRequiredOutputBounds,
       currentRequiredFrameWindow,
+      executionRequest.outputBounds,
     );
     byDeviceId.set(device.id, devicePlan);
 

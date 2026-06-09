@@ -125,6 +125,7 @@ const TIMELINE_WINDOW_EPSILON = 1e-9;
 const FULL_EXECUTION_BOUNDS: SpatialRequirement = 'all';
 const EMPTY_EXECUTION_PLAN: OperatorExecutionPlan = Object.freeze({
   requiredOutputBounds: FULL_EXECUTION_BOUNDS,
+  generatorOutputBounds: FULL_EXECUTION_BOUNDS,
   requiredInputRoi: FULL_EXECUTION_BOUNDS,
   requiredSourceRoi: 'none',
   requiredFrameWindow: 'all',
@@ -2063,7 +2064,7 @@ const applyGeneratorDevice = (
         nextTimeline.sampleStepBeats,
       ) as GeneratorNode,
       deviceIndex,
-      executionPlan.requiredOutputBounds,
+      executionPlan.generatorOutputBounds,
     );
   }
 
@@ -2099,21 +2100,16 @@ const applyCompiledRackStage = (
   mutedGeneratorIds: ReadonlySet<string>,
 ): MutableGenerationState => {
   if (isGeneratorStage(stage)) {
-    return sealStageWithTemporalInvariant(
-      applyGeneratorDevice(
-        materializePendingTemporalState(
-          state,
-          outputAdapter,
-          mutedGroupIds,
-          mutedGeneratorIds,
-        ),
-        stage,
-        modulationContext,
-        executionPlanByDeviceId,
+    return applyGeneratorDevice(
+      materializePendingTemporalState(
+        state,
         outputAdapter,
         mutedGroupIds,
         mutedGeneratorIds,
       ),
+      stage,
+      modulationContext,
+      executionPlanByDeviceId,
       outputAdapter,
       mutedGroupIds,
       mutedGeneratorIds,
@@ -2134,23 +2130,18 @@ const applyCompiledRackStage = (
     );
   }
 
-  return sealStageWithTemporalInvariant(
-    applyEffectDevice(
-      materializePendingTemporalState(
-        state,
-        outputAdapter,
-        mutedGroupIds,
-        mutedGeneratorIds,
-      ),
-      compiledPlan.baseChain,
-      stage,
+  return applyEffectDevice(
+    materializePendingTemporalState(
+      state,
       outputAdapter,
-      modulationContext,
-      executionPlanByDeviceId,
       mutedGroupIds,
       mutedGeneratorIds,
     ),
+    compiledPlan.baseChain,
+    stage,
     outputAdapter,
+    modulationContext,
+    executionPlanByDeviceId,
     mutedGroupIds,
     mutedGeneratorIds,
   );

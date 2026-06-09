@@ -33,6 +33,7 @@ export interface CanonicalExecutionRequest {
 
 export interface OperatorExecutionPlan {
   requiredOutputBounds: SpatialRequirement;
+  generatorOutputBounds: SpatialRequirement;
   requiredInputRoi: SpatialRequirement;
   requiredSourceRoi: SpatialRequirement;
   requiredFrameWindow: BeatRange | 'all';
