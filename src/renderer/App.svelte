@@ -271,12 +271,28 @@
     const disposeMainWindowCloseRequest = bridgeClient.subscribeMainWindowCloseRequest(() => {
       void presetController.handleMainWindowCloseRequest();
     });
+    const disposeMainWindowRackFileMenuRequest = bridgeClient.subscribeMainWindowRackFileMenuRequest(
+      (action) => {
+        if (action === 'new') {
+          void presetController.handleNewRack();
+          return;
+        }
+
+        if (action === 'save') {
+          void presetController.handleSaveRack();
+          return;
+        }
+
+        void presetController.handleSaveRackAs();
+      },
+    );
 
     settingsController.initialize();
     playbackSession.renderPreviewFrame();
     editorSession.scheduleAutoPreview(0);
 
     return () => {
+      disposeMainWindowRackFileMenuRequest();
       disposeMainWindowCloseRequest();
       disposeKeyboardShortcuts();
       disposeBridgeSubscriptions();

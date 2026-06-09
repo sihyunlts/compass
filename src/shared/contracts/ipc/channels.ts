@@ -10,6 +10,7 @@ export const IPC_CHANNELS = {
   requestPreviewWindowVisibility: 'preview:request-window-visibility',
   previewWindowVisibilityUpdate: 'preview:window-visibility-update',
   mainWindowCloseRequest: 'app:main-window-close-request',
+  mainWindowRackFileMenuRequest: 'app:main-window-rack-file-menu-request',
   confirmMainWindowClose: 'app:confirm-main-window-close',
   pushMainWindowDocumentState: 'app:push-main-window-document-state',
   openExternal: 'bridge:open-external',

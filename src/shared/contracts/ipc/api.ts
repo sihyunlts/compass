@@ -30,6 +30,8 @@ export interface MainWindowDocumentState {
   filePath: string | null;
 }
 
+export type RackFileMenuAction = 'new' | 'save' | 'save-as';
+
 export interface CompassApi {
   generateAndSend: (
     request: GenerateAndSendRequest,
@@ -48,6 +50,9 @@ export interface CompassApi {
   ) => () => void;
   subscribeMainWindowCloseRequest: (
     listener: () => void,
+  ) => () => void;
+  subscribeMainWindowRackFileMenuRequest: (
+    listener: (action: RackFileMenuAction) => void,
   ) => () => void;
   confirmMainWindowClose: () => Promise<void>;
   pushMainWindowDocumentState: (state: MainWindowDocumentState) => void;

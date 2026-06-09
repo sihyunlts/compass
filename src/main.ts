@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 
 import { createMainWindow } from './main/app-window';
+import { installApplicationMenu } from './main/application-menu';
 import { LiveTempoListener } from './main/bridge/live-tempo-listener';
 import { registerIpcHandlers } from './main/ipc/handlers';
 import { GeneratorService } from './main/services/generator-service';
@@ -35,6 +36,8 @@ if (devUserDataPath) {
 }
 
 app.whenReady().then(() => {
+  installApplicationMenu();
+
   liveTempoListener.start((update) => {
     sendToAllWindows(IPC_CHANNELS.liveTempoUpdate, update);
   });

@@ -17,7 +17,11 @@ import type {
   ShowPresetsRootInFolderResponse,
 } from './shared/contracts/ipc/presets';
 import type { PreviewWindowState } from './shared/contracts/preview/window-state';
-import type { CompassApi, MainWindowDocumentState } from './shared/contracts/ipc/api';
+import type {
+  CompassApi,
+  MainWindowDocumentState,
+  RackFileMenuAction,
+} from './shared/contracts/ipc/api';
 import type { LiveTempoUpdate } from './shared/bridge/types';
 
 interface ListenerSet<T> {
@@ -51,6 +55,7 @@ const liveTempoListeners = createListenerSet<LiveTempoUpdate>();
 const previewWindowStateListeners = createListenerSet<PreviewWindowState>();
 const previewWindowVisibilityListeners = createListenerSet<boolean>();
 const mainWindowCloseRequestListeners = createListenerSet<void>();
+const mainWindowRackFileMenuRequestListeners = createListenerSet<RackFileMenuAction>();
 
 ipcRenderer.on(IPC_CHANNELS.liveTempoUpdate, (_event, payload: LiveTempoUpdate) => {
   liveTempoListeners.emit(payload);
@@ -74,6 +79,15 @@ ipcRenderer.on(IPC_CHANNELS.mainWindowCloseRequest, () => {
   mainWindowCloseRequestListeners.emit();
 });
 
+ipcRenderer.on(
+  IPC_CHANNELS.mainWindowRackFileMenuRequest,
+  (_event, action: RackFileMenuAction) => {
+    if (action === 'new' || action === 'save' || action === 'save-as') {
+      mainWindowRackFileMenuRequestListeners.emit(action);
+    }
+  },
+);
+
 const api: CompassApi = {
   generateAndSend: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.generateAndSend, request),
@@ -96,6 +110,8 @@ const api: CompassApi = {
     previewWindowVisibilityListeners.subscribe(listener),
   subscribeMainWindowCloseRequest: (listener) =>
     mainWindowCloseRequestListeners.subscribe(listener),
+  subscribeMainWindowRackFileMenuRequest: (listener) =>
+    mainWindowRackFileMenuRequestListeners.subscribe(listener),
   confirmMainWindowClose: () =>
     ipcRenderer.invoke(IPC_CHANNELS.confirmMainWindowClose),
   pushMainWindowDocumentState: (state: MainWindowDocumentState) => {
