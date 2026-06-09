@@ -42,10 +42,13 @@ const collectTestFiles = (
 };
 
 run('npm', ['run', 'lint']);
-run(path.join(repoRoot, 'node_modules', '.bin', `tsx${binSuffix}`), [
-  '--test',
-  ...collectTestFiles(path.join(repoRoot, 'src')),
-]);
+const testFiles = collectTestFiles(path.join(repoRoot, 'src'));
+if (testFiles.length > 0) {
+  run(path.join(repoRoot, 'node_modules', '.bin', `tsx${binSuffix}`), [
+    '--test',
+    ...testFiles,
+  ]);
+}
 
 if (isFullRun) {
   run(path.join(repoRoot, 'node_modules', '.bin', `tsc${binSuffix}`), [
