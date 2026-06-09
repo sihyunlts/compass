@@ -602,7 +602,7 @@
         <Button
           class="browser-page-switch-button"
           variant="icon"
-          label="Presets"
+          label="Library"
           icon="inventory_2"
           pressed={activePage === 'presets'}
           onClick={() => onPageSelect('presets')}
@@ -641,14 +641,14 @@
           onOpenAboutSite={onOpenAboutSite}
         />
       {:else if activePage === 'presets' && isPresetLoading}
-        <p class="browser-status">Loading presets...</p>
+        <p class="browser-status">Loading library...</p>
       {:else if activePage === 'presets' && presetErrorText}
         <p class="browser-status browser-status-error">{presetErrorText}</p>
       {:else}
         <ul
           class="browser-tree-list browser-tree-root"
           role="tree"
-          aria-label={activePage === 'devices' ? 'Devices browser' : 'Presets browser'}
+          aria-label={activePage === 'devices' ? 'Devices browser' : 'Library browser'}
         >
           {#each visibleRows as row (row.node.id)}
             <li role="none" class:is-selected={selectedRowId === row.node.id}>
@@ -712,7 +712,7 @@
                     class="browser-tree-item-input"
                     type="text"
                     value={pendingPresetFolderDraft?.draftName ?? ''}
-                    aria-label="New preset folder name"
+                    aria-label="New library folder name"
                     onpointerdown={(event) => event.stopPropagation()}
                     onclick={(event) => event.stopPropagation()}
                     ondblclick={(event) => event.stopPropagation()}

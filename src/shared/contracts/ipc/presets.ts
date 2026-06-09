@@ -1,5 +1,5 @@
 import type { GeneratorDeviceNode } from '../../model';
-import type { PresetFile, PresetFileKind } from '../../presets';
+import type { PresetFile, PresetFileKind, RackPresetFile } from '../../presets';
 
 type RendererDeviceKind = GeneratorDeviceNode['kind'];
 
@@ -20,6 +20,22 @@ export type SavePresetFileResponse =
     }
   | {
       status: 'canceled';
+    }
+  | {
+      status: 'error';
+      message: string;
+      filePath?: string;
+    };
+
+export interface SaveRackFileRequest {
+  filePath: string;
+  payload: RackPresetFile;
+}
+
+export type SaveRackFileResponse =
+  | {
+      status: 'saved';
+      filePath: string;
     }
   | {
       status: 'error';
@@ -138,7 +154,6 @@ export type ReadPresetEntryResponse<K extends PresetFileKind = PresetFileKind> =
       status: 'loaded';
       filePath: string;
       payload: PresetFileByKind<K>;
-      warning?: string;
     }
   | {
       status: 'error';

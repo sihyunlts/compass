@@ -5,6 +5,7 @@ import { IPC_CHANNELS } from '../shared/contracts/ipc/channels';
 
 let mainWindowRef: BrowserWindow | null = null;
 let previewWindowRef: BrowserWindow | null = null;
+let mainWindowCloseConfirmed = false;
 const WINDOW_BACKGROUND_COLOR = '#0d0e0f';
 const PRELOAD_ENTRY_PATH = path.join(__dirname, 'preload.js');
 const MAIN_RENDERER_FILE_PATH = path.join(
@@ -81,7 +82,17 @@ export const createMainWindow = (): BrowserWindow => {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
+  mainWindow.on('close', (event) => {
+    if (mainWindowCloseConfirmed) {
+      return;
+    }
+
+    event.preventDefault();
+    mainWindow.webContents.send(IPC_CHANNELS.mainWindowCloseRequest);
+  });
+
   mainWindow.on('closed', () => {
+    mainWindowCloseConfirmed = false;
     mainWindowRef = null;
     if (previewWindowRef && !previewWindowRef.isDestroyed()) {
       previewWindowRef.close();
@@ -154,6 +165,33 @@ export const getPreviewWindow = (): BrowserWindow | null =>
 /** Returns the main window only while the current reference is still alive. */
 export const getMainWindow = (): BrowserWindow | null =>
   mainWindowRef && !mainWindowRef.isDestroyed() ? mainWindowRef : null;
+
+export const confirmMainWindowClose = (): void => {
+  const mainWindow = getMainWindow();
+  if (!mainWindow) {
+    return;
+  }
+
+  mainWindowCloseConfirmed = true;
+  mainWindow.close();
+};
+
+export const updateMainWindowDocumentState = (
+  state: {
+    edited: boolean;
+    filePath: string | null;
+  },
+): void => {
+  const mainWindow = getMainWindow();
+  if (!mainWindow) {
+    return;
+  }
+
+  mainWindow.setDocumentEdited(state.edited);
+  if (process.platform === 'darwin') {
+    mainWindow.setRepresentedFilename(state.filePath ?? '');
+  }
+};
 
 /** Returns true only while a live preview popout window reference exists. */
 export const isPreviewWindowOpen = (): boolean =>

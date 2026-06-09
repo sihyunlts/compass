@@ -10,6 +10,8 @@ import type {
   ReadPresetEntryResponse,
   RenamePresetFolderRequest,
   RenamePresetFolderResponse,
+  SaveRackFileRequest,
+  SaveRackFileResponse,
   SavePresetFileRequest,
   SavePresetFileResponse,
   ShowPresetEntryInFolderRequest,
@@ -22,6 +24,11 @@ import type {
   GenerateAndSendResponse,
   RequestLiveTempoResponse,
 } from './generator';
+
+export interface MainWindowDocumentState {
+  edited: boolean;
+  filePath: string | null;
+}
 
 export interface CompassApi {
   generateAndSend: (
@@ -39,6 +46,11 @@ export interface CompassApi {
   subscribePreviewWindowVisibility: (
     listener: (isOpen: boolean) => void,
   ) => () => void;
+  subscribeMainWindowCloseRequest: (
+    listener: () => void,
+  ) => () => void;
+  confirmMainWindowClose: () => Promise<void>;
+  pushMainWindowDocumentState: (state: MainWindowDocumentState) => void;
   subscribeLiveTempo: (
     listener: (update: LiveTempoUpdate) => void,
   ) => () => void;
@@ -46,6 +58,9 @@ export interface CompassApi {
   savePresetFile: (
     request: SavePresetFileRequest,
   ) => Promise<SavePresetFileResponse>;
+  saveRackFile: (
+    request: SaveRackFileRequest,
+  ) => Promise<SaveRackFileResponse>;
   createPresetFolder: (
     request: CreatePresetFolderRequest,
   ) => Promise<CreatePresetFolderResponse>;

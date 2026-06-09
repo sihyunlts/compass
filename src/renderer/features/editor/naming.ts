@@ -1,26 +1,7 @@
-import {
-  normalizeCustomName,
-  normalizeRackName,
-} from '../../../shared/model/naming';
+import { normalizeCustomName } from '../../../shared/model/naming';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import type { GeneratorChain } from '../../../shared/model';
 import { reconcileGroupStateById, withDevices } from './chain-ops';
-
-export const renameRack = (
-  chain: GeneratorChain,
-  rawName: string,
-): GeneratorChain | null => {
-  const currentName = normalizeRackName(chain.name);
-  const nextName = normalizeRackName(rawName);
-  if (currentName === nextName) {
-    return null;
-  }
-
-  return {
-    ...chain,
-    name: nextName,
-  };
-};
 
 export const renameDeviceById = (
   chain: GeneratorChain,

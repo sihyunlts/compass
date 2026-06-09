@@ -5,10 +5,6 @@ import {
 } from '../../../shared/model';
 import { clamp } from '../../../shared/math';
 import {
-  formatInvalidHydratedDeviceWarning,
-  hydrateImportedGeneratorChain,
-} from '../../../shared/model/chain-normalization';
-import {
   DEFAULT_BRIDGE_SETTINGS,
   sanitizeBridgeSettings,
 } from '../../../shared/validation/bridge-settings';
@@ -31,11 +27,6 @@ const MIN_SIDEBAR_WIDTH_PX = 160;
 const MAX_SIDEBAR_WIDTH_PX = 240;
 const DEFAULT_LAUNCHPAD_MODEL: LaunchpadModel = 'mk3';
 
-export interface LoadedChainSettingsResult {
-  chain: GeneratorChain;
-  warning?: string;
-}
-
 const createDefaultChain = (): GeneratorChain => ({
   name: null,
   devices: createInitialChainDevices(),
@@ -47,21 +38,6 @@ const toBoolean = (value: unknown, fallback: boolean): boolean =>
 
 const toLaunchpadModel = (value: unknown): LaunchpadModel =>
   value === 'mk2' ? 'mk2' : DEFAULT_LAUNCHPAD_MODEL;
-
-const toCollapsedDeviceIds = (value: unknown): string[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  const unique = new Set<string>();
-  for (const item of value) {
-    if (typeof item === 'string' && item.trim()) {
-      unique.add(item.trim());
-    }
-  }
-
-  return [...unique];
-};
 
 /** Clamps preview BPM to the supported renderer range. */
 export const sanitizePreviewBpm = (value: unknown): number => {
@@ -94,40 +70,11 @@ export const saveBridgeSettings = (bridge: BridgeSettings): void => {
   });
 };
 
-/** Loads persisted chain state or returns defaults when stored data is malformed. */
-export const loadChainSettings = (): LoadedChainSettingsResult => {
-  const chain = readPersistedRendererState().chain;
-  const hydrated = hydrateImportedGeneratorChain(chain, {
-    mode: 'recover',
-  });
-  if (!hydrated) {
-    return {
-      chain: createDefaultChain(),
-    };
-  }
-
-  syncDeviceNodeIdSeeds(hydrated.chain.devices);
-  const warning = formatInvalidHydratedDeviceWarning(
-    hydrated.invalidDeviceCount,
-    'restoring the saved rack',
-  );
-  if (warning) {
-    writePersistedRendererState({
-      chain: hydrated.chain,
-    });
-  }
-
-  return {
-    chain: hydrated.chain,
-    warning,
-  };
-};
-
-/** Persists chain settings as provided by the renderer. */
-export const saveChainSettings = (chain: GeneratorChain): void => {
-  writePersistedRendererState({
-    chain,
-  });
+/** Creates the default rack shown when the app starts. */
+export const createDefaultChainSettings = (): GeneratorChain => {
+  const chain = createDefaultChain();
+  syncDeviceNodeIdSeeds(chain.devices);
+  return chain;
 };
 
 /** Loads preview BPM and clamps it to the supported renderer range. */
@@ -165,19 +112,6 @@ export const saveSidebarWidth = (width: number): void => {
   writePersistedRendererState({
     ui: {
       sidebarWidthPx: sanitizeSidebarWidth(width),
-    },
-  });
-};
-
-/** Loads collapsed device IDs after trimming, deduplicating, and dropping empties. */
-export const loadCollapsedDeviceIds = (): string[] =>
-  toCollapsedDeviceIds(readPersistedRendererState().ui?.collapsedDeviceIds);
-
-/** Persists collapsed device IDs after trimming and deduplicating. */
-export const saveCollapsedDeviceIds = (ids: readonly string[]): void => {
-  writePersistedRendererState({
-    ui: {
-      collapsedDeviceIds: toCollapsedDeviceIds(ids),
     },
   });
 };

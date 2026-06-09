@@ -6,20 +6,20 @@ export const PRESET_FILE_SPECS = {
   device: {
     directory: 'Devices',
     extension: '.compassdevice',
-    filterName: 'Compass Device Presets',
-    defaultName: 'Device Preset',
+    filterName: 'Compass Devices',
+    defaultName: 'Device',
   },
   group: {
     directory: 'Groups',
     extension: '.compassgroup',
-    filterName: 'Compass Group Presets',
-    defaultName: 'Group Preset',
+    filterName: 'Compass Groups',
+    defaultName: 'Group',
   },
   rack: {
     directory: 'Racks',
     extension: '.compassrack',
-    filterName: 'Compass Rack Presets',
-    defaultName: 'Rack Preset',
+    filterName: 'Compass Racks',
+    defaultName: 'Rack',
   },
 } as const satisfies Record<
   PresetFileKind,

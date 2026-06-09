@@ -83,13 +83,13 @@ export class PresetStorage {
     const rootDirectory = await this.resolvePresetDirectory(presetType);
     const parentDirectory = resolvePresetPath(rootDirectory, parentRelativePath);
     if (!parentDirectory) {
-      throw new Error('Invalid preset folder path.');
+      throw new Error('Invalid library folder path.');
     }
 
     const relativePath = [...parentRelativePath, normalizedFolderName];
     const directoryPath = resolvePresetPath(rootDirectory, relativePath);
     if (!directoryPath) {
-      throw new Error('Invalid preset folder path.');
+      throw new Error('Invalid library folder path.');
     }
 
     try {
@@ -97,10 +97,10 @@ export class PresetStorage {
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
       if (code === 'EEXIST') {
-        throw new Error('A preset or folder with that name already exists.', { cause: error });
+        throw new Error('An item or folder with that name already exists.', { cause: error });
       }
       if (code === 'ENOENT' || code === 'ENOTDIR') {
-        throw new Error('Parent preset folder does not exist.', { cause: error });
+        throw new Error('Parent folder does not exist.', { cause: error });
       }
 
       throw error;
@@ -115,7 +115,7 @@ export class PresetStorage {
     folderName: string,
   ): Promise<string[]> {
     if (relativePath.length === 0) {
-      throw new Error('Preset root folders cannot be renamed.');
+      throw new Error('Library root folders cannot be renamed.');
     }
 
     const normalizedFolderName = normalizePresetPathSegment(folderName);
@@ -126,7 +126,7 @@ export class PresetStorage {
     const rootDirectory = await this.resolvePresetDirectory(presetType);
     const sourceDirectory = resolvePresetPath(rootDirectory, relativePath);
     if (!sourceDirectory) {
-      throw new Error('Invalid preset folder path.');
+      throw new Error('Invalid library folder path.');
     }
 
     const parentRelativePath = relativePath.slice(0, -1);
@@ -137,15 +137,15 @@ export class PresetStorage {
 
     const targetDirectory = resolvePresetPath(rootDirectory, nextRelativePath);
     if (!targetDirectory) {
-      throw new Error('Invalid preset folder path.');
+      throw new Error('Invalid library folder path.');
     }
 
     try {
       await access(targetDirectory);
-      throw new Error('A preset or folder with that name already exists.');
+      throw new Error('An item or folder with that name already exists.');
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        if (error instanceof Error && error.message === 'A preset or folder with that name already exists.') {
+        if (error instanceof Error && error.message === 'An item or folder with that name already exists.') {
           throw error;
         }
         throw error;
@@ -157,10 +157,10 @@ export class PresetStorage {
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
       if (code === 'EEXIST') {
-        throw new Error('A preset or folder with that name already exists.', { cause: error });
+        throw new Error('An item or folder with that name already exists.', { cause: error });
       }
       if (code === 'ENOENT' || code === 'ENOTDIR') {
-        throw new Error('Preset folder does not exist.', { cause: error });
+        throw new Error('Folder does not exist.', { cause: error });
       }
 
       throw error;
@@ -198,7 +198,6 @@ export class PresetStorage {
       const text = await readFile(filePath, 'utf8');
       const parsed = parsePresetFileText(text, {
         fileName: filePath,
-        mode: 'recover',
       });
       if (parsed.ok === false) {
         return {
@@ -210,7 +209,7 @@ export class PresetStorage {
       if (parsed.preset.presetType !== presetType) {
         return {
           status: 'error',
-          message: `Expected a ${presetType} preset file.`,
+          message: `Expected a ${presetType} file.`,
           filePath,
         };
       }
@@ -219,14 +218,13 @@ export class PresetStorage {
         status: 'loaded',
         filePath,
         payload: parsed.preset as Extract<PresetFile, { presetType: K }>,
-        warning: parsed.warning,
       };
     } catch (error) {
       return {
         status: 'error',
         message: error instanceof Error && error.message.trim()
           ? error.message.trim()
-          : 'Failed to read preset file.',
+          : 'Failed to read file.',
         filePath,
       };
     }

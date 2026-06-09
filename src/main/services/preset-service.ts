@@ -6,6 +6,7 @@ import type {
   ListPresetBrowserTreeResponse,
   ReadPresetEntryResponse,
   RenamePresetFolderResponse,
+  SaveRackFileResponse,
   SavePresetFileResponse,
   ShowPresetEntryInFolderResponse,
   ShowPresetsRootInFolderResponse,
@@ -21,6 +22,7 @@ import {
   parseCreatePresetFolderRequest,
   parsePresetEntryRequest,
   parseReadPresetEntryRequest,
+  parseSaveRackFileRequest,
   parseRenamePresetFolderRequest,
   parseSavePresetFileRequest,
 } from './presets/preset-requests';
@@ -50,7 +52,7 @@ export class PresetService {
     if (!parsedRequest) {
       return {
         status: 'error',
-        message: 'Invalid preset save request.',
+        message: 'Invalid save request.',
       };
     }
 
@@ -75,7 +77,41 @@ export class PresetService {
     } catch (error) {
       return {
         status: 'error',
-        message: toErrorMessage(error, 'Failed to save preset file.'),
+        message: toErrorMessage(error, 'Failed to save file.'),
+      };
+    }
+  }
+
+  public async saveRackFile(
+    request: unknown,
+  ): Promise<SaveRackFileResponse> {
+    const parsedRequest = parseSaveRackFileRequest(request);
+    if (!parsedRequest) {
+      return {
+        status: 'error',
+        message: 'Invalid rack save request.',
+      };
+    }
+
+    if (!hasPresetExtension(parsedRequest.filePath, PRESET_FILE_SPECS.rack.extension)) {
+      return {
+        status: 'error',
+        message: 'Unsupported rack file extension.',
+        filePath: parsedRequest.filePath,
+      };
+    }
+
+    try {
+      await this.storage.writePresetFile(parsedRequest.filePath, parsedRequest.payload);
+      return {
+        status: 'saved',
+        filePath: parsedRequest.filePath,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to save rack file.'),
+        filePath: parsedRequest.filePath,
       };
     }
   }
@@ -89,7 +125,7 @@ export class PresetService {
     } catch (error) {
       return {
         status: 'error',
-        message: toErrorMessage(error, 'Failed to list preset browser tree.'),
+        message: toErrorMessage(error, 'Failed to list library.'),
       };
     }
   }
@@ -101,7 +137,7 @@ export class PresetService {
     if (!parsedRequest) {
       return {
         status: 'error',
-        message: 'Invalid preset folder request.',
+        message: 'Invalid folder request.',
       };
     }
 
@@ -117,7 +153,7 @@ export class PresetService {
     } catch (error) {
       return {
         status: 'error',
-        message: toErrorMessage(error, 'Failed to create preset folder.'),
+        message: toErrorMessage(error, 'Failed to create folder.'),
       };
     }
   }
@@ -129,7 +165,7 @@ export class PresetService {
     if (!parsedRequest) {
       return {
         status: 'error',
-        message: 'Invalid preset folder request.',
+        message: 'Invalid folder request.',
       };
     }
 
@@ -145,7 +181,7 @@ export class PresetService {
     } catch (error) {
       return {
         status: 'error',
-        message: toErrorMessage(error, 'Failed to rename preset folder.'),
+        message: toErrorMessage(error, 'Failed to rename folder.'),
       };
     }
   }
@@ -157,7 +193,7 @@ export class PresetService {
     if (!parsedRequest) {
       return {
         status: 'error',
-        message: 'Invalid preset read request.',
+        message: 'Invalid file read request.',
       };
     }
 
@@ -166,14 +202,14 @@ export class PresetService {
     if (!filePath) {
       return {
         status: 'error',
-        message: 'Invalid preset file path.',
+        message: 'Invalid file path.',
       };
     }
 
     if (!hasPresetExtension(filePath, PRESET_FILE_SPECS[parsedRequest.presetType].extension)) {
       return {
         status: 'error',
-        message: 'Unsupported preset file extension.',
+        message: 'Unsupported file extension.',
         filePath,
       };
     }
@@ -188,7 +224,7 @@ export class PresetService {
     if (!parsedRequest) {
       return {
         status: 'error',
-        message: 'Invalid preset entry request.',
+        message: 'Invalid library item request.',
       };
     }
 
@@ -198,7 +234,7 @@ export class PresetService {
       if (!filePath) {
         return {
           status: 'error',
-          message: 'Invalid preset file path.',
+          message: 'Invalid file path.',
         };
       }
 
@@ -208,7 +244,7 @@ export class PresetService {
       ) {
         return {
           status: 'error',
-          message: 'Invalid preset file type.',
+          message: 'Invalid file type.',
         };
       }
 
@@ -229,7 +265,7 @@ export class PresetService {
     } catch (error) {
       return {
         status: 'error',
-        message: toErrorMessage(error, 'Failed to reveal preset file.'),
+        message: toErrorMessage(error, 'Failed to reveal file.'),
       };
     }
   }
@@ -249,7 +285,7 @@ export class PresetService {
     } catch (error) {
       return {
         status: 'error',
-        message: toErrorMessage(error, 'Failed to reveal presets folder.'),
+        message: toErrorMessage(error, 'Failed to reveal library folder.'),
       };
     }
   }
@@ -261,7 +297,7 @@ export class PresetService {
     if (!parsedRequest) {
       return {
         status: 'error',
-        message: 'Invalid preset entry request.',
+        message: 'Invalid library item request.',
       };
     }
 
@@ -271,7 +307,7 @@ export class PresetService {
       if (!filePath) {
         return {
           status: 'error',
-          message: 'Invalid preset file path.',
+          message: 'Invalid file path.',
         };
       }
 
@@ -281,7 +317,7 @@ export class PresetService {
       ) {
         return {
           status: 'error',
-          message: 'Invalid preset file type.',
+          message: 'Invalid file type.',
         };
       }
 
@@ -291,7 +327,7 @@ export class PresetService {
     } catch (error) {
       return {
         status: 'error',
-        message: toErrorMessage(error, 'Failed to delete preset entry.'),
+        message: toErrorMessage(error, 'Failed to delete library item.'),
       };
     }
   }

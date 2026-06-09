@@ -54,6 +54,6 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('will-quit', () => {
   liveTempoListener.stop();
 });

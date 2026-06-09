@@ -3,11 +3,14 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { IPC_CHANNELS } from '../../shared/contracts/ipc/channels';
 import type { PreviewWindowState } from '../../shared/contracts/preview/window-state';
 import type { GenerateAndSendRequest } from '../../shared/contracts/ipc/generator';
+import type { MainWindowDocumentState } from '../../shared/contracts/ipc/api';
 import {
   getMainWindow,
   getPreviewWindow,
+  confirmMainWindowClose,
   isPreviewWindowOpen,
   openPreviewWindow,
+  updateMainWindowDocumentState,
 } from '../app-window';
 import { GeneratorService } from '../services/generator-service';
 import { PresetService } from '../services/preset-service';
@@ -15,6 +18,25 @@ import { PresetService } from '../services/preset-service';
 let latestPreviewWindowState: PreviewWindowState | null = null;
 
 const resolveDialogParentWindow = () => getMainWindow() ?? BrowserWindow.getFocusedWindow() ?? undefined;
+
+const parseMainWindowDocumentState = (
+  value: unknown,
+): MainWindowDocumentState | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const edited = (value as { edited?: unknown }).edited;
+  const filePath = (value as { filePath?: unknown }).filePath;
+  if (typeof edited !== 'boolean' || (filePath !== null && typeof filePath !== 'string')) {
+    return null;
+  }
+
+  return {
+    edited,
+    filePath,
+  };
+};
 
 /** Registers Electron IPC handlers for main-only responsibilities. */
 export const registerIpcHandlers = (
@@ -69,6 +91,23 @@ export const registerIpcHandlers = (
     () => isPreviewWindowOpen(),
   );
 
+  ipcMain.handle(
+    IPC_CHANNELS.confirmMainWindowClose,
+    () => confirmMainWindowClose(),
+  );
+
+  ipcMain.on(
+    IPC_CHANNELS.pushMainWindowDocumentState,
+    (_event, state) => {
+      const parsedState = parseMainWindowDocumentState(state);
+      if (!parsedState) {
+        return;
+      }
+
+      updateMainWindowDocumentState(parsedState);
+    },
+  );
+
   ipcMain.on(
     IPC_CHANNELS.pushPreviewWindowState,
     (_event, state: PreviewWindowState) => {
@@ -90,6 +129,12 @@ export const registerIpcHandlers = (
     IPC_CHANNELS.savePresetFile,
     (_event, request) =>
       presetService.savePresetFile(request, resolveDialogParentWindow()),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.saveRackFile,
+    (_event, request) =>
+      presetService.saveRackFile(request),
   );
 
   ipcMain.handle(

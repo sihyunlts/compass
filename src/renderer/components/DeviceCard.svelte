@@ -127,8 +127,8 @@
         <button
           class="preset-save-button"
           type="button"
-          aria-label={`Save preset for ${title}`}
-          title={`Save preset for ${title}`}
+          aria-label={`Save ${title}`}
+          title={`Save ${title}`}
           onpointerdown={handleSavePresetPointerDown}
           onclick={handleSavePresetClick}
           oncontextmenu={handleSavePresetContextMenu}

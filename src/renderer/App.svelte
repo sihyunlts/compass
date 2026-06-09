@@ -133,6 +133,14 @@
     return clamp(currentPreviewBeatBeats / sourceTimelineEndBeat, 0, 1);
   });
 
+  $effect(() => {
+    void uiState.chainRevision;
+    void uiState.collapsedDeviceIds;
+    void presetState.currentRackFilePath;
+    void presetState.isRackDirty;
+    presetController.syncMainWindowDocumentState();
+  });
+
   const createRackBinding = (): EditorRackBinding | null => {
     if (!rackViewApi) {
       return null;
@@ -257,12 +265,16 @@
       closeContextMenu,
       onBeforeUnload: disposeBridgeSubscriptions,
     });
+    const disposeMainWindowCloseRequest = bridgeClient.subscribeMainWindowCloseRequest(() => {
+      void presetController.handleMainWindowCloseRequest();
+    });
 
     settingsController.initialize();
     playbackSession.renderPreviewFrame();
     editorSession.scheduleAutoPreview(0);
 
     return () => {
+      disposeMainWindowCloseRequest();
       disposeKeyboardShortcuts();
       disposeBridgeSubscriptions();
       sendFlow.dispose();
@@ -346,15 +358,26 @@
           />
 
           <WorkspaceRackTitle
-            name={uiState.chainState.name ?? null}
-            onCommit={(rawName) => editorSession.commands.renameRack(rawName)}
+            title={presetState.currentRackDisplayName}
+            dirty={presetState.isRackDirty}
           />
           <Button
-            id="rack-preset-save"
+            id="rack-save-button"
             text="Save"
-            title="Save the current rack state."
-            label="Save rack preset"
-            onClick={() => presetController.handleSaveRackPreset()}
+            disabled={presetState.isRackPresetLoadPending}
+            title={presetState.currentRackFilePath
+              ? 'Save the current rack.'
+              : 'Save the current rack as a file.'}
+            label="Save rack"
+            onClick={() => presetController.handleSaveRack()}
+          />
+          <Button
+            id="rack-save-as-button"
+            text="Save As"
+            disabled={presetState.isRackPresetLoadPending}
+            title="Save the current rack as..."
+            label="Save rack as"
+            onClick={() => presetController.handleSaveRackAs()}
           />
 
           <span
@@ -487,13 +510,15 @@
 
   <ModalDialog
     open={presetState.pendingRackPresetLoadTarget !== null}
-    title="Load rack preset?"
+    title="Save current rack?"
     description={presetState.pendingRackPresetLoadTarget
       ? presetController.getRackPresetLoadDescription(presetState.pendingRackPresetLoadTarget)
       : null}
-    confirmLabel="Load"
+    confirmLabel="Save"
+    secondaryLabel="Don't Save"
     cancelLabel="Cancel"
     busy={presetState.isRackPresetLoadPending}
-    onConfirm={() => presetController.confirmRackPresetLoad()}
+    onConfirm={() => presetController.confirmRackSaveBeforeLoad()}
+    onSecondary={() => presetController.confirmRackDiscardBeforeLoad()}
     onCancel={() => presetController.closeRackPresetLoadDialog()}
   />

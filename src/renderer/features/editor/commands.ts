@@ -36,13 +36,12 @@ export const EDITOR_HISTORY_META = {
   groupToggleEnabled: { kind: 'group-toggle-enabled', label: 'Toggle group enabled' },
   renameDevice: { kind: 'rename-device', label: 'Rename device' },
   renameGroup: { kind: 'rename-group', label: 'Rename group' },
-  renameRack: { kind: 'rename-rack', label: 'Rename rack' },
   clipboardCut: { kind: 'clipboard-cut', label: 'Cut selection' },
   clipboardPaste: { kind: 'clipboard-paste', label: 'Paste selection' },
   duplicate: { kind: 'duplicate', label: 'Duplicate selection' },
-  insertDevicePreset: { kind: 'insert-device-preset', label: 'Insert device preset' },
-  insertGroupPreset: { kind: 'insert-group-preset', label: 'Insert group preset' },
-  loadRackPreset: { kind: 'load-rack-preset', label: 'Load rack preset' },
+  insertDevicePreset: { kind: 'insert-device-preset', label: 'Insert device' },
+  insertGroupPreset: { kind: 'insert-group-preset', label: 'Insert group' },
+  loadRackPreset: { kind: 'load-rack-preset', label: 'Load rack' },
 } as const satisfies Record<string, ChainMutationMeta>;
 
 const allocateDeviceId = (kind: GeneratorDeviceNode['kind']): string =>

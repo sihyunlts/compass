@@ -360,8 +360,8 @@
                     <button
                       class="preset-save-button"
                       type="button"
-                      aria-label={`Save preset for ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
-                      title={`Save preset for ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
+                      aria-label={`Save ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
+                      title={`Save ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
                       onpointerdown={(event) => controller.handleGroupSavePointerDown(event)}
                       onclick={(event) => controller.handleGroupSaveClick(event, col.groupId)}
                       oncontextmenu={(event) => controller.handleGroupSaveContextMenu(event)}

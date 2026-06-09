@@ -4,11 +4,9 @@ import {
   type GeneratorDeviceNode,
 } from './model';
 import {
-  formatInvalidHydratedDeviceWarning,
   hydrateImportedGeneratorChain,
   hydrateImportedGeneratorDevice,
   hydrateImportedGeneratorDevices,
-  type ImportedDataMode,
 } from './model/chain-normalization';
 
 export const PRESET_FILE_SCHEMA_VERSION = 1 as const;
@@ -55,7 +53,6 @@ export type ParsedPresetFileResult =
   | {
       ok: true;
       preset: PresetFile;
-      warning?: string;
     }
   | {
       ok: false;
@@ -121,7 +118,6 @@ const parsePresetFileHeader = (
 
 interface ParsedPresetPayload {
   preset: PresetFile;
-  warning?: string;
 }
 
 export const toStandaloneDevicePresetDevice = (
@@ -138,20 +134,7 @@ const parseDevicePresetPayload = (
     schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
     savedAtIso: string;
   },
-  options: {
-    allowStoredName: boolean;
-  } = {
-    allowStoredName: true,
-  },
 ): ParsedPresetPayload | null => {
-  if (
-    !options.allowStoredName
-    && isRecord(rawDevice)
-    && Object.hasOwn(rawDevice, 'name')
-  ) {
-    return null;
-  }
-
   const device = hydrateImportedGeneratorDevice(rawDevice);
   if (!device) {
     return null;
@@ -167,6 +150,20 @@ const parseDevicePresetPayload = (
   };
 };
 
+const parseStoredDevicePresetPayload = (
+  rawDevice: unknown,
+  header: {
+    schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
+    savedAtIso: string;
+  },
+): ParsedPresetPayload | null => {
+  if (isRecord(rawDevice) && Object.hasOwn(rawDevice, 'name')) {
+    return null;
+  }
+
+  return parseDevicePresetPayload(rawDevice, header);
+};
+
 const parseGroupPresetPayload = (
   rawGroup: unknown,
   rawUi: unknown,
@@ -174,33 +171,25 @@ const parseGroupPresetPayload = (
     schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
     savedAtIso: string;
   },
-  options: {
-    mode?: ImportedDataMode;
-    allowStoredName?: boolean;
-  } = {},
 ): ParsedPresetPayload | null => {
   const group = rawGroup;
   if (
     !isRecord(group)
     || typeof group.enabled !== 'boolean'
-    || (
-      (options.allowStoredName ?? true)
-        ? group.name !== undefined && group.name !== null && typeof group.name !== 'string'
-        : Object.hasOwn(group, 'name')
-    )
+    || group.name !== undefined && group.name !== null && typeof group.name !== 'string'
     || !Array.isArray(group.devices)
     || group.devices.length === 0
   ) {
     return null;
   }
 
-  const hydratedDevices = hydrateImportedGeneratorDevices(group.devices, options);
-  if (!hydratedDevices || hydratedDevices.devices.length === 0) {
+  const hydratedDevices = hydrateImportedGeneratorDevices(group.devices);
+  if (!hydratedDevices || hydratedDevices.length === 0) {
     return null;
   }
 
   const collapsedDeviceIds = sanitizeCollapsedDeviceIdsForDevices(
-    hydratedDevices.devices,
+    hydratedDevices,
     isRecord(rawUi) ? rawUi.collapsedDeviceIds : undefined,
   );
 
@@ -212,7 +201,7 @@ const parseGroupPresetPayload = (
       group: {
         enabled: group.enabled,
         name: typeof group.name === 'string' ? group.name : null,
-        devices: hydratedDevices.devices,
+        devices: hydratedDevices,
       },
       ...(collapsedDeviceIds.length > 0
         ? {
@@ -222,11 +211,22 @@ const parseGroupPresetPayload = (
           }
         : {}),
     },
-    warning: formatInvalidHydratedDeviceWarning(
-      hydratedDevices.invalidDeviceCount,
-      'importing preset',
-    ),
   };
+};
+
+const parseStoredGroupPresetPayload = (
+  rawGroup: unknown,
+  rawUi: unknown,
+  header: {
+    schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
+    savedAtIso: string;
+  },
+): ParsedPresetPayload | null => {
+  if (isRecord(rawGroup) && Object.hasOwn(rawGroup, 'name')) {
+    return null;
+  }
+
+  return parseGroupPresetPayload(rawGroup, rawUi, header);
 };
 
 const parseRackPresetPayload = (
@@ -236,21 +236,18 @@ const parseRackPresetPayload = (
     schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
     savedAtIso: string;
   },
-  options: {
-    mode?: ImportedDataMode;
-  } = {},
 ): ParsedPresetPayload | null => {
-  const hydratedChain = hydrateImportedGeneratorChain(rawChain, options);
+  const hydratedChain = hydrateImportedGeneratorChain(rawChain);
   const sourceDevices = (rawChain as { devices?: unknown } | undefined)?.devices;
   if (
     !hydratedChain
-    || (Array.isArray(sourceDevices) && sourceDevices.length > 0 && hydratedChain.chain.devices.length === 0)
+    || (Array.isArray(sourceDevices) && sourceDevices.length > 0 && hydratedChain.devices.length === 0)
   ) {
     return null;
   }
 
   const collapsedDeviceIds = sanitizeCollapsedDeviceIdsForChain(
-    hydratedChain.chain,
+    hydratedChain,
     isRecord(rawUi) ? rawUi.collapsedDeviceIds : undefined,
   );
 
@@ -259,7 +256,7 @@ const parseRackPresetPayload = (
       schemaVersion: header.schemaVersion,
       presetType: 'rack',
       savedAtIso: header.savedAtIso,
-      chain: hydratedChain.chain,
+      chain: hydratedChain,
       ...(collapsedDeviceIds.length > 0
         ? {
             ui: {
@@ -268,18 +265,11 @@ const parseRackPresetPayload = (
           }
         : {}),
     },
-    warning: formatInvalidHydratedDeviceWarning(
-      hydratedChain.invalidDeviceCount,
-      'importing preset',
-    ),
   };
 };
 
 export const parsePresetFile = (
   value: unknown,
-  options: {
-    mode?: ImportedDataMode;
-  } = {},
 ): ParsedPresetPayload | null => {
   const header = parsePresetFileHeader(value);
   if (!header) {
@@ -295,10 +285,6 @@ export const parsePresetFile = (
       (value as { group?: unknown }).group,
       (value as { ui?: unknown }).ui,
       header,
-      {
-        mode: options.mode,
-        allowStoredName: true,
-      },
     );
   }
 
@@ -306,17 +292,11 @@ export const parsePresetFile = (
     (value as { chain?: unknown }).chain,
     (value as { ui?: unknown }).ui,
     header,
-    {
-    mode: options.mode,
-    },
   );
 };
 
 const parseStoredPresetFile = (
   value: unknown,
-  options: {
-    mode?: ImportedDataMode;
-  } = {},
 ): ParsedPresetPayload | null => {
   const header = parsePresetFileHeader(value);
   if (!header) {
@@ -324,20 +304,14 @@ const parseStoredPresetFile = (
   }
 
   if (header.presetType === 'device') {
-    return parseDevicePresetPayload((value as { device?: unknown }).device, header, {
-      allowStoredName: false,
-    });
+    return parseStoredDevicePresetPayload((value as { device?: unknown }).device, header);
   }
 
   if (header.presetType === 'group') {
-    return parseGroupPresetPayload(
+    return parseStoredGroupPresetPayload(
       (value as { group?: unknown }).group,
       (value as { ui?: unknown }).ui,
       header,
-      {
-        mode: options.mode,
-        allowStoredName: false,
-      },
     );
   }
 
@@ -345,9 +319,6 @@ const parseStoredPresetFile = (
     (value as { chain?: unknown }).chain,
     (value as { ui?: unknown }).ui,
     header,
-    {
-    mode: options.mode,
-    },
   );
 };
 
@@ -422,7 +393,6 @@ const applyPresetNameFromFileName = (
 
 interface ParsePresetFileTextOptions {
   fileName: string;
-  mode?: ImportedDataMode;
 }
 
 export const parsePresetFileText = (
@@ -433,7 +403,7 @@ export const parsePresetFileText = (
   if (!extensionType) {
     return {
       ok: false,
-      message: 'Unsupported preset file extension.',
+      message: 'Unsupported file extension.',
     };
   }
 
@@ -443,31 +413,28 @@ export const parsePresetFileText = (
   } catch {
     return {
       ok: false,
-      message: 'Invalid preset file format.',
+      message: 'Invalid file format.',
     };
   }
 
-  const parsedPreset = parseStoredPresetFile(parsed, {
-    mode: options.mode,
-  });
+  const parsedPreset = parseStoredPresetFile(parsed);
   if (!parsedPreset) {
     return {
       ok: false,
-      message: 'Invalid preset file format.',
+      message: 'Invalid file format.',
     };
   }
 
-  const { preset, warning } = parsedPreset;
+  const { preset } = parsedPreset;
   if (preset.presetType !== extensionType) {
     return {
       ok: false,
-      message: 'Preset file extension does not match the preset payload.',
+      message: 'File extension does not match the file payload.',
     };
   }
 
   return {
     ok: true,
     preset: applyPresetNameFromFileName(preset, options.fileName),
-    warning,
   };
 };

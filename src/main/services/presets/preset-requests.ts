@@ -2,6 +2,7 @@ import type {
   CreatePresetFolderRequest,
   ReadPresetEntryRequest,
   RenamePresetFolderRequest,
+  SaveRackFileRequest,
   SavePresetFileRequest,
   ShowPresetEntryInFolderRequest,
 } from '../../../shared/contracts/ipc/presets';
@@ -23,15 +24,35 @@ export const parseSavePresetFileRequest = (
     return null;
   }
 
-  const payload = parsePresetFile((value as { payload?: unknown }).payload, {
-    mode: 'strict',
-  });
+  const payload = parsePresetFile((value as { payload?: unknown }).payload);
   if (!payload) {
     return null;
   }
 
   return {
     suggestedName: (value as { suggestedName: string }).suggestedName,
+    payload: payload.preset,
+  };
+};
+
+export const parseSaveRackFileRequest = (
+  value: unknown,
+): SaveRackFileRequest | null => {
+  if (
+    typeof value !== 'object'
+    || value === null
+    || typeof (value as { filePath?: unknown }).filePath !== 'string'
+  ) {
+    return null;
+  }
+
+  const payload = parsePresetFile((value as { payload?: unknown }).payload);
+  if (!payload || payload.preset.presetType !== 'rack') {
+    return null;
+  }
+
+  return {
+    filePath: (value as { filePath: string }).filePath,
     payload: payload.preset,
   };
 };

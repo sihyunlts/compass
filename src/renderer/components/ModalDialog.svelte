@@ -18,18 +18,22 @@
     title,
     description = null,
     confirmLabel = 'OK',
+    secondaryLabel = null,
     cancelLabel = 'Cancel',
     busy = false,
     onConfirm = () => {},
+    onSecondary = () => {},
     onCancel = () => {},
   } = $props<{
     open?: boolean;
     title: string;
     description?: string | null;
     confirmLabel?: string;
+    secondaryLabel?: string | null;
     cancelLabel?: string;
     busy?: boolean;
     onConfirm?: () => void | Promise<void>;
+    onSecondary?: () => void | Promise<void>;
     onCancel?: () => void | Promise<void>;
   }>();
 
@@ -88,6 +92,14 @@
     }
 
     void onConfirm();
+  };
+
+  const handleSecondary = (): void => {
+    if (busy) {
+      return;
+    }
+
+    void onSecondary();
   };
 
   const handleBackdropPointerDown = (event: PointerEvent): void => {
@@ -200,6 +212,14 @@
           text={cancelLabel}
           onClick={handleCancel}
         />
+        {#if secondaryLabel}
+          <Button
+            class="modal-dialog-action-button"
+            disabled={busy}
+            text={secondaryLabel}
+            onClick={handleSecondary}
+          />
+        {/if}
         <Button
           class="modal-dialog-action-button"
           disabled={busy}

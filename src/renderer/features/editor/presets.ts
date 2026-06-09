@@ -19,7 +19,6 @@ import { sanitizeGeneratorChain } from '../../../shared/model/chain-normalizatio
 import {
   buildDeviceDisplayNameById,
   buildGroupDisplayNameById,
-  resolveRackDisplayName,
 } from '../rack/display-names';
 import {
   applyInsertDevicesByDropZone,
@@ -175,7 +174,7 @@ export const resolveDevicePresetSuggestedName = (
   deviceId: string,
 ): string => {
   const displayNameById = buildDeviceDisplayNameById(chain.devices);
-  return displayNameById[deviceId] ?? 'Device Preset';
+  return displayNameById[deviceId] ?? 'Device';
 };
 
 export const resolveGroupPresetSuggestedName = (
@@ -188,10 +187,6 @@ export const resolveGroupPresetSuggestedName = (
   );
   return displayNameById[groupId] ?? groupId;
 };
-
-export const resolveRackPresetSuggestedName = (
-  chain: GeneratorChain,
-): string => resolveRackDisplayName(chain);
 
 export const buildDevicePresetFile = (
   chain: GeneratorChain,
@@ -280,14 +275,14 @@ export const insertDevicePresetFile = (
   if (!prepared) {
     return {
       ok: false,
-      message: 'Device preset could not be inserted.',
+      message: 'Device could not be inserted.',
     };
   }
 
   return {
     ok: true,
     chain: buildChainWithPreparedPresetInsert(chain, dropZone, prepared),
-    message: 'Device preset inserted.',
+    message: 'Device inserted.',
   };
 };
 
@@ -301,14 +296,14 @@ export const insertGroupPresetFile = (
   if (!prepared) {
     return {
       ok: false,
-      message: 'Group preset could not be inserted.',
+      message: 'Group could not be inserted.',
     };
   }
   const groupId = prepared.groupStatePatch?.groupId ?? prepared.forcedGroupId;
   if (!groupId) {
     return {
       ok: false,
-      message: 'Group preset could not be inserted.',
+      message: 'Group could not be inserted.',
     };
   }
 
@@ -324,7 +319,7 @@ export const insertGroupPresetFile = (
       coerceGroupInsertDropZone(chain, dropZone),
       prepared,
     ),
-    message: 'Group preset inserted.',
+    message: 'Group inserted.',
   };
 };
 
@@ -340,6 +335,6 @@ export const applyRackPresetFile = (
     ok: true,
     chain: preset.chain,
     collapsedDeviceIds,
-    message: 'Rack preset loaded.',
+    message: 'Rack loaded.',
   };
 };

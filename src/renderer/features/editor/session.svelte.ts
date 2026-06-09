@@ -72,7 +72,6 @@ import {
   allocateDeviceNodeId,
 } from './device-node-factory';
 import {
-  renameRack,
   renameDeviceById,
   renameGroupById,
 } from './naming';
@@ -341,7 +340,6 @@ export class EditorSession {
       this.renameDevice(deviceId, rawName),
     renameGroup: (groupId: string, rawName: string): boolean =>
       this.renameGroup(groupId, rawName),
-    renameRack: (rawName: string): boolean => this.renameRack(rawName),
     insertDevicePreset: (
       dropZone: RackDropZone,
       preset: DevicePresetFile,
@@ -595,16 +593,6 @@ export class EditorSession {
     }
 
     this.persistChainMutation(nextChain, EDITOR_HISTORY_META.renameGroup);
-    return true;
-  }
-
-  private renameRack(rawName: string): boolean {
-    const nextChain = renameRack(this.state.chainState, rawName);
-    if (!nextChain) {
-      return false;
-    }
-
-    this.persistChainMutation(nextChain, EDITOR_HISTORY_META.renameRack);
     return true;
   }
 

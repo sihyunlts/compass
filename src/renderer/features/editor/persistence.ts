@@ -1,13 +1,10 @@
 import {
+  createDefaultChainSettings,
   loadBridgeSettings,
-  loadChainSettings,
-  loadCollapsedDeviceIds,
   loadLaunchpadModel,
   loadPreviewBpm,
   loadPreviewLoopEnabled,
   loadSidebarWidth,
-  saveChainSettings,
-  saveCollapsedDeviceIds,
   saveSidebarWidth,
 } from './persistence-storage';
 import {
@@ -17,13 +14,12 @@ import type { EditorSessionState } from './session.svelte';
 
 export const createInitialEditorState = (): EditorSessionState => {
   const bridge = loadBridgeSettings();
-  const loadedChain = loadChainSettings();
   return {
     sidebarPage: 'devices',
-    chainState: loadedChain.chain,
+    chainState: createDefaultChainSettings(),
     chainRevision: 1,
     launchpadModel: loadLaunchpadModel(),
-    headerIndicatorText: loadedChain.warning ?? '',
+    headerIndicatorText: '',
     paletteNameText: 'Default palette: loading...',
     previewBpm: loadPreviewBpm(),
     previewLoopLengthBeats: bridge.autoCreateLengthBeats,
@@ -35,7 +31,7 @@ export const createInitialEditorState = (): EditorSessionState => {
     sendButtonDisabled: false,
     sidebarWidthPx: loadSidebarWidth(),
     isSidebarResizing: false,
-    collapsedDeviceIds: loadCollapsedDeviceIds(),
+    collapsedDeviceIds: [],
     clipboardAvailable: false,
     canUndo: false,
     canRedo: false,
@@ -59,7 +55,6 @@ export const toggleCollapse = (
     ? state.collapsedDeviceIds.filter((item) => item !== id)
     : [...state.collapsedDeviceIds, id];
   state.collapsedDeviceIds = next;
-  saveCollapsedDeviceIds(next);
 };
 
 const filterCollapsedDeviceIds = (
@@ -76,7 +71,6 @@ export const replaceCollapsedDeviceIds = (
 ): void => {
   const next = filterCollapsedDeviceIds(state, ids);
   state.collapsedDeviceIds = next;
-  saveCollapsedDeviceIds(next);
 };
 
 export const mergeCollapsedDeviceIds = (
@@ -88,7 +82,6 @@ export const mergeCollapsedDeviceIds = (
     ...ids,
   ]);
   state.collapsedDeviceIds = [...new Set(next)];
-  saveCollapsedDeviceIds(state.collapsedDeviceIds);
 };
 
 const pruneCollapsedDeviceIds = (state: EditorSessionState): void => {
@@ -98,7 +91,6 @@ const pruneCollapsedDeviceIds = (state: EditorSessionState): void => {
   }
 
   state.collapsedDeviceIds = next;
-  saveCollapsedDeviceIds(next);
 };
 
 export const persistChainState = (
@@ -106,6 +98,5 @@ export const persistChainState = (
   requestSyncAfterRender: () => void,
 ): void => {
   pruneCollapsedDeviceIds(state);
-  saveChainSettings(state.chainState);
   requestSyncAfterRender();
 };

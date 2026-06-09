@@ -37,61 +37,30 @@ export const hydrateImportedGeneratorDevice = (
   return hydrateImportedRendererDeviceNode(kind, value);
 };
 
-export interface HydratedGeneratorDevicesResult {
-  devices: GeneratorDeviceNode[];
-  invalidDeviceCount: number;
-}
-
-export type ImportedDataMode = 'strict' | 'recover';
-
-export const formatInvalidHydratedDeviceWarning = (
-  invalidDeviceCount: number,
-  action: string,
-): string | undefined =>
-  invalidDeviceCount > 0
-    ? `Skipped ${invalidDeviceCount} invalid ${invalidDeviceCount === 1 ? 'device' : 'devices'} while ${action}.`
-    : undefined;
-
 export const hydrateImportedGeneratorDevices = (
   value: unknown,
-  options: {
-    mode?: ImportedDataMode;
-  } = {},
-): HydratedGeneratorDevicesResult | null => {
-  const mode = options.mode ?? 'recover';
+): GeneratorDeviceNode[] | null => {
   if (!Array.isArray(value)) {
     return null;
   }
 
   const devices: GeneratorDeviceNode[] = [];
   const seenIds = new Set<string>();
-  let invalidDeviceCount = 0;
   for (const device of value) {
     const hydrated = hydrateImportedGeneratorDevice(device);
     if (!hydrated) {
-      invalidDeviceCount += 1;
-      if (mode === 'strict') {
-        return null;
-      }
-      continue;
+      return null;
     }
 
     if (seenIds.has(hydrated.id)) {
-      invalidDeviceCount += 1;
-      if (mode === 'strict') {
-        return null;
-      }
-      continue;
+      return null;
     }
 
     seenIds.add(hydrated.id);
     devices.push(hydrated);
   }
 
-  return {
-    devices,
-    invalidDeviceCount,
-  };
+  return devices;
 };
 
 const hydrateImportedGroupStateById = (
@@ -238,37 +207,22 @@ export const sanitizeGeneratorChain = (
   return sanitized;
 };
 
-export interface HydratedGeneratorChainResult {
-  chain: GeneratorChain;
-  invalidDeviceCount: number;
-}
-
 /** Validates and hydrates an externally loaded chain into a runtime-safe shape. */
 export const hydrateImportedGeneratorChain = (
   value: unknown,
-  options: {
-    mode?: ImportedDataMode;
-  } = {},
-): HydratedGeneratorChainResult | null => {
-  const mode = options.mode ?? 'recover';
-  if (!isRecord(value) || !Array.isArray(value.devices)) {
-    return null;
-  }
-  if (mode === 'strict' && !isRecord(value.groupStateById)) {
+): GeneratorChain | null => {
+  if (!isRecord(value) || !Array.isArray(value.devices) || !isRecord(value.groupStateById)) {
     return null;
   }
 
-  const hydratedDevices = hydrateImportedGeneratorDevices(value.devices, { mode });
-  if (!hydratedDevices) {
+  const devices = hydrateImportedGeneratorDevices(value.devices);
+  if (!devices) {
     return null;
   }
 
-  return {
-    chain: sanitizeGeneratorChain({
-      name: normalizeRackName(value.name),
-      devices: hydratedDevices.devices,
-      groupStateById: hydrateImportedGroupStateById(value.groupStateById),
-    }),
-    invalidDeviceCount: hydratedDevices.invalidDeviceCount,
-  };
+  return sanitizeGeneratorChain({
+    name: normalizeRackName(value.name),
+    devices,
+    groupStateById: hydrateImportedGroupStateById(value.groupStateById),
+  });
 };

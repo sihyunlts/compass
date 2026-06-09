@@ -1,13 +1,9 @@
 import type { BridgeSettings } from '../shared/bridge/types';
-import type {
-  GeneratorChain,
-  LaunchpadModel,
-} from '../shared/model';
+import type { LaunchpadModel } from '../shared/model';
 
 const RENDERER_STATE_KEY = 'compass.state.v1';
 
 export interface PersistedRendererState {
-  chain?: GeneratorChain;
   bridge?: BridgeSettings;
   preview?: {
     bpm?: number;
@@ -15,7 +11,6 @@ export interface PersistedRendererState {
   };
   ui?: {
     sidebarWidthPx?: number;
-    collapsedDeviceIds?: string[];
     launchpadModel?: LaunchpadModel;
   };
   palette?: {
@@ -25,7 +20,6 @@ export interface PersistedRendererState {
 }
 
 type PersistedRendererStatePatch = {
-  chain?: GeneratorChain;
   bridge?: BridgeSettings;
   preview?: PersistedRendererState['preview'];
   ui?: PersistedRendererState['ui'];
@@ -49,30 +43,77 @@ const mergeRecordSection = <T extends Record<string, unknown>>(
   };
 };
 
+const pickPersistedPreview = (
+  preview: PersistedRendererState['preview'],
+): PersistedRendererState['preview'] | undefined => {
+  if (!preview) {
+    return undefined;
+  }
+
+  return {
+    ...(preview.bpm !== undefined ? { bpm: preview.bpm } : {}),
+    ...(preview.loopEnabled !== undefined ? { loopEnabled: preview.loopEnabled } : {}),
+  };
+};
+
+const pickPersistedUi = (
+  ui: PersistedRendererState['ui'],
+): PersistedRendererState['ui'] | undefined => {
+  if (!ui) {
+    return undefined;
+  }
+
+  return {
+    ...(ui.sidebarWidthPx !== undefined ? { sidebarWidthPx: ui.sidebarWidthPx } : {}),
+    ...(ui.launchpadModel !== undefined ? { launchpadModel: ui.launchpadModel } : {}),
+  };
+};
+
+const pickPersistedPalette = (
+  palette: PersistedRendererState['palette'],
+): PersistedRendererState['palette'] => {
+  if (palette === null || palette === undefined) {
+    return palette;
+  }
+
+  return {
+    ...(palette.name !== undefined ? { name: palette.name } : {}),
+    ...(palette.content !== undefined ? { content: palette.content } : {}),
+  };
+};
+
 const mergePersistedRendererState = (
   previous: PersistedRendererState,
   patch: PersistedRendererStatePatch,
-): PersistedRendererState => ({
-  ...previous,
-  ...(patch.chain !== undefined ? { chain: patch.chain } : {}),
-  ...(patch.bridge !== undefined ? { bridge: patch.bridge } : {}),
-  ...(patch.preview !== undefined
-    ? { preview: mergeRecordSection(previous.preview, patch.preview) }
-    : {}),
-  ...(patch.ui !== undefined
-    ? { ui: mergeRecordSection(previous.ui, patch.ui) }
-    : {}),
-  ...(patch.palette !== undefined
-    ? {
-        palette: patch.palette === null
-          ? null
-          : mergeRecordSection(
-            previous.palette && isRecord(previous.palette) ? previous.palette : undefined,
-            patch.palette,
-          ),
-      }
-    : {}),
-});
+): PersistedRendererState => {
+  const preview = pickPersistedPreview(previous.preview);
+  const ui = pickPersistedUi(previous.ui);
+  const palette = pickPersistedPalette(previous.palette);
+
+  return {
+    ...(previous.bridge !== undefined ? { bridge: previous.bridge } : {}),
+    ...(preview !== undefined ? { preview } : {}),
+    ...(ui !== undefined ? { ui } : {}),
+    ...(palette !== undefined ? { palette } : {}),
+    ...(patch.bridge !== undefined ? { bridge: patch.bridge } : {}),
+    ...(patch.preview !== undefined
+      ? { preview: mergeRecordSection(preview, patch.preview) }
+      : {}),
+    ...(patch.ui !== undefined
+      ? { ui: mergeRecordSection(ui, patch.ui) }
+      : {}),
+    ...(patch.palette !== undefined
+      ? {
+          palette: patch.palette === null
+            ? null
+            : mergeRecordSection(
+              palette && isRecord(palette) ? palette : undefined,
+              patch.palette,
+            ),
+        }
+      : {}),
+  };
+};
 
 /** Reads the shared renderer state document from localStorage. */
 export const readPersistedRendererState = (): PersistedRendererState => {
