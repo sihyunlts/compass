@@ -6,6 +6,7 @@ import { IPC_CHANNELS } from '../shared/contracts/ipc/channels';
 let mainWindowRef: BrowserWindow | null = null;
 let previewWindowRef: BrowserWindow | null = null;
 let mainWindowCloseConfirmed = false;
+let mainWindowDocumentEdited = false;
 const WINDOW_BACKGROUND_COLOR = '#0d0e0f';
 const PRELOAD_ENTRY_PATH = path.join(__dirname, 'preload.js');
 const MAIN_RENDERER_FILE_PATH = path.join(
@@ -87,12 +88,17 @@ export const createMainWindow = (): BrowserWindow => {
       return;
     }
 
+    if (!mainWindowDocumentEdited) {
+      return;
+    }
+
     event.preventDefault();
     mainWindow.webContents.send(IPC_CHANNELS.mainWindowCloseRequest);
   });
 
   mainWindow.on('closed', () => {
     mainWindowCloseConfirmed = false;
+    mainWindowDocumentEdited = false;
     mainWindowRef = null;
     if (previewWindowRef && !previewWindowRef.isDestroyed()) {
       previewWindowRef.close();
@@ -188,6 +194,7 @@ export const updateMainWindowDocumentState = (
   }
 
   mainWindow.setDocumentEdited(state.edited);
+  mainWindowDocumentEdited = state.edited;
   if (process.platform === 'darwin') {
     mainWindow.setRepresentedFilename(state.filePath ?? '');
   }
