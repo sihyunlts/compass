@@ -7,9 +7,48 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
+const PRESET_DOCUMENT_TYPES = [
+  {
+    kind: 'device',
+    name: 'Compass Device',
+    extension: 'compassdevice',
+    identifier: 'com.sihyunlights.compass.device',
+  },
+  {
+    kind: 'group',
+    name: 'Compass Group',
+    extension: 'compassgroup',
+    identifier: 'com.sihyunlights.compass.group',
+  },
+  {
+    kind: 'rack',
+    name: 'Compass Rack',
+    extension: 'compassrack',
+    identifier: 'com.sihyunlights.compass.rack',
+  },
+] as const;
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    extendInfo: {
+      CFBundleDocumentTypes: PRESET_DOCUMENT_TYPES.map((type) => ({
+        CFBundleTypeExtensions: [type.extension],
+        CFBundleTypeName: type.name,
+        CFBundleTypeRole: 'Editor',
+        LSHandlerRank: 'Owner',
+        LSItemContentTypes: [type.identifier],
+      })),
+      UTExportedTypeDeclarations: PRESET_DOCUMENT_TYPES.map((type) => ({
+        UTTypeConformsTo: ['public.json'],
+        UTTypeDescription: type.name,
+        UTTypeIdentifier: type.identifier,
+        UTTypeTagSpecification: {
+          'public.filename-extension': [type.extension],
+          'public.mime-type': [`application/vnd.compass.${type.kind}+json`],
+        },
+      })),
+    },
     icon: 'assets/compass',
   },
   rebuildConfig: {},
