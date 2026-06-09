@@ -10,6 +10,9 @@
   /* Disable selection and tap highlight */
   user-select: none;
   -webkit-user-select: none;
+
+  /* Electron-only continuous corner smoothing for every rounded surface. */
+  -electron-corner-smoothing: 80%;
 }
 
 /* Hide default focus ring and re-enable for keyboard navigation mode */
