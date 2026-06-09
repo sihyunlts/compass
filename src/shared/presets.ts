@@ -120,6 +120,9 @@ interface ParsedPresetPayload {
   preset: PresetFile;
 }
 
+const hasStoredName = (value: unknown): boolean =>
+  isRecord(value) && Object.hasOwn(value, 'name');
+
 export const toStandaloneDevicePresetDevice = (
   device: GeneratorDeviceNode,
 ): GeneratorDeviceNode => {
@@ -148,20 +151,6 @@ const parseDevicePresetPayload = (
       device: toStandaloneDevicePresetDevice(device),
     },
   };
-};
-
-const parseStoredDevicePresetPayload = (
-  rawDevice: unknown,
-  header: {
-    schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
-    savedAtIso: string;
-  },
-): ParsedPresetPayload | null => {
-  if (isRecord(rawDevice) && Object.hasOwn(rawDevice, 'name')) {
-    return null;
-  }
-
-  return parseDevicePresetPayload(rawDevice, header);
 };
 
 const parseGroupPresetPayload = (
@@ -212,21 +201,6 @@ const parseGroupPresetPayload = (
         : {}),
     },
   };
-};
-
-const parseStoredGroupPresetPayload = (
-  rawGroup: unknown,
-  rawUi: unknown,
-  header: {
-    schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
-    savedAtIso: string;
-  },
-): ParsedPresetPayload | null => {
-  if (isRecord(rawGroup) && Object.hasOwn(rawGroup, 'name')) {
-    return null;
-  }
-
-  return parseGroupPresetPayload(rawGroup, rawUi, header);
 };
 
 const parseRackPresetPayload = (
@@ -293,6 +267,35 @@ export const parsePresetFile = (
     (value as { ui?: unknown }).ui,
     header,
   );
+};
+
+const parseStoredDevicePresetPayload = (
+  rawDevice: unknown,
+  header: {
+    schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
+    savedAtIso: string;
+  },
+): ParsedPresetPayload | null => {
+  if (hasStoredName(rawDevice)) {
+    return null;
+  }
+
+  return parseDevicePresetPayload(rawDevice, header);
+};
+
+const parseStoredGroupPresetPayload = (
+  rawGroup: unknown,
+  rawUi: unknown,
+  header: {
+    schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
+    savedAtIso: string;
+  },
+): ParsedPresetPayload | null => {
+  if (hasStoredName(rawGroup)) {
+    return null;
+  }
+
+  return parseGroupPresetPayload(rawGroup, rawUi, header);
 };
 
 const parseStoredPresetFile = (
