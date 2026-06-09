@@ -12,6 +12,7 @@ interface ColorDeviceConfig {
 }
 
 interface ColorProgramTiming {
+  slotStepDuration: number;
   segmentLength: number;
   gapDuration: number;
 }
@@ -19,12 +20,16 @@ interface ColorProgramTiming {
 export interface TimedColorSource {
   startBeat: number;
   endBeat: number;
+  referenceDuration?: number;
 }
 
 export interface PlannedColorSlot<T extends TimedColorSource = TimedColorSource> {
   source: T;
   velocity: number;
+  slotIndex: number;
   offset: number;
+  sourceStartBeat: number;
+  sourceDuration: number;
   startBeat: number;
   endBeat: number;
 }
@@ -41,8 +46,7 @@ const sanitizeColorVelocities = (velocities: readonly number[]): number[] => {
     .filter((slotVelocity) => Number.isFinite(slotVelocity))
     .map((slotVelocity) => Math.round(slotVelocity))
     .filter((slotVelocity) => slotVelocity >= 1 && slotVelocity <= 127);
-  const uniqueVelocities = Array.from(new Set(sanitized));
-  return uniqueVelocities.length > 0 ? uniqueVelocities : [DEFAULT_COLOR_VELOCITY];
+  return sanitized.length > 0 ? sanitized : [DEFAULT_COLOR_VELOCITY];
 };
 
 const sanitizeColorNoteLengthPercent = (value: number): number => {
@@ -95,6 +99,7 @@ const resolveColorProgramTiming = (
   );
 
   return {
+    slotStepDuration: referenceDuration,
     segmentLength: nominalSegmentLength,
     gapDuration: nominalGapDuration,
   };
@@ -111,6 +116,7 @@ export const planColorProgramSlots = <T extends TimedColorSource>(
   const referenceDuration = resolveMedianDuration(
     sourceSegments
       .map((sourceSegment) => sourceSegment.endBeat - sourceSegment.startBeat)
+      .map((duration, index) => sourceSegments[index].referenceDuration ?? duration)
       .filter((duration) => Number.isFinite(duration) && duration > 0),
   );
   if (referenceDuration === null) {
@@ -125,17 +131,25 @@ export const planColorProgramSlots = <T extends TimedColorSource>(
   const slots: PlannedColorSlot<T>[] = [];
   for (const source of sourceSegments) {
     for (let slotIndex = 0; slotIndex < colorConfig.velocities.length; slotIndex += 1) {
-      const offset = slotIndex * (timing.segmentLength + timing.gapDuration);
+      const offset = slotIndex * (timing.slotStepDuration + timing.gapDuration);
       const startBeat = source.startBeat + offset;
-      const endBeat = source.endBeat + offset;
+      const endBeat = startBeat + timing.segmentLength;
       if (!Number.isFinite(startBeat) || !Number.isFinite(endBeat) || endBeat <= startBeat) {
+        continue;
+      }
+
+      const sourceDuration = source.endBeat - source.startBeat;
+      if (!Number.isFinite(sourceDuration) || sourceDuration <= 0) {
         continue;
       }
 
       slots.push({
         source,
         velocity: colorConfig.velocities[slotIndex],
+        slotIndex,
         offset,
+        sourceStartBeat: source.startBeat,
+        sourceDuration,
         startBeat,
         endBeat,
       });

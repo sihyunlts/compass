@@ -523,6 +523,38 @@ const cloneMask = (
   inverseTransform: { ...mask.inverseTransform },
 });
 
+const resolveIntraWriteOrder = (
+  writeOrder: number,
+): number => {
+  if (!Number.isFinite(writeOrder)) {
+    return 0;
+  }
+
+  const baseOrder = Math.trunc(writeOrder);
+  return writeOrder - baseOrder;
+};
+
+const resolveStageWriteOrder = (
+  writeOrder: number,
+  stroke: GeometryStroke,
+): number => writeOrder + resolveIntraWriteOrder(stroke.writeOrder);
+
+const resolveColorSlotWriteOrder = (
+  writeOrder: number,
+  slotIndex: number,
+  slotCount: number,
+): number => writeOrder + ((slotIndex + 1) / (Math.max(slotCount, 1) + 1));
+
+const resolveColorSlotRasterRadius = (
+  noteLengthPercent: number,
+): number => {
+  if (!Number.isFinite(noteLengthPercent) || noteLengthPercent <= 100) {
+    return 0;
+  }
+
+  return 0.5 + ((noteLengthPercent - 100) / 200);
+};
+
 const transformMask = (
   mask: GeometryMask,
   transform: ReturnType<typeof toTranslationTransform> | null,
@@ -555,7 +587,7 @@ const cloneStrokeWithWriteOrder = (
     })),
   },
   originGroupId: stroke.originGroupId,
-  writeOrder,
+  writeOrder: resolveStageWriteOrder(writeOrder, stroke),
   masks: stroke.masks.map(cloneMask),
 });
 
@@ -563,10 +595,16 @@ const cloneStrokeWithVelocityAndWriteOrder = (
   stroke: GeometryStroke,
   velocity: number,
   writeOrder: number,
+  colorSlotIndex: number,
+  colorSlotCount: number,
+  rasterRadius: number,
 ): Omit<GeometryStroke, 'writeId'> => ({
   polyline: {
     ...stroke.polyline,
     velocity,
+    colorSlotIndex,
+    colorSlotCount,
+    rasterRadius,
     points: stroke.polyline.points.map((point) => ({ ...point })),
     clipStack: stroke.polyline.clipStack.map((clip) => ({
       ...clip,
@@ -594,7 +632,7 @@ const transformStroke = (
         })),
       },
   originGroupId: stroke.originGroupId,
-  writeOrder,
+  writeOrder: resolveStageWriteOrder(writeOrder, stroke),
   masks: stroke.masks.map((mask) => transformMask(mask, transform)),
 });
 
@@ -928,6 +966,21 @@ interface ColorTimingSegment extends TimedColorSource {
   originId: string;
 }
 
+const resolveFrameActivationStepBeats = (
+  strokes: ReadonlyArray<GeometryStroke>,
+  sampleStepBeats: number,
+): number | null => {
+  const activationStepBeats = strokes
+    .map((stroke) => stroke.polyline.activationStepBeats)
+    .find((value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0);
+  if (activationStepBeats === undefined) {
+    return null;
+  }
+
+  const activationStepFrames = Math.max(1, Math.round(activationStepBeats / sampleStepBeats));
+  return activationStepFrames * sampleStepBeats;
+};
+
 const buildSourceTimingSegmentsByOriginId = (
   sourceStrokesByOriginAndFrame: ReadonlyMap<string, ReadonlyMap<number, ReadonlyArray<GeometryStroke>>>,
   sampleStepBeats: number,
@@ -940,11 +993,74 @@ const buildSourceTimingSegmentsByOriginId = (
       continue;
     }
 
-    const segments = frameIndexes.map((frameIndex): ColorTimingSegment => ({
-      originId,
-      startBeat: frameIndex * sampleStepBeats,
-      endBeat: (frameIndex + 1) * sampleStepBeats,
-    }));
+    const segments: ColorTimingSegment[] = [];
+    let activeSegmentStartFrame: number | null = null;
+    let activeSegmentEndFrameExclusive: number | null = null;
+    let activeSignature: string | null = null;
+
+    const flushActiveSegment = (): void => {
+      if (activeSegmentStartFrame === null || activeSegmentEndFrameExclusive === null) {
+        return;
+      }
+
+      segments.push({
+        originId,
+        startBeat: activeSegmentStartFrame * sampleStepBeats,
+        endBeat: activeSegmentEndFrameExclusive * sampleStepBeats,
+      });
+    };
+
+    for (const frameIndex of frameIndexes) {
+      const frameStrokes = frameMap.get(frameIndex) ?? [];
+      const activationStepBeats = resolveFrameActivationStepBeats(frameStrokes, sampleStepBeats);
+      if (activationStepBeats !== null) {
+        flushActiveSegment();
+        activeSegmentStartFrame = null;
+        activeSegmentEndFrameExclusive = null;
+        activeSignature = null;
+        const startBeat = frameIndex * sampleStepBeats;
+        segments.push({
+          originId,
+          startBeat,
+          endBeat: startBeat + sampleStepBeats,
+          referenceDuration: activationStepBeats,
+        });
+        continue;
+      }
+
+      const signature = Array.from(
+        new Set(
+          frameStrokes
+            .map((stroke) => stroke.polyline.activationSignature ?? `stroke:${stroke.writeId}`),
+        ),
+      )
+        .sort()
+        .join('|');
+      if (!signature) {
+        flushActiveSegment();
+        activeSegmentStartFrame = null;
+        activeSegmentEndFrameExclusive = null;
+        activeSignature = null;
+        continue;
+      }
+
+      if (
+        activeSegmentStartFrame === null
+        || activeSegmentEndFrameExclusive === null
+        || activeSignature !== signature
+        || frameIndex !== activeSegmentEndFrameExclusive
+      ) {
+        flushActiveSegment();
+        activeSegmentStartFrame = frameIndex;
+        activeSegmentEndFrameExclusive = frameIndex + 1;
+        activeSignature = signature;
+        continue;
+      }
+
+      activeSegmentEndFrameExclusive = frameIndex + 1;
+    }
+
+    flushActiveSegment();
 
     segmentsByOriginId.set(originId, segments);
   }
@@ -1014,12 +1130,11 @@ const toSourceFrameIndex = (
 const resolveColorSlotSourceEndBeat = <T extends TimedColorSource>(
   slot: PlannedColorSlot<T>,
 ): number => {
-  const slotDuration = slot.endBeat - slot.startBeat;
-  if (!Number.isFinite(slotDuration) || slotDuration <= 0) {
-    return slot.source.startBeat;
+  if (!Number.isFinite(slot.sourceDuration) || slot.sourceDuration <= 0) {
+    return slot.sourceStartBeat;
   }
 
-  return Math.min(slot.source.endBeat, slot.source.startBeat + slotDuration);
+  return slot.sourceStartBeat + slot.sourceDuration;
 };
 
 const resolveColorSlotSourceFrameWindow = <T extends TimedColorSource>(
@@ -1027,7 +1142,7 @@ const resolveColorSlotSourceFrameWindow = <T extends TimedColorSource>(
   timeline: GeometryTimeline,
 ): FrameWindow => toFrameWindow(
   {
-    start: slot.source.startBeat,
+    start: slot.sourceStartBeat,
     end: resolveColorSlotSourceEndBeat(slot),
   },
   timeline.sampleStepBeats,
@@ -1047,11 +1162,10 @@ const resolveColorSlotDestinationFrameWindow = <T extends TimedColorSource>(
 );
 
 const resolveColorDestinationFrameIndex = (
-  sourceFrameIndex: number,
-  slotOffset: number,
+  slotStartBeat: number,
   sampleStepBeats: number,
 ): number => Math.floor(
-  ((sourceFrameIndex * sampleStepBeats) + slotOffset) / sampleStepBeats,
+  slotStartBeat / sampleStepBeats,
 );
 
 const hasMappedSourceFrame = (
@@ -1782,6 +1896,8 @@ const applyColorEffect = (
     sourceStrokesByOriginAndFrame,
   );
 
+  stripOriginFrames(nextTimeline, state.timeline.frames.length, targetOriginIds);
+
   for (const [originId, sourceSegments] of targetSegmentsByOriginId.entries()) {
     const sourceStrokesByFrame = sourceStrokesByOriginAndFrame.get(originId);
     const sourceFrameIndexes = sourceFrameIndexesByOriginId.get(originId);
@@ -1807,13 +1923,13 @@ const applyColorEffect = (
         }
 
         const destinationFrameIndex = resolveColorDestinationFrameIndex(
-          sourceFrameIndex,
-          slot.offset,
+          slot.startBeat,
           nextTimeline.sampleStepBeats,
         );
         if (
           !isFrameWithinWindow(destinationFrameIndex, frameWindow)
-          || !isFrameWithinWindow(destinationFrameIndex, destinationFrameWindow)
+          || destinationFrameIndex < destinationFrameWindow.startFrame
+          || destinationFrameIndex >= destinationFrameWindow.endFrameExclusive
         ) {
           continue;
         }
@@ -1827,7 +1943,14 @@ const applyColorEffect = (
           addStrokeToFrame(
             nextTimeline,
             destinationFrameIndex,
-            cloneStrokeWithVelocityAndWriteOrder(stroke, slot.velocity, writeOrder),
+            cloneStrokeWithVelocityAndWriteOrder(
+              stroke,
+              slot.velocity,
+              resolveColorSlotWriteOrder(writeOrder, slot.slotIndex, colorConfig.velocities.length),
+              slot.slotIndex,
+              colorConfig.velocities.length,
+              resolveColorSlotRasterRadius(colorConfig.noteLengthPercent),
+            ),
           );
         }
       }

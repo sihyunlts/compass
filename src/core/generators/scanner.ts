@@ -3,6 +3,7 @@ import type { ScannerParams } from '../../shared/model';
 import { toAxisBasis } from '../geometry';
 
 const SCAN_TRAVEL_PADDING = 0.5;
+const SCAN_POSITION_TIE_BREAK = 1e-6;
 
 const projectOnAxis = (point: Vec2, axis: Vec2): number => point.x * axis.x + point.y * axis.y;
 
@@ -60,7 +61,7 @@ export const buildScannerPolyline = (
     return null;
   }
 
-  const scanPos = scanStart + t01 * travelRange;
+  const scanPos = scanStart + t01 * travelRange + SCAN_POSITION_TIE_BREAK;
   if (!Number.isFinite(scanPos)) {
     return null;
   }
@@ -80,6 +81,8 @@ export const buildScannerPolyline = (
     closed: false,
     originId,
     velocity,
+    activationStepBeats: 1 / travelRange,
+    rasterMode: 'centerline',
     clipStack: [],
   };
 };

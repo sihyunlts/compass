@@ -1,4 +1,5 @@
 import { GENERATED_VELOCITY, POLYLINE_STEP } from '../core/pipeline/constants';
+import type { Polyline } from '../core/core-types';
 import { buildPathPolyline } from '../core/generators/path';
 import { buildScannerPolyline } from '../core/generators/scanner';
 import { buildSpiralPolyline } from '../core/generators/spiral';
@@ -7,6 +8,7 @@ import { normalizeOptionalId } from '../shared/normalize-id';
 import type { GeneratorNode } from '../shared/model';
 import { toBounds } from './analysis/bounds';
 import type { SpatialRequirement } from './analysis/types';
+import { collectOccupiedCoordinates } from './timeline-analysis';
 import type { GeometryTimeline } from './types';
 import { addStrokeToFrame } from './timeline';
 
@@ -61,6 +63,22 @@ const buildScannerGeneratorPolyline = (
   );
 };
 
+const resolveActivationSignature = (
+  polyline: Polyline,
+): string | undefined => {
+  const occupied = collectOccupiedCoordinates([{
+    polyline,
+    originGroupId: null,
+    writeOrder: 0,
+    writeId: 0,
+    masks: [],
+  }], true);
+  const coordinates = Array.from(occupied.values())
+    .map((coordinate) => `${coordinate.x},${coordinate.y}`)
+    .sort();
+  return coordinates.length > 0 ? coordinates.join('|') : undefined;
+};
+
 export const rasterizeGeneratorFrame = (
   timeline: GeometryTimeline,
   frameIndex: number,
@@ -77,7 +95,10 @@ export const rasterizeGeneratorFrame = (
   }
 
   addStrokeToFrame(timeline, frameIndex, {
-    polyline,
+    polyline: {
+      ...polyline,
+      activationSignature: resolveActivationSignature(polyline),
+    },
     originGroupId: normalizeOptionalId(device.groupId),
     writeOrder,
   });
