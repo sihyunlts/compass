@@ -33,7 +33,7 @@ const clonePathPoints = (
   y: point.y,
 }));
 
-export const createDefaultPathPoints = (): PathPoint[] =>
+const createDefaultPathPoints = (): PathPoint[] =>
   clonePathPoints(DEFAULT_PATH_POINTS);
 
 export const sanitizePathPoints = (

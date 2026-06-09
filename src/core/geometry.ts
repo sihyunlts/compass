@@ -1,11 +1,7 @@
 import type {
   AffineTransform,
   Bounds,
-  ClipShape,
-  HalfPlaneClipShape,
   Polyline,
-  SceneClip,
-  TileUnionClipShape,
   Vec2,
 } from './core-types';
 
@@ -26,10 +22,6 @@ export const IDENTITY_AFFINE: AffineTransform = Object.freeze({
   tx: 0,
   ty: 0,
 });
-
-const TILE_MIN = 0;
-const TILE_MAX = 9;
-const TILE_COUNT = 10;
 
 export const composeAffine = (after: AffineTransform, before: AffineTransform): AffineTransform => ({
   a: after.a * before.a + after.b * before.c,
@@ -64,49 +56,6 @@ export const applyAffine = (transform: AffineTransform, point: Vec2): Vec2 => ({
   x: transform.a * point.x + transform.b * point.y + transform.tx,
   y: transform.c * point.x + transform.d * point.y + transform.ty,
 });
-
-const isInTileBounds = (value: number): boolean =>
-  Number.isFinite(value) && value >= TILE_MIN && value <= TILE_MAX;
-
-const toTileIndex = (point: Vec2): number | null => {
-  if (!isInTileBounds(point.x) || !isInTileBounds(point.y)) {
-    return null;
-  }
-
-  const tileX = Math.round(point.x);
-  const tileY = Math.round(point.y);
-  if (!isInTileBounds(tileX) || !isInTileBounds(tileY)) {
-    return null;
-  }
-
-  return tileY * TILE_COUNT + tileX;
-};
-
-export const mapBoundsThroughAffine = (bounds: Bounds, transform: AffineTransform): Bounds => {
-  const corners = [
-    applyAffine(transform, { x: bounds.minX, y: bounds.minY }),
-    applyAffine(transform, { x: bounds.minX, y: bounds.maxY }),
-    applyAffine(transform, { x: bounds.maxX, y: bounds.minY }),
-    applyAffine(transform, { x: bounds.maxX, y: bounds.maxY }),
-  ];
-
-  let minX = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const corner of corners) {
-    if (corner.x < minX) minX = corner.x;
-    if (corner.x > maxX) maxX = corner.x;
-    if (corner.y < minY) minY = corner.y;
-    if (corner.y > maxY) maxY = corner.y;
-  }
-
-  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minY) || !Number.isFinite(maxY)) {
-    return { ...bounds };
-  }
-
-  return { minX, maxX, minY, maxY };
-};
 
 export const toAxisBasis = (angleDeg: number): { axisX: number; axisY: number; perpX: number; perpY: number } => {
   const rad = (angleDeg * Math.PI) / 180;
@@ -212,72 +161,6 @@ export const toScaleTransformAt = (
     ty: center.y - (center.y * scaleY),
   };
 };
-
-export const createTileUnionClip = (
-  tiles: Iterable<number>,
-): TileUnionClipShape => ({
-  kind: 'tile-union',
-  tiles: Array.from(new Set(tiles)).sort((left, right) => left - right),
-});
-
-export const createHalfPlaneClip = (
-  point: Vec2,
-  normal: Vec2,
-): HalfPlaneClipShape => ({
-  kind: 'half-plane',
-  point: { ...point },
-  normal: { ...normal },
-});
-
-export const intersectClipShapes = (
-  shapes: ReadonlyArray<ClipShape>,
-): ClipShape => {
-  const flattened: ClipShape[] = [];
-  for (const shape of shapes) {
-    if (shape.kind === 'intersection') {
-      flattened.push(...shape.shapes);
-      continue;
-    }
-    flattened.push(shape);
-  }
-
-  if (flattened.length === 1) {
-    return flattened[0];
-  }
-
-  return {
-    kind: 'intersection',
-    shapes: flattened,
-  };
-};
-
-export const evaluateClipShape = (
-  shape: ClipShape,
-  point: Vec2,
-): boolean => {
-  if (shape.kind === 'tile-union') {
-    const tileIndex = toTileIndex(point);
-    return tileIndex !== null && shape.tiles.includes(tileIndex);
-  }
-
-  if (shape.kind === 'half-plane') {
-    const dx = point.x - shape.point.x;
-    const dy = point.y - shape.point.y;
-    return (dx * shape.normal.x) + (dy * shape.normal.y) >= 0;
-  }
-
-  return shape.shapes.every((child) => evaluateClipShape(child, point));
-};
-
-export const isPointInsideClip = (
-  clip: SceneClip,
-  point: Vec2,
-): boolean => evaluateClipShape(clip.shape, applyAffine(clip.inverseTransform, point));
-
-export const isPointInsideClipStack = (
-  clipStack: ReadonlyArray<SceneClip>,
-  point: Vec2,
-): boolean => clipStack.every((clip) => isPointInsideClip(clip, point));
 
 const distanceToSegmentSquared = (point: Vec2, a: Vec2, b: Vec2): number => {
   const dx = b.x - a.x;

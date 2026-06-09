@@ -4,11 +4,11 @@ export interface SampledActivePitch {
   originId?: string;
 }
 
-export interface SampledOpenNoteState extends SampledActivePitch {
+interface SampledOpenNoteState extends SampledActivePitch {
   startBeat: number;
 }
 
-export interface SampledTimedNote extends SampledOpenNoteState {
+interface SampledTimedNote extends SampledOpenNoteState {
   pitch: number;
   durationBeats: number;
 }
@@ -30,7 +30,7 @@ const hasSameNoteState = (
   && left.originId === right.originId
 );
 
-export const closeSampledNote = (
+const closeSampledNote = (
   notes: SampledTimedNote[],
   pitch: number,
   open: SampledOpenNoteState,

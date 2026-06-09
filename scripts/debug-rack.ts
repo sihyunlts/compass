@@ -18,9 +18,6 @@ import {
   buildRuntimeMapDataFromButtonIndex,
 } from '../src/domain/runtime-map';
 import {
-  collectActivationSegments,
-} from '../src/generation/timeline-analysis';
-import {
   toRoundedCoordinateKey,
 } from '../src/generation/coordinates';
 import {
@@ -72,7 +69,6 @@ interface TimingBreakdown {
   totalMs: number;
   visibleWindowMs: number;
   activePitchScanMs: number;
-  activationSegmentsMs: number;
 }
 
 interface CpuProfileNode {
@@ -385,10 +381,6 @@ const measureOneGeneration = (
   }
   const activePitchScanEnd = performance.now();
 
-  const activationSegmentsStart = performance.now();
-  collectActivationSegments(canonical.timeline, () => true);
-  const activationSegmentsEnd = performance.now();
-
   return {
     canonicalMs: canonicalEnd - canonicalStart,
     notesMs: notesEnd - notesStart,
@@ -396,7 +388,6 @@ const measureOneGeneration = (
     totalMs: ledFramesEnd - canonicalStart,
     visibleWindowMs: visibleWindowEnd - visibleWindowStart,
     activePitchScanMs: activePitchScanEnd - activePitchScanStart,
-    activationSegmentsMs: activationSegmentsEnd - activationSegmentsStart,
   };
 };
 
@@ -411,7 +402,6 @@ const averageTimings = (
       totalMs: sum.totalMs + timing.totalMs,
       visibleWindowMs: sum.visibleWindowMs + timing.visibleWindowMs,
       activePitchScanMs: sum.activePitchScanMs + timing.activePitchScanMs,
-      activationSegmentsMs: sum.activationSegmentsMs + timing.activationSegmentsMs,
     }),
     {
       canonicalMs: 0,
@@ -420,7 +410,6 @@ const averageTimings = (
       totalMs: 0,
       visibleWindowMs: 0,
       activePitchScanMs: 0,
-      activationSegmentsMs: 0,
     },
   );
 
@@ -431,7 +420,6 @@ const averageTimings = (
     totalMs: total.totalMs / timings.length,
     visibleWindowMs: total.visibleWindowMs / timings.length,
     activePitchScanMs: total.activePitchScanMs / timings.length,
-    activationSegmentsMs: total.activationSegmentsMs / timings.length,
   };
 };
 

@@ -26,7 +26,7 @@ const DEFAULT_TIME_WARP_CURVE: Readonly<TimeWarpCurve> = Object.freeze({
 const sortNodes = (nodes: CurveNode[]): CurveNode[] =>
   [...nodes].sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
 
-export const sanitizeTimeWarpCurveDivisions = (value: unknown): number => {
+const sanitizeTimeWarpCurveDivisions = (value: unknown): number => {
   const numeric = Math.round(Number(value));
   if (!Number.isFinite(numeric)) {
     return DEFAULT_CURVE_DIVISIONS;

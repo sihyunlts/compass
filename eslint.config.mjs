@@ -10,6 +10,7 @@ export default [
       '**/node_modules/**',
       '**/dist/**',
       '**/out/**',
+      'tmp/**',
       'max4live/**',
     ],
   },

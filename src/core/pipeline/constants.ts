@@ -1,4 +1,3 @@
-export const SAMPLES_PER_BEAT = 64;
 export const NOTE_SAMPLES_PER_BEAT = 256;
 export const POLYLINE_STEP = 1;
 export const THICKNESS = 0.5;

@@ -4,18 +4,7 @@ import { toRoundedCoordinateKey } from './coordinates';
 import type {
   GeometryMask,
   GeometryStroke,
-  GeometryTimeline,
 } from './types';
-
-export interface GeometryActivationSegment {
-  originId: string;
-  originGroupId: string | null;
-  x: number;
-  y: number;
-  velocity: number;
-  startBeat: number;
-  endBeat: number;
-}
 
 interface OccupiedCoordinate {
   originId: string;
@@ -144,54 +133,4 @@ export const createCoordinateMask = (
     const coordinateKey = toRoundedCoordinateKey(x, y);
     return coordinateKey !== null && roundedKeys.has(coordinateKey);
   };
-};
-
-export const collectActivationSegments = (
-  timeline: GeometryTimeline,
-  predicate: (stroke: GeometryStroke) => boolean,
-): GeometryActivationSegment[] => {
-  const segments: GeometryActivationSegment[] = [];
-  const activeSegmentByKey = new Map<string, GeometryActivationSegment>();
-
-  for (let frameIndex = 0; frameIndex < timeline.frames.length; frameIndex += 1) {
-    const frameStartBeat = frameIndex * timeline.sampleStepBeats;
-    const frameEndBeat = frameStartBeat + timeline.sampleStepBeats;
-    const winnerByKey = new Map<string, OccupiedCoordinate>();
-    const occupied = collectOccupiedCoordinates(
-      timeline.frames[frameIndex].strokes.filter(predicate),
-      true,
-    );
-
-    for (const coordinate of occupied.values()) {
-      const winnerKey = `${coordinate.originId}:${coordinate.x},${coordinate.y}`;
-      winnerByKey.set(winnerKey, coordinate);
-    }
-
-    for (const [winnerKey, segment] of activeSegmentByKey.entries()) {
-      const winner = winnerByKey.get(winnerKey);
-      if (winner && winner.velocity === segment.velocity) {
-        segment.endBeat = frameEndBeat;
-        winnerByKey.delete(winnerKey);
-        continue;
-      }
-
-      segments.push(segment);
-      activeSegmentByKey.delete(winnerKey);
-    }
-
-    for (const [winnerKey, winner] of winnerByKey.entries()) {
-      activeSegmentByKey.set(winnerKey, {
-        originId: winner.originId,
-        originGroupId: winner.originGroupId,
-        x: winner.x,
-        y: winner.y,
-        velocity: winner.velocity,
-        startBeat: frameStartBeat,
-        endBeat: frameEndBeat,
-      });
-    }
-  }
-
-  segments.push(...activeSegmentByKey.values());
-  return segments;
 };

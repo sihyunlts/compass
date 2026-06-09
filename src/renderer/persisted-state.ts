@@ -4,7 +4,7 @@ import type {
   LaunchpadModel,
 } from '../shared/model';
 
-export const RENDERER_STATE_KEY = 'compass.state.v1';
+const RENDERER_STATE_KEY = 'compass.state.v1';
 
 export interface PersistedRendererState {
   chain?: GeneratorChain;

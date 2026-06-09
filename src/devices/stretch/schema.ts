@@ -17,7 +17,7 @@ const STRETCH_MODULATION_TARGET_PARAMS = [
   { key: 'start', label: 'Start' },
   { key: 'end', label: 'End' },
 ] as const;
-export const STRETCH_NUMERIC_PARAM_KEYS = ['start', 'end'] as const;
+const STRETCH_NUMERIC_PARAM_KEYS = ['start', 'end'] as const;
 
 const createDefaultStretchNode = (
   id: string,

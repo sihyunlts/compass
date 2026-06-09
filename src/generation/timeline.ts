@@ -140,7 +140,7 @@ export const setFrameStrokes = (
   };
 };
 
-export const clampFrameIndex = (
+const clampFrameIndex = (
   frameIndex: number,
   frameCount: number,
 ): number => {

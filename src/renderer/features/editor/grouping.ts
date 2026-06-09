@@ -22,7 +22,7 @@ interface GroupingContext {
   ) => void;
 }
 
-export const handoffDeviceSelection = (
+const handoffDeviceSelection = (
   context: GroupingContext,
   removedDeviceIds: readonly string[],
   replacementDeviceIds: readonly string[] = [],

@@ -1,10 +1,3 @@
-import type {
-  PathParams,
-  ScannerParams,
-  SpiralParams,
-  WaterdropParams,
-} from '../shared/model';
-
 export interface Vec2 {
   x: number;
   y: number;
@@ -85,60 +78,3 @@ export interface Polyline {
   velocity: number;
   clipStack: SceneClip[];
 }
-
-export interface SceneInstanceBase {
-  originId: string;
-  originGroupId: string | null;
-  spatial: AffineTransform;
-  inverseSpatial: AffineTransform;
-  sourceBounds: Bounds;
-  temporal: SceneTemporalState;
-  clipStack: SceneClip[];
-  velocity: number;
-}
-
-export interface WaterdropPrimitive {
-  kind: 'waterdrop';
-  params: WaterdropParams;
-}
-
-export interface ScannerPrimitive {
-  kind: 'scanner';
-  params: ScannerParams;
-}
-
-export interface SpiralPrimitive {
-  kind: 'spiral';
-  params: SpiralParams;
-}
-
-export interface PathPrimitive {
-  kind: 'path';
-  params: PathParams;
-}
-
-export type ScenePrimitive = WaterdropPrimitive | ScannerPrimitive | SpiralPrimitive | PathPrimitive;
-export type ScenePrimitiveKind = ScenePrimitive['kind'];
-
-interface WaterdropSceneInstance extends SceneInstanceBase {
-  primitive: WaterdropPrimitive;
-}
-
-interface ScannerSceneInstance extends SceneInstanceBase {
-  primitive: ScannerPrimitive;
-}
-
-interface SpiralSceneInstance extends SceneInstanceBase {
-  primitive: SpiralPrimitive;
-}
-
-interface PathSceneInstance extends SceneInstanceBase {
-  primitive: PathPrimitive;
-}
-
-export type SceneInstance =
-  | WaterdropSceneInstance
-  | ScannerSceneInstance
-  | SpiralSceneInstance
-  | PathSceneInstance;
-export type SceneInstanceOfKind<K extends ScenePrimitiveKind> = Extract<SceneInstance, { primitive: { kind: K } }>;

@@ -173,7 +173,7 @@ export const RENDERER_DEVICE_KINDS = Object.freeze(
 
 const RENDERER_DEVICE_KIND_SET = new Set<RendererDeviceKind>(RENDERER_DEVICE_KINDS);
 
-export const getRendererDeviceSchema = <K extends RendererDeviceKind>(
+const getRendererDeviceSchema = <K extends RendererDeviceKind>(
   kind: K,
 ): RendererDeviceSchemaByKind[K] => rendererDeviceSchemas[kind];
 

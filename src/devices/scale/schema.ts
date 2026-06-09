@@ -21,7 +21,7 @@ const SCALE_MODULATION_TARGET_PARAMS = [
   { key: 'scaleX', label: 'Scale X' },
   { key: 'scaleY', label: 'Scale Y' },
 ] as const;
-export const SCALE_NUMERIC_PARAM_KEYS = ['centerX', 'centerY', 'scaleX', 'scaleY'] as const;
+const SCALE_NUMERIC_PARAM_KEYS = ['centerX', 'centerY', 'scaleX', 'scaleY'] as const;
 
 export const normalizePositiveScaleFactor = (
   value: unknown,

@@ -38,34 +38,6 @@ export const unionSpatialRequirements = (
   );
 };
 
-export const intersectSpatialRequirements = (
-  left: SpatialRequirement,
-  right: SpatialRequirement,
-): SpatialRequirement => {
-  if (left === 'none' || right === 'none') {
-    return 'none';
-  }
-
-  if (left === 'all') {
-    return right;
-  }
-
-  if (right === 'all') {
-    return left;
-  }
-
-  const minX = Math.max(left.minX, right.minX);
-  const maxX = Math.min(left.maxX, right.maxX);
-  const minY = Math.max(left.minY, right.minY);
-  const maxY = Math.min(left.maxY, right.maxY);
-
-  if (minX > maxX || minY > maxY) {
-    return 'none';
-  }
-
-  return createSpatialBounds(minX, maxX, minY, maxY);
-};
-
 export const transformSpatialRequirement = (
   requirement: SpatialRequirement,
   transform: AffineTransform,
@@ -109,23 +81,4 @@ export const toBounds = (
     minY: requirement.minY,
     maxY: requirement.maxY,
   };
-};
-
-export const containsPointInSpatialRequirement = (
-  requirement: SpatialRequirement,
-  x: number,
-  y: number,
-): boolean => {
-  if (requirement === 'all') {
-    return true;
-  }
-
-  if (requirement === 'none') {
-    return false;
-  }
-
-  return x >= requirement.minX
-    && x <= requirement.maxX
-    && y >= requirement.minY
-    && y <= requirement.maxY;
 };

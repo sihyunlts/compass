@@ -17,7 +17,7 @@ const TRIM_MODULATION_TARGET_PARAMS = [
   { key: 'start', label: 'Start' },
   { key: 'end', label: 'End' },
 ] as const;
-export const TRIM_NUMERIC_PARAM_KEYS = ['start', 'end'] as const;
+const TRIM_NUMERIC_PARAM_KEYS = ['start', 'end'] as const;
 
 const createDefaultTrimNode = (
   id: string,

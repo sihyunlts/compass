@@ -6,7 +6,7 @@ import {
 } from './control-helpers';
 import type { RendererControlHandler } from './control-types';
 
-export const TIME_WINDOW_PARAM_KEYS = ['start', 'end'] as const;
+const TIME_WINDOW_PARAM_KEYS = ['start', 'end'] as const;
 
 type TimeWindowParamKey = (typeof TIME_WINDOW_PARAM_KEYS)[number];
 type TimeWindowValue = {
@@ -39,7 +39,7 @@ const clampTimeWindowEnd = (
   minimumSpan: number,
 ): number => clamp(value, Math.min(1, start + minimumSpan), 1);
 
-export const resolveTimeWindowInputValue = (
+const resolveTimeWindowInputValue = (
   currentWindow: TimeWindowValue,
   param: TimeWindowParamKey,
   rawValue: number,

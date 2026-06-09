@@ -61,7 +61,7 @@ const collectOrderedGroupIds = (
   return orderedGroupIds;
 };
 
-export const resolveStoredDeviceName = (
+const resolveStoredDeviceName = (
   device: Pick<GeneratorDeviceNode, 'name'>,
 ): string | null => normalizeCustomName(device.name);
 

@@ -1,5 +1,4 @@
 import type {
-  SceneInstance,
   SceneTemporalState,
   TemporalAffineRemap,
   TemporalRemap,
@@ -14,7 +13,7 @@ export interface TemporalTransform {
 
 const DEFAULT_TEMPORAL_SAMPLE_COUNT = 129;
 
-export const NORMALIZED_TIMELINE_WINDOW: TemporalVisibilityWindow = {
+const NORMALIZED_TIMELINE_WINDOW: TemporalVisibilityWindow = {
   start: 0,
   end: 1,
 };
@@ -159,7 +158,7 @@ export const evaluateTemporalRemap = (
   return interpolateNullableSample(lowerSample, upperSample, ratio);
 };
 
-export const resolveSceneTemporalInputTime = (
+const resolveSceneTemporalInputTime = (
   sceneTemporal: SceneTemporalState,
   t01: number,
 ): number | null => {
@@ -289,14 +288,6 @@ export const composeSceneTemporalState = (
   return composeSceneTemporalStateBySampling(sceneTemporal, transform);
 };
 
-export const transformSceneInstancesTemporally = (
-  sceneInstances: ReadonlyArray<SceneInstance>,
-  transform: TemporalTransform,
-): SceneInstance[] => sceneInstances.map((sceneInstance) => ({
-  ...sceneInstance,
-  temporal: composeSceneTemporalState(sceneInstance.temporal, transform),
-}));
-
 export const isNonWrapping01TemporalWindow = (
   start: number,
   end: number,
@@ -307,134 +298,3 @@ export const isNonWrapping01TemporalWindow = (
   && end <= 1
   && end > start
 );
-
-export const isIdentity01TemporalWindow = (
-  start: number,
-  end: number,
-): boolean => isNonWrapping01TemporalWindow(start, end) && start === 0 && end === 1;
-
-const resolveSceneInstanceTemporalSourceWindow = (
-  sceneInstance: SceneInstance,
-  sourceTemporalWindowByOriginId: ReadonlyMap<string, TemporalVisibilityWindow> | undefined,
-): TemporalVisibilityWindow => {
-  if (sceneInstance.temporal.hasAuthoredTimeline) {
-    return NORMALIZED_TIMELINE_WINDOW;
-  }
-
-  return sourceTemporalWindowByOriginId?.get(sceneInstance.originId) ?? NORMALIZED_TIMELINE_WINDOW;
-};
-
-const createNormalizedTrimTransform = (
-  sourceWindow: TemporalVisibilityWindow,
-  start: number,
-  end: number,
-): TemporalTransform => {
-  const sourceSpan = sourceWindow.end - sourceWindow.start;
-
-  return {
-    remapToInput: createAffineTemporalRemap(
-      sourceSpan * (end - start),
-      sourceWindow.start + sourceSpan * start,
-    ),
-    visibilityWindow: { ...NORMALIZED_TIMELINE_WINDOW },
-    marksAuthoredTimeline: true,
-  };
-};
-
-const createPlacementPreservingReverseTransform = (
-  placementWindow: TemporalVisibilityWindow,
-): TemporalTransform => ({
-  remapToInput: createAffineTemporalRemap(
-    -1,
-    placementWindow.start + placementWindow.end,
-  ),
-  visibilityWindow: {
-    start: placementWindow.start,
-    end: placementWindow.end,
-  },
-});
-
-export const stretchSceneInstancesTemporally = (
-  sceneInstances: ReadonlyArray<SceneInstance>,
-  start: number,
-  end: number,
-  sourceTemporalWindowByOriginId?: ReadonlyMap<string, TemporalVisibilityWindow>,
-): SceneInstance[] => {
-  if (!isNonWrapping01TemporalWindow(start, end)) {
-    return [];
-  }
-
-  if (isIdentity01TemporalWindow(start, end)) {
-    return sceneInstances.map((sceneInstance) => ({ ...sceneInstance }));
-  }
-
-  return sceneInstances.map((sceneInstance) => {
-    const sourceWindow = resolveSceneInstanceTemporalSourceWindow(
-      sceneInstance,
-      sourceTemporalWindowByOriginId,
-    );
-    const sourceSpan = sourceWindow.end - sourceWindow.start;
-    if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
-      return { ...sceneInstance };
-    }
-
-    return {
-      ...sceneInstance,
-      temporal: composeSceneTemporalState(sceneInstance.temporal, {
-        remapToInput: createAffineTemporalRemap(
-          sourceSpan / (end - start),
-          sourceWindow.start - (sourceSpan * start) / (end - start),
-        ),
-        visibilityWindow: {
-          start,
-          end,
-        },
-        marksAuthoredTimeline: true,
-      }),
-    };
-  });
-};
-
-export const trimSceneInstancesTemporally = (
-  sceneInstances: ReadonlyArray<SceneInstance>,
-  start: number,
-  end: number,
-  sourceTemporalWindowByOriginId?: ReadonlyMap<string, TemporalVisibilityWindow>,
-): SceneInstance[] => {
-  if (!isNonWrapping01TemporalWindow(start, end)) {
-    return [];
-  }
-
-  if (isIdentity01TemporalWindow(start, end)) {
-    return sceneInstances.map((sceneInstance) => ({ ...sceneInstance }));
-  }
-
-  return sceneInstances.map((sceneInstance) => {
-    const sourceWindow = resolveSceneInstanceTemporalSourceWindow(
-      sceneInstance,
-      sourceTemporalWindowByOriginId,
-    );
-    const sourceSpan = sourceWindow.end - sourceWindow.start;
-    if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
-      return { ...sceneInstance };
-    }
-
-    return {
-      ...sceneInstance,
-      temporal: composeSceneTemporalState(
-        sceneInstance.temporal,
-        createNormalizedTrimTransform(sourceWindow, start, end),
-      ),
-    };
-  });
-};
-
-export const reverseSceneInstancesTemporally = (
-  sceneInstances: ReadonlyArray<SceneInstance>,
-): SceneInstance[] => sceneInstances.map((sceneInstance) => ({
-  ...sceneInstance,
-  temporal: composeSceneTemporalState(
-    sceneInstance.temporal,
-    createPlacementPreservingReverseTransform(sceneInstance.temporal.visibilityWindow),
-  ),
-}));
