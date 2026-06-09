@@ -263,6 +263,9 @@
     const disposeKeyboardShortcuts = mountKeyboardShortcuts({
       editorSession,
       closeContextMenu,
+      onNewRack: () => presetController.handleNewRack(),
+      onSaveRack: () => presetController.handleSaveRack(),
+      onSaveRackAs: () => presetController.handleSaveRackAs(),
       onBeforeUnload: disposeBridgeSubscriptions,
     });
     const disposeMainWindowCloseRequest = bridgeClient.subscribeMainWindowCloseRequest(() => {
@@ -365,7 +368,7 @@
             id="rack-new-button"
             text="New"
             disabled={presetState.isRackPresetLoadPending}
-            title="Create a new rack."
+            title="Create a new rack (Cmd/Ctrl+N)."
             label="New rack"
             onClick={() => presetController.handleNewRack()}
           />
@@ -374,8 +377,8 @@
             text="Save"
             disabled={presetState.isRackPresetLoadPending}
             title={presetState.currentRackFilePath
-              ? 'Save the current rack.'
-              : 'Save the current rack as a file.'}
+              ? 'Save the current rack (Cmd/Ctrl+S).'
+              : 'Save the current rack as a file (Cmd/Ctrl+S).'}
             label="Save rack"
             onClick={() => presetController.handleSaveRack()}
           />
@@ -383,7 +386,7 @@
             id="rack-save-as-button"
             text="Save As"
             disabled={presetState.isRackPresetLoadPending}
-            title="Save the current rack as..."
+            title="Save the current rack as... (Cmd/Ctrl+Shift+S)."
             label="Save rack as"
             onClick={() => presetController.handleSaveRackAs()}
           />

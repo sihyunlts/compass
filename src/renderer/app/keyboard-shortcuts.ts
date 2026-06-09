@@ -4,6 +4,9 @@ import { isTextEditingElement } from '../features/rack/text-editing';
 interface KeyboardShortcutOptions {
   editorSession: EditorSession;
   closeContextMenu: () => void;
+  onNewRack?: () => void | Promise<void>;
+  onSaveRack?: () => void | Promise<void>;
+  onSaveRackAs?: () => void | Promise<void>;
   onBeforeUnload?: () => void;
 }
 
@@ -62,6 +65,22 @@ export const mountKeyboardShortcuts = (
         if (options.editorSession.commands.beginRenameSelection()) {
           options.closeContextMenu();
         }
+        return;
+      }
+
+      if (key === 'n' && !event.shiftKey) {
+        event.preventDefault();
+        options.closeContextMenu();
+        void options.onNewRack?.();
+        return;
+      }
+
+      if (key === 's') {
+        event.preventDefault();
+        options.closeContextMenu();
+        void (event.shiftKey
+          ? options.onSaveRackAs?.()
+          : options.onSaveRack?.());
         return;
       }
 
