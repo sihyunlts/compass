@@ -26,6 +26,7 @@ import {
   resolveDevicePresetSuggestedName,
   resolveGroupPresetSuggestedName,
 } from '../features/editor/presets';
+import { createDefaultChainSettings } from '../features/editor/persistence-storage';
 import type { EditorSession } from '../features/editor/session.svelte';
 import { resolveGroupMemberIds } from '../features/editor/chain-ops';
 import type { RackDropZone } from '../features/rack/drop-ops';
@@ -199,6 +200,12 @@ class PresetController {
 
   public async handleSaveRackAs(): Promise<void> {
     await this.saveRackAs({ showSuccessMessage: true });
+  }
+
+  public async handleNewRack(): Promise<void> {
+    await this.runPresetAction(async () => {
+      await this.requestNewRack();
+    }, 'New rack failed.');
   }
 
   private markCurrentRackClean(): void {
@@ -832,6 +839,39 @@ class PresetController {
     this.setCurrentRackFile(target.filePath, target.label);
     this.markCurrentRackClean();
     this.showMessage('Rack loaded.');
+  }
+
+  private async requestNewRack(): Promise<void> {
+    this.syncRackDirtyState();
+    const load = async (): Promise<void> => {
+      this.loadNewRack();
+    };
+
+    if (this.state.isRackDirty) {
+      this.state.pendingRackPresetLoadTarget = {
+        label: DEFAULT_RACK_FILE_DISPLAY_NAME,
+        description: 'Save changes to the current rack before creating a new rack?',
+        load,
+      };
+      this.state.isRackPresetLoadPending = false;
+      return;
+    }
+
+    await load();
+  }
+
+  private loadNewRack(): void {
+    const result = this.options.editorSession.commands.applyRackPreset(
+      buildRackPresetFile(createDefaultChainSettings(), []),
+    );
+    if (!result.ok) {
+      this.showMessage(result.message);
+      return;
+    }
+
+    this.setCurrentRackFile(null, DEFAULT_RACK_FILE_DISPLAY_NAME);
+    this.markCurrentRackClean();
+    this.showMessage('New rack created.');
   }
 
   private async savePreset(

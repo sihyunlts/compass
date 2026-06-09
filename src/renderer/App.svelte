@@ -362,6 +362,14 @@
             dirty={presetState.isRackDirty}
           />
           <Button
+            id="rack-new-button"
+            text="New"
+            disabled={presetState.isRackPresetLoadPending}
+            title="Create a new rack."
+            label="New rack"
+            onClick={() => presetController.handleNewRack()}
+          />
+          <Button
             id="rack-save-button"
             text="Save"
             disabled={presetState.isRackPresetLoadPending}
