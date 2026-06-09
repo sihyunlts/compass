@@ -981,6 +981,17 @@ const resolveFrameActivationStepBeats = (
   return activationStepFrames * sampleStepBeats;
 };
 
+const resolveFrameActivationSignature = (
+  strokes: ReadonlyArray<GeometryStroke>,
+): string => Array.from(
+  new Set(
+    strokes
+      .map((stroke) => stroke.polyline.activationSignature ?? `stroke:${stroke.writeId}`),
+  ),
+)
+  .sort()
+  .join('|');
+
 const buildSourceTimingSegmentsByOriginId = (
   sourceStrokesByOriginAndFrame: ReadonlyMap<string, ReadonlyMap<number, ReadonlyArray<GeometryStroke>>>,
   sampleStepBeats: number,
@@ -1028,14 +1039,7 @@ const buildSourceTimingSegmentsByOriginId = (
         continue;
       }
 
-      const signature = Array.from(
-        new Set(
-          frameStrokes
-            .map((stroke) => stroke.polyline.activationSignature ?? `stroke:${stroke.writeId}`),
-        ),
-      )
-        .sort()
-        .join('|');
+      const signature = resolveFrameActivationSignature(frameStrokes);
       if (!signature) {
         flushActiveSegment();
         activeSegmentStartFrame = null;
@@ -1140,14 +1144,23 @@ const resolveColorSlotSourceEndBeat = <T extends TimedColorSource>(
 const resolveColorSlotSourceFrameWindow = <T extends TimedColorSource>(
   slot: PlannedColorSlot<T>,
   timeline: GeometryTimeline,
-): FrameWindow => toFrameWindow(
-  {
-    start: slot.sourceStartBeat,
-    end: resolveColorSlotSourceEndBeat(slot),
-  },
-  timeline.sampleStepBeats,
-  timeline.frames.length,
-);
+): FrameWindow => {
+  const startBeat = slot.sourceStartBeat;
+  const endBeat = resolveColorSlotSourceEndBeat(slot);
+  const startFrame = Math.min(
+    Math.max(Math.round(startBeat / timeline.sampleStepBeats), 0),
+    timeline.frames.length,
+  );
+  const endFrameExclusive = Math.min(
+    Math.max(Math.ceil((endBeat / timeline.sampleStepBeats) - 1e-9), startFrame),
+    timeline.frames.length,
+  );
+
+  return {
+    startFrame,
+    endFrameExclusive,
+  };
+};
 
 const resolveColorSlotDestinationFrameWindow = <T extends TimedColorSource>(
   slot: PlannedColorSlot<T>,
@@ -1164,7 +1177,7 @@ const resolveColorSlotDestinationFrameWindow = <T extends TimedColorSource>(
 const resolveColorDestinationFrameIndex = (
   slotStartBeat: number,
   sampleStepBeats: number,
-): number => Math.floor(
+): number => Math.round(
   slotStartBeat / sampleStepBeats,
 );
 

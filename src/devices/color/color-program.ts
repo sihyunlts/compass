@@ -130,10 +130,20 @@ export const planColorProgramSlots = <T extends TimedColorSource>(
 
   const slots: PlannedColorSlot<T>[] = [];
   for (const source of sourceSegments) {
+    const sourceStepDuration = source.referenceDuration ?? timing.slotStepDuration;
+    const sourceSegmentLength = Math.max(
+      sourceStepDuration * (colorConfig.noteLengthPercent / 100),
+      MIN_COLOR_SEGMENT,
+    );
+    const sourceGapDuration = Math.max(
+      sourceStepDuration * (colorConfig.gapPercent / 100),
+      0,
+    );
+
     for (let slotIndex = 0; slotIndex < colorConfig.velocities.length; slotIndex += 1) {
-      const offset = slotIndex * (timing.slotStepDuration + timing.gapDuration);
+      const offset = slotIndex * (sourceStepDuration + sourceGapDuration);
       const startBeat = source.startBeat + offset;
-      const endBeat = startBeat + timing.segmentLength;
+      const endBeat = startBeat + sourceSegmentLength;
       if (!Number.isFinite(startBeat) || !Number.isFinite(endBeat) || endBeat <= startBeat) {
         continue;
       }
