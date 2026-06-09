@@ -1,6 +1,6 @@
 {
   "name": "compass",
-  "productName": "compass",
+  "productName": "Compass",
   "version": "1.0.0",
   "description": "Next Generation Lightshow Tool",
   "main": ".vite/build/main.js",
