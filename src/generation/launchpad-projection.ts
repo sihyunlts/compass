@@ -31,22 +31,6 @@ interface WinnerStroke {
   originId: string;
 }
 
-type OccupiedCoordinate = ReturnType<typeof collectOccupiedCoordinates> extends Map<string, infer T>
-  ? T
-  : never;
-
-interface BalancedColorSlotGroup {
-  slotCount: number;
-  candidateByCoordinateKey: Map<string, OccupiedCoordinate[]>;
-  slotStatsByIndex: Map<number, {
-    originId: string;
-    velocity: number;
-    xTotal: number;
-    yTotal: number;
-    count: number;
-  }>;
-}
-
 const TILE_MIN = 0;
 const TILE_MAX = 9;
 const TILE_COUNT = 10;
@@ -135,128 +119,6 @@ const isVisibleStroke = (
   return !(stroke.originGroupId && mutedGroupIds.has(stroke.originGroupId));
 };
 
-const toBalancedColorGroupKey = (
-  coordinate: OccupiedCoordinate,
-): string | null => {
-  if (
-    typeof coordinate.colorSlotIndex !== 'number'
-    || typeof coordinate.colorSlotCount !== 'number'
-    || coordinate.colorSlotCount <= 1
-    || typeof coordinate.rasterRadius !== 'number'
-    || coordinate.rasterRadius <= 0
-  ) {
-    return null;
-  }
-
-  return [
-    coordinate.originId,
-    coordinate.originGroupId ?? '',
-    coordinate.colorSlotCount,
-  ].join('|');
-};
-
-const applyBalancedColorSlotWinners = (
-  winnerByCoordinate: Map<string, WinnerStroke>,
-  visibleStrokes: ReadonlyArray<GeometryStroke>,
-  coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
-): void => {
-  const rawOccupied = collectOccupiedCoordinates(visibleStrokes, false);
-  const groupByKey = new Map<string, BalancedColorSlotGroup>();
-
-  for (const coordinate of rawOccupied.values()) {
-    const coordinateKey = toRoundedCoordinateKey(coordinate.x, coordinate.y);
-    if (coordinateKey === null || !coordinateGroupByKey.has(coordinateKey)) {
-      continue;
-    }
-
-    const groupKey = toBalancedColorGroupKey(coordinate);
-    if (groupKey === null || typeof coordinate.colorSlotIndex !== 'number' || typeof coordinate.colorSlotCount !== 'number') {
-      continue;
-    }
-
-    let group = groupByKey.get(groupKey);
-    if (!group) {
-      group = {
-        slotCount: coordinate.colorSlotCount,
-        candidateByCoordinateKey: new Map(),
-        slotStatsByIndex: new Map(),
-      };
-      groupByKey.set(groupKey, group);
-    }
-
-    const candidates = group.candidateByCoordinateKey.get(coordinateKey) ?? [];
-    candidates.push(coordinate);
-    group.candidateByCoordinateKey.set(coordinateKey, candidates);
-
-    const slotStats = group.slotStatsByIndex.get(coordinate.colorSlotIndex) ?? {
-      originId: coordinate.originId,
-      velocity: coordinate.velocity,
-      xTotal: 0,
-      yTotal: 0,
-      count: 0,
-    };
-    slotStats.xTotal += coordinate.x;
-    slotStats.yTotal += coordinate.y;
-    slotStats.count += 1;
-    group.slotStatsByIndex.set(coordinate.colorSlotIndex, slotStats);
-  }
-
-  for (const group of groupByKey.values()) {
-    if (group.candidateByCoordinateKey.size === 0 || group.slotStatsByIndex.size < 2) {
-      continue;
-    }
-
-    const orderedSlots = Array.from(group.slotStatsByIndex.entries())
-      .sort(([left], [right]) => left - right);
-    const firstStats = orderedSlots[0][1];
-    const lastStats = orderedSlots[orderedSlots.length - 1][1];
-    const firstCenter = {
-      x: firstStats.xTotal / firstStats.count,
-      y: firstStats.yTotal / firstStats.count,
-    };
-    const lastCenter = {
-      x: lastStats.xTotal / lastStats.count,
-      y: lastStats.yTotal / lastStats.count,
-    };
-    const axis = {
-      x: lastCenter.x - firstCenter.x,
-      y: lastCenter.y - firstCenter.y,
-    };
-    const axisLength = Math.hypot(axis.x, axis.y);
-    const axisX = axisLength > 1e-9 ? axis.x / axisLength : 1;
-    const axisY = axisLength > 1e-9 ? axis.y / axisLength : 0;
-
-    const sortedCoordinateKeys = Array.from(group.candidateByCoordinateKey.keys())
-      .sort((leftKey, rightKey) => {
-        const left = coordinateGroupByKey.get(leftKey);
-        const right = coordinateGroupByKey.get(rightKey);
-        if (!left || !right) {
-          return leftKey.localeCompare(rightKey);
-        }
-
-        const projectionDelta = ((left.x * axisX) + (left.y * axisY)) - ((right.x * axisX) + (right.y * axisY));
-        return projectionDelta || leftKey.localeCompare(rightKey);
-      });
-
-    for (let index = 0; index < sortedCoordinateKeys.length; index += 1) {
-      const coordinateKey = sortedCoordinateKeys[index];
-      const slotIndex = Math.min(
-        group.slotCount - 1,
-        Math.floor((index * group.slotCount) / sortedCoordinateKeys.length),
-      );
-      const slotStats = group.slotStatsByIndex.get(slotIndex);
-      if (!slotStats) {
-        continue;
-      }
-
-      winnerByCoordinate.set(coordinateKey, {
-        velocity: slotStats.velocity,
-        originId: slotStats.originId,
-      });
-    }
-  }
-};
-
 const resolveWinnerByCoordinate = (
   strokes: ReadonlyArray<GeometryStroke>,
   coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
@@ -290,8 +152,6 @@ const resolveWinnerByCoordinate = (
       originId: coordinate.originId,
     });
   }
-
-  applyBalancedColorSlotWinners(winnerByCoordinate, visibleStrokes, coordinateGroupByKey);
 
   return winnerByCoordinate;
 };

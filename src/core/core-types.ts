@@ -79,7 +79,6 @@ export interface Polyline {
   activationSignature?: string;
   activationStepBeats?: number;
   rasterMode?: 'centerline';
-  rasterRadius?: number;
   colorSlotIndex?: number;
   colorSlotCount?: number;
   clipStack: SceneClip[];

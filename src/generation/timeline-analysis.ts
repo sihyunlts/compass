@@ -15,7 +15,6 @@ interface OccupiedCoordinate {
   writeOrder: number;
   writeId: number;
   distanceSquared: number;
-  rasterRadius?: number;
   colorSlotIndex?: number;
   colorSlotCount?: number;
 }
@@ -83,7 +82,7 @@ const shouldReplaceWinner = (
   current: OccupiedCoordinate,
 ): boolean => {
   if (isRelatedColorSlotCandidate(candidate, current)) {
-    const distanceDelta = candidate.distanceSquared - current.distanceSquared;
+    const distanceDelta = resolveColorSlotBoundaryDistance(candidate) - resolveColorSlotBoundaryDistance(current);
     if (Math.abs(distanceDelta) > 1e-9) {
       return distanceDelta < 0;
     }
@@ -105,6 +104,15 @@ const isRelatedColorSlotCandidate = (
   && typeof second.colorSlotCount === 'number'
   && first.colorSlotCount === second.colorSlotCount
 );
+
+const resolveColorSlotBoundaryDistance = (
+  coordinate: OccupiedCoordinate,
+): number => {
+  const edgeSlotPenalty = coordinate.colorSlotIndex === 0 || coordinate.colorSlotIndex === coordinate.colorSlotCount - 1
+    ? 0.04
+    : 0;
+  return coordinate.distanceSquared + edgeSlotPenalty;
+};
 
 const collectCenterlineCandidateCoordinates = (
   stroke: GeometryStroke,
@@ -156,41 +164,6 @@ const collectCenterlineCandidateCoordinates = (
   return Array.from(coordinates.values());
 };
 
-const collectBandCandidateCoordinates = (
-  stroke: GeometryStroke,
-  radius: number,
-): Array<{ x: number; y: number }> => {
-  const points = stroke.polyline.points;
-  if (points.length === 0) {
-    return [];
-  }
-
-  let minX = Number.POSITIVE_INFINITY;
-  let maxX = Number.NEGATIVE_INFINITY;
-  let minY = Number.POSITIVE_INFINITY;
-  let maxY = Number.NEGATIVE_INFINITY;
-  for (const point of points) {
-    if (point.x < minX) minX = point.x;
-    if (point.x > maxX) maxX = point.x;
-    if (point.y < minY) minY = point.y;
-    if (point.y > maxY) maxY = point.y;
-  }
-
-  const coordinates: Array<{ x: number; y: number }> = [];
-  const radiusSquared = radius * radius;
-  for (let y = Math.floor(minY - radius); y <= Math.ceil(maxY + radius); y += 1) {
-    for (let x = Math.floor(minX - radius); x <= Math.ceil(maxX + radius); x += 1) {
-      if (distanceToPolylineSquared({ x, y }, stroke.polyline) > radiusSquared) {
-        continue;
-      }
-
-      coordinates.push({ x, y });
-    }
-  }
-
-  return coordinates;
-};
-
 const collectStrokeOccupiedCoordinates = (
   stroke: GeometryStroke,
 ): Array<{ x: number; y: number }> => {
@@ -200,10 +173,7 @@ const collectStrokeOccupiedCoordinates = (
   }
 
   let coordinates: Array<{ x: number; y: number }>;
-  const rasterRadius = stroke.polyline.rasterRadius;
-  if (typeof rasterRadius === 'number' && Number.isFinite(rasterRadius) && rasterRadius > 0) {
-    coordinates = collectBandCandidateCoordinates(stroke, rasterRadius);
-  } else if (stroke.polyline.rasterMode === 'centerline') {
+  if (stroke.polyline.rasterMode === 'centerline') {
     coordinates = collectCenterlineCandidateCoordinates(stroke);
   } else {
     const bounds = toCandidateBounds(stroke);
@@ -339,7 +309,6 @@ export const collectOccupiedCoordinates = (
         writeOrder: stroke.writeOrder,
         writeId: stroke.writeId,
         distanceSquared: distanceToPolylineSquared({ x, y }, stroke.polyline),
-        rasterRadius: stroke.polyline.rasterRadius,
         colorSlotIndex: stroke.polyline.colorSlotIndex,
         colorSlotCount: stroke.polyline.colorSlotCount,
       };

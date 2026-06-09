@@ -105,6 +105,33 @@ const resolveColorProgramTiming = (
   };
 };
 
+const resolveNonSteppedMovingReferenceDuration = <T extends TimedColorSource>(
+  sourceSegments: ReadonlyArray<T>,
+  colorConfig: ColorDeviceConfig,
+): number | null => {
+  if (
+    sourceSegments.length <= 1
+    || colorConfig.velocities.length <= 1
+    || sourceSegments.some((sourceSegment) => sourceSegment.referenceDuration !== undefined)
+  ) {
+    return null;
+  }
+
+  const firstStartBeat = sourceSegments[0].startBeat;
+  const lastEndBeat = sourceSegments[sourceSegments.length - 1].endBeat;
+  const sourceSpan = lastEndBeat - firstStartBeat;
+  if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
+    return null;
+  }
+
+  const slotCount = colorConfig.velocities.length;
+  const timelineDivisions = Math.max(slotCount * 2, 14);
+  const referenceDuration = sourceSpan / timelineDivisions;
+  return Number.isFinite(referenceDuration) && referenceDuration > 0
+    ? referenceDuration
+    : null;
+};
+
 export const planColorProgramSlots = <T extends TimedColorSource>(
   sourceSegments: ReadonlyArray<T>,
   colorConfig: ColorDeviceConfig,
@@ -113,12 +140,13 @@ export const planColorProgramSlots = <T extends TimedColorSource>(
     return [];
   }
 
-  const referenceDuration = resolveMedianDuration(
-    sourceSegments
-      .map((sourceSegment) => sourceSegment.endBeat - sourceSegment.startBeat)
-      .map((duration, index) => sourceSegments[index].referenceDuration ?? duration)
-      .filter((duration) => Number.isFinite(duration) && duration > 0),
-  );
+  const referenceDuration = resolveNonSteppedMovingReferenceDuration(sourceSegments, colorConfig)
+    ?? resolveMedianDuration(
+      sourceSegments
+        .map((sourceSegment) => sourceSegment.endBeat - sourceSegment.startBeat)
+        .map((duration, index) => sourceSegments[index].referenceDuration ?? duration)
+        .filter((duration) => Number.isFinite(duration) && duration > 0),
+    );
   if (referenceDuration === null) {
     return [];
   }
@@ -139,9 +167,12 @@ export const planColorProgramSlots = <T extends TimedColorSource>(
       sourceStepDuration * (colorConfig.gapPercent / 100),
       0,
     );
+    const sourceSlotStride = source.referenceDuration === undefined
+      ? sourceStepDuration + sourceGapDuration
+      : sourceSegmentLength + sourceGapDuration;
 
     for (let slotIndex = 0; slotIndex < colorConfig.velocities.length; slotIndex += 1) {
-      const offset = slotIndex * (sourceStepDuration + sourceGapDuration);
+      const offset = slotIndex * sourceSlotStride;
       const startBeat = source.startBeat + offset;
       const endBeat = startBeat + sourceSegmentLength;
       if (!Number.isFinite(startBeat) || !Number.isFinite(endBeat) || endBeat <= startBeat) {
