@@ -307,7 +307,7 @@ class PresetController {
       this.state.presetTree = [];
       this.state.presetErrorText = error instanceof Error && error.message.trim()
         ? error.message.trim()
-        : 'Failed to load library.';
+        : 'Failed to load presets.';
     } finally {
       if (requestToken === this.presetListRequestToken) {
         this.state.isPresetLoading = false;
@@ -318,7 +318,7 @@ class PresetController {
   public async handlePresetEntryOpen(entry: BrowserTreePresetLeafNode): Promise<void> {
     await this.runPresetAction(async () => {
       await this.loadPresetFromBrowserEntry(entry);
-    }, 'Library item load failed.');
+    }, 'Preset load failed.');
   }
 
   public async handlePresetFilePointerDown(
@@ -335,7 +335,7 @@ class PresetController {
         this.toReadPresetEntryRequest(entry),
       );
       if (response.status === 'error') {
-        this.showMessage(`Library item load failed | ${response.message}`);
+        this.showMessage(`Preset load failed | ${response.message}`);
         return;
       }
 
@@ -350,7 +350,7 @@ class PresetController {
         sourceEvent,
         itemEl,
       });
-    }, 'Library item load failed.');
+    }, 'Preset load failed.');
   }
 
   public openRackPresetDropDialog(
@@ -670,7 +670,7 @@ class PresetController {
 
   public async handlePresetFileDrop(payload: RackPresetFileDrop): Promise<void> {
     if (payload.fileCount !== 1) {
-      this.showMessage('Drop a single library file at a time.');
+      this.showMessage('Drop a single preset file at a time.');
       return;
     }
 
@@ -782,7 +782,7 @@ class PresetController {
       this.toReadPresetEntryRequest(entry),
     );
     if (response.status === 'error') {
-      this.showMessage(`Library item load failed | ${response.message}`);
+      this.showMessage(`Preset load failed | ${response.message}`);
       return;
     }
 

@@ -83,13 +83,13 @@ export class PresetStorage {
     const rootDirectory = await this.resolvePresetDirectory(presetType);
     const parentDirectory = resolvePresetPath(rootDirectory, parentRelativePath);
     if (!parentDirectory) {
-      throw new Error('Invalid library folder path.');
+      throw new Error('Invalid preset folder path.');
     }
 
     const relativePath = [...parentRelativePath, normalizedFolderName];
     const directoryPath = resolvePresetPath(rootDirectory, relativePath);
     if (!directoryPath) {
-      throw new Error('Invalid library folder path.');
+      throw new Error('Invalid preset folder path.');
     }
 
     try {
@@ -115,7 +115,7 @@ export class PresetStorage {
     folderName: string,
   ): Promise<string[]> {
     if (relativePath.length === 0) {
-      throw new Error('Library root folders cannot be renamed.');
+      throw new Error('Preset root folders cannot be renamed.');
     }
 
     const normalizedFolderName = normalizePresetPathSegment(folderName);
@@ -126,7 +126,7 @@ export class PresetStorage {
     const rootDirectory = await this.resolvePresetDirectory(presetType);
     const sourceDirectory = resolvePresetPath(rootDirectory, relativePath);
     if (!sourceDirectory) {
-      throw new Error('Invalid library folder path.');
+      throw new Error('Invalid preset folder path.');
     }
 
     const parentRelativePath = relativePath.slice(0, -1);
@@ -137,7 +137,7 @@ export class PresetStorage {
 
     const targetDirectory = resolvePresetPath(rootDirectory, nextRelativePath);
     if (!targetDirectory) {
-      throw new Error('Invalid library folder path.');
+      throw new Error('Invalid preset folder path.');
     }
 
     try {

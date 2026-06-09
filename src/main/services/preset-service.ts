@@ -125,7 +125,7 @@ export class PresetService {
     } catch (error) {
       return {
         status: 'error',
-        message: toErrorMessage(error, 'Failed to list library.'),
+        message: toErrorMessage(error, 'Failed to list presets.'),
       };
     }
   }
@@ -224,7 +224,7 @@ export class PresetService {
     if (!parsedRequest) {
       return {
         status: 'error',
-        message: 'Invalid library item request.',
+        message: 'Invalid preset item request.',
       };
     }
 
@@ -285,7 +285,7 @@ export class PresetService {
     } catch (error) {
       return {
         status: 'error',
-        message: toErrorMessage(error, 'Failed to reveal library folder.'),
+        message: toErrorMessage(error, 'Failed to reveal presets folder.'),
       };
     }
   }
@@ -297,7 +297,7 @@ export class PresetService {
     if (!parsedRequest) {
       return {
         status: 'error',
-        message: 'Invalid library item request.',
+        message: 'Invalid preset item request.',
       };
     }
 
@@ -327,7 +327,7 @@ export class PresetService {
     } catch (error) {
       return {
         status: 'error',
-        message: toErrorMessage(error, 'Failed to delete library item.'),
+        message: toErrorMessage(error, 'Failed to delete preset item.'),
       };
     }
   }
