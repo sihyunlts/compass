@@ -61,10 +61,8 @@ import type {
   SpatialRequirement,
 } from './analysis/types';
 import {
-  collectActivationSegments,
   collectOccupiedCoordinates,
   createCoordinateMask,
-  type GeometryActivationSegment,
 } from './timeline-analysis';
 import {
   addExistingStrokeToFrame,
@@ -437,16 +435,6 @@ const forEachTargetedFrame = (
     }
 
     visit(frameIndex, targeted);
-  }
-};
-
-const stripTargetedFrames = (
-  timeline: GeometryTimeline,
-  sourceFrameCount: number,
-  targetGroupId: string | null,
-): void => {
-  for (let frameIndex = 0; frameIndex < sourceFrameCount; frameIndex += 1) {
-    takeTargetedStrokesFromFrame(timeline, frameIndex, targetGroupId);
   }
 };
 
@@ -931,9 +919,37 @@ const buildSourceFrameIndexesByOriginId = (
 ): Map<string, number[]> => new Map(
   Array.from(sourceStrokesByOriginAndFrame.entries(), ([originId, frameMap]) => [
     originId,
-    Array.from(frameMap.keys()),
+    Array.from(frameMap.keys()).sort((left, right) => left - right),
   ]),
 );
+
+interface ColorTimingSegment extends TimedColorSource {
+  originId: string;
+}
+
+const buildSourceTimingSegmentsByOriginId = (
+  sourceStrokesByOriginAndFrame: ReadonlyMap<string, ReadonlyMap<number, ReadonlyArray<GeometryStroke>>>,
+  sampleStepBeats: number,
+): Map<string, ColorTimingSegment[]> => {
+  const segmentsByOriginId = new Map<string, ColorTimingSegment[]>();
+
+  for (const [originId, frameMap] of sourceStrokesByOriginAndFrame.entries()) {
+    const frameIndexes = Array.from(frameMap.keys()).sort((left, right) => left - right);
+    if (frameIndexes.length === 0) {
+      continue;
+    }
+
+    const segments = frameIndexes.map((frameIndex): ColorTimingSegment => ({
+      originId,
+      startBeat: frameIndex * sampleStepBeats,
+      endBeat: (frameIndex + 1) * sampleStepBeats,
+    }));
+
+    segmentsByOriginId.set(originId, segments);
+  }
+
+  return segmentsByOriginId;
+};
 
 const splitFrameStrokesByOriginIds = (
   strokes: ReadonlyArray<GeometryStroke>,
@@ -1218,7 +1234,7 @@ const buildPendingTemporalMaterializationRemaps = (
     const placementWindow = resolveOutputWindow(timelineState);
     const placementSpan = placementWindow.end - placementWindow.start;
     const sourceFrameIndexByOutputFrame: Array<number | null> = !Number.isFinite(placementSpan) || placementSpan <= 0
-      ? Array.from({ length: outputFrameCount }, () => null)
+      ? Array.from({ length: outputFrameCount }, (): number | null => null)
       : Array.from(
           { length: outputFrameCount },
           (_, frameIndex) => {
@@ -1735,74 +1751,6 @@ const applyMaskEffect = (
   };
 };
 
-interface ColorTimingSegment extends TimedColorSource {
-  originId: string;
-}
-
-const groupActivationSegmentsByOriginId = (
-  segments: ReadonlyArray<GeometryActivationSegment>,
-): Map<string, ColorTimingSegment[]> => {
-  const rawSegmentsByOriginId = new Map<string, ColorTimingSegment[]>();
-
-  for (const segment of segments) {
-    if (
-      !Number.isFinite(segment.startBeat)
-      || !Number.isFinite(segment.endBeat)
-      || segment.endBeat <= segment.startBeat
-    ) {
-      continue;
-    }
-
-    const existingSegments = rawSegmentsByOriginId.get(segment.originId);
-    if (existingSegments) {
-      existingSegments.push({
-        originId: segment.originId,
-        startBeat: segment.startBeat,
-        endBeat: segment.endBeat,
-      });
-      continue;
-    }
-
-    rawSegmentsByOriginId.set(segment.originId, [{
-      originId: segment.originId,
-      startBeat: segment.startBeat,
-      endBeat: segment.endBeat,
-    }]);
-  }
-
-  const segmentsByOriginId = new Map<string, ColorTimingSegment[]>();
-  for (const [originId, rawSegments] of rawSegmentsByOriginId.entries()) {
-    if (rawSegments.length === 0) {
-      continue;
-    }
-
-    const orderedSegments = [...rawSegments].sort((left, right) => (
-      left.startBeat - right.startBeat || left.endBeat - right.endBeat
-    ));
-    const mergedSegments: ColorTimingSegment[] = [];
-
-    for (const currentSegment of orderedSegments) {
-      const previousSegment = mergedSegments[mergedSegments.length - 1];
-      if (!previousSegment || currentSegment.startBeat > previousSegment.endBeat + TIMELINE_WINDOW_EPSILON) {
-        mergedSegments.push({
-          originId,
-          startBeat: currentSegment.startBeat,
-          endBeat: currentSegment.endBeat,
-        });
-        continue;
-      }
-
-      previousSegment.endBeat = Math.max(previousSegment.endBeat, currentSegment.endBeat);
-    }
-
-    if (mergedSegments.length > 0) {
-      segmentsByOriginId.set(originId, mergedSegments);
-    }
-  }
-
-  return segmentsByOriginId;
-};
-
 const applyColorEffect = (
   state: MutableGenerationState,
   effect: ColorEffectNode,
@@ -1820,21 +1768,18 @@ const applyColorEffect = (
     state.timeline.sampleStepBeats,
     state.timeline.frames.length,
   );
-  const targetSegmentsByOriginId = groupActivationSegmentsByOriginId(
-    collectActivationSegments(
-      state.timeline,
-      (stroke) => isTargetedStroke(stroke, targetGroupId),
-    ),
-  );
+  const targetOriginIds = buildTargetOriginIds(state.timeline, targetGroupId);
   const sourceStrokesByOriginAndFrame = buildSourceStrokesByOriginAndFrame(
     state.timeline,
-    new Set(targetSegmentsByOriginId.keys()),
+    targetOriginIds,
+  );
+  const targetSegmentsByOriginId = buildSourceTimingSegmentsByOriginId(
+    sourceStrokesByOriginAndFrame,
+    state.timeline.sampleStepBeats,
   );
   const sourceFrameIndexesByOriginId = buildSourceFrameIndexesByOriginId(
     sourceStrokesByOriginAndFrame,
   );
-
-  stripTargetedFrames(nextTimeline, state.timeline.frames.length, targetGroupId);
 
   for (const [originId, sourceSegments] of targetSegmentsByOriginId.entries()) {
     const sourceStrokesByFrame = sourceStrokesByOriginAndFrame.get(originId);
@@ -1849,7 +1794,6 @@ const applyColorEffect = (
     }
 
     for (const slot of slots) {
-      ensureTimelineFrameCount(nextTimeline, slot.endBeat);
       const sourceFrameWindow = resolveColorSlotSourceFrameWindow(slot, state.timeline);
       const destinationFrameWindow = resolveColorSlotDestinationFrameWindow(slot, nextTimeline);
 

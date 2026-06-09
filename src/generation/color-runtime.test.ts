@@ -26,6 +26,18 @@ const colorDevice: Extract<GeneratorDeviceNode, { kind: 'color' }> = {
   },
 };
 
+const defaultColorDevice: Extract<GeneratorDeviceNode, { kind: 'color' }> = {
+  id: 'c2',
+  kind: 'color',
+  enabled: true,
+  groupId: null,
+  params: {
+    velocities: [3],
+    noteLengthPercent: 100,
+    gapPercent: 0,
+  },
+};
+
 const pathDevice: Extract<GeneratorDeviceNode, { kind: 'path' }> = {
   id: 'p1',
   kind: 'path',
@@ -129,13 +141,11 @@ const toShapeSignature = (
 test('color preserves upstream stroke polylines instead of creating point followers', () => {
   const timeline = buildTimeline([pathDevice, colorDevice]);
   const activeStrokes = timeline.frames.flatMap((frame) => frame.strokes);
+  const colorVelocities = new Set(colorDevice.params.velocities);
 
   assert.ok(activeStrokes.length > 0);
   assert.equal(activeStrokes.every((stroke) => stroke.polyline.points.length > 1), true);
-  assert.deepEqual(
-    new Set(activeStrokes.map((stroke) => stroke.polyline.velocity)),
-    new Set(colorDevice.params.velocities),
-  );
+  assert.equal(activeStrokes.some((stroke) => colorVelocities.has(stroke.polyline.velocity)), true);
 });
 
 test('color keeps scanner and spiral source polylines intact', () => {
@@ -161,6 +171,71 @@ test('color keeps scanner and spiral source polylines intact', () => {
   assert.ok(spiralColorShapes.length > 0);
   assert.equal(scannerColorShapes.every((shape) => scannerSourceShapes.has(shape)), true);
   assert.equal(spiralColorShapes.every((shape) => spiralSourceShapes.has(shape)), true);
+});
+
+test('default color adds a top paint layer without deleting source strokes', () => {
+  for (const sourceDevice of [pathDevice, scannerDevice, spiralDevice]) {
+    const sourceTimeline = buildTimeline([sourceDevice]);
+    const colorTimeline = buildTimeline([sourceDevice, defaultColorDevice]);
+
+    assert.equal(colorTimeline.frames.length, sourceTimeline.frames.length);
+    for (let frameIndex = 0; frameIndex < sourceTimeline.frames.length; frameIndex += 1) {
+      const sourceFrame = sourceTimeline.frames[frameIndex];
+      const colorFrame = colorTimeline.frames[frameIndex];
+
+      assert.equal(colorFrame.strokes.length >= sourceFrame.strokes.length, true);
+      assert.equal(
+        sourceFrame.strokes.every((sourceStroke) => (
+          colorFrame.strokes.some((colorStroke) => toShapeSignature(colorStroke) === toShapeSignature(sourceStroke))
+        )),
+        true,
+      );
+      const topStroke = colorFrame.strokes[colorFrame.strokes.length - 1];
+      if (topStroke) {
+        assert.equal(topStroke.polyline.velocity, defaultColorDevice.params.velocities[0]);
+      }
+    }
+  }
+});
+
+test('color does not multiply scanner strokes from coordinate activation segments', () => {
+  const scannerTimeline = buildTimeline([scannerDevice, colorDevice]);
+  const maxStrokesPerFrame = Math.max(...scannerTimeline.frames.map((frame) => frame.strokes.length));
+  const layeredFrame = scannerTimeline.frames.find(
+    (frame) => {
+      const frameVelocities = new Set(frame.strokes.map((stroke) => stroke.polyline.velocity));
+      return colorDevice.params.velocities.every((velocity) => frameVelocities.has(velocity));
+    },
+  );
+  const activeVelocities = new Set(
+    scannerTimeline.frames.flatMap((frame) => frame.strokes.map((stroke) => stroke.polyline.velocity)),
+  );
+
+  assert.equal(maxStrokesPerFrame <= colorDevice.params.velocities.length + 1, true);
+  assert.ok(layeredFrame);
+  assert.equal(colorDevice.params.velocities.every((velocity) => activeVelocities.has(velocity)), true);
+});
+
+test('later color slots can draw above earlier source paint when geometry overlaps', () => {
+  const timeline = buildTimeline([pathDevice, colorDevice]);
+  const overlappingFrame = timeline.frames.find((frame) => frame.strokes.length > 1);
+
+  assert.ok(overlappingFrame);
+  assert.equal(colorDevice.params.velocities.includes(
+    overlappingFrame.strokes[overlappingFrame.strokes.length - 1].polyline.velocity,
+  ), true);
+});
+
+test('color keeps downstream runtime inside the fixed loop boundary', () => {
+  for (const devices of [
+    [scannerDevice, colorDevice],
+    [scannerDevice, colorDevice, rotateDevice],
+  ]) {
+    const timeline = buildTimeline(devices);
+
+    assert.equal(timeline.timeDomainEndBeat, 1);
+    assert.equal(timeline.frames.length, 256);
+  }
 });
 
 test('rotate and color commute for history-layer cloning', () => {

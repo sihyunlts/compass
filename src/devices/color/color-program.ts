@@ -41,7 +41,8 @@ const sanitizeColorVelocities = (velocities: readonly number[]): number[] => {
     .filter((slotVelocity) => Number.isFinite(slotVelocity))
     .map((slotVelocity) => Math.round(slotVelocity))
     .filter((slotVelocity) => slotVelocity >= 1 && slotVelocity <= 127);
-  return sanitized.length > 0 ? sanitized : [DEFAULT_COLOR_VELOCITY];
+  const uniqueVelocities = Array.from(new Set(sanitized));
+  return uniqueVelocities.length > 0 ? uniqueVelocities : [DEFAULT_COLOR_VELOCITY];
 };
 
 const sanitizeColorNoteLengthPercent = (value: number): number => {
@@ -126,7 +127,7 @@ export const planColorProgramSlots = <T extends TimedColorSource>(
     for (let slotIndex = 0; slotIndex < colorConfig.velocities.length; slotIndex += 1) {
       const offset = slotIndex * (timing.segmentLength + timing.gapDuration);
       const startBeat = source.startBeat + offset;
-      const endBeat = startBeat + timing.segmentLength;
+      const endBeat = source.endBeat + offset;
       if (!Number.isFinite(startBeat) || !Number.isFinite(endBeat) || endBeat <= startBeat) {
         continue;
       }

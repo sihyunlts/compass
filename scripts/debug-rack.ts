@@ -29,7 +29,8 @@ import {
 import {
   createLaunchpadExecutionRequest,
   createLaunchpadOutputAdapter,
-  projectTimelineToNotes,
+  projectActivePitchesToNotes,
+  projectTimelineToActivePitchesBySampleIndex,
   resolveActiveByPitchFromFrameStrokes,
 } from '../src/generation/launchpad-projection';
 import type { ClipNote, GeneratorChain, LaunchpadButton, LaunchpadModel } from '../src/shared/model';
@@ -37,9 +38,6 @@ import { parsePresetFileText } from '../src/shared/presets';
 import type {
   RuntimeMapData,
 } from '../src/domain/note-generation-types';
-import type {
-  GeneratedRuntimeFieldResult,
-} from '../src/domain/field-result';
 import type {
   ButtonIndexGroup,
 } from '../src/core/pipeline/types';
@@ -307,39 +305,13 @@ const writeJson = async (
   await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 };
 
-const scaleNotesToLoopLength = (
-  notes: ReadonlyArray<GeneratedRuntimeFieldResult['notes'][number]>,
-  loopLengthBeats: number,
-): ClipNote[] => notes.map((note) => ({
-  pitch: note.pitch,
-  channel: note.channel,
-  velocity: note.velocity,
-  startBeat: note.startBeat * loopLengthBeats,
-  durationBeats: note.durationBeats * loopLengthBeats,
-}));
-
-const buildLedFramesFromNotes = (
-  notes: ReadonlyArray<ClipNote>,
-  frameCount: number,
-  sampleStepBeats: number,
+const buildLedFramesFromActivePitches = (
+  activeByPitchFrames: ReadonlyArray<ReadonlyMap<number, { velocity: number }>>,
 ): number => {
   let totalActiveEntries = 0;
 
-  for (let frameIndex = 0; frameIndex < Math.max(frameCount, 1); frameIndex += 1) {
-    const frameStartBeat = frameIndex * sampleStepBeats;
-    const frameEndBeat = frameStartBeat + sampleStepBeats;
-    const activeByPitch = new Map<number, number>();
-
-    for (const note of notes) {
-      const noteEndBeat = note.startBeat + note.durationBeats;
-      if (note.startBeat >= frameEndBeat || noteEndBeat <= frameStartBeat) {
-        continue;
-      }
-
-      activeByPitch.set(note.pitch, note.velocity);
-    }
-
-    totalActiveEntries += activeByPitch.size;
+  for (const frame of activeByPitchFrames) {
+    totalActiveEntries += frame.size;
   }
 
   return totalActiveEntries;
@@ -380,20 +352,17 @@ const measureOneGeneration = (
   const canonicalEnd = performance.now();
 
   const notesStart = performance.now();
-  const notes = projectTimelineToNotes(
+  const activeByPitchFrames = projectTimelineToActivePitchesBySampleIndex(
     canonical.timeline,
     runtimeMap,
     canonical.mutedGroupIds,
     canonical.mutedGeneratorIds,
   );
+  projectActivePitchesToNotes(activeByPitchFrames, canonical.timeline);
   const notesEnd = performance.now();
 
-  const scaledNotes = scaleNotesToLoopLength(notes, loopLengthBeats);
-  const frameCount = Math.max(canonical.timeline.frames.length, 1);
-  const sampleStepBeats = loopLengthBeats / frameCount;
-
   const ledFramesStart = performance.now();
-  buildLedFramesFromNotes(scaledNotes, frameCount, sampleStepBeats);
+  buildLedFramesFromActivePitches(activeByPitchFrames);
   const ledFramesEnd = performance.now();
 
   const visibleWindowStart = performance.now();
