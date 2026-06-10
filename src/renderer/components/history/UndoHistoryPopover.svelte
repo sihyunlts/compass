@@ -34,6 +34,7 @@
   let popoverEl = $state<HTMLDivElement | null>(null);
   let x = $state(0);
   let y = $state(0);
+  let maxHeightPx = $state(0);
   let positionToken = 0;
 
   const displayItems = $derived.by(() => [...items].reverse());
@@ -151,16 +152,18 @@
     }
 
     const anchorRect = anchorEl.getBoundingClientRect();
+    const preferredY = anchorRect.bottom + 8;
+    maxHeightPx = Math.max(0, window.innerHeight - preferredY - 8);
     const nextPosition = resolveViewportFloatingLayerPosition(
       anchorRect.left,
-      anchorRect.bottom + 8,
+      preferredY,
       {
         width: popoverEl.offsetWidth,
-        height: popoverEl.offsetHeight,
+        height: 0,
       },
     );
     x = nextPosition.x;
-    y = nextPosition.y;
+    y = preferredY;
     focusInitialItem();
   };
 
@@ -193,6 +196,7 @@
     role="dialog"
     aria-label="Undo history"
     style:transform={`translate3d(${x}px, ${y}px, 0)`}
+    style:--undo-history-max-height={`${maxHeightPx}px`}
   >
     <div class="undo-history-list" role="list">
       {#each displayItems as item, index (item.id)}
@@ -222,7 +226,7 @@
     inset: 0 auto auto 0;
     z-index: 44;
     width: min(15rem, calc(100vw - 1rem));
-    max-height: min(24rem, calc(100vh - 1rem));
+    max-height: min(24rem, var(--undo-history-max-height, calc(100vh - 1rem)));
     overflow-y: auto;
     padding: var(--gap-4);
     border: 1px solid var(--neutral-30);
