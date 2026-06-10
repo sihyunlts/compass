@@ -823,21 +823,20 @@
       flex-direction: column;
       gap: var(--gap-6);
     }
+  }
 
-    &-button {
-      color: var(--browser-page-accent, var(--neutral-50));
-      background: transparent;
+  :global(.browser-page-switch-button) {
+    color: var(--browser-page-accent, var(--neutral-50));
+    background: transparent;
+  }
 
-      &:hover,
-      &:global(.is-active) {
-        color: var(--browser-page-accent, var(--neutral-90));
-        background: color-mix(
-          in srgb,
-          var(--browser-page-accent, var(--accent-500)) 18%,
-          transparent
-        );
-      }
-    }
+  :global(.browser-page-switch-button.is-active) {
+    color: var(--browser-page-accent, var(--neutral-90));
+    background: color-mix(
+      in srgb,
+      var(--browser-page-accent, var(--accent-500)) 18%,
+      transparent
+    );
   }
 
   .browser-page-panel {

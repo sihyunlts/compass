@@ -46,7 +46,7 @@ class PreviewGenerationWorkerClient {
         }
 
         this.clearWorker(worker);
-        if (response.ok) {
+        if (response.ok === true) {
           resolve(response.preview);
           return;
         }

@@ -77,7 +77,7 @@ const createEmptyFieldResult = (): GeneratedRuntimeFieldResult => ({
   compiledPlan: null,
 });
 
-export const buildGeneratedFieldResultWithRuntimeMap = ({
+const buildGeneratedFieldResultWithRuntimeMap = ({
   chain,
   loopLengthBeats,
   runtimeMap,

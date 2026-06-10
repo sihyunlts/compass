@@ -553,7 +553,6 @@ const main = async (): Promise<void> => {
   const text = await readFile(options.rackPath, 'utf8');
   const parsed = parsePresetFileText(text, {
     fileName: options.rackPath,
-    mode: 'recover',
   });
   if (parsed.ok === false) {
     throw new Error(parsed.message);
@@ -622,7 +621,6 @@ const main = async (): Promise<void> => {
     launchpadModel: options.launchpadModel,
     loopLengthBeats: options.loopLengthBeats,
     beats: options.beats,
-    warning: parsed.warning ?? null,
     noteCount: preview.notes.length,
     ledFrameCount: preview.ledFramesBySampleIndex.length,
     sourceTimelineEndBeat: preview.sourceTimelineEndBeat,

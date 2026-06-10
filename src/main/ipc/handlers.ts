@@ -28,13 +28,22 @@ const parseMainWindowDocumentState = (
 
   const edited = (value as { edited?: unknown }).edited;
   const filePath = (value as { filePath?: unknown }).filePath;
-  if (typeof edited !== 'boolean' || (filePath !== null && typeof filePath !== 'string')) {
+  if (typeof edited !== 'boolean') {
+    return null;
+  }
+
+  let normalizedFilePath: string | null;
+  if (filePath === null) {
+    normalizedFilePath = null;
+  } else if (typeof filePath === 'string') {
+    normalizedFilePath = filePath;
+  } else {
     return null;
   }
 
   return {
     edited,
-    filePath,
+    filePath: normalizedFilePath,
   };
 };
 

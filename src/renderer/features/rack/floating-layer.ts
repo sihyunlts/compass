@@ -10,12 +10,12 @@ export type FloatingLayerPosition = {
   y: number;
 };
 
-export type AdjacentFloatingLayerOptions = {
+type AdjacentFloatingLayerOptions = {
   gapPx?: number;
   marginPx?: number;
 };
 
-export type FloatingLayerDismissHandlers = {
+type FloatingLayerDismissHandlers = {
   isActive: () => boolean;
   containsEventTarget: (eventTarget: EventTarget | null) => boolean;
   onPointerDownOutside: (event: PointerEvent) => void;

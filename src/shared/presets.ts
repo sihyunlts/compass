@@ -325,7 +325,7 @@ const parseStoredPresetFile = (
   );
 };
 
-export const resolvePresetFileKindFromName = (
+const resolvePresetFileKindFromName = (
   fileName: string,
 ): PresetFileKind | null => {
   const normalized = extractBaseName(fileName).trim().toLowerCase();

@@ -22,7 +22,15 @@ type PreviewGenerationResponse =
     error: string;
   };
 
-const workerScope = self as DedicatedWorkerGlobalScope;
+interface PreviewGenerationWorkerScope {
+  addEventListener(
+    type: 'message',
+    listener: (event: MessageEvent<PreviewGenerationRequest>) => void,
+  ): void;
+  postMessage(message: PreviewGenerationResponse): void;
+}
+
+const workerScope = self as PreviewGenerationWorkerScope;
 
 workerScope.addEventListener('message', (event: MessageEvent<PreviewGenerationRequest>) => {
   const { requestId, sourceChain, loopLengthBeats, launchpadModel } = event.data;
