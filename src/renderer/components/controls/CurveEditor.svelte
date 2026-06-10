@@ -12,10 +12,11 @@
     toSegmentCurveBend,
     toSegmentCurvePoint,
     type CurvePoint,
-  } from '../../core/curve-segments';
-  import { resolveSegmentCurvePoint } from '../../core/modulation/curve';
-  import { clamp } from '../../shared/math';
-  import type { CurveNode } from '../../shared/model';
+  } from '../../../core/curve-segments';
+  import { resolveSegmentCurvePoint } from '../../../core/modulation/curve';
+  import { clamp } from '../../../shared/math';
+  import type { CurveNode } from '../../../shared/model';
+  import FieldShell from '../fields/FieldShell.svelte';
 
   interface EditableCurve {
     divisions: number;
@@ -45,6 +46,7 @@
   };
 
   let {
+    label,
     deviceId,
     curve,
     currentProgress01 = 0,
@@ -55,6 +57,7 @@
     guideValue = 0,
     wrapperClass = '',
   } = $props<{
+    label?: string;
     deviceId: string;
     curve: EditableCurve;
     currentProgress01?: number;
@@ -562,6 +565,7 @@
   });
 </script>
 
+{#snippet curveEditor()}
 <div class={`curve-editor-wrap ${wrapperClass}`.trim()}>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
@@ -616,6 +620,15 @@
     data-id={deviceId}
   />
 </div>
+{/snippet}
+
+{#if label}
+  <FieldShell {label}>
+    {@render curveEditor()}
+  </FieldShell>
+{:else}
+  {@render curveEditor()}
+{/if}
 
 <style lang="scss">
   .curve-editor {

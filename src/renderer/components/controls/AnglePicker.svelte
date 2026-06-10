@@ -2,7 +2,8 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { clamp } from '../../shared/math';
+  import { clamp } from '../../../shared/math';
+  import FieldShell from '../fields/FieldShell.svelte';
 
   let {
     label,
@@ -204,8 +205,7 @@
   });
 </script>
 
-<div class="angle-picker">
-  <span class="field-label">{label}</span>
+<FieldShell {label} class="angle-picker">
   <div class="angle-picker-controls">
     <div
       bind:this={dialEl}
@@ -252,69 +252,56 @@
       aria-label={numberLabel}
     />
   </div>
-</div>
+</FieldShell>
 
 <style lang="scss">
-  .angle-picker {
+  .angle-picker-controls {
     display: flex;
-    flex-direction: column;
-    gap: var(--gap-6);
+    align-items: center;
+    gap: var(--gap-8);
     min-width: 0;
-    min-height: 0;
+  }
 
-    .field-label {
-      color: var(--neutral-50);
-      font-size: var(--text-12);
-    }
+  .angle-picker-dial {
+    position: relative;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-round);
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    cursor: n-resize;
+    touch-action: none;
+    background-color: var(--neutral-20);
 
-    &-controls {
-      display: flex;
-      align-items: center;
-      gap: var(--gap-8);
-      min-width: 0;
-    }
-
-    &-dial {
-      position: relative;
-      width: 2.5rem;
-      height: 2.5rem;
+    &-ring {
+      position: absolute;
+      inset: 0;
       border-radius: var(--radius-round);
-      display: grid;
-      place-items: center;
-      flex: 0 0 auto;
-      cursor: n-resize;
-      touch-action: none;
-      background-color: var(--neutral-20);
-
-      &-ring {
-        position: absolute;
-        inset: 0;
-        border-radius: var(--radius-round);
-      }
-
-      &-knob {
-        position: absolute;
-        width: 0.5rem;
-        height: 0.5rem;
-        border-radius: var(--radius-round);
-        background: var(--accent-500);
-        transform: rotate(var(--angle-deg)) translateY(-0.75rem);
-      }
-
-      &:focus-visible {
-        outline: 2px solid var(--accent-500);
-        outline-offset: 2px;
-      }
     }
 
-    &-slider-input {
-      display: none;
+    &-knob {
+      position: absolute;
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: var(--radius-round);
+      background: var(--accent-500);
+      transform: rotate(var(--angle-deg)) translateY(-0.75rem);
     }
 
-    &-number-input {
-      width: 4.8rem;
-      height: 1.75rem;
-      flex: 0 0 auto;
+    &:focus-visible {
+      outline: 2px solid var(--accent-500);
+      outline-offset: 2px;
     }
+  }
+
+  .angle-picker-slider-input {
+    display: none;
+  }
+
+  .angle-picker-number-input {
+    width: 4.8rem;
+    height: 1.75rem;
+    flex: 0 0 auto;
   }
 </style>

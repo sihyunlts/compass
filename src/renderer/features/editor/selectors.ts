@@ -1,4 +1,4 @@
-import type { ContextMenuTarget } from '../../components/context-menu-types';
+import type { ContextMenuTarget } from '../../components/overlays/context-menu-types';
 import type { GroupSelectionContext } from '../rack/selection.svelte';
 import type { GeneratorChain } from '../../../shared/model';
 import { resolveExistingOrderedDeviceIds } from './chain-ops';

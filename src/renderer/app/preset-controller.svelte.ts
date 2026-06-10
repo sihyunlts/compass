@@ -12,13 +12,13 @@ import type {
   BrowserTreePresetLeafNode,
   PendingPresetFolderDraft,
   PresetFolderSelectionTarget,
-} from '../components/browser-tree-types';
-import type { ContextMenuTarget } from '../components/context-menu-types';
+} from '../components/browser/browser-tree-types';
+import type { ContextMenuTarget } from '../components/overlays/context-menu-types';
 import type {
   BrowserInsertSource,
   BrowserPresetInsertSource,
   RackPresetFileDrop,
-} from '../components/device-rack-types';
+} from '../components/rack/device-rack-types';
 import {
   buildDevicePresetFile,
   buildGroupPresetFile,

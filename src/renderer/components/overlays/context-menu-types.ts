@@ -1,4 +1,4 @@
-import type { PresetFileKind } from '../../shared/presets';
+import type { PresetFileKind } from '../../../shared/presets';
 
 export type ContextMenuTarget =
   | {

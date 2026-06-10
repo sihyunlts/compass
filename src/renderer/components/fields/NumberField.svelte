@@ -1,7 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  import FieldShell from './FieldShell.svelte';
+  import FieldShell from '../fields/FieldShell.svelte';
 
   let {
     label,

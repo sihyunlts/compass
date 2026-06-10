@@ -4,33 +4,33 @@
    * Integrates rack selection, drop indicators, and group rendering state.
    */
   import { onMount } from 'svelte';
-  import type { GeneratorDeviceNode, GeneratorChain } from '../../shared/model';
-  import type { ContextMenuTarget } from './context-menu-types';
+  import type { GeneratorDeviceNode, GeneratorChain } from '../../../shared/model';
+  import type { ContextMenuTarget } from '../overlays/context-menu-types';
   import type {
     BrowserNonRackPresetInsertSource,
     BrowserPresetInsertSource,
     RackInteractionCommit,
     RackPresetFileDrop,
     RackScrollMetrics,
-  } from './device-rack-types';
-  import type { ChainMutationMeta } from '../features/editor/history-core';
+  } from '../rack/device-rack-types';
+  import type { ChainMutationMeta } from '../../features/editor/history-core';
   import {
     buildGroupColumns,
     buildGroupMemberIdsByGroupId,
     buildOrderedGroupIds,
     buildRackContentItems,
-  } from '../features/rack/layout';
-  import type { RackDropZone } from '../features/rack/drop-ops';
-  import type { RackViewApi } from '../features/rack/api';
+  } from '../../features/rack/layout';
+  import type { RackDropZone } from '../../features/rack/drop-ops';
+  import type { RackViewApi } from '../../features/rack/api';
   import {
     buildDeviceDisplayNameById,
     buildGroupDisplayNameById,
-  } from '../features/rack/display-names';
+  } from '../../features/rack/display-names';
   import {
     resolveDeviceDisplayName,
     resolveGroupDisplayName,
-  } from '../features/rack/rename';
-  import { createDeviceRackController } from '../features/rack/device-rack-controller.svelte';
+  } from '../../features/rack/rename';
+  import { createDeviceRackController } from '../../features/rack/device-rack-controller.svelte';
   import RackRenamePopover from './RackRenamePopover.svelte';
   import DeviceCard from './DeviceCard.svelte';
 

@@ -1,7 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  import TimeWindowEditor from '../../renderer/components/TimeWindowEditor.svelte';
+  import TimeWindowEditor from '../../renderer/components/controls/TimeWindowEditor.svelte';
   import type { GeneratorDeviceNode } from '../../shared/model';
   import type { RendererDeviceEditorPropsBase } from '../types';
 

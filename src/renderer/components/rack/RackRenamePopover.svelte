@@ -1,7 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  import { isEventTargetWithinFloatingLayer } from '../features/rack/floating-layer';
+  import { isEventTargetWithinFloatingLayer } from '../../features/rack/floating-layer';
 
   let {
     x,

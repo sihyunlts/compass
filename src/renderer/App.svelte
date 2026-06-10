@@ -9,20 +9,20 @@
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
   import { DEVICE_BROWSER_TREE } from './features/editor/device-browser-categories';
   import { sanitizeSidebarWidth } from './features/editor/persistence-storage';
-  import BrowserPanel from './components/BrowserPanel.svelte';
-  import type { ContextMenuTarget } from './components/context-menu-types';
-  import Button from './components/Button.svelte';
-  import SidebarResizer from './components/SidebarResizer.svelte';
-  import DeviceRack from './components/DeviceRack.svelte';
-  import UndoHistoryControl from './components/UndoHistoryControl.svelte';
+  import BrowserPanel from './components/browser/BrowserPanel.svelte';
+  import type { ContextMenuTarget } from './components/overlays/context-menu-types';
+  import Button from './components/primitives/Button.svelte';
+  import SidebarResizer from './components/layout/SidebarResizer.svelte';
+  import DeviceRack from './components/rack/DeviceRack.svelte';
+  import UndoHistoryControl from './components/history/UndoHistoryControl.svelte';
   import type {
     RackScrollMetrics,
-  } from './components/device-rack-types';
-  import RackHeaderScrollbar from './components/RackHeaderScrollbar.svelte';
-  import PreviewPanel from './components/PreviewPanel.svelte';
-  import ContextMenu from './components/ContextMenu.svelte';
-  import ModalDialog from './components/ModalDialog.svelte';
-  import WorkspaceRackTitle from './components/WorkspaceRackTitle.svelte';
+  } from './components/rack/device-rack-types';
+  import RackHeaderScrollbar from './components/rack/RackHeaderScrollbar.svelte';
+  import PreviewPanel from './components/preview/PreviewPanel.svelte';
+  import ContextMenu from './components/overlays/ContextMenu.svelte';
+  import ModalDialog from './components/overlays/ModalDialog.svelte';
+  import WorkspaceRackTitle from './components/rack/WorkspaceRackTitle.svelte';
   import { createPresetController } from './app/preset-controller.svelte';
   import { createSettingsController } from './app/settings-controller.svelte';
   import { mountBridgeSubscriptions } from './app/bridge-subscriptions';

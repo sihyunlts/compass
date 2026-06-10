@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
-  import SelectField from '../../renderer/components/SelectField.svelte';
+  import SelectField from '../../renderer/components/fields/SelectField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   const SYMMETRY_MODE_OPTIONS = [

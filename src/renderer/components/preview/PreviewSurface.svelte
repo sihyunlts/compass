@@ -5,7 +5,7 @@
   import {
     createEmptyPreviewSurfaceViewModel,
     type PreviewSurfaceViewModel,
-  } from '../features/preview/view-model';
+  } from '../../features/preview/view-model';
 
   type PreviewSurfaceMode = 'rack' | 'popout';
 

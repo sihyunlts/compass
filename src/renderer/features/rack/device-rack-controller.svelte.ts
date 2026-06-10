@@ -1,14 +1,14 @@
 import { tick } from 'svelte';
 
 import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/model';
-import type { ContextMenuTarget } from '../../components/context-menu-types';
+import type { ContextMenuTarget } from '../../components/overlays/context-menu-types';
 import type {
   BrowserPresetInsertSource,
   BrowserNonRackPresetInsertSource,
   RackInteractionCommit,
   RackPresetFileDrop,
   RackScrollMetrics,
-} from '../../components/device-rack-types';
+} from '../../components/rack/device-rack-types';
 import { canCreateGroupFromSelection } from '../editor/chain-ops';
 import type { ChainMutationMeta } from '../editor/history-core';
 import { blurIfTextEditingElement } from './text-editing';

@@ -1,4 +1,4 @@
-import type { RackPresetFileDrop } from '../../components/device-rack-types';
+import type { RackPresetFileDrop } from '../../components/rack/device-rack-types';
 import type { RackDropZone } from './drop-ops';
 
 interface ExternalFileDropControllerOptions {

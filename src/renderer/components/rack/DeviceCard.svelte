@@ -3,9 +3,9 @@
 <script lang="ts">
   /** Renders the shared device card shell and mounts the kind-specific editor body. */
   import { tick } from 'svelte';
-  import type { GeneratorDeviceNode } from '../../shared/model';
-  import { getDeviceBrowserCategory } from '../features/editor/device-browser-categories';
-  import { getRendererDeviceDefinition } from '../../devices';
+  import type { GeneratorDeviceNode } from '../../../shared/model';
+  import { getDeviceBrowserCategory } from '../../features/editor/device-browser-categories';
+  import { getRendererDeviceDefinition } from '../../../devices';
 
   let {
     device,
@@ -353,31 +353,20 @@
         width: 100%;
       }
 
-      :global(.modulation-sidebar),
-      :global(.modulation-main) {
+      :global(.modulation-sidebar) {
         min-width: 0;
       }
 
       :global(.modulation-main) {
-        display: flex;
-        flex-direction: column;
-        gap: var(--gap-4);
         min-width: 16rem;
       }
 
+      :global(.modulation-main > .control-field) {
+        width: 100%;
+      }
+
       :global(.modulation-curve-control) {
-        flex: 1 1 auto;
         min-width: 12rem;
-      }
-
-      :global(.modulation-curve-control .curve-editor) {
-        height: 8rem;
-      }
-
-      :global(.modulation-readout) {
-        min-width: 0;
-        line-height: 1.25;
-        font-size: var(--text-11);
       }
     }
 
@@ -433,9 +422,5 @@
       }
     }
 
-    :global(.modulation-readout) {
-      color: var(--neutral-50);
-      font-size: var(--text-12);
-    }
   }
 </style>

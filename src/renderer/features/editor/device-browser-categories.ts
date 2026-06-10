@@ -6,7 +6,7 @@ import {
   type DeviceBrowserCategoryDefinition,
   type DeviceBrowserCategoryId,
 } from '../../../devices/browser-categories';
-import type { BrowserTreeDeviceFolderNode, BrowserTreeDeviceLeafNode } from '../../components/browser-tree-types';
+import type { BrowserTreeDeviceFolderNode, BrowserTreeDeviceLeafNode } from '../../components/browser/browser-tree-types';
 
 const toDeviceLeafNode = (
   kind: DeviceBrowserCategoryDefinition['deviceKinds'][number],

@@ -7,16 +7,17 @@
     label,
     children,
     class: className = '',
+    ...rest
   } = $props<{
     label: string;
     children?: Snippet;
     class?: string;
-  }>();
+  } & Record<string, unknown>>();
 
   const rootClass = $derived(`control-field ${className}`.trim());
 </script>
 
-<div class={rootClass}>
+<div {...rest} class={rootClass}>
   <span class="field-label">{label}</span>
   {#if children}
     {@render children()}
@@ -31,8 +32,8 @@
     min-width: 0;
     min-height: 0;
 
-    :global(input),
-    :global(select) {
+    > :global(input),
+    > :global(select) {
       width: 6.6rem;
       height: 1.75rem;
     }

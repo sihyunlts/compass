@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
-  import FieldShell from '../../renderer/components/FieldShell.svelte';
+  import FieldShell from '../../renderer/components/fields/FieldShell.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   type ReverseDeviceEditorProps = RendererDeviceEditorPropsBase & {

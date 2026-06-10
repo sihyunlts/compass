@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
-  import AnglePicker from '../../renderer/components/AnglePicker.svelte';
+  import AnglePicker from '../../renderer/components/controls/AnglePicker.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   type RotateDeviceEditorProps = RendererDeviceEditorPropsBase & {

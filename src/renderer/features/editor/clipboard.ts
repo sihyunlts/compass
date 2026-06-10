@@ -1,4 +1,4 @@
-import type { ContextMenuTarget } from '../../components/context-menu-types';
+import type { ContextMenuTarget } from '../../components/overlays/context-menu-types';
 import type { ChainMutationMeta } from './history-core';
 import type { RackClipboard } from './rack-clipboard';
 import {

@@ -1,8 +1,8 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  import type { EditorHistoryListEntry } from '../features/editor/editor-history';
-  import SplitButton from './SplitButton.svelte';
+  import type { EditorHistoryListEntry } from '../../features/editor/editor-history';
+  import SplitButton from '../primitives/SplitButton.svelte';
   import UndoHistoryPopover from './UndoHistoryPopover.svelte';
 
   let {

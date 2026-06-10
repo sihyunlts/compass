@@ -1,13 +1,13 @@
-import type { RendererDeviceKind } from '../../devices';
+import type { RendererDeviceKind } from '../../../devices';
 import type {
   DevicePresetFile,
   GroupPresetFile,
   RackPresetFile,
-} from '../../shared/presets';
+} from '../../../shared/presets';
 import type {
   ChainDragSourceKind,
   RackDropZone,
-} from '../features/rack/drop-ops';
+} from '../../features/rack/drop-ops';
 
 export interface RackScrollMetrics {
   scrollLeft: number;

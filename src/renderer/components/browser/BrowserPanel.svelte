@@ -1,10 +1,10 @@
 <script lang="ts">
   import { tick } from 'svelte';
 
-  import type { RendererDeviceKind } from '../../devices';
-  import type { PresetFileKind } from '../../shared/presets';
-  import { getDeviceBrowserIcon } from '../features/editor/device-browser-categories';
-  import Button from './Button.svelte';
+  import type { RendererDeviceKind } from '../../../devices';
+  import type { PresetFileKind } from '../../../shared/presets';
+  import { getDeviceBrowserIcon } from '../../features/editor/device-browser-categories';
+  import Button from '../primitives/Button.svelte';
   import SidebarSettingsPage from './SidebarSettingsPage.svelte';
   import type {
     BrowserTreeDeviceLeafNode,
@@ -15,8 +15,8 @@
     BrowserTreePresetLeafNode,
     BrowserTreePresetFolderNode,
   } from './browser-tree-types';
-  import type { ContextMenuTarget } from './context-menu-types';
-  import type { BrowserInsertSource } from './device-rack-types';
+  import type { ContextMenuTarget } from '../overlays/context-menu-types';
+  import type { BrowserInsertSource } from '../rack/device-rack-types';
 
   export type BrowserPanelPage = 'devices' | 'presets' | 'settings';
 

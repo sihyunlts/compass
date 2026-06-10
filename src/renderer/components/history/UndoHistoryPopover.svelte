@@ -2,12 +2,12 @@
 
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import type { EditorHistoryListEntry } from '../features/editor/editor-history';
+  import type { EditorHistoryListEntry } from '../../features/editor/editor-history';
   import {
     attachFloatingLayerDismissHandlers,
     isEventTargetWithinFloatingLayer,
     resolveViewportFloatingLayerPosition,
-  } from '../features/rack/floating-layer';
+  } from '../../features/rack/floating-layer';
 
   const timestampFormatter = new Intl.DateTimeFormat(undefined, {
     hour: 'numeric',

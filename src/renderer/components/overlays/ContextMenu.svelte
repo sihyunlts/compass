@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import type { ContextMenuTarget } from './context-menu-types';
+  import type { ContextMenuTarget } from '../overlays/context-menu-types';
   import {
     attachFloatingLayerDismissHandlers,
     isEventTargetWithinFloatingLayer,
     resolveViewportFloatingLayerPosition,
-  } from '../features/rack/floating-layer';
+  } from '../../features/rack/floating-layer';
 
   let {
     onCopy,

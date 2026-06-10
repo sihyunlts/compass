@@ -1,14 +1,15 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  import type { PathPoint } from '../../shared/model';
+  import type { PathPoint } from '../../../shared/model';
+  import FieldShell from '../fields/FieldShell.svelte';
   import {
     PATH_COORDINATE_MAX,
     PATH_COORDINATE_MIN,
     PATH_POINT_MIN_COUNT,
     sanitizePathPoints,
-  } from '../../devices/path/schema';
-  import { clamp } from '../../shared/math';
+  } from '../../../devices/path/schema';
+  import { clamp } from '../../../shared/math';
 
   let {
     deviceId,
@@ -310,8 +311,7 @@
     {/each}
   </div>
 
-  <div class="path-editor-sidebar">
-    <span class="field-label">Path Points</span>
+  <FieldShell label="Path Points">
     <div class="path-editor-actions">
       <span class="path-editor-count">{localPoints.length}</span>
       <button
@@ -323,7 +323,7 @@
         Delete Selected
       </button>
     </div>
-  </div>
+  </FieldShell>
 
   <input
     bind:this={hiddenInputEl}
@@ -344,18 +344,12 @@
       min-width: 0;
     }
 
-    &-sidebar,
     &-actions {
       display: flex;
       flex-direction: column;
       align-items: stretch;
       gap: var(--gap-8);
       min-width: 0;
-    }
-
-    &-sidebar .field-label {
-      color: var(--neutral-50);
-      font-size: var(--text-12);
     }
 
     &-actions {

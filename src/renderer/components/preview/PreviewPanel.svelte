@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { clamp } from '../../shared/math';
-  import type { PreviewSurfaceViewModel } from '../features/preview/view-model';
-  import Button from './Button.svelte';
+  import { clamp } from '../../../shared/math';
+  import type { PreviewSurfaceViewModel } from '../../features/preview/view-model';
+  import Button from '../primitives/Button.svelte';
   import PreviewSurface from './PreviewSurface.svelte';
 
   const SCRUB_MAX = 1000;

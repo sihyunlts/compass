@@ -1,9 +1,9 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  import { clamp } from '../../shared/math';
-  import FieldShell from './FieldShell.svelte';
-  import NumberField from './NumberField.svelte';
+  import { clamp } from '../../../shared/math';
+  import FieldShell from '../fields/FieldShell.svelte';
+  import NumberField from '../fields/NumberField.svelte';
 
   const SNAP_DIVISION_OPTIONS = [4, 8, 16, 32] as const;
   type TimeWindowEditorMode = 'stretch' | 'trim';

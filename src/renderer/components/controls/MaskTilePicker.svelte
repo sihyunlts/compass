@@ -1,6 +1,8 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import FieldShell from '../fields/FieldShell.svelte';
+
   const GRID_SIZE = 10;
 
   let {
@@ -28,11 +30,8 @@
   });
 </script>
 
-<div class="mask-tile-control">
-  <div class="mask-tile-head">
-    <span class="field-label">Tile Selection</span>
-    <span class="mask-tile-count">Selected {selectionCount}</span>
-  </div>
+<FieldShell label="Tile Selection">
+  <span class="mask-tile-count">Selected {selectionCount}</span>
   <div
     class="mask-tile-grid"
     data-action="mask-tile-grid"
@@ -49,21 +48,10 @@
       ></button>
     {/each}
   </div>
-</div>
+</FieldShell>
 
 <style lang="scss">
-  .mask-tile-control {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap-6);
-    min-width: 0;
-  }
-
-  .mask-tile-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--gap-8);
+  .mask-tile-count {
     color: var(--neutral-50);
     font-size: var(--text-12);
   }

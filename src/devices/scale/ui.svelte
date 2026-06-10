@@ -2,8 +2,8 @@
 
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
-  import CenterPointPicker from '../../renderer/components/CenterPointPicker.svelte';
-  import NumberField from '../../renderer/components/NumberField.svelte';
+  import CenterPointPicker from '../../renderer/components/controls/CenterPointPicker.svelte';
+  import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   type ScaleDeviceEditorProps = RendererDeviceEditorPropsBase & {

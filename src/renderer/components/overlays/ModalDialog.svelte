@@ -9,7 +9,7 @@
 
 <script lang="ts">
   import { tick } from 'svelte';
-  import Button from './Button.svelte';
+  import Button from '../primitives/Button.svelte';
 
   const ACTION_BUTTON_SELECTOR = 'button:not([disabled])';
 

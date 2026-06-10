@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
-  import PathEditor from '../../renderer/components/PathEditor.svelte';
+  import PathEditor from '../../renderer/components/controls/PathEditor.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   type PathDeviceEditorProps = RendererDeviceEditorPropsBase & {

@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
-  import NumberField from '../../renderer/components/NumberField.svelte';
+  import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   const BLACK_RGB = '0 0 0';

@@ -1,8 +1,9 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  import { clamp } from '../../shared/math';
-  import NumberField from './NumberField.svelte';
+  import { clamp } from '../../../shared/math';
+  import FieldShell from '../fields/FieldShell.svelte';
+  import NumberField from '../fields/NumberField.svelte';
 
   let {
     deviceId,
@@ -30,8 +31,12 @@
   let surfaceHeight = $state(0);
 </script>
 
-<div class="center-point-control" role="group" aria-label="Center point picker">
-  <span class="field-label">Center</span>
+<FieldShell
+  label="Center"
+  class="center-point-control"
+  role="group"
+  aria-label="Center point picker"
+>
   <div
     class="center-picker-surface"
     bind:clientHeight={surfaceHeight}
@@ -67,20 +72,9 @@
       dataParam="centerY"
     />
   </div>
-</div>
+</FieldShell>
 
 <style lang="scss">
-  .center-point-control {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gap-6);
-  }
-
-  .field-label {
-    color: var(--neutral-50);
-    font-size: var(--text-12);
-  }
-
   .center-picker-surface {
     position: relative;
     flex: 1;

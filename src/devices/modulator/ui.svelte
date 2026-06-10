@@ -2,10 +2,10 @@
 
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
-  import CurveEditor from '../../renderer/components/CurveEditor.svelte';
-  import FieldShell from '../../renderer/components/FieldShell.svelte';
-  import NumberField from '../../renderer/components/NumberField.svelte';
-  import SelectField from '../../renderer/components/SelectField.svelte';
+  import CurveEditor from '../../renderer/components/controls/CurveEditor.svelte';
+  import FieldShell from '../../renderer/components/fields/FieldShell.svelte';
+  import NumberField from '../../renderer/components/fields/NumberField.svelte';
+  import SelectField from '../../renderer/components/fields/SelectField.svelte';
   import { sanitizeCurveNodes } from '../../core/modulation/curve';
   import {
     getRendererDeviceLabel,
@@ -100,8 +100,8 @@
     </div>
   </div>
   <div class="modulation-main">
-    <span class="modulation-readout">{modulationReadoutText}</span>
     <CurveEditor
+      label={modulationReadoutText}
       deviceId={device.id}
       curve={device.params.curve}
       hiddenInputAction="set-modulation-curve-nodes"

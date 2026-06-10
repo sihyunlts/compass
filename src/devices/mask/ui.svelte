@@ -3,9 +3,9 @@
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
   import { normalizeOptionalId } from '../../shared/normalize-id';
-  import FieldShell from '../../renderer/components/FieldShell.svelte';
-  import MaskTilePicker from '../../renderer/components/MaskTilePicker.svelte';
-  import SelectField from '../../renderer/components/SelectField.svelte';
+  import FieldShell from '../../renderer/components/fields/FieldShell.svelte';
+  import MaskTilePicker from '../../renderer/components/controls/MaskTilePicker.svelte';
+  import SelectField from '../../renderer/components/fields/SelectField.svelte';
   import {
     getRendererDeviceGroup,
     getRendererDeviceLabel,

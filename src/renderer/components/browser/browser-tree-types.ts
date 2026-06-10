@@ -1,5 +1,5 @@
-import type { RendererDeviceKind } from '../../devices';
-import type { PresetFileKind } from '../../shared/presets';
+import type { RendererDeviceKind } from '../../../devices';
+import type { PresetFileKind } from '../../../shared/presets';
 
 interface BrowserTreeBaseFolderNode {
   kind: 'folder';

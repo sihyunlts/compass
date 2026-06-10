@@ -1,7 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  import CurveEditor from '../../renderer/components/CurveEditor.svelte';
+  import CurveEditor from '../../renderer/components/controls/CurveEditor.svelte';
   import { sanitizeTimeWarpCurveNodes } from '../../core/timewarp/curve';
   import type { GeneratorDeviceNode } from '../../shared/model';
   import type { RendererDeviceEditorPropsBase } from '../types';
