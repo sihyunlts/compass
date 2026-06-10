@@ -164,6 +164,28 @@ const buildVisibleWindowByOriginId = (
 ): ReadonlyMap<string, GenerationTimelineWindow> => {
   const windowByOriginId = new Map<string, GenerationTimelineWindow>();
 
+  const updateWindow = (
+    originId: string,
+    frameStartBeat: number,
+    frameEndBeat: number,
+  ): void => {
+    const existing = windowByOriginId.get(originId);
+    if (existing) {
+      if (frameStartBeat < existing.start) {
+        existing.start = frameStartBeat;
+      }
+      if (frameEndBeat > existing.end) {
+        existing.end = frameEndBeat;
+      }
+      return;
+    }
+
+    windowByOriginId.set(originId, {
+      start: frameStartBeat,
+      end: frameEndBeat,
+    });
+  };
+
   for (let frameIndex = 0; frameIndex < timeline.frames.length; frameIndex += 1) {
     const frameStrokes = timeline.frames[frameIndex]?.strokes ?? [];
     if (frameStrokes.length === 0) {
@@ -172,34 +194,27 @@ const buildVisibleWindowByOriginId = (
 
     const frameStartBeat = frameIndex * timeline.sampleStepBeats;
     const frameEndBeat = frameStartBeat + timeline.sampleStepBeats;
-    const winnerByCoordinate = resolveWinnerByCoordinate(
-      frameStrokes,
-      coordinateGroupByKey,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    );
 
-    for (const [coordinateKey, winner] of winnerByCoordinate.entries()) {
-      const coordinateGroup = coordinateGroupByKey.get(coordinateKey);
-      if (!coordinateGroup || !hasNoteOutput(coordinateGroup)) {
+    for (const stroke of frameStrokes) {
+      if (!isVisibleStroke(stroke, mutedGroupIds, mutedGeneratorIds)) {
         continue;
       }
 
-      const existing = windowByOriginId.get(winner.originId);
-      if (existing) {
-        if (frameStartBeat < existing.start) {
-          existing.start = frameStartBeat;
+      const occupied = collectOccupiedCoordinates([stroke], true, { fillColorSlotGaps: true });
+      for (const coordinate of occupied.values()) {
+        const coordinateKey = toRoundedCoordinateKey(coordinate.x, coordinate.y);
+        if (coordinateKey === null) {
+          continue;
         }
-        if (frameEndBeat > existing.end) {
-          existing.end = frameEndBeat;
-        }
-        continue;
-      }
 
-      windowByOriginId.set(winner.originId, {
-        start: frameStartBeat,
-        end: frameEndBeat,
-      });
+        const coordinateGroup = coordinateGroupByKey.get(coordinateKey);
+        if (!coordinateGroup || !hasNoteOutput(coordinateGroup)) {
+          continue;
+        }
+
+        updateWindow(stroke.polyline.originId, frameStartBeat, frameEndBeat);
+        break;
+      }
     }
   }
 
