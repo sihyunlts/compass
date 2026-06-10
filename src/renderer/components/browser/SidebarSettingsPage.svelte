@@ -131,7 +131,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--gap-16);
-    padding: 0 var(--gap-2) 0 0;
   }
 
   .sidebar-settings-section {
