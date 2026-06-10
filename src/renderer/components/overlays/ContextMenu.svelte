@@ -356,7 +356,12 @@
     left: 0;
     top: 0;
     z-index: 42;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: fit-content;
     min-width: 120px;
+    max-width: calc(100vw - var(--gap-16));
     padding: var(--gap-4);
     border: 1px solid var(--neutral-30);
     border-radius: var(--radius-8);
@@ -369,13 +374,13 @@
     }
 
     &-item {
-      width: 100%;
       border: 0;
       border-radius: var(--radius-4);
       background: transparent;
       color: var(--neutral-90);
       text-align: start;
       font-size: var(--text-13);
+      white-space: nowrap;
       padding: var(--gap-6) var(--gap-8);
       cursor: pointer;
 
