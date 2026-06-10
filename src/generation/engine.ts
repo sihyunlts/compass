@@ -2120,17 +2120,21 @@ const applyColorEffect = (
     const hasActivationColorSlots = sourceSegments.some(
       (sourceSegment) => sourceSegment.referenceDuration !== undefined,
     );
-    if (hasActivationColorSlots) {
+    const isMovingColorSource = isNonSteppedMovingColorSource(sourceSegments);
+    const hasExtendedColorSlots = hasActivationColorSlots
+      || (colorConfig.gapPercent > 0 && isMovingColorSource);
+    if (hasExtendedColorSlots) {
       const colorEndBeat = slots.reduce(
         (maxEndBeat, slot) => Math.max(maxEndBeat, slot.endBeat),
         nextTimeline.timeDomainEndBeat,
       );
       ensureTimelineFrameCount(nextTimeline, colorEndBeat);
     }
-    const colorFrameWindow = hasActivationColorSlots
+    const colorFrameWindow = hasExtendedColorSlots
       ? resolveFrameWindow('all', nextTimeline.sampleStepBeats, nextTimeline.frames.length)
       : frameWindow;
-    const shouldWrapColorSlots = isNonSteppedMovingColorSource(sourceSegments);
+    const shouldWrapColorSlots = colorConfig.gapPercent <= 0
+      && isMovingColorSource;
     for (const slot of slots) {
       const sourceFrameWindow = resolveColorSlotSourceFrameWindow(slot, state.timeline);
       const destinationFrameWindow = resolveColorSlotDestinationFrameWindow(slot, nextTimeline);
