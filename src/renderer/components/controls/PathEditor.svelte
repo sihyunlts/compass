@@ -421,7 +421,7 @@
 
     &-line {
       fill: none;
-      stroke: var(--accent-500);
+      stroke: var(--device-control-accent, var(--accent-500));
       stroke-width: 1.4;
       stroke-linecap: round;
       stroke-linejoin: round;
@@ -436,7 +436,7 @@
       padding: 0;
       border-radius: 999px;
       border: 2px solid var(--neutral-10);
-      background: var(--accent-500);
+      background: var(--device-control-accent, var(--accent-500));
       box-shadow: 0 0 0 1px rgb(var(--rgb-white) / 0.18);
       cursor: grab;
 

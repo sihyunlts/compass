@@ -173,7 +173,7 @@
 <style lang="scss">
   .device-card {
     --device-category-accent: var(--category-generators-500);
-    --accent-500: var(--device-category-accent);
+    --device-control-accent: var(--device-category-accent);
     display: flex;
     flex-direction: column;
     flex: 0 0 auto;

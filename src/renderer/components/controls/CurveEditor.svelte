@@ -673,7 +673,7 @@
     }
 
     .curve-fill {
-      fill: color-mix(in srgb, var(--accent-500) 22%, transparent);
+      fill: color-mix(in srgb, var(--device-control-accent, var(--accent-500)) 22%, transparent);
     }
 
     .curve-line-halo {
@@ -685,7 +685,7 @@
 
     .curve-line {
       fill: none;
-      stroke: var(--accent-500);
+      stroke: var(--device-control-accent, var(--accent-500));
       stroke-width: 1.4;
       stroke-linejoin: round;
       stroke-linecap: round;
@@ -743,7 +743,7 @@
       }
 
       &.selected {
-        background: var(--accent-500);
+        background: var(--device-control-accent, var(--accent-500));
         border-width: 1.5px;
       }
     }

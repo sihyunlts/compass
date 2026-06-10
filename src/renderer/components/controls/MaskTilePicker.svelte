@@ -106,7 +106,7 @@
     cursor: pointer;
 
     &.is-selected {
-      background: var(--accent-500);
+      background: var(--device-control-accent, var(--accent-500));
     }
   }
 </style>

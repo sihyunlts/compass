@@ -36,7 +36,7 @@ select {
 
 input {
   &[type='checkbox'] {
-    accent-color: var(--accent-500);
+    accent-color: var(--device-control-accent, var(--accent-500));
 
     &.round-checkbox {
       appearance: none;
@@ -48,7 +48,7 @@ input {
       margin: 0;
 
       &:checked {
-        background-color: var(--accent-500);
+        background-color: var(--device-control-accent, var(--accent-500));
       }
     }
   }
@@ -87,7 +87,7 @@ input {
     width: 100%;
     cursor: pointer;
     --range-fill: 0%;
-    --range-fill-color: var(--accent-500);
+    --range-fill-color: var(--device-control-accent, var(--accent-500));
     --range-track-color: var(--neutral-30);
 
     &::-webkit-slider-runnable-track {

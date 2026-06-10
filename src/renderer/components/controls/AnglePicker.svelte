@@ -285,12 +285,12 @@
       width: 0.5rem;
       height: 0.5rem;
       border-radius: var(--radius-round);
-      background: var(--accent-500);
+      background: var(--device-control-accent, var(--accent-500));
       transform: rotate(var(--angle-deg)) translateY(-0.75rem);
     }
 
     &:focus-visible {
-      outline: 2px solid var(--accent-500);
+      outline: 2px solid var(--device-control-accent, var(--accent-500));
       outline-offset: 2px;
     }
   }

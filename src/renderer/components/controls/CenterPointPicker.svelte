@@ -115,11 +115,11 @@
       --picker-guide-y-color: var(--neutral-30);
     }
     &:active[data-center-x-state='center'] {
-      --picker-guide-x-color: var(--accent-500);
+      --picker-guide-x-color: var(--device-control-accent, var(--accent-500));
     }
 
     &:active[data-center-y-state='center'] {
-      --picker-guide-y-color: var(--accent-500);
+      --picker-guide-y-color: var(--device-control-accent, var(--accent-500));
     }
 
     &::after {
@@ -130,7 +130,7 @@
       width: 0.5rem;
       height: 0.5rem;
       border-radius: var(--radius-round);
-      background: var(--accent-500);
+      background: var(--device-control-accent, var(--accent-500));
       transform: translate(-50%, -50%);
     }
   }
