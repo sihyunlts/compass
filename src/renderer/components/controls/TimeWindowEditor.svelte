@@ -47,6 +47,11 @@
   const normalizedPlayhead = $derived(
     clamp(Number.isFinite(currentProgress01) ? currentProgress01 : 0, 0, 1),
   );
+  const displayedPlayhead = $derived(
+    mode === 'trim' && hasValidWindow
+      ? visibleStart + (visibleEnd - visibleStart) * normalizedPlayhead
+      : normalizedPlayhead,
+  );
   const showsPlayhead = $derived(currentProgress01 !== undefined && currentProgress01 !== null);
   const rangeStep = $derived(1 / snapDivisions);
   const ticks = $derived.by(() =>
@@ -90,7 +95,7 @@
     class:is-stretch={mode === 'stretch'}
     class:is-trim={mode === 'trim'}
     class:is-invalid={!hasValidWindow}
-    style={`--window-start:${visibleStart * 100}%;--window-end:${visibleEnd * 100}%;--playhead:${normalizedPlayhead * 100}%;`}
+    style={`--window-start:${visibleStart * 100}%;--window-end:${visibleEnd * 100}%;--playhead:${displayedPlayhead * 100}%;`}
   >
     <div class="time-window-track" aria-hidden="true">
       <div class="time-window-outside time-window-outside-start"></div>
@@ -318,9 +323,8 @@
     bottom: 0;
     left: var(--playhead, 0%);
     width: 2px;
-    background: var(--time-window-accent);
+    background: rgb(var(--rgb-white));
     transform: translateX(-1px);
-    box-shadow: 0 0 0 1px rgb(var(--rgb-white) / 0.12);
   }
 
   .time-window-tick {
