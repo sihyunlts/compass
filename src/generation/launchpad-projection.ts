@@ -74,6 +74,16 @@ const buildCoordinateGroupByKey = (
   return coordinateGroupByKey;
 };
 
+const buildFractionalCoordinateGroups = (
+  runtimeMap: RuntimeMapData['buttonIndex'],
+): CoordinateGroup[] => runtimeMap.groups
+  .filter((group) => !Number.isInteger(group.x) || !Number.isInteger(group.y))
+  .map((group) => ({
+    x: group.x,
+    y: group.y,
+    buttons: group.buttons,
+  }));
+
 const buildViewportCoordinateKeyByTileId = (
   runtimeMap: RuntimeMapData['buttonIndex'],
 ): Map<number, string> => {
@@ -132,21 +142,21 @@ const isPointInsideMasks = (
   return mask.contains(localPoint.x, localPoint.y);
 });
 
+const isStrokeActiveAtCoordinate = (
+  stroke: GeometryStroke,
+  x: number,
+  y: number,
+): boolean => (
+  isPointInsideMasks(stroke, x, y)
+  && distanceToPolylineSquared({ x, y }, stroke.polyline) <= THICKNESS * THICKNESS
+);
+
 const doesStrokeHitNoteOutput = (
   stroke: GeometryStroke,
   noteOutputCoordinateGroups: ReadonlyArray<CoordinateGroup>,
 ): boolean => {
   for (const coordinateGroup of noteOutputCoordinateGroups) {
-    if (!isPointInsideMasks(stroke, coordinateGroup.x, coordinateGroup.y)) {
-      continue;
-    }
-
-    if (
-      distanceToPolylineSquared(
-        { x: coordinateGroup.x, y: coordinateGroup.y },
-        stroke.polyline,
-      ) <= THICKNESS * THICKNESS
-    ) {
+    if (isStrokeActiveAtCoordinate(stroke, coordinateGroup.x, coordinateGroup.y)) {
       return true;
     }
   }
@@ -167,6 +177,34 @@ const resolveStrokeHitsNoteOutput = (
   const result = doesStrokeHitNoteOutput(stroke, noteOutputCoordinateGroups);
   noteOutputHitByStroke.set(stroke, result);
   return result;
+};
+
+const resolveExactCoordinateWinner = (
+  coordinateGroup: CoordinateGroup,
+  visibleStrokes: ReadonlyArray<GeometryStroke>,
+): WinnerStroke | null => {
+  let winner: GeometryStroke | null = null;
+
+  for (const stroke of visibleStrokes) {
+    if (!isStrokeActiveAtCoordinate(stroke, coordinateGroup.x, coordinateGroup.y)) {
+      continue;
+    }
+
+    if (
+      !winner
+      || stroke.writeOrder > winner.writeOrder
+      || (stroke.writeOrder === winner.writeOrder && stroke.writeId > winner.writeId)
+    ) {
+      winner = stroke;
+    }
+  }
+
+  return winner
+    ? {
+      velocity: winner.polyline.velocity,
+      originId: winner.polyline.originId,
+    }
+    : null;
 };
 
 const resolveWinnerByCoordinate = (
@@ -272,6 +310,7 @@ export const resolveActiveByPitchFromFrameStrokes = (
   coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
   mutedGroupIds: ReadonlySet<string> = new Set<string>(),
   mutedGeneratorIds: ReadonlySet<string> = new Set<string>(),
+  fractionalCoordinateGroups: ReadonlyArray<CoordinateGroup> = [],
 ): Map<number, SampledActivePitch> => {
   const activeByPitch = new Map<number, SampledActivePitch>();
   const winnerByCoordinate = resolveWinnerByCoordinate(
@@ -300,6 +339,28 @@ export const resolveActiveByPitchFromFrameStrokes = (
     }
   }
 
+  const visibleStrokes = fractionalCoordinateGroups.length === 0
+    ? []
+    : strokes.filter((stroke) => isVisibleStroke(stroke, mutedGroupIds, mutedGeneratorIds));
+  for (const coordinateGroup of fractionalCoordinateGroups) {
+    const winner = resolveExactCoordinateWinner(coordinateGroup, visibleStrokes);
+    if (!winner) {
+      continue;
+    }
+
+    for (const button of coordinateGroup.buttons) {
+      if (button.output.kind !== 'note') {
+        continue;
+      }
+
+      activeByPitch.set(button.output.number, {
+        velocity: winner.velocity,
+        channel: button.output.channel,
+        originId: winner.originId,
+      });
+    }
+  }
+
   return activeByPitch;
 };
 
@@ -310,6 +371,7 @@ export const projectTimelineToActivePitchesBySampleIndex = (
   mutedGeneratorIds: ReadonlySet<string>,
 ): ReadonlyArray<ReadonlyMap<number, SampledActivePitch>> => {
   const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
+  const fractionalCoordinateGroups = buildFractionalCoordinateGroups(runtimeMap.buttonIndex);
 
   return timeline.frames.map((frame) => {
     if (frame.strokes.length === 0) {
@@ -321,6 +383,7 @@ export const projectTimelineToActivePitchesBySampleIndex = (
       coordinateGroupByKey,
       mutedGroupIds,
       mutedGeneratorIds,
+      fractionalCoordinateGroups,
     );
   });
 };
