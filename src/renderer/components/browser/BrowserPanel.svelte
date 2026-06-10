@@ -760,6 +760,7 @@
     min-height: 0;
     padding: var(--gap-10);
     background: var(--neutral-10);
+    border-right: 1px solid var(--neutral-20);
 
     &::before {
       content: '';
