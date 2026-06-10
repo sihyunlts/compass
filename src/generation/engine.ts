@@ -349,12 +349,13 @@ const resolveModulatedDeviceAtFrame = <T extends GeneratorDeviceNode>(
   device: T,
   frameIndex: number,
   sampleStepBeats: number,
+  evaluationLoopLengthBeats = context.loopLengthBeats,
 ): T => {
   if (context.program.routes.length === 0) {
     return device;
   }
 
-  const cacheKey = `${device.id}:${frameIndex}`;
+  const cacheKey = `${device.id}:${frameIndex}:${evaluationLoopLengthBeats}`;
   const cached = context.deviceByFrameKey.get(cacheKey);
   if (cached) {
     return cached as T;
@@ -369,7 +370,7 @@ const resolveModulatedDeviceAtFrame = <T extends GeneratorDeviceNode>(
     },
     new Map<string, GeneratorDeviceNode>([[snapshot.id, snapshot]]),
     frameIndex * sampleStepBeats,
-    context.loopLengthBeats,
+    evaluationLoopLengthBeats,
     { wrap: true },
   );
   context.deviceByFrameKey.set(cacheKey, snapshot);
@@ -1742,6 +1743,7 @@ const resolveLastModulatedTemporalState = <TEffect extends GeneratorEffectNode>(
       effect,
       frameIndex,
       state.timeline.sampleStepBeats,
+      state.timeline.timeDomainEndBeat,
     ) as TEffect;
     const temporalState = resolveTemporalStateAtFrame(deviceAtFrame, frameIndex);
     if (temporalState) {
@@ -2387,6 +2389,7 @@ const applyEffectDevice = (
         device,
         frameIndex,
         state.timeline.sampleStepBeats,
+        state.timeline.timeDomainEndBeat,
       ) as GeneratorEffectNode,
     ),
     executionPlan.requiredFrameWindow,
@@ -2425,6 +2428,7 @@ const applyGeneratorDevice = (
         device,
         frameIndex,
         nextTimeline.sampleStepBeats,
+        nextTimeline.timeDomainEndBeat,
       ) as GeneratorNode,
       deviceIndex,
       executionPlan.generatorOutputBounds,

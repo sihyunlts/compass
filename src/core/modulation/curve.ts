@@ -178,17 +178,16 @@ export const resolveSegmentCurvePoint = (
 };
 
 export const toLoopProgress01 = (
-  beat01: number,
+  beat: number,
   loopLengthBeats: number,
   wrap = true,
 ): number => {
   const safeLoopLength = Number.isFinite(loopLengthBeats) && loopLengthBeats > 0
     ? loopLengthBeats
     : 1;
-  const normalized = Number.isFinite(beat01) ? beat01 : 0;
+  const normalized = Number.isFinite(beat) ? beat / safeLoopLength : 0;
   if (!wrap) {
     return clamp(normalized, 0, 1);
   }
-  const beatInLoop = normalized * safeLoopLength;
-  return ((beatInLoop / safeLoopLength) % 1 + 1) % 1;
+  return ((normalized % 1) + 1) % 1;
 };
