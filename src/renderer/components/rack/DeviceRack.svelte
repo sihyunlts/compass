@@ -117,6 +117,7 @@
     buildGroupDisplayNameById(devices, chainState.groupStateById));
   const rackContentItems = $derived.by(() =>
     buildRackContentItems(devices, resolveGroupEnabled));
+  const isRackEmpty = $derived(rackContentItems.length === 0);
 
   const miniMapLayoutSignature = $derived.by(() => {
     const rackOrderSignature = rackContentItems
@@ -251,6 +252,10 @@
     ondragleave={(event) => controller.externalFileDrop.handleDragLeave(event)}
     ondrop={(event) => void controller.externalFileDrop.handleDrop(event)}
   >
+    {#if isRackEmpty}
+      <p class="rack-empty-message">Drop a Device, Group, or Rack Here</p>
+    {/if}
+
     {#each rackContentItems as item (item.key)}
       <div
         class={item.kind === 'device'
@@ -433,6 +438,18 @@
       height: 100%;
       overflow: auto;
       border-radius: var(--radius-8);
+    }
+
+    .rack-empty-message {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      margin: 0;
+      transform: translate(-50%, -50%);
+      color: var(--neutral-50);
+      font-size: var(--text-13);
+      white-space: nowrap;
+      pointer-events: none;
     }
   }
 
