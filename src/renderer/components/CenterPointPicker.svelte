@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import { clamp } from '../../shared/math';
+  import NumberField from './NumberField.svelte';
 
   let {
     deviceId,
@@ -45,32 +46,26 @@
     style={`width:${surfaceHeight}px;--picker-x:${xPercent}%;--picker-y:${yPercent}%;--picker-grid-step:${gridStepPercent}%;`}
   ></div>
   <div class="center-picker-inputs">
-    <div class="control-field">
-      <span class="field-label">X</span>
-      <input
-        type="number"
-        step={STEP}
-        min={MIN}
-        max={MAX}
-        value={resolvedCenterX}
-        data-action="set-center-picker-param"
-        data-id={deviceId}
-        data-param="centerX"
-      />
-    </div>
-    <div class="control-field">
-      <span class="field-label">Y</span>
-      <input
-        type="number"
-        step={STEP}
-        min={MIN}
-        max={MAX}
-        value={resolvedCenterY}
-        data-action="set-center-picker-param"
-        data-id={deviceId}
-        data-param="centerY"
-      />
-    </div>
+    <NumberField
+      label="X"
+      step={STEP}
+      min={MIN}
+      max={MAX}
+      value={resolvedCenterX}
+      dataAction="set-center-picker-param"
+      dataId={deviceId}
+      dataParam="centerX"
+    />
+    <NumberField
+      label="Y"
+      step={STEP}
+      min={MIN}
+      max={MAX}
+      value={resolvedCenterY}
+      dataAction="set-center-picker-param"
+      dataId={deviceId}
+      dataParam="centerY"
+    />
   </div>
 </div>
 
@@ -79,6 +74,11 @@
     display: flex;
     flex-direction: column;
     gap: var(--gap-6);
+  }
+
+  .field-label {
+    color: var(--neutral-50);
+    font-size: var(--text-12);
   }
 
   .center-picker-surface {
@@ -146,13 +146,13 @@
     gap: var(--gap-8);
     margin-top: var(--gap-2);
 
-    .control-field {
+    :global(.control-field) {
       flex: 1 1 0;
       gap: var(--gap-4);
       flex-direction: row;
       align-items: center;
-      
-      input {
+
+      :global(input) {
         flex: 1 1 0;
         width: auto;
         height: var(--gap-20);

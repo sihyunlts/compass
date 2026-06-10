@@ -353,6 +353,11 @@
       min-width: 0;
     }
 
+    &-sidebar .field-label {
+      color: var(--neutral-50);
+      font-size: var(--text-12);
+    }
+
     &-actions {
       align-items: stretch;
       justify-content: flex-start;

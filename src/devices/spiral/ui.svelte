@@ -3,6 +3,7 @@
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
   import CenterPointPicker from '../../renderer/components/CenterPointPicker.svelte';
+  import NumberField from '../../renderer/components/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   type SpiralDeviceEditorProps = RendererDeviceEditorPropsBase & {
@@ -18,17 +19,14 @@
     centerX={device.params.centerX}
     centerY={device.params.centerY}
   />
-  <div class="control-field">
-    <span class="field-label">Turns</span>
-    <input
-      type="number"
-      step="0.1"
-      min="0.25"
-      max="8"
-      value={device.params.turns}
-      data-action="set-spiral-param"
-      data-id={device.id}
-      data-param="turns"
-    />
-  </div>
+  <NumberField
+    label="Turns"
+    step="0.1"
+    min="0.25"
+    max="8"
+    value={device.params.turns}
+    dataAction="set-spiral-param"
+    dataId={device.id}
+    dataParam="turns"
+  />
 </div>

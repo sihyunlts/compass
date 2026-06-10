@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
+  import NumberField from '../../renderer/components/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   type TranslateDeviceEditorProps = RendererDeviceEditorPropsBase & {
@@ -13,27 +14,21 @@
 
 <div class="device-controls">
   <div class="column-wrapper">
-    <div class="control-field">
-      <span class="field-label">Offset X</span>
-      <input
-        type="number"
-        step="0.1"
-        value={device.params.offsetX}
-        data-action="set-translate-param"
-        data-id={device.id}
-        data-param="offsetX"
-      />
-    </div>
-    <div class="control-field">
-      <span class="field-label">Offset Y</span>
-      <input
-        type="number"
-        step="0.1"
-        value={device.params.offsetY}
-        data-action="set-translate-param"
-        data-id={device.id}
-        data-param="offsetY"
-      />
-    </div>
+    <NumberField
+      label="Offset X"
+      step="0.1"
+      value={device.params.offsetX}
+      dataAction="set-translate-param"
+      dataId={device.id}
+      dataParam="offsetX"
+    />
+    <NumberField
+      label="Offset Y"
+      step="0.1"
+      value={device.params.offsetY}
+      dataAction="set-translate-param"
+      dataId={device.id}
+      dataParam="offsetY"
+    />
   </div>
 </div>

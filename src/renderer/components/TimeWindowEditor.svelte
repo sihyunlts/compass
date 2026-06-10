@@ -2,6 +2,8 @@
 
 <script lang="ts">
   import { clamp } from '../../shared/math';
+  import FieldShell from './FieldShell.svelte';
+  import NumberField from './NumberField.svelte';
 
   const SNAP_DIVISION_OPTIONS = [4, 8, 16, 32] as const;
   type TimeWindowEditorMode = 'stretch' | 'trim';
@@ -135,36 +137,29 @@
   </div>
 
   <div class="time-window-inputs">
-    <div class="control-field">
-      <span class="field-label">Start</span>
-      <input
-        type="number"
-        min="0"
-        max="1"
-        step="0.001"
-        value={resolvedStart}
-        data-action={dataAction}
-        data-id={deviceId}
-        data-param="start"
-      />
-    </div>
-    <div class="control-field">
-      <span class="field-label">End</span>
-      <input
-        type="number"
-        min="0"
-        max="1"
-        step="0.001"
-        value={resolvedEnd}
-        data-action={dataAction}
-        data-id={deviceId}
-        data-param="end"
-      />
-    </div>
-    <div class="control-field">
-      <span class="field-label">Length</span>
+    <NumberField
+      label="Start"
+      min="0"
+      max="1"
+      step="0.001"
+      value={resolvedStart}
+      dataAction={dataAction}
+      dataId={deviceId}
+      dataParam="start"
+    />
+    <NumberField
+      label="End"
+      min="0"
+      max="1"
+      step="0.001"
+      value={resolvedEnd}
+      dataAction={dataAction}
+      dataId={deviceId}
+      dataParam="end"
+    />
+    <FieldShell label="Length">
       <input type="text" value={windowLengthText} readonly tabindex="-1" />
-    </div>
+    </FieldShell>
   </div>
 </div>
 
@@ -376,11 +371,11 @@
   .time-window-inputs {
     gap: var(--gap-8);
 
-    .control-field {
+    :global(.control-field) {
       flex: 1 1 0;
     }
 
-    input[readonly] {
+    :global(input[readonly]) {
       color: var(--neutral-50);
       cursor: default;
     }

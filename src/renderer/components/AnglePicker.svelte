@@ -262,6 +262,11 @@
     min-width: 0;
     min-height: 0;
 
+    .field-label {
+      color: var(--neutral-50);
+      font-size: var(--text-12);
+    }
+
     &-controls {
       display: flex;
       align-items: center;

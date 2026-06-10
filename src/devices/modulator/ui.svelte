@@ -3,6 +3,9 @@
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
   import CurveEditor from '../../renderer/components/CurveEditor.svelte';
+  import FieldShell from '../../renderer/components/FieldShell.svelte';
+  import NumberField from '../../renderer/components/NumberField.svelte';
+  import SelectField from '../../renderer/components/SelectField.svelte';
   import { sanitizeCurveNodes } from '../../core/modulation/curve';
   import {
     getRendererDeviceLabel,
@@ -13,6 +16,11 @@
   type ModulatorDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'modulator' }>;
   };
+
+  const MODULATION_DIVISION_OPTIONS = [4, 8, 16, 32, 64].map((divisions) => ({
+    value: divisions,
+    label: String(divisions),
+  }));
 
   let {
     device,
@@ -43,8 +51,7 @@
 <div class="device-controls modulation-layout">
   <div class="modulation-sidebar">
     <div class="modulation-control-grid">
-      <div class="control-field">
-        <span class="field-label">Target Device</span>
+      <FieldShell label="Target Device">
         <select data-action="set-modulation-target-device" data-id={device.id}>
           <option value="" selected={!device.params.target?.deviceId}>None</option>
           {#each targetableDevices as targetDevice (targetDevice.id)}
@@ -56,9 +63,8 @@
             </option>
           {/each}
         </select>
-      </div>
-      <div class="control-field modulation-control-field-wide">
-        <span class="field-label">Target Parameter</span>
+      </FieldShell>
+      <FieldShell label="Target Parameter" class="modulation-control-field-wide">
         <select
           data-action="set-modulation-target-param"
           data-id={device.id}
@@ -74,28 +80,22 @@
             </option>
           {/each}
         </select>
-      </div>
+      </FieldShell>
       <div class="modulation-compact-row">
-        <div class="control-field">
-          <span class="field-label">Amount</span>
-          <input
-            type="number"
-            step="0.1"
-            value={device.params.amount}
-            data-action="set-modulation-amount"
-            data-id={device.id}
-          />
-        </div>
-        <div class="control-field">
-          <span class="field-label">Divisions</span>
-          <select data-action="set-modulation-divisions" data-id={device.id}>
-            {#each [4, 8, 16, 32, 64] as divisions (divisions)}
-              <option value={divisions} selected={device.params.curve.divisions === divisions}>
-                {divisions}
-              </option>
-            {/each}
-          </select>
-        </div>
+        <NumberField
+          label="Amount"
+          step="0.1"
+          value={device.params.amount}
+          dataAction="set-modulation-amount"
+          dataId={device.id}
+        />
+        <SelectField
+          label="Divisions"
+          value={device.params.curve.divisions}
+          options={MODULATION_DIVISION_OPTIONS}
+          dataAction="set-modulation-divisions"
+          dataId={device.id}
+        />
       </div>
     </div>
   </div>

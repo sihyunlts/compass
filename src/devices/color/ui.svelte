@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
+  import NumberField from '../../renderer/components/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   const BLACK_RGB = '0 0 0';
@@ -132,42 +133,33 @@
     </div>
   </div>
   <div class="column-wrapper">
-    <div class="control-field">
-      <span class="field-label">Note Length</span>
-      <input
-        type="number"
-        step="1"
-        min="1"
-        value={device.params.noteLengthPercent}
-        data-action="set-color-note-length-percent"
-        data-id={device.id}
-      />
-    </div>
+    <NumberField
+      label="Note Length"
+      step="1"
+      min="1"
+      value={device.params.noteLengthPercent}
+      dataAction="set-color-note-length-percent"
+      dataId={device.id}
+    />
 
-    <div class="control-field">
-      <span class="field-label">Gap</span>
-      <input
-        type="number"
-        step="1"
-        min="0"
-        max="400"
-        value={device.params.gapPercent}
-        data-action="set-color-gap-percent"
-        data-id={device.id}
-      />
-    </div>
+    <NumberField
+      label="Gap"
+      step="1"
+      min="0"
+      max="400"
+      value={device.params.gapPercent}
+      dataAction="set-color-gap-percent"
+      dataId={device.id}
+    />
 
-    <div class="control-field">
-      <span class="field-label">Slots</span>
-      <input
-        type="number"
-        min="1"
-        step="1"
-        value={device.params.velocities.length}
-        data-action="set-color-slot-count"
-        data-id={device.id}
-        aria-label="Color slot count"
-      />
-    </div>
+    <NumberField
+      label="Slots"
+      min="1"
+      step="1"
+      value={device.params.velocities.length}
+      dataAction="set-color-slot-count"
+      dataId={device.id}
+      ariaLabel="Color slot count"
+    />
   </div>
 </div>

@@ -3,12 +3,30 @@
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
   import { normalizeOptionalId } from '../../shared/normalize-id';
+  import FieldShell from '../../renderer/components/FieldShell.svelte';
   import MaskTilePicker from '../../renderer/components/MaskTilePicker.svelte';
+  import SelectField from '../../renderer/components/SelectField.svelte';
   import {
     getRendererDeviceGroup,
     getRendererDeviceLabel,
   } from '../schema-registry';
   import type { RendererDeviceEditorPropsBase } from '../types';
+
+  const MASK_MODE_OPTIONS = [
+    { value: 'include', label: 'Show Selection Only' },
+    { value: 'exclude', label: 'Hide Selection Only' },
+  ] as const;
+
+  const MASK_SOURCE_KIND_OPTIONS = [
+    { value: 'tiles', label: 'Tiles' },
+    { value: 'group', label: 'Group' },
+    { value: 'generator', label: 'Generator' },
+  ] as const;
+
+  const MASK_SOURCE_VISIBILITY_OPTIONS = [
+    { value: 'hide', label: 'Hide' },
+    { value: 'show', label: 'Show' },
+  ] as const;
 
   type MaskDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'mask' }>;
@@ -39,46 +57,34 @@
 </script>
 
 <div class="device-controls">
-  <div class="control-field">
-    <span class="field-label">Mode</span>
-    <select data-action="set-mask-mode" data-id={device.id}>
-      <option value="include" selected={device.params.mode === 'include'}>
-        Show Selection Only
-      </option>
-      <option value="exclude" selected={device.params.mode === 'exclude'}>
-        Hide Selection Only
-      </option>
-    </select>
-  </div>
-  <div class="control-field">
-    <span class="field-label">Mask Source</span>
-    <select data-action="set-mask-source-kind" data-id={device.id}>
-      <option value="tiles" selected={device.params.sourceKind === 'tiles'}>Tiles</option>
-      <option value="group" selected={device.params.sourceKind === 'group'}>Group</option>
-      <option value="generator" selected={device.params.sourceKind === 'generator'}>
-        Generator
-      </option>
-    </select>
-  </div>
-  <div class="control-field">
-    <span class="field-label">Source Visibility</span>
-    <select data-action="set-mask-source-visibility" data-id={device.id}>
-      <option value="hide" selected={device.params.sourceVisibility !== 'show'}>
-        Hide
-      </option>
-      <option value="show" selected={device.params.sourceVisibility === 'show'}>
-        Show
-      </option>
-    </select>
-  </div>
+  <SelectField
+    label="Mode"
+    value={device.params.mode}
+    options={MASK_MODE_OPTIONS}
+    dataAction="set-mask-mode"
+    dataId={device.id}
+  />
+  <SelectField
+    label="Mask Source"
+    value={device.params.sourceKind}
+    options={MASK_SOURCE_KIND_OPTIONS}
+    dataAction="set-mask-source-kind"
+    dataId={device.id}
+  />
+  <SelectField
+    label="Source Visibility"
+    value={device.params.sourceVisibility}
+    options={MASK_SOURCE_VISIBILITY_OPTIONS}
+    dataAction="set-mask-source-visibility"
+    dataId={device.id}
+  />
   {#if device.params.sourceKind === 'tiles'}
     <MaskTilePicker
       deviceId={device.id}
       tiles={device.params.tiles}
     />
   {:else if device.params.sourceKind === 'group'}
-    <div class="control-field">
-      <span class="field-label">Group</span>
+    <FieldShell label="Group">
       <select
         data-action="set-mask-source-id"
         data-id={device.id}
@@ -93,10 +99,9 @@
           </option>
         {/each}
       </select>
-    </div>
+    </FieldShell>
   {:else}
-    <div class="control-field">
-      <span class="field-label">Generator</span>
+    <FieldShell label="Generator">
       <select
         data-action="set-mask-source-id"
         data-id={device.id}
@@ -114,6 +119,6 @@
           </option>
         {/each}
       </select>
-    </div>
+    </FieldShell>
   {/if}
 </div>
