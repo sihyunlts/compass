@@ -286,7 +286,7 @@ const buildStretchTransform = (
   };
 };
 
-const buildNormalizedTrimTransform = (
+const buildTrimTransform = (
   sourceWindow: TimelineWindow,
   start: number,
   end: number,
@@ -1819,7 +1819,12 @@ const buildTrimRemaps = (
   state,
   targetGroupId,
   requiredFrameWindow,
-  (_originId, timelineState, frameWindow) => {
+  (originId, timelineState, frameWindow) => {
+    const sourceWindow = resolveSourceWindow(state.timelineStateByOriginId, originId);
+    if (!sourceWindow) {
+      return null;
+    }
+
     return resolveLastModulatedTemporalState(
       state,
       effect,
@@ -1831,10 +1836,13 @@ const buildTrimRemaps = (
         if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 1 || end <= start) {
           return null;
         }
+        if (isFixedTimelineWindow({ start, end })) {
+          return null;
+        }
 
         return composeSceneTemporalState(
           timelineState?.temporal ?? createIdentitySceneTemporalState(),
-          buildNormalizedTrimTransform(DEFAULT_TIMELINE_WINDOW, start, end),
+          buildTrimTransform(sourceWindow, start, end),
         );
       },
     );
