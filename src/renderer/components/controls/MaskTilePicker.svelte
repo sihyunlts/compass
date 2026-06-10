@@ -91,7 +91,6 @@
     gap: var(--gap-2);
     padding: var(--gap-6);
     border-radius: var(--radius-6);
-    background: var(--neutral-20);
     border: 1px solid var(--neutral-30);
     user-select: none;
     touch-action: none;
@@ -99,9 +98,9 @@
 
   .mask-tile {
     appearance: none;
-    border: 1px solid var(--neutral-30);
+    border: none;
     border-radius: var(--radius-2);
-    background: var(--neutral-10);
+    background: var(--neutral-20);
     aspect-ratio: 1 / 1;
     padding: 0;
     cursor: pointer;
