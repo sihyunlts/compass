@@ -614,12 +614,14 @@ const cloneStrokeWithVelocityAndWriteOrder = (
   writeOrder: number,
   colorSlotIndex: number,
   colorSlotCount: number,
+  colorSlotGapFill: boolean,
 ): Omit<GeometryStroke, 'writeId'> => ({
   polyline: {
     ...stroke.polyline,
     velocity,
     colorSlotIndex,
     colorSlotCount,
+    colorSlotGapFill,
     points: stroke.polyline.points.map((point) => ({ ...point })),
     clipStack: stroke.polyline.clipStack.map((clip) => ({
       ...clip,
@@ -2101,6 +2103,7 @@ const applyColorEffect = (
               resolveColorSlotWriteOrder(writeOrder, staticSlot.slotIndex, staticSlot.slotCount),
               staticSlot.slotIndex,
               staticSlot.slotCount,
+              false,
             ),
           );
         }
@@ -2168,6 +2171,7 @@ const applyColorEffect = (
                 resolveColorSlotWriteOrder(writeOrder, slot.slotIndex, colorConfig.velocities.length),
                 slot.slotIndex,
                 colorConfig.velocities.length,
+                slot.source.referenceDuration !== undefined,
               ),
             );
           }

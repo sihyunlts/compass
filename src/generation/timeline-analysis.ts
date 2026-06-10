@@ -17,6 +17,7 @@ interface OccupiedCoordinate {
   distanceSquared: number;
   colorSlotIndex?: number;
   colorSlotCount?: number;
+  colorSlotGapFill?: boolean;
 }
 
 interface CoordinateCollectionOptions {
@@ -30,6 +31,17 @@ const COLOR_SLOT_GAP_DIRECTIONS = Object.freeze([
   Object.freeze({ dx: 0, dy: 1 }),
   Object.freeze({ dx: 1, dy: 1 }),
   Object.freeze({ dx: 1, dy: -1 }),
+]);
+const INTERIOR_COLOR_SLOT_GAP_MIN_NEIGHBORS = 7;
+const COLOR_SLOT_GAP_SUPPORT_OFFSETS = Object.freeze([
+  Object.freeze({ dx: -1, dy: -1 }),
+  Object.freeze({ dx: 0, dy: -1 }),
+  Object.freeze({ dx: 1, dy: -1 }),
+  Object.freeze({ dx: -1, dy: 0 }),
+  Object.freeze({ dx: 1, dy: 0 }),
+  Object.freeze({ dx: -1, dy: 1 }),
+  Object.freeze({ dx: 0, dy: 1 }),
+  Object.freeze({ dx: 1, dy: 1 }),
 ]);
 
 const isPointInsideMasks = (
@@ -82,6 +94,10 @@ const shouldReplaceWinner = (
   current: OccupiedCoordinate,
 ): boolean => {
   if (isRelatedColorSlotCandidate(candidate, current)) {
+    if (Math.abs(candidate.writeOrder - current.writeOrder) > 1e-9) {
+      return candidate.writeOrder > current.writeOrder;
+    }
+
     const distanceDelta = resolveColorSlotBoundaryDistance(candidate) - resolveColorSlotBoundaryDistance(current);
     if (Math.abs(distanceDelta) > 1e-9) {
       return distanceDelta < 0;
@@ -216,13 +232,49 @@ const isAdjacentColorSlotGap = (
   && Math.abs(first.colorSlotIndex - second.colorSlotIndex) === 1
 );
 
+const countOccupiedNeighbors = (
+  snapshot: ReadonlyMap<string, OccupiedCoordinate>,
+  x: number,
+  y: number,
+): number => {
+  let count = 0;
+  for (const { dx, dy } of COLOR_SLOT_GAP_SUPPORT_OFFSETS) {
+    const coordinateKey = coordinateKeyAt(x + dx, y + dy);
+    if (coordinateKey && snapshot.has(coordinateKey)) {
+      count += 1;
+    }
+  }
+  return count;
+};
+
+const canFillColorSlotGap = (
+  snapshot: ReadonlyMap<string, OccupiedCoordinate>,
+  x: number,
+  y: number,
+  first: OccupiedCoordinate,
+  second: OccupiedCoordinate,
+): boolean => {
+  if (!isAdjacentColorSlotGap(first, second)) {
+    return false;
+  }
+
+  if (first.colorSlotGapFill === true && second.colorSlotGapFill === true) {
+    return true;
+  }
+
+  return countOccupiedNeighbors(snapshot, x, y) >= INTERIOR_COLOR_SLOT_GAP_MIN_NEIGHBORS;
+};
+
 const toColorSlotGapFill = (
   x: number,
   y: number,
   first: OccupiedCoordinate,
   second: OccupiedCoordinate,
 ): OccupiedCoordinate => {
-  const winner = shouldReplaceWinner(first, second) ? first : second;
+  const distanceDelta = resolveColorSlotBoundaryDistance(first) - resolveColorSlotBoundaryDistance(second);
+  const winner = Math.abs(distanceDelta) > 1e-9
+    ? (distanceDelta < 0 ? first : second)
+    : (shouldReplaceWinner(first, second) ? first : second);
   return {
     ...winner,
     x,
@@ -267,7 +319,7 @@ const fillColorSlotGaps = (
 
         const first = snapshot.get(firstKey);
         const second = snapshot.get(secondKey);
-        if (!first || !second || !isAdjacentColorSlotGap(first, second)) {
+        if (!first || !second || !canFillColorSlotGap(snapshot, x, y, first, second)) {
           continue;
         }
 
@@ -311,6 +363,7 @@ export const collectOccupiedCoordinates = (
         distanceSquared: distanceToPolylineSquared({ x, y }, stroke.polyline),
         colorSlotIndex: stroke.polyline.colorSlotIndex,
         colorSlotCount: stroke.polyline.colorSlotCount,
+        colorSlotGapFill: stroke.polyline.colorSlotGapFill,
       };
 
       if (!winnerOnly) {

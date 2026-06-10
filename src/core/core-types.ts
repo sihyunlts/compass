@@ -81,5 +81,6 @@ export interface Polyline {
   rasterMode?: 'centerline';
   colorSlotIndex?: number;
   colorSlotCount?: number;
+  colorSlotGapFill?: boolean;
   clipStack: SceneClip[];
 }
