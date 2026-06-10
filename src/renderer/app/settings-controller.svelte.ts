@@ -4,6 +4,7 @@ import type { PlaybackSessionController } from './playback-session.svelte';
 import { createPaletteController, PaletteParseError } from './palette-controller';
 
 const ABOUT_SITE_URL = 'https://sihyunlights.com';
+const GITHUB_URL = 'https://github.com/sihyunlts/compass';
 
 interface SettingsControllerState {
   appVersionText: string;
@@ -125,6 +126,14 @@ class SettingsController {
       await this.options.bridgeClient.openExternal(ABOUT_SITE_URL);
     } catch (error) {
       this.showAboutError('Failed to open website', error);
+    }
+  }
+
+  public async openGitHub(): Promise<void> {
+    try {
+      await this.options.bridgeClient.openExternal(GITHUB_URL);
+    } catch (error) {
+      this.showAboutError('Failed to open GitHub', error);
     }
   }
 

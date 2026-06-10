@@ -8,10 +8,12 @@
     appVersionText = '',
     aboutDescription,
     aboutDescriptionTone = 'neutral',
+    githubDescription,
     onLaunchpadModelToggle,
     onPaletteReset,
     onPaletteFileChange,
     onOpenAboutSite,
+    onOpenGitHub,
   } = $props<{
     launchpadMk2Enabled: boolean;
     paletteDescription: string;
@@ -19,10 +21,12 @@
     appVersionText?: string;
     aboutDescription: string;
     aboutDescriptionTone?: 'neutral' | 'error';
+    githubDescription: string;
     onLaunchpadModelToggle: (enabled: boolean) => void;
     onPaletteReset: () => void;
     onPaletteFileChange: (event: Event) => void | Promise<void>;
     onOpenAboutSite: () => void | Promise<void>;
+    onOpenGitHub: () => void | Promise<void>;
   }>();
 </script>
 
@@ -90,6 +94,18 @@
 
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
+          <span class="sidebar-settings-label">GitHub</span>
+          <span class="sidebar-settings-description">{githubDescription}</span>
+        </div>
+        <Button
+          text="Open"
+          title="Open GitHub"
+          onClick={() => onOpenGitHub()}
+        />
+      </div>
+
+      <div class="sidebar-settings-row">
+        <div class="sidebar-settings-info">
           <span class="sidebar-settings-label">sihyunlights</span>
           <span
             class="sidebar-settings-description"
@@ -101,8 +117,8 @@
           </span>
         </div>
         <Button
-          text="Visit"
-          title="Visit website"
+          text="Open"
+          title="Open website"
           onClick={() => onOpenAboutSite()}
         />
       </div>

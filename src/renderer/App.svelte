@@ -335,6 +335,7 @@
       appVersionText={settingsState.appVersionText}
       aboutDescription={settingsState.aboutDescriptionOverride || settingsController.getAboutSiteUrl()}
       aboutDescriptionTone={settingsState.aboutDescriptionTone}
+      githubDescription="sihyunlts/compass"
       onPageSelect={(nextPage) => {
         uiState.sidebarPage = nextPage;
       }}
@@ -345,6 +346,7 @@
       onPaletteReset={() => settingsController.handlePaletteReset()}
       onPaletteFileChange={(event) => settingsController.handlePaletteFileChange(event)}
       onOpenAboutSite={() => settingsController.openAboutSite()}
+      onOpenGitHub={() => settingsController.openGitHub()}
       onPresetEntryOpen={(entry) => presetController.handlePresetEntryOpen(entry)}
       onPresetFilePointerDown={(entry, sourceEvent, itemEl) =>
         presetController.handlePresetFilePointerDown(entry, sourceEvent, itemEl)}

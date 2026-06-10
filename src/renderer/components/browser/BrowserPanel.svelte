@@ -221,6 +221,7 @@
     appVersionText = '',
     aboutDescription = '',
     aboutDescriptionTone = 'neutral',
+    githubDescription = '',
     onPageSelect = () => {},
     onDeviceAdd,
     onBrowserPointerDown,
@@ -229,6 +230,7 @@
     onPaletteReset = () => {},
     onPaletteFileChange = () => {},
     onOpenAboutSite = () => {},
+    onOpenGitHub = () => {},
     onPresetEntryOpen,
     onPresetFilePointerDown,
     onPendingPresetFolderDraftNameChange = () => {},
@@ -249,6 +251,7 @@
     appVersionText?: string;
     aboutDescription?: string;
     aboutDescriptionTone?: 'neutral' | 'error';
+    githubDescription?: string;
     onPageSelect?: (page: BrowserPanelPage) => void;
     onDeviceAdd: (kind: RendererDeviceKind) => void;
     onBrowserPointerDown: (payload: BrowserPointerDownPayload) => void;
@@ -261,6 +264,7 @@
     onPaletteReset?: () => void;
     onPaletteFileChange?: (event: Event) => void | Promise<void>;
     onOpenAboutSite?: () => void | Promise<void>;
+    onOpenGitHub?: () => void | Promise<void>;
     onPresetEntryOpen: (entry: BrowserTreePresetLeafNode) => void | Promise<void>;
     onPresetFilePointerDown: (
       entry: BrowserTreePresetLeafNode,
@@ -652,10 +656,12 @@
           {appVersionText}
           {aboutDescription}
           {aboutDescriptionTone}
+          {githubDescription}
           onLaunchpadModelToggle={onLaunchpadModelToggle}
           onPaletteReset={onPaletteReset}
           onPaletteFileChange={onPaletteFileChange}
           onOpenAboutSite={onOpenAboutSite}
+          onOpenGitHub={onOpenGitHub}
         />
       {:else if activePage === 'presets' && isPresetLoading}
         <p class="browser-status">Loading presets...</p>
