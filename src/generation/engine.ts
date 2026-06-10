@@ -303,15 +303,29 @@ const buildNormalizedTrimTransform = (
   };
 };
 
-const buildPlacementPreservingReverseTransform = (
+const buildReverseTransform = (
+  sourceWindow: TimelineWindow,
   placementWindow: TimelineWindow,
-): TemporalTransform => ({
-  remapToInput: createAffineTemporalRemap(
-    -1,
-    placementWindow.start + placementWindow.end,
-  ),
-  visibilityWindow: cloneTimelineWindow(placementWindow),
-});
+  sampleStepBeats: number,
+): TemporalTransform => {
+  const sourceSpan = sourceWindow.end - sourceWindow.start;
+  const placementSpan = placementWindow.end - placementWindow.start;
+  const sourceFrameSpan = sourceSpan - sampleStepBeats;
+  const placementFrameSpan = placementSpan - sampleStepBeats;
+  const sourceEndBeat = sourceWindow.end - sampleStepBeats;
+  const alpha = sourceFrameSpan > 0 && placementFrameSpan > 0
+    ? -sourceFrameSpan / placementFrameSpan
+    : -sourceSpan / placementSpan;
+
+  return {
+    remapToInput: createAffineTemporalRemap(
+      alpha,
+      (sourceFrameSpan > 0 && placementFrameSpan > 0 ? sourceEndBeat : sourceWindow.end)
+        - alpha * placementWindow.start,
+    ),
+    visibilityWindow: cloneTimelineWindow(placementWindow),
+  };
+};
 
 const buildPlacementPreservingTimeWarpTransform = (
   placementWindow: TimelineWindow,
@@ -1760,10 +1774,23 @@ const buildReverseRemaps = (
   state,
   targetGroupId,
   requiredFrameWindow,
-  (_originId, timelineState, frameWindow) => {
+  (originId, timelineState, frameWindow) => {
     const placementWindow = resolveOutputWindow(timelineState);
+    const sourceWindow = timelineState?.temporal.hasAuthoredTimeline === true
+      ? placementWindow
+      : resolveSourceWindow(state.timelineStateByOriginId, originId);
+    if (!sourceWindow) {
+      return null;
+    }
+
+    const sourceSpan = sourceWindow.end - sourceWindow.start;
     const placementSpan = placementWindow.end - placementWindow.start;
-    if (!Number.isFinite(placementSpan) || placementSpan <= 0) {
+    if (
+      !Number.isFinite(sourceSpan)
+      || sourceSpan <= 0
+      || !Number.isFinite(placementSpan)
+      || placementSpan <= 0
+    ) {
       return null;
     }
 
@@ -1777,7 +1804,7 @@ const buildReverseRemaps = (
 
     return composeSceneTemporalState(
       timelineState?.temporal ?? createIdentitySceneTemporalState(),
-      buildPlacementPreservingReverseTransform(placementWindow),
+      buildReverseTransform(sourceWindow, placementWindow, state.timeline.sampleStepBeats),
     );
   },
 );
