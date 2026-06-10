@@ -287,6 +287,12 @@ const coordinateKeyAt = (
   y: number,
 ): string | null => toRoundedCoordinateKey(x, y);
 
+const coordinateMaskBlockKey = (
+  coordinateKey: string,
+  originId: string,
+  originGroupId: string | null,
+): string => `${originId}\n${originGroupId ?? ''}\n${coordinateKey}`;
+
 const isAdjacentColorSlotGap = (
   first: OccupiedCoordinate,
   second: OccupiedCoordinate,
@@ -353,6 +359,7 @@ const toColorSlotGapFill = (
 
 const fillColorSlotGaps = (
   byCoordinate: Map<string, OccupiedCoordinate>,
+  maskedOutCoordinateKeys: ReadonlySet<string>,
 ): void => {
   if (byCoordinate.size === 0) {
     return;
@@ -392,6 +399,14 @@ const fillColorSlotGaps = (
           continue;
         }
 
+        if (maskedOutCoordinateKeys.has(coordinateMaskBlockKey(
+          coordinateKey,
+          first.originId,
+          first.originGroupId,
+        ))) {
+          continue;
+        }
+
         fills.set(coordinateKey, toColorSlotGapFill(x, y, first, second));
         break;
       }
@@ -409,15 +424,21 @@ export const collectOccupiedCoordinates = (
   options: CoordinateCollectionOptions = {},
 ): Map<string, OccupiedCoordinate> => {
   const byCoordinate = new Map<string, OccupiedCoordinate>();
+  const maskedOutCoordinateKeys = new Set<string>();
 
   for (const stroke of strokes) {
     for (const { x, y, distanceSquared } of collectStrokeOccupiedCoordinates(stroke)) {
-      if (!isPointInsideMasks(stroke.masks, x, y)) {
+      const coordinateKey = toRoundedCoordinateKey(x, y);
+      if (!coordinateKey) {
         continue;
       }
 
-      const coordinateKey = toRoundedCoordinateKey(x, y);
-      if (!coordinateKey) {
+      if (!isPointInsideMasks(stroke.masks, x, y)) {
+        maskedOutCoordinateKeys.add(coordinateMaskBlockKey(
+          coordinateKey,
+          stroke.polyline.originId,
+          stroke.originGroupId,
+        ));
         continue;
       }
 
@@ -448,7 +469,7 @@ export const collectOccupiedCoordinates = (
   }
 
   if (winnerOnly && options.fillColorSlotGaps) {
-    fillColorSlotGaps(byCoordinate);
+    fillColorSlotGaps(byCoordinate, maskedOutCoordinateKeys);
   }
 
   return byCoordinate;

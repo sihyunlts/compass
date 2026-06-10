@@ -96,12 +96,24 @@ interface MutableGenerationState {
   timeline: GeometryTimeline;
   timelineStateByOriginId: Map<string, OriginTimelineState>;
   pendingTemporalWriteOrderByOriginId: Map<string, number>;
+  sealedOriginIds: Set<string>;
 }
 
 interface ModulationContext {
   loopLengthBeats: number;
   program: CompiledModulationProgram;
   deviceByFrameKey: Map<string, GeneratorDeviceNode>;
+}
+
+interface MaskSourceReferenceContext {
+  compiledPlan: CompiledRackPlan;
+  outputAdapter: CanonicalOutputAdapter;
+  modulationContext: ModulationContext;
+  executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>;
+  mutedGroupIds: ReadonlySet<string>;
+  mutedGeneratorIds: ReadonlySet<string>;
+  timelineBySourceKey: Map<string, GeometryTimeline>;
+  resolvingSourceKeys: Set<string>;
 }
 
 interface OriginFrameRemap {
@@ -183,6 +195,10 @@ const cloneTimelineStateByOriginId = (
 const clonePendingTemporalWriteOrderByOriginId = (
   pendingTemporalWriteOrderByOriginId: ReadonlyMap<string, number>,
 ): Map<string, number> => new Map(pendingTemporalWriteOrderByOriginId);
+
+const cloneSealedOriginIds = (
+  sealedOriginIds: ReadonlySet<string>,
+): Set<string> => new Set(sealedOriginIds);
 
 const cloneTimelineWindow = (
   window: TimelineWindow,
@@ -458,14 +474,34 @@ const forEachTargetedFrame = (
 const buildTargetOriginIds = (
   timeline: GeometryTimeline,
   targetGroupId: string | null,
+  options: {
+    excludeMutedSources?: boolean;
+    mutedGroupIds?: ReadonlySet<string>;
+    mutedGeneratorIds?: ReadonlySet<string>;
+  } = {},
 ): Set<string> => {
   const originIds = new Set<string>();
+  const excludeMutedSources = options.excludeMutedSources === true;
+  const mutedGroupIds = options.mutedGroupIds ?? new Set<string>();
+  const mutedGeneratorIds = options.mutedGeneratorIds ?? new Set<string>();
 
   for (const frame of timeline.frames) {
     for (const stroke of frame.strokes) {
-      if (isTargetedStroke(stroke, targetGroupId)) {
-        originIds.add(stroke.polyline.originId);
+      if (!isTargetedStroke(stroke, targetGroupId)) {
+        continue;
       }
+
+      if (
+        excludeMutedSources
+        && (
+          mutedGeneratorIds.has(stroke.polyline.originId)
+          || (stroke.originGroupId !== null && mutedGroupIds.has(stroke.originGroupId))
+        )
+      ) {
+        continue;
+      }
+
+      originIds.add(stroke.polyline.originId);
     }
   }
 
@@ -730,6 +766,7 @@ const applySpatialTransform = (
     pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
       state.pendingTemporalWriteOrderByOriginId,
     ),
+    sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
   };
 };
 
@@ -811,6 +848,7 @@ const applyMirrorHalfSymmetry = (
     pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
       state.pendingTemporalWriteOrderByOriginId,
     ),
+    sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
   };
 };
 
@@ -875,6 +913,7 @@ const applyQuadMirrorSymmetry = (
     pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
       state.pendingTemporalWriteOrderByOriginId,
     ),
+    sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
   };
 };
 
@@ -928,6 +967,7 @@ const applyQuadPinwheelSymmetry = (
     pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
       state.pendingTemporalWriteOrderByOriginId,
     ),
+    sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
   };
 };
 
@@ -1446,6 +1486,7 @@ const applyTemporalStateUpdates = (
     timeline: state.timeline,
     timelineStateByOriginId,
     pendingTemporalWriteOrderByOriginId,
+    sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
   };
 };
 
@@ -1458,6 +1499,7 @@ const buildNormalizeNonAuthoredRemaps = (
   for (const [originId, timelineState] of state.timelineStateByOriginId.entries()) {
     if (
       timelineState.temporal.hasAuthoredTimeline
+      || state.sealedOriginIds.has(originId)
       || isWindowEmpty(timelineState.observedWindow)
       || !isFixedTimelineWindow(timelineState.temporal.visibilityWindow)
     ) {
@@ -1632,6 +1674,7 @@ const materializePendingTemporalState = (
       mutedGeneratorIds,
     ),
     pendingTemporalWriteOrderByOriginId,
+    sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
   };
 };
 
@@ -1662,27 +1705,30 @@ const sealStageWithTemporalInvariant = (
       )
     : clampTimelineToFixedLoop(state.timeline);
 
+  const timelineStateByOriginId = buildTimelineStateByOriginId(
+    nextTimeline,
+    state.timelineStateByOriginId,
+    outputAdapter,
+    mutedGroupIds,
+    mutedGeneratorIds,
+    normalizeRemaps.size > 0
+      ? new Map([
+          ...temporalOverrides,
+          ...Array.from(
+            normalizeRemaps.entries(),
+            ([originId, remap]) => [originId, remap.nextTemporal] as const,
+          ),
+        ])
+      : temporalOverrides,
+  );
+
   return {
     timeline: nextTimeline,
-    timelineStateByOriginId: buildTimelineStateByOriginId(
-      nextTimeline,
-      state.timelineStateByOriginId,
-      outputAdapter,
-      mutedGroupIds,
-      mutedGeneratorIds,
-      normalizeRemaps.size > 0
-        ? new Map([
-            ...temporalOverrides,
-            ...Array.from(
-              normalizeRemaps.entries(),
-              ([originId, remap]) => [originId, remap.nextTemporal] as const,
-            ),
-          ])
-        : temporalOverrides,
-    ),
+    timelineStateByOriginId,
     pendingTemporalWriteOrderByOriginId: normalizeRemaps.size > 0
       ? new Map<string, number>()
       : clonePendingTemporalWriteOrderByOriginId(state.pendingTemporalWriteOrderByOriginId),
+    sealedOriginIds: new Set(timelineStateByOriginId.keys()),
   };
 };
 
@@ -1964,6 +2010,28 @@ const resolveMaskSourceTimeReversed = (
   return reverseParity;
 };
 
+const resolveMaskSourceTimeline = (
+  currentTimeline: GeometryTimeline,
+  effect: MaskEffectNode,
+  referenceContext: MaskSourceReferenceContext,
+): GeometryTimeline => {
+  if (effect.params.sourceKind === 'tiles') {
+    return currentTimeline;
+  }
+
+  const sourceId = normalizeOptionalId(effect.params.sourceId);
+  if (!sourceId) {
+    return currentTimeline;
+  }
+
+  const referenceTimeline = resolveMaskSourceReferenceTimeline(
+    referenceContext,
+    effect.params.sourceKind,
+    sourceId,
+  );
+  return referenceTimeline ?? currentTimeline;
+};
+
 const resolveMaskSourceMask = (
   sourceTimeline: GeometryTimeline,
   chain: GeneratorChain,
@@ -2018,8 +2086,13 @@ const applyMaskEffect = (
   executionPlan: OperatorExecutionPlan,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
+  referenceContext: MaskSourceReferenceContext,
 ): MutableGenerationState => {
-  const sourceTimeline = state.timeline;
+  const sourceTimeline = resolveMaskSourceTimeline(
+    state.timeline,
+    effect,
+    referenceContext,
+  );
   const nextTimeline = beginTimelineStage(state.timeline);
   const targetFrameWindow = resolveFrameWindow(
     executionPlan.requiredFrameWindow,
@@ -2064,6 +2137,7 @@ const applyMaskEffect = (
     pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
       state.pendingTemporalWriteOrderByOriginId,
     ),
+    sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
   };
 };
 
@@ -2084,7 +2158,15 @@ const applyColorEffect = (
     state.timeline.sampleStepBeats,
     state.timeline.frames.length,
   );
-  const targetOriginIds = buildTargetOriginIds(state.timeline, targetGroupId);
+  const targetOriginIds = buildTargetOriginIds(
+    state.timeline,
+    targetGroupId,
+    {
+      excludeMutedSources: targetGroupId === null,
+      mutedGroupIds,
+      mutedGeneratorIds,
+    },
+  );
   const sourceStrokesByOriginAndFrame = buildSourceStrokesByOriginAndFrame(
     state.timeline,
     targetOriginIds,
@@ -2232,6 +2314,10 @@ const applyColorEffect = (
   }
 
   const sealedTimeline = completeTimelineStage(nextTimeline);
+  const sealedOriginIds = cloneSealedOriginIds(state.sealedOriginIds);
+  for (const originId of targetOriginIds) {
+    sealedOriginIds.delete(originId);
+  }
   return {
     timeline: sealedTimeline,
     timelineStateByOriginId: buildTimelineStateByOriginId(
@@ -2244,6 +2330,7 @@ const applyColorEffect = (
     pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
       state.pendingTemporalWriteOrderByOriginId,
     ),
+    sealedOriginIds,
   };
 };
 
@@ -2299,6 +2386,7 @@ const applyEffectDevice = (
   executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
+  referenceContext: MaskSourceReferenceContext,
 ): MutableGenerationState => {
   const device = stage.device as GeneratorEffectNode;
   const deviceIndex = stage.stageIndex;
@@ -2307,7 +2395,17 @@ const applyEffectDevice = (
 
   if (device.kind === 'mask') {
     return applyMaskEffect(
-      state,
+      sealStageWithTemporalInvariant(
+        materializePendingTemporalState(
+          state,
+          outputAdapter,
+          mutedGroupIds,
+          mutedGeneratorIds,
+        ),
+        outputAdapter,
+        mutedGroupIds,
+        mutedGeneratorIds,
+      ),
       chain,
       device,
       targetGroupId,
@@ -2317,6 +2415,7 @@ const applyEffectDevice = (
       executionPlan,
       mutedGroupIds,
       mutedGeneratorIds,
+      referenceContext,
     );
   }
 
@@ -2473,6 +2572,8 @@ const applyGeneratorDevice = (
     observedWindow: EMPTY_TIMELINE_WINDOW,
     temporal: createIdentitySceneTemporalState(),
   });
+  const sealedOriginIds = cloneSealedOriginIds(state.sealedOriginIds);
+  sealedOriginIds.delete(device.id);
   return {
     timeline: sealedTimeline,
     timelineStateByOriginId: buildTimelineStateByOriginId(
@@ -2485,6 +2586,7 @@ const applyGeneratorDevice = (
     pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
       state.pendingTemporalWriteOrderByOriginId,
     ),
+    sealedOriginIds,
   };
 };
 
@@ -2520,6 +2622,7 @@ const applyCompiledRackStage = (
   executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
+  referenceContext: MaskSourceReferenceContext,
 ): MutableGenerationState => {
   if (isGeneratorStage(stage)) {
     return applyGeneratorDevice(
@@ -2554,6 +2657,7 @@ const applyCompiledRackStage = (
       executionPlanByDeviceId,
       mutedGroupIds,
       mutedGeneratorIds,
+      referenceContext,
     );
   }
 
@@ -2571,7 +2675,175 @@ const applyCompiledRackStage = (
     executionPlanByDeviceId,
     mutedGroupIds,
     mutedGeneratorIds,
+    referenceContext,
   );
+};
+
+const isReferenceGeneratorStage = (
+  stage: CompiledRackStage,
+  sourceKind: 'group' | 'generator',
+  sourceId: string,
+): boolean => {
+  if (!isGeneratorStage(stage)) {
+    return false;
+  }
+
+  return sourceKind === 'group'
+    ? stage.groupId === sourceId
+    : stage.deviceId === sourceId;
+};
+
+const resolveGeneratorGroupId = (
+  chain: GeneratorChain,
+  generatorId: string,
+): string | null | undefined => {
+  const generator = chain.devices.find((device) => (
+    device.id === generatorId
+    && (
+      device.kind === 'waterdrop'
+      || device.kind === 'scanner'
+      || device.kind === 'spiral'
+      || device.kind === 'path'
+    )
+  ));
+
+  return generator ? normalizeOptionalId(generator.groupId) : undefined;
+};
+
+const isReferenceEffectStage = (
+  stage: CompiledRackStage,
+  context: MaskSourceReferenceContext,
+  sourceKind: 'group' | 'generator',
+  sourceId: string,
+): boolean => {
+  if (isGeneratorStage(stage)) {
+    return false;
+  }
+
+  if (sourceKind === 'group') {
+    return stage.groupId === sourceId;
+  }
+
+  const sourceGroupId = resolveGeneratorGroupId(context.compiledPlan.baseChain, sourceId);
+  if (sourceGroupId === undefined) {
+    return false;
+  }
+
+  return stage.groupId === sourceGroupId;
+};
+
+const shouldApplyReferenceStage = (
+  stage: CompiledRackStage,
+  context: MaskSourceReferenceContext,
+  sourceKind: 'group' | 'generator',
+  sourceId: string,
+): boolean => isReferenceGeneratorStage(stage, sourceKind, sourceId)
+  || isReferenceEffectStage(stage, context, sourceKind, sourceId);
+
+const resolveMaskReferenceMutedGroupIds = (
+  context: MaskSourceReferenceContext,
+  sourceKind: 'group' | 'generator',
+  sourceId: string,
+): Set<string> => {
+  const mutedGroupIds = new Set(context.mutedGroupIds);
+  if (sourceKind === 'group') {
+    mutedGroupIds.delete(sourceId);
+    return mutedGroupIds;
+  }
+
+  const sourceGroupId = resolveGeneratorGroupId(context.compiledPlan.baseChain, sourceId);
+  if (sourceGroupId) {
+    mutedGroupIds.delete(sourceGroupId);
+  }
+  return mutedGroupIds;
+};
+
+const resolveMaskReferenceMutedGeneratorIds = (
+  context: MaskSourceReferenceContext,
+  sourceKind: 'group' | 'generator',
+  sourceId: string,
+): Set<string> => {
+  const mutedGeneratorIds = new Set(context.mutedGeneratorIds);
+  if (sourceKind === 'generator') {
+    mutedGeneratorIds.delete(sourceId);
+  }
+  return mutedGeneratorIds;
+};
+
+const resolveMaskSourceReferenceTimeline = (
+  context: MaskSourceReferenceContext,
+  sourceKind: 'group' | 'generator',
+  sourceId: string,
+): GeometryTimeline | null => {
+  const sourceKey = `${sourceKind}:${sourceId}`;
+  const cached = context.timelineBySourceKey.get(sourceKey);
+  if (cached) {
+    return cached;
+  }
+
+  if (context.resolvingSourceKeys.has(sourceKey)) {
+    return createEmptyTimeline();
+  }
+
+  context.resolvingSourceKeys.add(sourceKey);
+  try {
+    const referenceMutedGroupIds = resolveMaskReferenceMutedGroupIds(
+      context,
+      sourceKind,
+      sourceId,
+    );
+    const referenceMutedGeneratorIds = resolveMaskReferenceMutedGeneratorIds(
+      context,
+      sourceKind,
+      sourceId,
+    );
+    const referenceContext: MaskSourceReferenceContext = {
+      ...context,
+      mutedGroupIds: referenceMutedGroupIds,
+      mutedGeneratorIds: referenceMutedGeneratorIds,
+    };
+    let currentState: MutableGenerationState = {
+      timeline: createEmptyTimeline(),
+      timelineStateByOriginId: new Map<string, OriginTimelineState>(),
+      pendingTemporalWriteOrderByOriginId: new Map<string, number>(),
+      sealedOriginIds: new Set<string>(),
+    };
+
+    for (const stage of context.compiledPlan.stages) {
+      if (!shouldApplyReferenceStage(stage, context, sourceKind, sourceId)) {
+        continue;
+      }
+
+      currentState = applyCompiledRackStage(
+        currentState,
+        context.compiledPlan,
+        stage,
+        context.outputAdapter,
+        context.modulationContext,
+        context.executionPlanByDeviceId,
+        referenceMutedGroupIds,
+        referenceMutedGeneratorIds,
+        referenceContext,
+      );
+    }
+
+    const sealedState = sealStageWithTemporalInvariant(
+      materializePendingTemporalState(
+        currentState,
+        context.outputAdapter,
+        referenceMutedGroupIds,
+        referenceMutedGeneratorIds,
+      ),
+      context.outputAdapter,
+      referenceMutedGroupIds,
+      referenceMutedGeneratorIds,
+    );
+    const timeline = sealedState.timeline;
+    context.timelineBySourceKey.set(sourceKey, timeline);
+    return timeline;
+  } finally {
+    context.resolvingSourceKeys.delete(sourceKey);
+  }
 };
 
 const executeCompiledRackPlan = (
@@ -2584,10 +2856,21 @@ const executeCompiledRackPlan = (
   mutedGeneratorIds: ReadonlySet<string>,
 ): MutableGenerationState => {
   const modulationContext = createModulationContext(modulationChain, loopLengthBeats);
+  const referenceContext: MaskSourceReferenceContext = {
+    compiledPlan,
+    outputAdapter,
+    modulationContext,
+    executionPlanByDeviceId,
+    mutedGroupIds,
+    mutedGeneratorIds,
+    timelineBySourceKey: new Map<string, GeometryTimeline>(),
+    resolvingSourceKeys: new Set<string>(),
+  };
   let currentState: MutableGenerationState = {
     timeline: createEmptyTimeline(),
     timelineStateByOriginId: new Map<string, OriginTimelineState>(),
     pendingTemporalWriteOrderByOriginId: new Map<string, number>(),
+    sealedOriginIds: new Set<string>(),
   };
 
   for (const stage of compiledPlan.stages) {
@@ -2600,6 +2883,7 @@ const executeCompiledRackPlan = (
       executionPlanByDeviceId,
       mutedGroupIds,
       mutedGeneratorIds,
+      referenceContext,
     );
   }
 
