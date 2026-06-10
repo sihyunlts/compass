@@ -3,6 +3,7 @@
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
+  import { resolveLedSurfaceRgb } from '../../renderer/app/led-surface-color';
   import type { RendererDeviceEditorPropsBase } from '../types';
 
   const BLACK_RGB = '0 0 0';
@@ -60,7 +61,7 @@
 
   const resolvePaletteSwatchRgb = (velocity: number, revision: number): string => {
     void revision;
-    return resolvePaletteRgb(velocity);
+    return resolveLedSurfaceRgb(resolvePaletteRgb(velocity));
   };
 
   const isPaletteSlotDisabled = (rgb: string): boolean => rgb.trim() === BLACK_RGB;
