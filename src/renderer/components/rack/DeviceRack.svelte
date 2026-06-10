@@ -417,7 +417,7 @@
     .chain-devices {
       position: relative;
       display: flex;
-      gap: var(--gap-10);
+      gap: var(--gap-8);
       height: 100%;
       overflow: auto;
       border-radius: var(--radius-6);
@@ -434,7 +434,7 @@
   .device-group.is-rack {
     background: var(--neutral-10);
     border: 1px solid var(--neutral-20);
-    border-radius: var(--radius-6);
+    border-radius: var(--radius-8);
   }
 
   .device-group.is-rack.is-selected {
@@ -516,15 +516,15 @@
     &-left {
       min-width: 2rem;
       border-right: 1px solid var(--neutral-20);
-      border-top-left-radius: var(--radius-6);
-      border-bottom-left-radius: var(--radius-6);
+      border-top-left-radius: var(--radius-8);
+      border-bottom-left-radius: var(--radius-8);
     }
 
     &-right {
       min-width: 0.75rem;
       border-left: 1px solid var(--neutral-20);
-      border-top-right-radius: var(--radius-6);
-      border-bottom-right-radius: var(--radius-6);
+      border-top-right-radius: var(--radius-8);
+      border-bottom-right-radius: var(--radius-8);
     }
   }
 

@@ -178,7 +178,7 @@
     flex-direction: column;
     flex: 0 0 auto;
     border: 1px solid var(--neutral-20);
-    border-radius: var(--radius-6);
+    border-radius: var(--radius-8);
     background: var(--neutral-10);
     transition: transform 130ms ease, opacity 130ms ease;
 
