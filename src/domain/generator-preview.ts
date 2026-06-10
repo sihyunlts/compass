@@ -1,11 +1,7 @@
 import type { GeneratorPreview } from '../shared/contracts/preview/generator-preview';
 import {
-  buildGeneratedFieldResult,
   type GeneratedRuntimeFieldResult,
 } from './field-result';
-import {
-  type GenerateNotesInput,
-} from './note-generation-types';
 import { toClipNote } from './note-utils';
 
 export {
@@ -31,18 +27,4 @@ export const toGeneratorPreview = (
     sampleStepBeats: generated.sampleStepBeats,
     ledFramesBySampleIndex: generated.ledFramesBySampleIndex,
   };
-};
-
-/** Builds the canonical preview payload for one chain and one Launchpad model. */
-export const buildGeneratorPreview = ({
-  chain,
-  loopLengthBeats,
-  launchpadModel,
-}: GenerateNotesInput): GeneratorPreview => {
-  const generated = buildGeneratedFieldResult({
-    chain,
-    loopLengthBeats,
-    launchpadModel,
-  });
-  return toGeneratorPreview(generated);
 };

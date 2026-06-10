@@ -1,11 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 import { clamp } from '../../../shared/math';
 
-import {
-  buildGeneratedFieldResult,
-} from '../../../domain/field-result';
-import { toGeneratorPreview } from '../../../domain/generator-preview';
-import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
+import type { LaunchpadModel } from '../../../shared/model';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
 import { EMPTY_ACTIVE_VELOCITY_BY_PITCH } from './utils';
 import { LatestSourceKeyFamilyCache } from './source-key-cache';
@@ -19,11 +15,10 @@ export interface PreviewResultCacheEntry {
 }
 
 interface PreviewResultInput {
-  sourceChain: GeneratorChain;
   sourceKey: string;
   loopLengthBeats: number;
   launchpadModel: LaunchpadModel;
-  preview?: GeneratorPreview;
+  preview: GeneratorPreview;
 }
 
 class PreviewResultCache {
@@ -42,20 +37,14 @@ class PreviewResultCache {
       return cached;
     }
 
-    const generated = input.preview
-      ? undefined
-      : buildGeneratedFieldResult({
-        chain: input.sourceChain,
-        loopLengthBeats: input.loopLengthBeats,
-        launchpadModel: input.launchpadModel,
-      });
-    const preview = input.preview ?? toGeneratorPreview(generated);
     const entry: PreviewResultCacheEntry = {
       key,
-      preview,
-      sourceTimelineEndBeat: preview.sourceTimelineEndBeat,
-      sampleStepBeats: preview.sampleStepBeats,
-      ledFramesBySampleIndex: preview.ledFramesBySampleIndex.map((frame) => new Map<number, number>(frame)),
+      preview: input.preview,
+      sourceTimelineEndBeat: input.preview.sourceTimelineEndBeat,
+      sampleStepBeats: input.preview.sampleStepBeats,
+      ledFramesBySampleIndex: input.preview.ledFramesBySampleIndex.map(
+        (frame) => new Map<number, number>(frame),
+      ),
     };
     this.resultsByKey.set(key, entry);
     this.evictStaleSourceFamilyEntries(input.sourceKey);

@@ -151,12 +151,6 @@ export class PreviewSession {
       return;
     }
 
-    this.previewResultCache.resolve({
-      sourceChain: previewState.chain,
-      sourceKey: `preview-window:${previewState.previewRevision}`,
-      loopLengthBeats: previewState.loopLengthBeats,
-      launchpadModel: previewState.launchpadModel ?? 'mk3',
-    });
     this.syncPreviewSurface(
       previewState,
     );
