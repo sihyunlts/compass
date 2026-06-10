@@ -30,7 +30,6 @@
     color: var(--neutral-90);
     font-size: var(--text-14);
     font-weight: 500;
-    -webkit-app-region: no-drag;
 
     &-text {
       min-width: 0;
