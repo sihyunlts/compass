@@ -2188,7 +2188,7 @@ const applyColorEffect = (
               resolveColorSlotWriteOrder(writeOrder, slot.slotIndex, colorConfig.velocities.length),
               slot.slotIndex,
               colorConfig.velocities.length,
-              slot.source.referenceDuration !== undefined,
+              slot.source.referenceDuration !== undefined && colorConfig.gapPercent <= 0,
             ),
           );
         }
