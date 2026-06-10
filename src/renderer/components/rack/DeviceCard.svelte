@@ -316,18 +316,14 @@
       gap: var(--gap-10);
       flex: 1;
       min-width: 0;
+      min-height: 0;
     }
 
     :global(.column-wrapper) {
       display: flex;
       flex-direction: column;
       gap: var(--gap-8);
-    }
-
-    &[data-device-kind='mask'] {
-      :global(.device-controls) {
-        flex-direction: column;
-      }
+      min-height: 0;
     }
 
     &[data-device-kind='color'] {

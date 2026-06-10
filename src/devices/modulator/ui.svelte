@@ -120,6 +120,7 @@
   .modulation-main {
     flex: 1 1 12rem;
     min-width: 12rem;
+    min-height: 0;
   }
 
   .modulation-sidebar,
@@ -132,6 +133,13 @@
     :global(.control-field input),
     :global(.control-field select) {
       width: 100%;
+    }
+  }
+
+  .modulation-main {
+    :global(.modulation-curve-control) {
+      flex: 1 1 auto;
+      min-height: 0;
     }
   }
 

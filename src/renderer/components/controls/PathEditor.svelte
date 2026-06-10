@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import type { PathPoint } from '../../../shared/model';
+  import ControlSurfaceFrame from './ControlSurfaceFrame.svelte';
   import FieldShell from '../fields/FieldShell.svelte';
   import {
     PATH_COORDINATE_MAX,
@@ -277,41 +278,43 @@
 </script>
 
 <div class="path-editor-wrap">
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="path-editor-surface"
-    bind:this={editorEl}
-    onclick={handleSurfaceClick}
-  >
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-      {#each gridLineOffsets as offset (`x:${offset}`)}
-        <line class="path-editor-grid-line" x1={offset} y1="0" x2={offset} y2="100"></line>
+  <ControlSurfaceFrame minSize="10rem">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="path-editor-surface"
+      bind:this={editorEl}
+      onclick={handleSurfaceClick}
+    >
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        {#each gridLineOffsets as offset (`x:${offset}`)}
+          <line class="path-editor-grid-line" x1={offset} y1="0" x2={offset} y2="100"></line>
+        {/each}
+        {#each gridLineOffsets as offset (`y:${offset}`)}
+          <line class="path-editor-grid-line" x1="0" y1={offset} x2="100" y2={offset}></line>
+        {/each}
+
+        {#if pathLine}
+          <path class="path-editor-line-halo" d={pathLine}></path>
+          <path class="path-editor-line" d={pathLine}></path>
+        {/if}
+      </svg>
+
+      {#each plottedPoints as plottedPoint (plottedPoint.index)}
+        <button
+          type="button"
+          class="path-editor-point"
+          class:is-selected={plottedPoint.index === selectedPointIndex}
+          style={`left:${plottedPoint.x}%;top:${plottedPoint.y}%;`}
+          aria-label={`Path point ${plottedPoint.index + 1}`}
+          onmousedown={(event) => handlePointMouseDown(event, plottedPoint.index)}
+          onclick={handlePointClick}
+        ></button>
       {/each}
-      {#each gridLineOffsets as offset (`y:${offset}`)}
-        <line class="path-editor-grid-line" x1="0" y1={offset} x2="100" y2={offset}></line>
-      {/each}
+    </div>
+  </ControlSurfaceFrame>
 
-      {#if pathLine}
-        <path class="path-editor-line-halo" d={pathLine}></path>
-        <path class="path-editor-line" d={pathLine}></path>
-      {/if}
-    </svg>
-
-    {#each plottedPoints as plottedPoint (plottedPoint.index)}
-      <button
-        type="button"
-        class="path-editor-point"
-        class:is-selected={plottedPoint.index === selectedPointIndex}
-        style={`left:${plottedPoint.x}%;top:${plottedPoint.y}%;`}
-        aria-label={`Path point ${plottedPoint.index + 1}`}
-        onmousedown={(event) => handlePointMouseDown(event, plottedPoint.index)}
-        onclick={handlePointClick}
-      ></button>
-    {/each}
-  </div>
-
-  <FieldShell label="Path Points">
+  <FieldShell label="Path Points" class="path-editor-controls">
     <div class="path-editor-actions">
       <span class="path-editor-count">{localPoints.length}</span>
       <button
@@ -337,11 +340,12 @@
 <style lang="scss">
   .path-editor {
     &-wrap {
-      display: grid;
-      grid-template-columns: minmax(10rem, 1fr) minmax(7.5rem, auto);
-      align-items: start;
+      display: flex;
+      align-items: stretch;
+      flex: 1 1 auto;
       gap: var(--gap-8);
       min-width: 0;
+      min-height: 0;
     }
 
     &-actions {
@@ -445,4 +449,10 @@
       }
     }
   }
+
+  :global(.path-editor-controls) {
+    flex: 0 0 7.5rem;
+    min-width: 7.5rem;
+  }
+
 </style>

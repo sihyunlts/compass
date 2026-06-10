@@ -15,6 +15,9 @@
 
   const selected = $derived(new Set(tiles));
   const selectionCount = $derived(tiles.length);
+  let tileContainerHeight = $state(0);
+  const tileGridSize = $derived.by(() =>
+    (tileContainerHeight > 0 ? `${tileContainerHeight}px` : '10rem'));
 
   const cells = $derived.by(() => {
     const next: Array<{ key: string; index: number; x: number; y: number }> = [];
@@ -30,35 +33,61 @@
   });
 </script>
 
-<FieldShell label="Tile Selection">
-  <span class="mask-tile-count">Selected {selectionCount}</span>
+<FieldShell
+  label={`Tile Selected ${selectionCount}`}
+  class="mask-tile-control"
+  style={`--mask-tile-grid-size:${tileGridSize};`}
+>
   <div
-    class="mask-tile-grid"
-    data-action="mask-tile-grid"
-    data-id={deviceId}
+    class="mask-tile-container"
+    bind:clientHeight={tileContainerHeight}
   >
-    {#each cells as cell (cell.key)}
-      <button
-        type="button"
-        class="mask-tile"
-        class:is-selected={selected.has(cell.index)}
-        data-tile-index={cell.index}
-        aria-pressed={selected.has(cell.index) ? 'true' : 'false'}
-        title={`X ${cell.x} | Y ${cell.y}`}
-      ></button>
-    {/each}
+    <div
+      class="mask-tile-grid"
+      data-action="mask-tile-grid"
+      data-id={deviceId}
+    >
+      {#each cells as cell (cell.key)}
+        <button
+          type="button"
+          class="mask-tile"
+          class:is-selected={selected.has(cell.index)}
+          data-tile-index={cell.index}
+          aria-pressed={selected.has(cell.index) ? 'true' : 'false'}
+          title={`X ${cell.x} | Y ${cell.y}`}
+        ></button>
+      {/each}
+    </div>
   </div>
 </FieldShell>
 
 <style lang="scss">
-  .mask-tile-count {
-    color: var(--neutral-50);
-    font-size: var(--text-12);
+  :global(.control-field.mask-tile-control) {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    flex: 1 1 auto;
+    align-self: flex-start;
+    inline-size: fit-content;
+    min-height: 0;
+    max-height: 100%;
+  }
+
+  :global(.mask-tile-control .field-label) {
+    white-space: nowrap;
+  }
+
+  .mask-tile-container {
+    min-height: 0;
+    block-size: 100%;
+    inline-size: var(--mask-tile-grid-size, 10rem);
   }
 
   .mask-tile-grid {
     display: grid;
     grid-template-columns: repeat(10, minmax(0, 1fr));
+    grid-template-rows: repeat(10, minmax(0, 1fr));
+    inline-size: var(--mask-tile-grid-size, 0px);
+    block-size: var(--mask-tile-grid-size, 0px);
     gap: var(--gap-2);
     padding: var(--gap-6);
     border-radius: var(--radius-6);

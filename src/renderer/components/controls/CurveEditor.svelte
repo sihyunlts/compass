@@ -16,6 +16,7 @@
   import { resolveSegmentCurvePoint } from '../../../core/modulation/curve';
   import { clamp } from '../../../shared/math';
   import type { CurveNode } from '../../../shared/model';
+  import ControlSurfaceFrame from './ControlSurfaceFrame.svelte';
   import FieldShell from '../fields/FieldShell.svelte';
 
   interface EditableCurve {
@@ -566,51 +567,53 @@
 </script>
 
 {#snippet curveEditor()}
-<div class={`curve-editor-wrap ${wrapperClass}`.trim()}>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="curve-editor"
-    bind:this={editorEl}
-    style={`--curve-divisions:${divisions};--curve-guide-y:${guideValue === null ? '-100%' : `${toPlotY(guideValue).toFixed(3)}%`};`}
-    ondblclick={handleEditorDoubleClick}
-  >
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-      {#if curveFillPath}
-        <path class="curve-fill" d={curveFillPath} />
-      {/if}
-      {#if curveLinePath}
-        <path class="curve-line-halo" d={curveLinePath} />
-        <path class="curve-line" d={curveLinePath} />
-      {/if}
-    </svg>
-    <div class="curve-editor-segment-controls">
-      {#each plottedSegmentControls as control (control.key)}
-        <button
-          type="button"
-          class="curve-editor-segment-control"
-          class:is-stub={control.isStub}
-          data-curve-segment-control-id={control.key}
-          style={`left:${control.x}%;top:${control.y}%;`}
-          onmousedown={(event) => handleSegmentControlMouseDown(event, control.startNodeId)}
-          aria-label={`Curve point between ${control.startNodeId} and ${control.endNodeId}`}
-        ></button>
-      {/each}
+<div class="curve-editor-wrap">
+  <ControlSurfaceFrame fill="stretch">
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="curve-editor"
+      bind:this={editorEl}
+      style={`--curve-divisions:${divisions};--curve-guide-y:${guideValue === null ? '-100%' : `${toPlotY(guideValue).toFixed(3)}%`};`}
+      ondblclick={handleEditorDoubleClick}
+    >
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        {#if curveFillPath}
+          <path class="curve-fill" d={curveFillPath} />
+        {/if}
+        {#if curveLinePath}
+          <path class="curve-line-halo" d={curveLinePath} />
+          <path class="curve-line" d={curveLinePath} />
+        {/if}
+      </svg>
+      <div class="curve-editor-segment-controls">
+        {#each plottedSegmentControls as control (control.key)}
+          <button
+            type="button"
+            class="curve-editor-segment-control"
+            class:is-stub={control.isStub}
+            data-curve-segment-control-id={control.key}
+            style={`left:${control.x}%;top:${control.y}%;`}
+            onmousedown={(event) => handleSegmentControlMouseDown(event, control.startNodeId)}
+            aria-label={`Curve point between ${control.startNodeId} and ${control.endNodeId}`}
+          ></button>
+        {/each}
+      </div>
+      <div class="curve-editor-nodes">
+        {#each plottedNodes as node (node.id)}
+          <button
+            type="button"
+            class="curve-editor-node"
+            class:selected={node.id === selectedNodeId}
+            data-curve-node-id={node.id}
+            style={`left:${node.x}%;top:${node.y}%;`}
+            onmousedown={(event) => handleNodeMouseDown(event, node.id)}
+            aria-label={`Curve node at ${node.t.toFixed(3)}, ${node.v.toFixed(3)}`}
+          ></button>
+        {/each}
+      </div>
+      <div class="curve-editor-playhead" style={`left:${(clampedProgress01 * 100).toFixed(3)}%;`}></div>
     </div>
-    <div class="curve-editor-nodes">
-      {#each plottedNodes as node (node.id)}
-        <button
-          type="button"
-          class="curve-editor-node"
-          class:selected={node.id === selectedNodeId}
-          data-curve-node-id={node.id}
-          style={`left:${node.x}%;top:${node.y}%;`}
-          onmousedown={(event) => handleNodeMouseDown(event, node.id)}
-          aria-label={`Curve node at ${node.t.toFixed(3)}, ${node.v.toFixed(3)}`}
-        ></button>
-      {/each}
-    </div>
-    <div class="curve-editor-playhead" style={`left:${(clampedProgress01 * 100).toFixed(3)}%;`}></div>
-  </div>
+  </ControlSurfaceFrame>
 
   <input
     bind:this={hiddenInputEl}
@@ -623,7 +626,7 @@
 {/snippet}
 
 {#if label}
-  <FieldShell {label}>
+  <FieldShell {label} class={wrapperClass}>
     {@render curveEditor()}
   </FieldShell>
 {:else}
@@ -635,11 +638,14 @@
     &-wrap {
       display: flex;
       flex-direction: column;
+      flex: 1 1 auto;
       min-width: 0;
+      min-height: 0;
+      max-height: 100%;
     }
 
     position: relative;
-    height: 8rem;
+    min-height: 0;
     border: 1px solid var(--neutral-30);
     border-radius: var(--radius-6);
     background:

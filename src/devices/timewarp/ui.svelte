@@ -15,6 +15,7 @@
 
 <div class="device-controls">
   <CurveEditor
+    label="Curve"
     deviceId={device.id}
     curve={device.params.curve}
     hiddenInputAction="set-timewarp-curve-nodes"
@@ -22,6 +23,15 @@
     valueMin={0}
     valueMax={1}
     guideValue={null}
+    wrapperClass="timewarp-curve-control"
     {currentProgress01}
   />
 </div>
+
+<style lang="scss">
+  :global(.timewarp-curve-control) {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+  }
+</style>
