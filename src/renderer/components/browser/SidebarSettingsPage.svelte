@@ -141,6 +141,7 @@
 
     &-title {
       font-size: var(--text-12);
+      font-weight: 500;
       color: var(--neutral-40);
       padding-left: var(--gap-2);
     }
