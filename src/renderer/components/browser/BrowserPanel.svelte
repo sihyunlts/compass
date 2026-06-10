@@ -3,7 +3,10 @@
 
   import type { RendererDeviceKind } from '../../../devices';
   import type { PresetFileKind } from '../../../shared/presets';
-  import { getDeviceBrowserIcon } from '../../features/editor/device-browser-categories';
+  import {
+    getDeviceBrowserCategory,
+    getDeviceBrowserIcon,
+  } from '../../features/editor/device-browser-categories';
   import Button from '../primitives/Button.svelte';
   import SidebarSettingsPage from './SidebarSettingsPage.svelte';
   import type {
@@ -336,6 +339,17 @@
     return 'tune';
   };
 
+  const resolveLeafAccentStyle = (
+    node: BrowserTreeDeviceLeafNode | BrowserTreePresetLeafNode,
+  ): string => {
+    const deviceKind = node.deviceKind;
+    if (deviceKind) {
+      return `--browser-icon-accent:var(${getDeviceBrowserCategory(deviceKind).accentColorVar});`;
+    }
+
+    return '';
+  };
+
   const handleLeafPointerDown = (
     node: BrowserTreeDeviceLeafNode | BrowserTreePresetLeafNode,
     event: PointerEvent,
@@ -593,6 +607,7 @@
       <div class="browser-page-switch-group">
         <Button
           class="browser-page-switch-button"
+          style="--browser-page-accent:var(--category-generators-500);"
           variant="icon"
           label="Devices"
           icon="widgets"
@@ -601,6 +616,7 @@
         />
         <Button
           class="browser-page-switch-button"
+          style="--browser-page-accent:var(--category-transform-500);"
           variant="icon"
           label="Presets"
           icon="inventory_2"
@@ -617,6 +633,7 @@
       <div class="browser-page-switch-group">
         <Button
           class="browser-page-switch-button"
+          style="--browser-page-accent:var(--category-utility-500);"
           variant="icon"
           label="Settings"
           icon="settings"
@@ -702,7 +719,11 @@
                     </span>
                   </button>
                 {:else}
-                  <span class="browser-tree-leading-slot browser-tree-item-icon material-symbols-rounded" aria-hidden="true">
+                  <span
+                    class="browser-tree-leading-slot browser-tree-item-icon material-symbols-rounded"
+                    style={resolveLeafAccentStyle(row.node)}
+                    aria-hidden="true"
+                  >
                     {resolveLeafIcon(row.node)}
                   </span>
                 {/if}
@@ -798,7 +819,18 @@
     }
 
     &-button {
-      color: var(--neutral-50);
+      color: var(--browser-page-accent, var(--neutral-50));
+      background: transparent;
+
+      &:hover,
+      &:global(.is-active) {
+        color: var(--browser-page-accent, var(--neutral-90));
+        background: color-mix(
+          in srgb,
+          var(--browser-page-accent, var(--accent-500)) 18%,
+          transparent
+        );
+      }
     }
   }
 
@@ -869,7 +901,7 @@
     &-icon {
       font-size: var(--text-14);
       line-height: 1;
-      color: var(--neutral-50);
+      color: var(--browser-icon-accent, var(--neutral-50));
       font-variation-settings: 'FILL' 1, 'wght' 400;
     }
 

@@ -100,7 +100,6 @@
           content: '';
           position: absolute;
           inset: 0.125rem;
-          border-radius: var(--radius-2);
           background: var(--neutral-00);
           pointer-events: none;
         }
