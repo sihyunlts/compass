@@ -199,6 +199,27 @@ export const addStrokeToFrame = (
   timeline.nextWriteId += 1;
 };
 
+export const addStrokeToFrames = (
+  timeline: GeometryTimeline | TimelineStageBuffer,
+  frameIndexes: ReadonlyArray<number>,
+  stroke: Omit<GeometryStroke, 'writeId' | 'masks'> & { masks?: GeometryMask[] },
+): void => {
+  if (frameIndexes.length === 0) {
+    return;
+  }
+
+  const sharedStroke: GeometryStroke = {
+    ...stroke,
+    writeId: timeline.nextWriteId,
+    masks: stroke.masks?.map(cloneMask) ?? [],
+  };
+  timeline.nextWriteId += 1;
+
+  for (const frameIndex of frameIndexes) {
+    getWritableFrame(timeline, frameIndex).strokes.push(sharedStroke);
+  }
+};
+
 export const addExistingStrokeToFrame = (
   timeline: GeometryTimeline | TimelineStageBuffer,
   frameIndex: number,

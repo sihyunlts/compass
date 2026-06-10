@@ -67,6 +67,7 @@ import {
 import {
   addExistingStrokeToFrame,
   addStrokeToFrame,
+  addStrokeToFrames,
   beginTimelineStage,
   completeTimelineStage,
   createEmptyTimeline,
@@ -623,11 +624,8 @@ const cloneStrokeWithVelocityAndWriteOrder = (
     colorSlotIndex,
     colorSlotCount,
     colorSlotGapFill,
-    points: stroke.polyline.points.map((point) => ({ ...point })),
-    clipStack: stroke.polyline.clipStack.map((clip) => ({
-      ...clip,
-      inverseTransform: { ...clip.inverseTransform },
-    })),
+    points: stroke.polyline.points,
+    clipStack: stroke.polyline.clipStack,
   },
   originGroupId: stroke.originGroupId,
   writeOrder,
@@ -2166,34 +2164,33 @@ const applyColorEffect = (
           continue;
         }
 
-        for (const resolvedDestinationFrameIndex of destinationFrameIndexes) {
-          if (
-            !isFrameWithinWindow(resolvedDestinationFrameIndex, colorFrameWindow)
+        const resolvedDestinationFrameIndexes = destinationFrameIndexes.filter((resolvedDestinationFrameIndex) => (
+          isFrameWithinWindow(resolvedDestinationFrameIndex, colorFrameWindow)
+          && (
+            shouldWrapColorSlots
             || (
-              !shouldWrapColorSlots
-              && (
-                resolvedDestinationFrameIndex < destinationFrameWindow.startFrame
-                || resolvedDestinationFrameIndex >= destinationFrameWindow.endFrameExclusive
-              )
+              resolvedDestinationFrameIndex >= destinationFrameWindow.startFrame
+              && resolvedDestinationFrameIndex < destinationFrameWindow.endFrameExclusive
             )
-          ) {
-            continue;
-          }
+          )
+        ));
+        if (resolvedDestinationFrameIndexes.length === 0) {
+          continue;
+        }
 
-          for (const stroke of sourceStrokes) {
-            addStrokeToFrame(
-              nextTimeline,
-              resolvedDestinationFrameIndex,
-              cloneStrokeWithVelocityAndWriteOrder(
-                stroke,
-                slot.velocity,
-                resolveColorSlotWriteOrder(writeOrder, slot.slotIndex, colorConfig.velocities.length),
-                slot.slotIndex,
-                colorConfig.velocities.length,
-                slot.source.referenceDuration !== undefined,
-              ),
-            );
-          }
+        for (const stroke of sourceStrokes) {
+          addStrokeToFrames(
+            nextTimeline,
+            resolvedDestinationFrameIndexes,
+            cloneStrokeWithVelocityAndWriteOrder(
+              stroke,
+              slot.velocity,
+              resolveColorSlotWriteOrder(writeOrder, slot.slotIndex, colorConfig.velocities.length),
+              slot.slotIndex,
+              colorConfig.velocities.length,
+              slot.source.referenceDuration !== undefined,
+            ),
+          );
         }
       }
     }

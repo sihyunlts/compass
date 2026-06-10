@@ -20,11 +20,20 @@ interface OccupiedCoordinate {
   colorSlotGapFill?: boolean;
 }
 
+interface StrokeOccupiedCoordinateCandidate {
+  x: number;
+  y: number;
+  distanceSquared: number;
+}
+
 interface CoordinateCollectionOptions {
   fillColorSlotGaps?: boolean;
 }
 
-const occupiedCoordinateCandidatesByStroke = new WeakMap<GeometryStroke, Array<{ x: number; y: number }>>();
+const occupiedCoordinateCandidatesByStroke = new WeakMap<GeometryStroke, StrokeOccupiedCoordinateCandidate[]>();
+const occupiedCoordinateCandidatesByPoints = new WeakMap<GeometryStroke['polyline']['points'], StrokeOccupiedCoordinateCandidate[]>();
+const geometryKeyByPoints = new WeakMap<GeometryStroke['polyline']['points'], string>();
+const occupiedCoordinateCandidatesByGeometryKey = new Map<string, StrokeOccupiedCoordinateCandidate[]>();
 
 const COLOR_SLOT_GAP_DIRECTIONS = Object.freeze([
   Object.freeze({ dx: 1, dy: 0 }),
@@ -180,17 +189,67 @@ const collectCenterlineCandidateCoordinates = (
   return Array.from(coordinates.values());
 };
 
+const toOccupiedCoordinateCandidates = (
+  stroke: GeometryStroke,
+  coordinates: ReadonlyArray<{ x: number; y: number }>,
+): StrokeOccupiedCoordinateCandidate[] => coordinates.map((coordinate) => ({
+  x: coordinate.x,
+  y: coordinate.y,
+  distanceSquared: distanceToPolylineSquared(coordinate, stroke.polyline),
+}));
+
+const resolvePolylineGeometryKey = (
+  stroke: GeometryStroke,
+): string => {
+  const cached = geometryKeyByPoints.get(stroke.polyline.points);
+  if (cached) {
+    return cached;
+  }
+
+  const key = [
+    stroke.polyline.closed ? 'closed' : 'open',
+    stroke.polyline.rasterMode ?? 'default',
+    ...stroke.polyline.points.map((point) => `${point.x},${point.y}`),
+  ].join('|');
+  geometryKeyByPoints.set(stroke.polyline.points, key);
+  return key;
+};
+
 const collectStrokeOccupiedCoordinates = (
   stroke: GeometryStroke,
-): Array<{ x: number; y: number }> => {
+): StrokeOccupiedCoordinateCandidate[] => {
   const cached = occupiedCoordinateCandidatesByStroke.get(stroke);
   if (cached) {
     return cached;
   }
 
-  let coordinates: Array<{ x: number; y: number }>;
+  const activationSignature = stroke.masks.length === 0
+    ? stroke.polyline.activationSignature
+    : undefined;
+  if (activationSignature) {
+    const geometryKey = `${activationSignature}\n${resolvePolylineGeometryKey(stroke)}`;
+    const geometryCached = occupiedCoordinateCandidatesByGeometryKey.get(geometryKey);
+    if (geometryCached) {
+      occupiedCoordinateCandidatesByStroke.set(stroke, geometryCached);
+      occupiedCoordinateCandidatesByPoints.set(stroke.polyline.points, geometryCached);
+      return geometryCached;
+    }
+  }
+
+  if (stroke.masks.length === 0) {
+    const pointsCached = occupiedCoordinateCandidatesByPoints.get(stroke.polyline.points);
+    if (pointsCached) {
+      occupiedCoordinateCandidatesByStroke.set(stroke, pointsCached);
+      return pointsCached;
+    }
+  }
+
+  let coordinates: StrokeOccupiedCoordinateCandidate[];
   if (stroke.polyline.rasterMode === 'centerline') {
-    coordinates = collectCenterlineCandidateCoordinates(stroke);
+    coordinates = toOccupiedCoordinateCandidates(
+      stroke,
+      collectCenterlineCandidateCoordinates(stroke),
+    );
   } else {
     const bounds = toCandidateBounds(stroke);
     if (!bounds) {
@@ -199,17 +258,27 @@ const collectStrokeOccupiedCoordinates = (
       coordinates = [];
       for (let y = bounds.startY; y <= bounds.endY; y += 1) {
         for (let x = bounds.startX; x <= bounds.endX; x += 1) {
-          if (distanceToPolylineSquared({ x, y }, stroke.polyline) > THICKNESS * THICKNESS) {
+          const distanceSquared = distanceToPolylineSquared({ x, y }, stroke.polyline);
+          if (distanceSquared > THICKNESS * THICKNESS) {
             continue;
           }
 
-          coordinates.push({ x, y });
+          coordinates.push({ x, y, distanceSquared });
         }
       }
     }
   }
 
   occupiedCoordinateCandidatesByStroke.set(stroke, coordinates);
+  if (stroke.masks.length === 0) {
+    occupiedCoordinateCandidatesByPoints.set(stroke.polyline.points, coordinates);
+    if (activationSignature) {
+      occupiedCoordinateCandidatesByGeometryKey.set(
+        `${activationSignature}\n${resolvePolylineGeometryKey(stroke)}`,
+        coordinates,
+      );
+    }
+  }
   return coordinates;
 };
 
@@ -342,7 +411,7 @@ export const collectOccupiedCoordinates = (
   const byCoordinate = new Map<string, OccupiedCoordinate>();
 
   for (const stroke of strokes) {
-    for (const { x, y } of collectStrokeOccupiedCoordinates(stroke)) {
+    for (const { x, y, distanceSquared } of collectStrokeOccupiedCoordinates(stroke)) {
       if (!isPointInsideMasks(stroke.masks, x, y)) {
         continue;
       }
@@ -360,7 +429,7 @@ export const collectOccupiedCoordinates = (
         velocity: stroke.polyline.velocity,
         writeOrder: stroke.writeOrder,
         writeId: stroke.writeId,
-        distanceSquared: distanceToPolylineSquared({ x, y }, stroke.polyline),
+        distanceSquared,
         colorSlotIndex: stroke.polyline.colorSlotIndex,
         colorSlotCount: stroke.polyline.colorSlotCount,
         colorSlotGapFill: stroke.polyline.colorSlotGapFill,
