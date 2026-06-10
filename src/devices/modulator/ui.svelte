@@ -49,57 +49,55 @@
 </script>
 
 <div class="device-controls modulation-layout">
-  <div class="modulation-sidebar">
-    <div class="modulation-control-grid">
-      <FieldShell label="Target Device">
-        <select data-action="set-modulation-target-device" data-id={device.id}>
-          <option value="" selected={!device.params.target?.deviceId}>None</option>
-          {#each targetableDevices as targetDevice (targetDevice.id)}
-            <option
-              value={targetDevice.id}
-              selected={device.params.target?.deviceId === targetDevice.id}
-            >
-              {deviceDisplayNameById[targetDevice.id] ?? getRendererDeviceLabel(targetDevice.kind)}
-            </option>
-          {/each}
-        </select>
-      </FieldShell>
-      <FieldShell label="Target Parameter" class="modulation-control-field-wide">
-        <select
-          data-action="set-modulation-target-param"
-          data-id={device.id}
-          disabled={!selectedTargetDevice}
-        >
-          <option value="" selected={!device.params.target?.paramKey}>None</option>
-          {#each targetParamOptions as option (option.key)}
-            <option
-              value={option.key}
-              selected={device.params.target?.paramKey === option.key}
-            >
-              {option.label}
-            </option>
-          {/each}
-        </select>
-      </FieldShell>
-      <div class="modulation-compact-row">
-        <NumberField
-          label="Amount"
-          step="0.1"
-          value={device.params.amount}
-          dataAction="set-modulation-amount"
-          dataId={device.id}
-        />
-        <SelectField
-          label="Divisions"
-          value={device.params.curve.divisions}
-          options={MODULATION_DIVISION_OPTIONS}
-          dataAction="set-modulation-divisions"
-          dataId={device.id}
-        />
-      </div>
+  <div class="column-wrapper modulation-sidebar">
+    <FieldShell label="Target Device">
+      <select data-action="set-modulation-target-device" data-id={device.id}>
+        <option value="" selected={!device.params.target?.deviceId}>None</option>
+        {#each targetableDevices as targetDevice (targetDevice.id)}
+          <option
+            value={targetDevice.id}
+            selected={device.params.target?.deviceId === targetDevice.id}
+          >
+            {deviceDisplayNameById[targetDevice.id] ?? getRendererDeviceLabel(targetDevice.kind)}
+          </option>
+        {/each}
+      </select>
+    </FieldShell>
+    <FieldShell label="Target Parameter" class="modulation-control-field-wide">
+      <select
+        data-action="set-modulation-target-param"
+        data-id={device.id}
+        disabled={!selectedTargetDevice}
+      >
+        <option value="" selected={!device.params.target?.paramKey}>None</option>
+        {#each targetParamOptions as option (option.key)}
+          <option
+            value={option.key}
+            selected={device.params.target?.paramKey === option.key}
+          >
+            {option.label}
+          </option>
+        {/each}
+      </select>
+    </FieldShell>
+    <div class="modulation-compact-row">
+      <NumberField
+        label="Amount"
+        step="0.1"
+        value={device.params.amount}
+        dataAction="set-modulation-amount"
+        dataId={device.id}
+      />
+      <SelectField
+        label="Divisions"
+        value={device.params.curve.divisions}
+        options={MODULATION_DIVISION_OPTIONS}
+        dataAction="set-modulation-divisions"
+        dataId={device.id}
+      />
     </div>
   </div>
-  <div class="modulation-main">
+  <div class="column-wrapper modulation-main">
     <CurveEditor
       label={modulationReadoutText}
       deviceId={device.id}
@@ -112,3 +110,38 @@
     />
   </div>
 </div>
+
+<style lang="scss">
+  .modulation-sidebar {
+    flex: 0 0 10rem;
+    min-width: 0;
+  }
+
+  .modulation-main {
+    flex: 1 1 12rem;
+    min-width: 12rem;
+  }
+
+  .modulation-sidebar,
+  .modulation-main {
+    :global(.control-field) {
+      width: 100%;
+      min-width: 0;
+    }
+
+    :global(.control-field input),
+    :global(.control-field select) {
+      width: 100%;
+    }
+  }
+
+  .modulation-compact-row {
+    display: flex;
+    gap: var(--gap-6);
+    min-width: 0;
+
+    :global(.control-field) {
+      flex: 1 1 0;
+    }
+  }
+</style>

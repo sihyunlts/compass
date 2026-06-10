@@ -262,7 +262,7 @@
       width: 2rem;
       min-width: 2rem;
 
-      :global(.device-controls) {
+      :global(.device-controls.device-controls) {
         display: none;
       }
 
@@ -319,55 +319,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--gap-8);
-    }
-
-    &[data-device-kind='modulator'] {
-      :global(.device-controls) {
-        display: grid;
-        grid-template-columns: minmax(9rem, 10rem) minmax(12rem, 1fr);
-        align-items: stretch;
-        overflow: visible;
-      }
-
-      :global(.modulation-control-grid) {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: var(--gap-5);
-        min-width: 0;
-      }
-
-      :global(.modulation-compact-row) {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: var(--gap-6);
-        min-width: 0;
-      }
-
-      :global(.modulation-control-grid .control-field) {
-        width: 100%;
-        min-width: 0;
-      }
-
-      :global(.modulation-control-grid .control-field input),
-      :global(.modulation-control-grid .control-field select) {
-        width: 100%;
-      }
-
-      :global(.modulation-sidebar) {
-        min-width: 0;
-      }
-
-      :global(.modulation-main) {
-        min-width: 16rem;
-      }
-
-      :global(.modulation-main > .control-field) {
-        width: 100%;
-      }
-
-      :global(.modulation-curve-control) {
-        min-width: 12rem;
-      }
     }
 
     &[data-device-kind='mask'] {
