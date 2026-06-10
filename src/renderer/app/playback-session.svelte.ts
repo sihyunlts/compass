@@ -14,11 +14,13 @@ import {
   createPreviewWindowStatePusher,
 } from './playback-runtime';
 import { sanitizePreviewBpm } from '../features/editor/persistence-storage';
+import { createPreviewGenerationWorkerClient } from '../features/preview/generation-worker-client';
 import type { HeaderIndicatorController } from './header-indicator.svelte';
 
 interface PlaybackSessionState {
   currentBeat: number;
   isPlaying: boolean;
+  isPreviewGenerating: boolean;
 }
 
 interface ApplyPreviewResultInput {
@@ -40,6 +42,20 @@ interface PlaybackSessionOptions {
   scrubMax?: number;
 }
 
+interface PreviewGenerationSource {
+  sourceChain: GeneratorChain;
+  sourceKey: string;
+  loopLengthBeats: number;
+  launchpadModel: LaunchpadModel;
+}
+
+interface CachedGeneratedPreview {
+  sourceKey: string;
+  loopLengthBeats: number;
+  launchpadModel: LaunchpadModel;
+  preview: GeneratorPreview;
+}
+
 const DEFAULT_PREVIEW_WINDOW_STATE_MAX_FPS = 120;
 const DEFAULT_SCRUB_MAX = 1000;
 
@@ -47,11 +63,20 @@ export class PlaybackSessionController {
   public readonly state: PlaybackSessionState = $state({
     currentBeat: 0,
     isPlaying: false,
+    isPreviewGenerating: false,
   });
 
   private readonly previewWindowStatePusher: ReturnType<typeof createPreviewWindowStatePusher>;
 
   private playbackScheduler: ReturnType<typeof createPlaybackScheduler> | null = null;
+
+  private readonly previewGenerator = createPreviewGenerationWorkerClient();
+
+  private previewGenerationRequestId = 0;
+
+  private previewGenerationPurpose: 'preview' | 'send' | null = null;
+
+  private latestGeneratedPreview: CachedGeneratedPreview | null = null;
 
   public constructor(private readonly options: PlaybackSessionOptions) {
     const maxFps = options.previewWindowStateMaxFps ?? DEFAULT_PREVIEW_WINDOW_STATE_MAX_FPS;
@@ -83,6 +108,7 @@ export class PlaybackSessionController {
   public dispose(): void {
     this.playbackScheduler?.teardown();
     this.playbackScheduler = null;
+    this.previewGenerator.dispose();
     this.previewWindowStatePusher.reset();
     this.options.previewSession.commands.resetCaches();
   }
@@ -114,18 +140,22 @@ export class PlaybackSessionController {
   }
 
   public async runPreview(): Promise<void> {
+    if (this.previewGenerationPurpose === 'send') {
+      return;
+    }
+
     try {
-      const { editorSession, previewSession } = this.options;
+      const { editorSession } = this.options;
       const uiState = editorSession.state;
       const sourceKey = `chain:${uiState.chainRevision}`;
       const launchpadModel = uiState.launchpadModel;
       const sourceChain = cloneChainForIpc(uiState.chainState);
-      const preview = previewSession.commands.generateRendererPreview({
+      const preview = await this.resolveGeneratedPreview({
         sourceChain,
         sourceKey,
         loopLengthBeats: uiState.previewLoopLengthBeats,
         launchpadModel,
-      });
+      }, 'preview');
 
       this.applyPreviewResult({
         preview,
@@ -136,10 +166,17 @@ export class PlaybackSessionController {
         launchpadModel,
       });
     } catch (error) {
+      if (isPreviewGenerationCancelled(error)) {
+        return;
+      }
       this.stopPlayback();
       const errorText = error instanceof Error ? error.message : 'Unknown preview error';
       this.options.headerIndicator.show(`Preview update failed | ${errorText}`);
     }
+  }
+
+  public async generatePreviewForSend(input: PreviewGenerationSource): Promise<GeneratorPreview> {
+    return this.resolveGeneratedPreview(input, 'send');
   }
 
   public applyPreviewResult(input: ApplyPreviewResultInput): void {
@@ -156,6 +193,12 @@ export class PlaybackSessionController {
       launchpadModel: input.launchpadModel,
     });
     editorSession.state.previewLoopLengthBeats = nextLoopLengthBeats;
+    this.latestGeneratedPreview = {
+      sourceKey: input.sourceKey,
+      loopLengthBeats: nextLoopLengthBeats,
+      launchpadModel: input.launchpadModel,
+      preview: input.preview,
+    };
 
     if (this.playbackScheduler) {
       this.playbackScheduler.setCurrentBeat(0);
@@ -257,8 +300,75 @@ export class PlaybackSessionController {
     const beats = Math.max(this.options.editorSession.state.previewLoopLengthBeats, 0.25);
     return (60000 / bpm) * beats;
   }
+
+  private async resolveGeneratedPreview(
+    input: PreviewGenerationSource,
+    purpose: 'preview' | 'send',
+  ): Promise<GeneratorPreview> {
+    const cachedPreview = this.resolveCachedGeneratedPreview(input);
+    if (cachedPreview) {
+      return cachedPreview;
+    }
+
+    const requestId = this.beginPreviewGeneration(purpose);
+    try {
+      await waitForNextAnimationFrame();
+      const preview = await this.previewGenerator.generate({
+        sourceChain: input.sourceChain,
+        loopLengthBeats: input.loopLengthBeats,
+        launchpadModel: input.launchpadModel,
+      });
+
+      if (requestId !== this.previewGenerationRequestId) {
+        throw new Error('Preview generation cancelled');
+      }
+
+      this.latestGeneratedPreview = {
+        sourceKey: input.sourceKey,
+        loopLengthBeats: input.loopLengthBeats,
+        launchpadModel: input.launchpadModel,
+        preview,
+      };
+      return preview;
+    } finally {
+      if (requestId === this.previewGenerationRequestId) {
+        this.state.isPreviewGenerating = false;
+        this.previewGenerationPurpose = null;
+      }
+    }
+  }
+
+  private beginPreviewGeneration(purpose: 'preview' | 'send'): number {
+    this.previewGenerationRequestId += 1;
+    this.previewGenerationPurpose = purpose;
+    this.state.isPreviewGenerating = true;
+    this.stopPlayback();
+    return this.previewGenerationRequestId;
+  }
+
+  private resolveCachedGeneratedPreview(input: PreviewGenerationSource): GeneratorPreview | null {
+    const cached = this.latestGeneratedPreview;
+    if (
+      cached
+      && cached.sourceKey === input.sourceKey
+      && cached.loopLengthBeats === input.loopLengthBeats
+      && cached.launchpadModel === input.launchpadModel
+    ) {
+      return cached.preview;
+    }
+
+    return null;
+  }
 }
 
 export const createPlaybackSession = (
   options: PlaybackSessionOptions,
 ): PlaybackSessionController => new PlaybackSessionController(options);
+
+const waitForNextAnimationFrame = (): Promise<void> =>
+  new Promise((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+
+const isPreviewGenerationCancelled = (error: unknown): boolean =>
+  error instanceof Error && error.message === 'Preview generation cancelled';

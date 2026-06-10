@@ -20,9 +20,9 @@ import type {
 } from './presets';
 import type { PreviewWindowState } from '../preview/window-state';
 import type {
-  GenerateAndSendRequest,
-  GenerateAndSendResponse,
   RequestLiveTempoResponse,
+  SendGeneratedPreviewRequest,
+  SendGeneratedPreviewResponse,
 } from './generator';
 
 export interface MainWindowDocumentState {
@@ -33,9 +33,9 @@ export interface MainWindowDocumentState {
 export type RackFileMenuAction = 'new' | 'save' | 'save-as';
 
 export interface CompassApi {
-  generateAndSend: (
-    request: GenerateAndSendRequest,
-  ) => Promise<GenerateAndSendResponse>;
+  sendGeneratedPreview: (
+    request: SendGeneratedPreviewRequest,
+  ) => Promise<SendGeneratedPreviewResponse>;
   requestAppVersion: () => Promise<string>;
   requestLiveTempo: () => Promise<RequestLiveTempoResponse>;
   openPreviewWindow: () => Promise<void>;

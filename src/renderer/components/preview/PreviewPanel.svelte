@@ -10,6 +10,7 @@
     surfaceModel,
     onPopout,
     isPlaying = false,
+    isGenerating = false,
     loopEnabled,
     onPlayClick,
     onLoopToggle,
@@ -19,6 +20,7 @@
     surfaceModel: PreviewSurfaceViewModel;
     onPopout: () => void | Promise<void>;
     isPlaying?: boolean;
+    isGenerating?: boolean;
     loopEnabled: boolean;
     onPlayClick: () => void;
     onLoopToggle: () => void;
@@ -43,16 +45,26 @@
       mode="rack"
       {surfaceModel}
     />
-    <input
-      id="preview-scrub"
-      class="preview-panel-scrub"
-      type="range"
-      min="0"
-      max={SCRUB_MAX}
-      bind:value={scrubValue}
-      style={`--range-fill:${clamp((scrubValue / SCRUB_MAX) * 100, 0, 100)}%`}
-      oninput={onScrubInput}
-    />
+    <div
+      class="preview-panel-scrub-frame"
+      class:is-loading={isGenerating}
+    >
+      <input
+        id="preview-scrub"
+        class="preview-panel-scrub"
+        type="range"
+        min="0"
+        max={SCRUB_MAX}
+        bind:value={scrubValue}
+        style={`--range-fill:${clamp((scrubValue / SCRUB_MAX) * 100, 0, 100)}%`}
+        oninput={onScrubInput}
+      />
+      {#if isGenerating}
+        <div class="preview-panel-scrub-loader" aria-hidden="true">
+          <span class="loader-bar"></span>
+        </div>
+      {/if}
+    </div>
   </div>
   <div class="preview-panel-controls">
     <Button
@@ -101,8 +113,56 @@
       gap: var(--gap-6);
     }
 
+    &-scrub-frame {
+      position: relative;
+      height: 1rem;
+
+      &.is-loading {
+        cursor: progress;
+
+        .preview-panel-scrub {
+          opacity: 0;
+          pointer-events: none;
+        }
+      }
+    }
+
     &-scrub {
       height: 1rem;
+    }
+
+    &-scrub-loader {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: 0.28rem;
+      overflow: hidden;
+      border-radius: var(--radius-2);
+      background: var(--neutral-30);
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+
+    .loader-bar {
+      position: absolute;
+      inset-block: 0;
+      width: 34%;
+      border-radius: inherit;
+      background: var(--neutral-50);
+      transform: translateX(-120%);
+      will-change: transform;
+      animation: preview-loader-slide 1.1s ease-in-out infinite;
+    }
+  }
+
+  @keyframes preview-loader-slide {
+    from {
+      transform: translateX(-120%);
+    }
+
+    to {
+      transform: translateX(320%);
     }
   }
 </style>

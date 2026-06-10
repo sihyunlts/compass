@@ -89,8 +89,8 @@ ipcRenderer.on(
 );
 
 const api: CompassApi = {
-  generateAndSend: (request) =>
-    ipcRenderer.invoke(IPC_CHANNELS.generateAndSend, request),
+  sendGeneratedPreview: (request) =>
+    ipcRenderer.invoke(IPC_CHANNELS.sendGeneratedPreview, request),
   requestAppVersion: () =>
     ipcRenderer.invoke(IPC_CHANNELS.requestAppVersion),
   requestLiveTempo: () =>

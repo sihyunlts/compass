@@ -35,12 +35,16 @@ class SendFlowController {
       const sourceKey = `chain:${uiState.chainRevision}`;
       const launchpadModel = uiState.launchpadModel;
       const sourceChain = cloneChainForIpc(uiState.chainState);
-
-      const response = await bridgeClient.generateAndSend({
-        chain: sourceChain,
-        bridge,
-        launchpadModel,
+      const preview = await playbackSession.generatePreviewForSend({
+        sourceChain,
         sourceKey,
+        loopLengthBeats: bridge.autoCreateLengthBeats,
+        launchpadModel,
+      });
+
+      const response = await bridgeClient.sendGeneratedPreview({
+        preview,
+        bridge,
       });
 
       playbackSession.applyPreviewResult({

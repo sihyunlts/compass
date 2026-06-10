@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron';
 
 import { IPC_CHANNELS } from '../../shared/contracts/ipc/channels';
 import type { PreviewWindowState } from '../../shared/contracts/preview/window-state';
-import type { GenerateAndSendRequest } from '../../shared/contracts/ipc/generator';
+import type { SendGeneratedPreviewRequest } from '../../shared/contracts/ipc/generator';
 import type { MainWindowDocumentState } from '../../shared/contracts/ipc/api';
 import {
   getMainWindow,
@@ -44,9 +44,9 @@ export const registerIpcHandlers = (
   presetService: PresetService,
 ): void => {
   ipcMain.handle(
-    IPC_CHANNELS.generateAndSend,
-    (_event, request: GenerateAndSendRequest) =>
-      generatorService.generateAndSend(request),
+    IPC_CHANNELS.sendGeneratedPreview,
+    (_event, request: SendGeneratedPreviewRequest) =>
+      generatorService.sendGeneratedPreview(request),
   );
 
   ipcMain.handle(

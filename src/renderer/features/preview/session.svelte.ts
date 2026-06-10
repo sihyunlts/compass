@@ -21,15 +21,12 @@ interface AppliedPreviewSource {
   previewRevision: number;
 }
 
-interface PreviewGenerateInput {
+interface PreviewApplyInput {
+  preview: GeneratorPreview;
   sourceChain: GeneratorChain;
   sourceKey: string;
   loopLengthBeats: number;
   launchpadModel: LaunchpadModel;
-}
-
-interface PreviewApplyInput extends PreviewGenerateInput {
-  preview: GeneratorPreview;
 }
 
 interface PreviewFrameInput {
@@ -74,8 +71,6 @@ export class PreviewSession {
   private readonly modulationReadoutCache = createModulationReadoutCache();
 
   public readonly commands = {
-    generateRendererPreview: (input: PreviewGenerateInput): GeneratorPreview =>
-      this.previewResultCache.resolve(input).preview,
     applyPreviewResult: (input: PreviewApplyInput): void => {
       this.applyPreviewResult(input);
     },

@@ -1,5 +1,5 @@
 export const IPC_CHANNELS = {
-  generateAndSend: 'bridge:generate-and-send',
+  sendGeneratedPreview: 'bridge:send-generated-preview',
   requestAppVersion: 'bridge:request-app-version',
   requestLiveTempo: 'bridge:request-live-tempo',
   liveTempoUpdate: 'live:tempo-update',

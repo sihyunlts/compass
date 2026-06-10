@@ -1,15 +1,12 @@
 import type { BridgeSettings, BridgeTarget } from '../../bridge/types';
-import type { GeneratorChain, LaunchpadModel } from '../../model';
 import type { GeneratorPreview } from '../preview/generator-preview';
 
-export interface GenerateAndSendRequest {
-  chain: GeneratorChain;
+export interface SendGeneratedPreviewRequest {
+  preview: GeneratorPreview;
   bridge: BridgeSettings;
-  launchpadModel?: LaunchpadModel;
-  sourceKey?: string;
 }
 
-export interface GenerateAndSendResponse {
+export interface SendGeneratedPreviewResponse {
   sentAtIso: string;
   target: BridgeTarget;
   bridge: BridgeSettings;

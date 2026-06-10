@@ -495,6 +495,7 @@
             surfaceModel={previewState.surfaceModel}
             onPopout={() => playbackSession.openPreviewPopout()}
             isPlaying={playbackSession.state.isPlaying}
+            isGenerating={playbackSession.state.isPreviewGenerating}
             loopEnabled={uiState.isPreviewLoopEnabled}
             onPlayClick={() => playbackSession.togglePlayback()}
             onLoopToggle={() => playbackSession.togglePreviewLoop()}
