@@ -420,7 +420,7 @@
       gap: var(--gap-8);
       height: 100%;
       overflow: auto;
-      border-radius: var(--radius-6);
+      border-radius: var(--radius-8);
     }
   }
 
