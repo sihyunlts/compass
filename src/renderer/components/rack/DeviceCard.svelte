@@ -183,7 +183,10 @@
     transition: transform 130ms ease, opacity 130ms ease;
 
     &.is-selected {
+      border-color: var(--neutral-30);
+
       .device-head {
+        border-bottom-color: var(--neutral-30);
         background-color: rgb(var(--rgb-white) / var(--alpha-04));
       }
     }

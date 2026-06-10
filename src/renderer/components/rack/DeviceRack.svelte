@@ -288,6 +288,9 @@
             onHeaderDoubleClick={(event) => controller.handleDeviceHeaderDoubleClick(event, item.device.id)}
           />
         {:else if item.kind === 'group'}
+          {@const isGroupSelected = selectedGroupIds.includes(item.groupId)}
+          {@const firstGroupDeviceId = item.devices[0]?.id}
+          {@const lastGroupDeviceId = item.devices.at(-1)?.id}
           <div class="device-group-body">
             {#each buildGroupColumns(item) as col (col.key)}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -297,6 +300,15 @@
                   : col.kind === 'left-rail'
                       ? 'group-rail group-rail-left'
                       : 'group-rail group-rail-right'}
+                class:is-selected={col.kind === 'device'
+                  ? isGroupSelected || selectedDeviceIds.includes(col.device.id)
+                  : col.kind === 'left-rail'
+                    ? isGroupSelected
+                      || (firstGroupDeviceId !== undefined
+                        && selectedDeviceIds.includes(firstGroupDeviceId))
+                    : isGroupSelected
+                      || (lastGroupDeviceId !== undefined
+                        && selectedDeviceIds.includes(lastGroupDeviceId))}
                 class:is-renaming={col.kind === 'left-rail' && controller.rename.isRenamingGroup(col.groupId)}
                 onpointerdown={col.kind === 'device'
                   ? undefined
@@ -333,7 +345,7 @@
                     title={resolveDeviceDisplayName(deviceDisplayNameById, col.device.id)}
                     isCollapsed={collapsedSet.has(col.device.id)}
                     isDisabledByGroup={!item.enabled}
-                    isSelected={selectedDeviceIds.includes(col.device.id)}
+                    isSelected={isGroupSelected || selectedDeviceIds.includes(col.device.id)}
                     isDragging={draggingDeviceIds.includes(col.device.id)}
                     isRenaming={controller.rename.isRenamingDevice(col.device.id)}
                     renameValue={controller.rename.resolveDeviceRenameValue(col.device.id)}
@@ -442,11 +454,11 @@
   }
 
   .device-group.is-rack.is-selected .group-rail-left {
-    background: var(--neutral-20);
+    background: rgb(var(--rgb-white) / var(--alpha-04));
   }
 
   .device-group.is-rack.is-selected .group-rail-right {
-    background: var(--neutral-20);
+    background: rgb(var(--rgb-white) / var(--alpha-04));
   }
 
   /* Visual state when group toggle is disabled. */
@@ -471,9 +483,13 @@
   }
 
   .device-group.is-rack .device-group-body > .device-slot + .device-slot :global(.device-card) {
-    border-left: 1px solid var(--neutral-20);
+    border-left: 1px solid var(--group-device-divider-color, var(--neutral-20));
   }
 
+  .device-group.is-rack .device-slot.is-selected :global(.device-card),
+  .device-group.is-rack .device-slot.is-selected + .device-slot :global(.device-card) {
+    --group-device-divider-color: var(--neutral-30);
+  }
   .device-slot {
     position: relative;
     display: flex;
@@ -518,6 +534,10 @@
       border-right: 1px solid var(--neutral-20);
       border-top-left-radius: var(--radius-8);
       border-bottom-left-radius: var(--radius-8);
+
+      &.is-selected {
+        border-right-color: var(--neutral-30);
+      }
     }
 
     &-right {
@@ -525,6 +545,10 @@
       border-left: 1px solid var(--neutral-20);
       border-top-right-radius: var(--radius-8);
       border-bottom-right-radius: var(--radius-8);
+
+      &.is-selected {
+        border-left-color: var(--neutral-30);
+      }
     }
   }
 
