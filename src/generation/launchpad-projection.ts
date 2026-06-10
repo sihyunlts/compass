@@ -1,6 +1,6 @@
-import { MIN_NOTE_DURATION } from '../core/pipeline/constants';
+import { MIN_NOTE_DURATION, THICKNESS } from '../core/pipeline/constants';
 import { collectPitchSampledNotes, type SampledActivePitch } from '../core/pipeline/note-sampling';
-import { COMPOSITION_BOUNDS } from '../core/geometry';
+import { applyAffine, COMPOSITION_BOUNDS, distanceToPolylineSquared } from '../core/geometry';
 import {
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   type RuntimeMapData,
@@ -105,6 +105,10 @@ const hasNoteOutput = (
   coordinateGroup: CoordinateGroup,
 ): boolean => coordinateGroup.buttons.some((button) => button.output.kind === 'note');
 
+const buildNoteOutputCoordinateGroups = (
+  coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
+): CoordinateGroup[] => Array.from(coordinateGroupByKey.values()).filter(hasNoteOutput);
+
 const EMPTY_ACTIVE_BY_PITCH = new Map<number, SampledActivePitch>();
 
 const isVisibleStroke = (
@@ -117,6 +121,52 @@ const isVisibleStroke = (
   }
 
   return !(stroke.originGroupId && mutedGroupIds.has(stroke.originGroupId));
+};
+
+const isPointInsideMasks = (
+  stroke: GeometryStroke,
+  x: number,
+  y: number,
+): boolean => stroke.masks.every((mask) => {
+  const localPoint = applyAffine(mask.inverseTransform, { x, y });
+  return mask.contains(localPoint.x, localPoint.y);
+});
+
+const doesStrokeHitNoteOutput = (
+  stroke: GeometryStroke,
+  noteOutputCoordinateGroups: ReadonlyArray<CoordinateGroup>,
+): boolean => {
+  for (const coordinateGroup of noteOutputCoordinateGroups) {
+    if (!isPointInsideMasks(stroke, coordinateGroup.x, coordinateGroup.y)) {
+      continue;
+    }
+
+    if (
+      distanceToPolylineSquared(
+        { x: coordinateGroup.x, y: coordinateGroup.y },
+        stroke.polyline,
+      ) <= THICKNESS * THICKNESS
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const resolveStrokeHitsNoteOutput = (
+  stroke: GeometryStroke,
+  noteOutputCoordinateGroups: ReadonlyArray<CoordinateGroup>,
+  noteOutputHitByStroke: WeakMap<GeometryStroke, boolean>,
+): boolean => {
+  const cached = noteOutputHitByStroke.get(stroke);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const result = doesStrokeHitNoteOutput(stroke, noteOutputCoordinateGroups);
+  noteOutputHitByStroke.set(stroke, result);
+  return result;
 };
 
 const resolveWinnerByCoordinate = (
@@ -158,7 +208,8 @@ const resolveWinnerByCoordinate = (
 
 const buildVisibleWindowByOriginId = (
   timeline: GeometryTimeline,
-  coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
+  noteOutputCoordinateGroups: ReadonlyArray<CoordinateGroup>,
+  noteOutputHitByStroke: WeakMap<GeometryStroke, boolean>,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): ReadonlyMap<string, GenerationTimelineWindow> => {
@@ -194,27 +245,22 @@ const buildVisibleWindowByOriginId = (
 
     const frameStartBeat = frameIndex * timeline.sampleStepBeats;
     const frameEndBeat = frameStartBeat + timeline.sampleStepBeats;
-
+    const updatedOriginIds = new Set<string>();
     for (const stroke of frameStrokes) {
-      if (!isVisibleStroke(stroke, mutedGroupIds, mutedGeneratorIds)) {
+      if (
+        updatedOriginIds.has(stroke.polyline.originId)
+        || !isVisibleStroke(stroke, mutedGroupIds, mutedGeneratorIds)
+        || !resolveStrokeHitsNoteOutput(
+          stroke,
+          noteOutputCoordinateGroups,
+          noteOutputHitByStroke,
+        )
+      ) {
         continue;
       }
 
-      const occupied = collectOccupiedCoordinates([stroke], true, { fillColorSlotGaps: true });
-      for (const coordinate of occupied.values()) {
-        const coordinateKey = toRoundedCoordinateKey(coordinate.x, coordinate.y);
-        if (coordinateKey === null) {
-          continue;
-        }
-
-        const coordinateGroup = coordinateGroupByKey.get(coordinateKey);
-        if (!coordinateGroup || !hasNoteOutput(coordinateGroup)) {
-          continue;
-        }
-
-        updateWindow(stroke.polyline.originId, frameStartBeat, frameEndBeat);
-        break;
-      }
+      updateWindow(stroke.polyline.originId, frameStartBeat, frameEndBeat);
+      updatedOriginIds.add(stroke.polyline.originId);
     }
   }
 
@@ -318,6 +364,8 @@ export const createLaunchpadOutputAdapter = (
   runtimeMap: RuntimeMapData,
 ): CanonicalOutputAdapter => {
   const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
+  const noteOutputCoordinateGroups = buildNoteOutputCoordinateGroups(coordinateGroupByKey);
+  const noteOutputHitByStroke = new WeakMap<GeometryStroke, boolean>();
   const coordinateKeyByTileId = buildViewportCoordinateKeyByTileId(runtimeMap.buttonIndex);
 
   return {
@@ -328,11 +376,13 @@ export const createLaunchpadOutputAdapter = (
           .filter((coordinateKey): coordinateKey is string => coordinateKey !== undefined),
       ),
     ),
-    buildVisibleWindowByOriginId: (timeline, mutedGroupIds, mutedGeneratorIds) => buildVisibleWindowByOriginId(
-      timeline,
-      coordinateGroupByKey,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    ),
+    buildVisibleWindowByOriginId: (timeline, mutedGroupIds, mutedGeneratorIds) =>
+      buildVisibleWindowByOriginId(
+        timeline,
+        noteOutputCoordinateGroups,
+        noteOutputHitByStroke,
+        mutedGroupIds,
+        mutedGeneratorIds,
+      ),
   };
 };
