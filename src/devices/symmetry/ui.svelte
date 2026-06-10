@@ -31,25 +31,27 @@
 </script>
 
 <div class="device-controls">
-  <SelectField
-    label="Mode"
-    value={device.params.mode}
-    options={SYMMETRY_MODE_OPTIONS}
-    dataAction="set-effect-symmetry-mode"
-    dataId={device.id}
-  />
-  <SelectField
-    label="Axis (Half Mode)"
-    value={device.params.axis}
-    options={SYMMETRY_AXIS_OPTIONS}
-    dataAction="set-effect-symmetry-axis"
-    dataId={device.id}
-  />
-  <SelectField
-    label="Source Quadrant"
-    value={device.params.sourceAnchor}
-    options={SYMMETRY_ANCHOR_OPTIONS}
-    dataAction="set-effect-symmetry-anchor"
-    dataId={device.id}
-  />
+  <div class="column-wrapper">
+    <SelectField
+      label="Mode"
+      value={device.params.mode}
+      options={SYMMETRY_MODE_OPTIONS}
+      dataAction="set-effect-symmetry-mode"
+      dataId={device.id}
+    />
+    <SelectField
+      label="Axis (Half Mode)"
+      value={device.params.axis}
+      options={SYMMETRY_AXIS_OPTIONS}
+      dataAction="set-effect-symmetry-axis"
+      dataId={device.id}
+    />
+    <SelectField
+      label="Source Quadrant"
+      value={device.params.sourceAnchor}
+      options={SYMMETRY_ANCHOR_OPTIONS}
+      dataAction="set-effect-symmetry-anchor"
+      dataId={device.id}
+    />
+  </div>
 </div>
