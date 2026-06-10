@@ -59,6 +59,22 @@ interface CachedGeneratedPreview {
 const DEFAULT_PREVIEW_WINDOW_STATE_MAX_FPS = 120;
 const DEFAULT_SCRUB_MAX = 1000;
 
+const hashPreviewSource = (chain: GeneratorChain): string => {
+  const source = JSON.stringify(chain);
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${(hash >>> 0).toString(16)}-${source.length}`;
+};
+
+const createPreviewSourceKey = (
+  chainRevision: number,
+  chain: GeneratorChain,
+): string =>
+  `chain:${chainRevision}:${hashPreviewSource(chain)}`;
+
 export class PlaybackSessionController {
   public readonly state: PlaybackSessionState = $state({
     currentBeat: 0,
@@ -147,9 +163,9 @@ export class PlaybackSessionController {
     try {
       const { editorSession } = this.options;
       const uiState = editorSession.state;
-      const sourceKey = `chain:${uiState.chainRevision}`;
       const launchpadModel = uiState.launchpadModel;
       const sourceChain = cloneChainForIpc(uiState.chainState);
+      const sourceKey = createPreviewSourceKey(uiState.chainRevision, sourceChain);
       const preview = await this.resolveGeneratedPreview({
         sourceChain,
         sourceKey,
