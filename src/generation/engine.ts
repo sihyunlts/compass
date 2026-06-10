@@ -2117,6 +2117,19 @@ const applyColorEffect = (
       continue;
     }
 
+    const hasActivationColorSlots = sourceSegments.some(
+      (sourceSegment) => sourceSegment.referenceDuration !== undefined,
+    );
+    if (hasActivationColorSlots) {
+      const colorEndBeat = slots.reduce(
+        (maxEndBeat, slot) => Math.max(maxEndBeat, slot.endBeat),
+        nextTimeline.timeDomainEndBeat,
+      );
+      ensureTimelineFrameCount(nextTimeline, colorEndBeat);
+    }
+    const colorFrameWindow = hasActivationColorSlots
+      ? resolveFrameWindow('all', nextTimeline.sampleStepBeats, nextTimeline.frames.length)
+      : frameWindow;
     const shouldWrapColorSlots = isNonSteppedMovingColorSource(sourceSegments);
     for (const slot of slots) {
       const sourceFrameWindow = resolveColorSlotSourceFrameWindow(slot, state.timeline);
@@ -2149,7 +2162,7 @@ const applyColorEffect = (
 
         for (const resolvedDestinationFrameIndex of destinationFrameIndexes) {
           if (
-            !isFrameWithinWindow(resolvedDestinationFrameIndex, frameWindow)
+            !isFrameWithinWindow(resolvedDestinationFrameIndex, colorFrameWindow)
             || (
               !shouldWrapColorSlots
               && (
@@ -2435,6 +2448,29 @@ const applyGeneratorDevice = (
   };
 };
 
+const prepareStateForTemporalEffect = (
+  state: MutableGenerationState,
+  outputAdapter: CanonicalOutputAdapter,
+  mutedGroupIds: ReadonlySet<string>,
+  mutedGeneratorIds: ReadonlySet<string>,
+): MutableGenerationState => {
+  if (state.timeline.timeDomainEndBeat <= FIXED_TIMELINE_END_BEAT + TIMELINE_WINDOW_EPSILON) {
+    return state;
+  }
+
+  return sealStageWithTemporalInvariant(
+    materializePendingTemporalState(
+      state,
+      outputAdapter,
+      mutedGroupIds,
+      mutedGeneratorIds,
+    ),
+    outputAdapter,
+    mutedGroupIds,
+    mutedGeneratorIds,
+  );
+};
+
 const applyCompiledRackStage = (
   state: MutableGenerationState,
   compiledPlan: CompiledRackPlan,
@@ -2465,7 +2501,12 @@ const applyCompiledRackStage = (
   const device = stage.device as GeneratorEffectNode;
   if (isTemporalEffectDevice(device)) {
     return applyEffectDevice(
-      state,
+      prepareStateForTemporalEffect(
+        state,
+        outputAdapter,
+        mutedGroupIds,
+        mutedGeneratorIds,
+      ),
       compiledPlan.baseChain,
       stage,
       outputAdapter,
