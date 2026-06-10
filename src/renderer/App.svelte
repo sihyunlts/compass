@@ -50,6 +50,7 @@
   const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, select, textarea, option';
 
   const bridgeClient = resolveCompassBridge();
+  const hasWindowsTitlebarControls = navigator.userAgent.includes('Windows');
   let rackViewApi: RackViewApi | null = $state(null);
   let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
 
@@ -321,8 +322,12 @@
   });
 </script>
 
-<section class="live-main">
+<section
+  class="live-main"
+  class:has-windows-titlebar-controls={hasWindowsTitlebarControls}
+>
     <BrowserPanel
+      reserveTitlebarSpace={!hasWindowsTitlebarControls}
       activePage={uiState.sidebarPage}
       deviceTree={DEVICE_BROWSER_TREE}
       presetTree={presetState.presetTree}

@@ -15,6 +15,7 @@ const sendRackFileMenuAction = (action: RackFileMenuAction): void => {
 
 export const installApplicationMenu = (): void => {
   if (process.platform !== 'darwin') {
+    Menu.setApplicationMenu(null);
     return;
   }
 

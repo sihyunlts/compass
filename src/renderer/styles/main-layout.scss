@@ -1,4 +1,6 @@
 .live-main {
+  --windows-titlebar-control-width: 138px;
+
   display: flex;
   flex: 1;
   position: relative;
@@ -7,6 +9,12 @@
 
   &[hidden] {
     display: none;
+  }
+
+  &.has-windows-titlebar-controls {
+    .workspace-head {
+      padding-right: calc(var(--windows-titlebar-control-width) + var(--gap-10));
+    }
   }
 }
 

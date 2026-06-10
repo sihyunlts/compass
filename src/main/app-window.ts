@@ -42,6 +42,7 @@ const broadcastPreviewWindowVisibility = (): void => {
 
 const buildMainWindowOptions = (): ConstructorParameters<typeof BrowserWindow>[0] => {
   const isMac = process.platform === 'darwin';
+  const isWindows = process.platform === 'win32';
   return {
     width: 1400,
     height: 280,
@@ -50,12 +51,23 @@ const buildMainWindowOptions = (): ConstructorParameters<typeof BrowserWindow>[0
     maxHeight: 280,
     fullscreenable: false,
     title: 'Compass',
+    autoHideMenuBar: isWindows,
     show: false,
     backgroundColor: WINDOW_BACKGROUND_COLOR,
     ...(isMac
       ? {
           titleBarStyle: 'hiddenInset' as const,
           trafficLightPosition: { x: 12, y: 12 },
+        }
+      : {}),
+    ...(isWindows
+      ? {
+          titleBarStyle: 'hidden' as const,
+          titleBarOverlay: {
+            color: WINDOW_BACKGROUND_COLOR,
+            symbolColor: '#d7dde4',
+            height: 44,
+          },
         }
       : {}),
     webPreferences: {
@@ -70,6 +82,7 @@ const buildMainWindowOptions = (): ConstructorParameters<typeof BrowserWindow>[0
 /** Creates and shows the primary Compass renderer window. */
 export const createMainWindow = (): BrowserWindow => {
   const mainWindow = new BrowserWindow(buildMainWindowOptions());
+  mainWindow.setMenuBarVisibility(false);
   mainWindowRef = mainWindow;
   mainWindow.once('ready-to-show', () => {
     if (!mainWindow.isDestroyed()) {

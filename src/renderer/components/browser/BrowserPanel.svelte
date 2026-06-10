@@ -215,6 +215,7 @@
     presetErrorText = null,
     pendingPresetFolderDraft = null,
     presetFolderSelectionTarget = null,
+    reserveTitlebarSpace = true,
     launchpadMk2Enabled = false,
     paletteDescription = 'Default palette',
     paletteDescriptionTone = 'neutral',
@@ -245,6 +246,7 @@
     presetErrorText?: string | null;
     pendingPresetFolderDraft?: PendingPresetFolderDraft | null;
     presetFolderSelectionTarget?: PresetFolderSelectionTarget | null;
+    reserveTitlebarSpace?: boolean;
     launchpadMk2Enabled?: boolean;
     paletteDescription?: string;
     paletteDescriptionTone?: 'neutral' | 'error';
@@ -605,7 +607,7 @@
   });
 </script>
 
-<aside class="browser-panel">
+<aside class="browser-panel" class:has-titlebar-spacer={reserveTitlebarSpace}>
   <div class="browser-view">
     <div class="browser-page-switch">
       <div class="browser-page-switch-group">
@@ -808,6 +810,16 @@
     margin-top: var(--gap-32);
     display: flex;
     gap: var(--gap-10);
+  }
+
+  .browser-panel:not(.has-titlebar-spacer) {
+    .browser-view {
+      margin-top: 0;
+    }
+
+    &::before {
+      display: none;
+    }
   }
 
   .browser-page-switch {
