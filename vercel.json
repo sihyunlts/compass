@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "ELECTRON_SKIP_BINARY_DOWNLOAD=1 corepack npm ci",
+  "buildCommand": "vite build --config vite.renderer.config.ts",
+  "outputDirectory": "dist"
+}
