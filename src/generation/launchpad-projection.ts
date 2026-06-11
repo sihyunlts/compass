@@ -59,6 +59,10 @@ const buildCoordinateGroupByKey = (
   const coordinateGroupByKey = new Map<string, CoordinateGroup>();
 
   for (const group of runtimeMap.groups) {
+    if (!Number.isInteger(group.x) || !Number.isInteger(group.y)) {
+      continue;
+    }
+
     const coordinateKey = toRoundedCoordinateKey(group.x, group.y);
     if (!coordinateKey) {
       continue;
@@ -117,7 +121,11 @@ const hasNoteOutput = (
 
 const buildNoteOutputCoordinateGroups = (
   coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
-): CoordinateGroup[] => Array.from(coordinateGroupByKey.values()).filter(hasNoteOutput);
+  fractionalCoordinateGroups: ReadonlyArray<CoordinateGroup>,
+): CoordinateGroup[] => [
+  ...Array.from(coordinateGroupByKey.values()),
+  ...fractionalCoordinateGroups,
+].filter(hasNoteOutput);
 
 const EMPTY_ACTIVE_BY_PITCH = new Map<number, SampledActivePitch>();
 
@@ -427,7 +435,11 @@ export const createLaunchpadOutputAdapter = (
   runtimeMap: RuntimeMapData,
 ): CanonicalOutputAdapter => {
   const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
-  const noteOutputCoordinateGroups = buildNoteOutputCoordinateGroups(coordinateGroupByKey);
+  const fractionalCoordinateGroups = buildFractionalCoordinateGroups(runtimeMap.buttonIndex);
+  const noteOutputCoordinateGroups = buildNoteOutputCoordinateGroups(
+    coordinateGroupByKey,
+    fractionalCoordinateGroups,
+  );
   const noteOutputHitByStroke = new WeakMap<GeometryStroke, boolean>();
   const coordinateKeyByTileId = buildViewportCoordinateKeyByTileId(runtimeMap.buttonIndex);
 
