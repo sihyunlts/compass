@@ -1,21 +1,19 @@
 <script lang="ts">
   /** Renders Launchpad preview cells for rack and popout modes. */
-  import { SvelteMap } from 'svelte/reactivity';
+  import { SvelteMap } from "svelte/reactivity";
 
   import {
     createEmptyPreviewSurfaceViewModel,
     type PreviewSurfaceViewModel,
-  } from '../../features/preview/view-model';
+  } from "../../features/preview/view-model";
 
-  type PreviewSurfaceMode = 'rack' | 'popout';
+  type PreviewSurfaceMode = "rack" | "popout";
 
-  let {
-    surfaceModel = createEmptyPreviewSurfaceViewModel(),
-    mode = 'rack',
-  } = $props<{
-    surfaceModel?: PreviewSurfaceViewModel;
-    mode: PreviewSurfaceMode;
-  }>();
+  let { surfaceModel = createEmptyPreviewSurfaceViewModel(), mode = "rack" } =
+    $props<{
+      surfaceModel?: PreviewSurfaceViewModel;
+      mode: PreviewSurfaceMode;
+    }>();
 
   let surfaceHeight = $state(0);
 
@@ -41,26 +39,44 @@
     return rgbByCellKey;
   };
 
-  const ledRgbByCellKey = $derived.by(() => resolveLedRgbByCellKey(surfaceModel));
+  const ledRgbByCellKey = $derived.by(() =>
+    resolveLedRgbByCellKey(surfaceModel),
+  );
+
+  const resolveCenterCornerCutClass = (cellKey: string): string => {
+    if (cellKey === "4:4") {
+      return "is-center-corner-bottom-right";
+    }
+    if (cellKey === "4:5") {
+      return "is-center-corner-bottom-left";
+    }
+    if (cellKey === "5:4") {
+      return "is-center-corner-top-right";
+    }
+    if (cellKey === "5:5") {
+      return "is-center-corner-top-left";
+    }
+    return "";
+  };
 </script>
 
 <div
   class="preview-launchpad"
-  class:mode-popout={mode === 'popout'}
+  class:mode-popout={mode === "popout"}
   bind:clientHeight={surfaceHeight}
-  style={surfaceHeight > 0 ? `width: ${surfaceHeight}px` : ''}
+  style={surfaceHeight > 0 ? `width: ${surfaceHeight}px` : ""}
   role="img"
   aria-label="Launchpad LED preview"
 >
   {#each surfaceModel.cells as cell (cell.key)}
     {@const ledRgb = ledRgbByCellKey.get(cell.key)}
     <div
-      class="preview-button"
+      class={`preview-button ${resolveCenterCornerCutClass(cell.key)}`}
       class:is-button={cell.pitches.length > 0}
       class:is-edge-button={cell.isEdgeButton}
       class:is-corner-placeholder={cell.isCornerPlaceholder}
       class:is-lit={ledRgb !== undefined}
-      style={ledRgb ? `--led-rgb: ${ledRgb}` : ''}
+      style={ledRgb ? `--led-rgb: ${ledRgb}` : ""}
     ></div>
   {/each}
 </div>
@@ -87,6 +103,8 @@
   }
 
   .preview-button {
+    --center-corner-cut-size: 15%;
+
     border-radius: var(--radius-percent-3);
 
     &.is-button {
@@ -97,7 +115,7 @@
         overflow: hidden;
 
         &::after {
-          content: '';
+          content: "";
           position: absolute;
           inset: 0.125rem;
           background: var(--neutral-00);
@@ -114,6 +132,46 @@
 
       &.is-lit {
         background: rgb(var(--led-rgb, var(--rgb-led-default)));
+      }
+
+      &.is-center-corner-bottom-right {
+        clip-path: polygon(
+          0 0,
+          100% 0,
+          100% calc(100% - var(--center-corner-cut-size)),
+          calc(100% - var(--center-corner-cut-size)) 100%,
+          0 100%
+        );
+      }
+
+      &.is-center-corner-bottom-left {
+        clip-path: polygon(
+          0 0,
+          100% 0,
+          100% 100%,
+          var(--center-corner-cut-size) 100%,
+          0 calc(100% - var(--center-corner-cut-size))
+        );
+      }
+
+      &.is-center-corner-top-right {
+        clip-path: polygon(
+          0 0,
+          calc(100% - var(--center-corner-cut-size)) 0,
+          100% var(--center-corner-cut-size),
+          100% 100%,
+          0 100%
+        );
+      }
+
+      &.is-center-corner-top-left {
+        clip-path: polygon(
+          var(--center-corner-cut-size) 0,
+          100% 0,
+          100% 100%,
+          0 100%,
+          0 var(--center-corner-cut-size)
+        );
       }
     }
   }
