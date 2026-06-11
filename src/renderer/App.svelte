@@ -26,6 +26,7 @@
   import { createPresetController } from './app/preset-controller.svelte';
   import { createSettingsController } from './app/settings-controller.svelte';
   import { mountBridgeSubscriptions } from './app/bridge-subscriptions';
+  import { resolveCompassBridge } from './app/browser-bridge';
   import { createHeaderIndicator } from './app/header-indicator.svelte';
   import { mountKeyboardShortcuts } from './app/keyboard-shortcuts';
   import { createPlaybackSession } from './app/playback-session.svelte';
@@ -48,7 +49,7 @@
   const SETTINGS_SIDEBAR_WIDTH_PX = 320;
   const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, select, textarea, option';
 
-  const bridgeClient = window.compass;
+  const bridgeClient = resolveCompassBridge();
   let rackViewApi: RackViewApi | null = $state(null);
   let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
 

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
 
   import type { PreviewWindowState } from '../../shared/contracts/preview/window-state';
+  import { resolveCompassBridge } from '../app/browser-bridge';
   import { createPreviewSession } from '../features/preview/session.svelte';
   import PreviewSurface from '../components/preview/PreviewSurface.svelte';
 
@@ -10,6 +11,7 @@
 
   const previewSession = createPreviewSession();
   const previewViewState = previewSession.state;
+  const bridgeClient = resolveCompassBridge();
   let previewState: PreviewWindowState | null = $state(null);
 
   const statusText = $derived.by(() => {
@@ -33,12 +35,12 @@
   });
 
   onMount(() => {
-    const unsubscribe = window.compass.subscribePreviewWindowState((nextState) => {
+    const unsubscribe = bridgeClient.subscribePreviewWindowState((nextState) => {
       previewState = nextState;
       previewSession.commands.applyWindowState(nextState);
     });
 
-    void window.compass.requestPreviewWindowState().then((state) => {
+    void bridgeClient.requestPreviewWindowState().then((state) => {
       previewState = state;
       previewSession.commands.applyWindowState(state);
     }).catch(() => {
