@@ -242,7 +242,7 @@ export const createBrowserCompassBridge = (): CompassApi => ({
   sendGeneratedPreview: async () => {
     throw new Error('Desktop app required to send to Ableton.');
   },
-  requestAppVersion: async () => 'web',
+  requestAppVersion: async () => __APP_VERSION__,
   requestLiveTempo: async () => ({
     sentAtIso: new Date().toISOString(),
     target: LIVE_BRIDGE_TARGET,
