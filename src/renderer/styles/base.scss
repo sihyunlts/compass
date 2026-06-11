@@ -39,7 +39,18 @@ html, body {
   overflow: hidden;
 }
 
+body[data-runtime='web'] {
+  display: flex;
+  align-items: center;
+}
+
 #app {
   max-height: 280px;
   height: 100%;
+
+  &.is-web-fallback {
+    width: 100%;
+    border-top: 1px solid var(--neutral-20);
+    border-bottom: 1px solid var(--neutral-20);
+  }
 }

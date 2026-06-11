@@ -54,6 +54,15 @@ const bootstrapRenderer = (root: HTMLElement): void => {
   bootstrapMainWindow(root);
 };
 
+const installWebFallbackFrame = (root: HTMLElement): void => {
+  if (window.compass) {
+    return;
+  }
+
+  document.body.setAttribute('data-runtime', 'web');
+  root.classList.add('is-web-fallback');
+};
+
 try {
   const root = document.getElementById('app');
   if (!root) {
@@ -61,6 +70,7 @@ try {
   }
 
   installTabOnlyFocusMode();
+  installWebFallbackFrame(root);
   bootstrapRenderer(root);
 } catch (error) {
   const message = error instanceof Error ? error.stack || error.message : String(error);
