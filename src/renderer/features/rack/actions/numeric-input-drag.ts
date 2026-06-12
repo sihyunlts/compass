@@ -39,8 +39,8 @@ const createNumericInputDragState = (): NumericInputDragState => ({
 const isRackNumericInput = (target: EventTarget | null): target is HTMLInputElement =>
   target instanceof HTMLInputElement
   && target.type === 'number'
-  && !!target.dataset.action
-  && !!target.dataset.id;
+  && !!target.dataset.controlAction
+  && !!target.dataset.deviceId;
 
 export class NumericInputInteraction {
   private readonly onResetInput: (target: EventTarget | null) => boolean;
@@ -102,7 +102,9 @@ export class NumericInputInteraction {
   }
 
   tryStart(event: PointerEvent, target: HTMLElement): boolean {
-    const input = target.closest<HTMLInputElement>('input[type="number"][data-action][data-id]');
+    const input = target.closest<HTMLInputElement>(
+      'input[type="number"][data-control-action][data-device-id]',
+    );
     if (!input || input.disabled || input.readOnly) {
       return false;
     }
@@ -114,7 +116,7 @@ export class NumericInputInteraction {
     const currentValue = Number(input.value);
     const initialValue = Number.isFinite(currentValue) ? currentValue : (min ?? 0);
     const hasFiniteRange = min !== null && max !== null && max > min;
-    const wrapMode = input.dataset.action === 'set-angle-param' && hasFiniteRange;
+    const wrapMode = input.dataset.controlAction === 'set-angle-param' && hasFiniteRange;
     const sensitivity = hasFiniteRange ? Math.max((max - min) / 480, step) : step;
 
     this.dragState.pointerId = event.pointerId;

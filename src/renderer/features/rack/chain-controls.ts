@@ -4,12 +4,9 @@ import {
   getRendererModulationTargetParamDefinitions,
   RENDERER_DEVICE_KINDS,
 } from '../../../devices';
-import {
-  createMergeKeyResolver,
-  getControlTarget,
-  requireInput,
-} from '../../../devices/control-helpers';
+import { createMergeKeyResolver } from '../../../devices/control-helpers';
 import type {
+  RendererControlChange,
   RendererControlContext,
   RendererControlDescriptor,
   RendererControlHandler,
@@ -30,12 +27,11 @@ const GENERIC_CONTROL_DESCRIPTORS: Readonly<Record<string, RendererControlDescri
 };
 
 const createGenericHandlers = (): Readonly<Record<string, ChainControlHandler>> => ({
-  'set-device-enabled': (device, target) => {
-    const input = requireInput(target);
-    if (!input) {
+  'set-device-enabled': (device, change) => {
+    if (typeof change.value !== 'boolean') {
       return false;
     }
-    device.enabled = input.checked;
+    device.enabled = change.value;
     return true;
   },
 });
@@ -141,90 +137,84 @@ export const createChainControlHandlers = (
   );
 };
 
-const resolveControlDescriptor = (
-  control: ReturnType<typeof getControlTarget>,
-): RendererControlDescriptor | null => {
-  if (!control) {
-    return null;
-  }
-
-  const action = control.dataset.action;
-  if (!action) {
-    return null;
-  }
-  return CHAIN_CONTROL_DESCRIPTORS[action] ?? null;
-};
+const resolveControlDescriptor = (change: RendererControlChange): RendererControlDescriptor | null =>
+  CHAIN_CONTROL_DESCRIPTORS[change.action] ?? null;
 
 export const applyChainControlChange = (
-  target: EventTarget | null,
+  change: RendererControlChange,
   findDeviceById: (id: string) => GeneratorDeviceNode | null,
   chainControlHandlers: Readonly<Record<string, ChainControlHandler>>,
 ): boolean => {
-  const control = getControlTarget(target);
-  if (!control) {
+  if (!change.action || !change.deviceId) {
     return false;
   }
 
-  const action = control.dataset.action;
-  const id = control.dataset.id;
-  if (!action || !id) {
-    return false;
-  }
-
-  const device = findDeviceById(id);
+  const device = findDeviceById(change.deviceId);
   if (!device) {
     return false;
   }
 
-  const handler = chainControlHandlers[action];
-  return handler ? handler(device, control) : false;
+  const handler = chainControlHandlers[change.action];
+  return handler ? handler(device, change) : false;
 };
 
 export const resolveChainControlMergeKey = (
-  target: EventTarget | null,
+  change: RendererControlChange,
 ): string | null => {
-  const control = getControlTarget(target);
-  const descriptor = resolveControlDescriptor(control);
-  return descriptor?.resolveMergeKey(control) ?? null;
+  const descriptor = resolveControlDescriptor(change);
+  return descriptor?.resolveMergeKey(change) ?? null;
 };
 
 export const resetNumericControlToDefault = (
   target: EventTarget | null,
   findDeviceById: (id: string) => GeneratorDeviceNode | null,
-  chainControlHandlers: Readonly<Record<string, ChainControlHandler>>,
-): boolean => {
+): RendererControlChange | null => {
   if (!(target instanceof HTMLInputElement) || target.type !== 'number') {
-    return false;
+    return null;
   }
 
-  const action = target.dataset.action;
-  const id = target.dataset.id;
-  const descriptor = resolveControlDescriptor(target);
-  if (!action || !id || !descriptor || !chainControlHandlers[action]) {
-    return false;
+  const action = target.dataset.controlAction;
+  const id = target.dataset.deviceId;
+  const paramKey = target.dataset.param;
+  if (!action || !id) {
+    return null;
   }
 
   const device = findDeviceById(id);
   if (!device) {
-    return false;
+    return null;
   }
 
+  const baseChange: RendererControlChange = {
+    action,
+    deviceId: id,
+    paramKey,
+    value: target.value,
+    finalize: true,
+  };
+  const descriptor = resolveControlDescriptor(baseChange);
+  if (!descriptor) {
+    return null;
+  }
   const defaultDevice = createRendererDeviceNode(
     device.kind,
     device.id,
     device.enabled !== false,
   );
-  const defaultValue = descriptor.resolveDefaultValue?.(defaultDevice, target) ?? null;
+  const defaultValue = descriptor.resolveDefaultValue?.(defaultDevice, baseChange) ?? null;
   if (defaultValue === null) {
-    return false;
+    return null;
   }
 
   const currentValue = Number(target.value);
   if (Number.isFinite(currentValue) && Math.abs(currentValue - defaultValue) < 0.0001) {
-    return false;
+    return null;
   }
 
   target.value = String(defaultValue);
-  target.dispatchEvent(new Event('input', { bubbles: true }));
-  return true;
+  return {
+    ...baseChange,
+    value: defaultValue,
+    finalize: true,
+  };
 };

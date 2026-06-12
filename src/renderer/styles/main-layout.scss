@@ -36,7 +36,7 @@
 
     button,
     input,
-    select {
+    .dropdown-select {
       -webkit-app-region: no-drag;
     }
 
@@ -77,8 +77,9 @@
     color: var(--neutral-50);
     font-size: var(--text-12);
 
-    .field-label {
-      white-space: nowrap;
+    .dropdown-select,
+    .dropdown-select-trigger {
+      width: 5rem;
     }
   }
 

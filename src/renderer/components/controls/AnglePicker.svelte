@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import { onMount } from 'svelte';
+  import type { RendererControlChange } from '../../../devices/control-types';
   import { clamp } from '../../../shared/math';
   import FieldShell from '../fields/FieldShell.svelte';
 
@@ -14,6 +15,7 @@
     min = 0,
     max = 360,
     step = 1,
+    onControlChange,
   } = $props<{
     label: string;
     value: number;
@@ -23,6 +25,7 @@
     min?: number;
     max?: number;
     step?: number;
+    onControlChange: (change: RendererControlChange) => void;
   }>();
 
   const sliderLabel = $derived(`${label} slider`);
@@ -84,6 +87,22 @@
 
     sliderEl.value = nextText;
     sliderEl.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  const emitControlChange = (event: Event, finalize: boolean): void => {
+    const input = event.currentTarget;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+
+    onControlChange({
+      action: dataAction,
+      deviceId: dataId,
+      paramKey: dataParam,
+      value: input.value,
+      finalize,
+      step: Number(input.step),
+    });
   };
 
   const applyDragDelta = (deltaX: number, deltaY: number): void => {
@@ -234,10 +253,9 @@
       max={max}
       step={step}
       value={value}
-      data-action={dataAction}
-      data-id={dataId}
-      data-param={dataParam}
       aria-label={sliderLabel}
+      oninput={(event) => emitControlChange(event, false)}
+      onchange={(event) => emitControlChange(event, true)}
     />
     <input
       class="angle-picker-number-input"
@@ -246,10 +264,12 @@
       max={max}
       step={step}
       value={value}
-      data-action={dataAction}
-      data-id={dataId}
+      data-control-action={dataAction}
+      data-device-id={dataId}
       data-param={dataParam}
       aria-label={numberLabel}
+      oninput={(event) => emitControlChange(event, false)}
+      onchange={(event) => emitControlChange(event, true)}
     />
   </div>
 </FieldShell>

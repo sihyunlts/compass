@@ -13,6 +13,7 @@ import {
   resolveChainControlMergeKey,
   resetNumericControlToDefault,
 } from './chain-controls';
+import type { RendererControlChange } from '../../../devices/control-types';
 
 /**
  * Coordinates non-selection rack interactions in the main renderer.
@@ -110,28 +111,21 @@ export class RackInteractionManager {
     }
   }
 
-  handleControlInputOrChange(event: Event): boolean {
-    const changed = this.applyChainControlChange(event.target);
+  handleControlChange(change: RendererControlChange): boolean {
+    const changed = this.applyChainControlChange(change);
     if (!changed) {
       return false;
     }
 
-    const id =
-      event.target instanceof HTMLInputElement
-      || event.target instanceof HTMLSelectElement
-        ? event.target.dataset.id
-        : undefined;
-    if (id) {
-      this.centerPicker.syncSelection(id);
-    }
+    this.centerPicker.syncSelection(change.deviceId);
 
-    const mergeKey = resolveChainControlMergeKey(event.target);
+    const mergeKey = resolveChainControlMergeKey(change);
     this.commitChainChange(
       {
         kind: 'control-edit',
-        label: 'Edit parameter',
+        label: change.label ?? 'Edit parameter',
         mergeKey,
-        finalize: event.type === 'change',
+        finalize: change.finalize,
       },
     );
     return true;
@@ -237,47 +231,27 @@ export class RackInteractionManager {
       || this.centerPicker.tryResetFromDoubleClick(event.target);
   }
 
-  handleControlClick(event: MouseEvent): boolean {
-    const target = event.target;
-    if (!(target instanceof HTMLElement) || !target.closest('button[data-action][data-id]')) {
-      return false;
-    }
-
-    if (!this.applyChainControlChange(event.target)) {
-      return false;
-    }
-
-    this.commitChainChange(
-      {
-        kind: 'control-edit',
-        label: 'Edit parameter',
-        mergeKey: resolveChainControlMergeKey(event.target),
-        finalize: true,
-      },
-    );
-    return true;
-  }
-
   private blurActiveTextEditingElement(): void {
     blurIfTextEditingElement(document.activeElement);
   }
 
   private tryResetNumericControl(target: EventTarget | null): boolean {
-    if (!resetNumericControlToDefault(
+    const change = resetNumericControlToDefault(
       target,
       this.findDeviceById.bind(this),
-      this.chainControlHandlers,
-    )) {
+    );
+    if (!change) {
       return false;
     }
 
+    this.handleControlChange(change);
     this.closeContextMenu();
     return true;
   }
 
-  private applyChainControlChange(target: EventTarget | null): boolean {
+  private applyChainControlChange(change: RendererControlChange): boolean {
     return applyChainControlChange(
-      target,
+      change,
       this.findDeviceById.bind(this),
       this.chainControlHandlers,
     );

@@ -59,12 +59,12 @@ const resolveMaskTileTarget = (
     return null;
   }
 
-  const grid = tile.closest<HTMLElement>('.mask-tile-grid[data-action="mask-tile-grid"]');
+  const grid = tile.closest<HTMLElement>('.mask-tile-grid[data-mask-tile-grid="true"]');
   if (!grid) {
     return null;
   }
 
-  const deviceId = grid.dataset.id;
+  const deviceId = grid.dataset.deviceId;
   const tileIndex = normalizeMaskTileIndex(tile.dataset.tileIndex);
   if (!deviceId || tileIndex === null) {
     return null;

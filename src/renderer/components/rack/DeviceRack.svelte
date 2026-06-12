@@ -237,8 +237,6 @@
     bind:this={chainDevicesEl}
     id="chain-devices"
     class="chain-devices"
-    oninput={(event) => controller.surface.handleChainControlInputOrChange(event)}
-    onchange={(event) => controller.surface.handleChainControlInputOrChange(event)}
     onfocusin={(event) => controller.surface.handleChainFocusIn(event)}
     onkeydown={(event) => controller.handleChainKeyDown(event)}
     onpointerdown={(event) => controller.surface.handleChainPointerDown(event)}
@@ -287,6 +285,7 @@
             onRenameBlur={() => controller.rename.handleInputBlur()}
             onRenameKeyDown={(event) => controller.rename.handleInputKeyDown(event)}
             onSavePreset={(deviceId) => controller.handleDeviceSavePreset(deviceId)}
+            onControlChange={(change) => controller.surface.handleControlChange(change)}
             onHeaderPointerDown={(event) => controller.handleDeviceHeaderPointerDown(event, item.device.id)}
             onHeaderClick={(event) => controller.handleDeviceHeaderClick(event, item.device.id)}
             onHeaderContextMenu={(event) => controller.handleDeviceHeaderContextMenu(event, item.device.id)}
@@ -358,6 +357,7 @@
                     onRenameBlur={() => controller.rename.handleInputBlur()}
                     onRenameKeyDown={(event) => controller.rename.handleInputKeyDown(event)}
                     onSavePreset={(deviceId) => controller.handleDeviceSavePreset(deviceId)}
+                    onControlChange={(change) => controller.surface.handleControlChange(change)}
                     onHeaderPointerDown={(event) => controller.handleDeviceHeaderPointerDown(event, col.device.id)}
                     onHeaderClick={(event) => controller.handleDeviceHeaderClick(event, col.device.id)}
                     onHeaderContextMenu={(event) => controller.handleDeviceHeaderContextMenu(event, col.device.id)}

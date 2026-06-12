@@ -1,7 +1,7 @@
 import type { Component } from 'svelte';
 
 import type { GeneratorDeviceNode } from '../shared/model';
-import type { RendererKindControlDefinition } from './control-types';
+import type { RendererControlChange, RendererKindControlDefinition } from './control-types';
 
 export type RendererDeviceKind = GeneratorDeviceNode['kind'];
 export type RendererDeviceGroup = 'generator' | 'effect';
@@ -19,6 +19,7 @@ export interface RendererDeviceEditorPropsBase {
   currentProgress01?: number;
   modulationReadoutById?: Record<string, string>;
   resolvePaletteRgb: (velocity: number) => string;
+  onControlChange: (change: RendererControlChange) => void;
 }
 
 type RendererDeviceEditorProps<K extends RendererDeviceKind = RendererDeviceKind> =

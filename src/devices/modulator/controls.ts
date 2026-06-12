@@ -1,8 +1,6 @@
 import {
   createMergeKeyResolver,
-  parseFiniteNumber,
-  requireInput,
-  requireSelect,
+  parseFiniteControlNumber,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 import { sanitizeCurveDivisions, sanitizeCurveNodes } from '../../core/modulation/curve';
@@ -31,17 +29,16 @@ export const modulatorDeviceControls = {
     },
   },
   createHandlers: (context) => ({
-    'set-modulation-target-device': (device, target) => {
+    'set-modulation-target-device': (device, change) => {
       if (device.kind !== 'modulator') {
         return false;
       }
 
-      const select = requireSelect(target);
-      if (!select) {
+      if (typeof change.value !== 'string') {
         return false;
       }
 
-      const deviceId = select.value.trim();
+      const deviceId = change.value.trim();
       if (!deviceId) {
         device.params.target = null;
         return true;
@@ -70,17 +67,16 @@ export const modulatorDeviceControls = {
       });
       return true;
     },
-    'set-modulation-target-param': (device, target) => {
+    'set-modulation-target-param': (device, change) => {
       if (device.kind !== 'modulator') {
         return false;
       }
 
-      const select = requireSelect(target);
-      if (!select) {
+      if (typeof change.value !== 'string') {
         return false;
       }
 
-      const paramKey = select.value.trim();
+      const paramKey = change.value.trim();
       if (!paramKey) {
         device.params.target = null;
         return true;
@@ -97,17 +93,12 @@ export const modulatorDeviceControls = {
       });
       return true;
     },
-    'set-modulation-amount': (device, target) => {
+    'set-modulation-amount': (device, change) => {
       if (device.kind !== 'modulator') {
         return false;
       }
 
-      const input = requireInput(target);
-      if (!input) {
-        return false;
-      }
-
-      const value = parseFiniteNumber(input.value);
+      const value = parseFiniteControlNumber(change.value);
       if (value === null) {
         return false;
       }
@@ -115,34 +106,28 @@ export const modulatorDeviceControls = {
       device.params.amount = value;
       return true;
     },
-    'set-modulation-divisions': (device, target) => {
+    'set-modulation-divisions': (device, change) => {
       if (device.kind !== 'modulator') {
         return false;
       }
 
-      const select = requireSelect(target);
-      if (!select) {
-        return false;
-      }
-
-      device.params.curve.divisions = sanitizeCurveDivisions(select.value);
+      device.params.curve.divisions = sanitizeCurveDivisions(change.value);
       return true;
     },
-    'set-modulation-curve-nodes': (device, target) => {
+    'set-modulation-curve-nodes': (device, change) => {
       if (device.kind !== 'modulator') {
-        return false;
-      }
-
-      const input = requireInput(target);
-      if (!input) {
         return false;
       }
 
       let parsed: unknown;
-      try {
-        parsed = JSON.parse(input.value);
-      } catch {
-        return false;
+      if (typeof change.value === 'string') {
+        try {
+          parsed = JSON.parse(change.value);
+        } catch {
+          return false;
+        }
+      } else {
+        parsed = change.value;
       }
 
       device.params.curve.nodes = sanitizeCurveNodes(parsed);

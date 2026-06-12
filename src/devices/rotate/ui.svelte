@@ -9,7 +9,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'rotate' }>;
   };
 
-  let { device }: RotateDeviceEditorProps = $props();
+  let { device, onControlChange }: RotateDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -19,5 +19,6 @@
     dataAction="set-angle-param"
     dataId={device.id}
     dataParam="angleDeg"
+    {onControlChange}
   />
 </div>

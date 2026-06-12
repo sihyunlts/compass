@@ -27,7 +27,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'symmetry' }>;
   };
 
-  let { device }: SymmetryDeviceEditorProps = $props();
+  let { device, onControlChange }: SymmetryDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -38,6 +38,7 @@
       options={SYMMETRY_MODE_OPTIONS}
       dataAction="set-effect-symmetry-mode"
       dataId={device.id}
+      {onControlChange}
     />
     <SelectField
       label="Axis (Half Mode)"
@@ -45,6 +46,7 @@
       options={SYMMETRY_AXIS_OPTIONS}
       dataAction="set-effect-symmetry-axis"
       dataId={device.id}
+      {onControlChange}
     />
     <SelectField
       label="Source Quadrant"
@@ -52,6 +54,7 @@
       options={SYMMETRY_ANCHOR_OPTIONS}
       dataAction="set-effect-symmetry-anchor"
       dataId={device.id}
+      {onControlChange}
     />
   </div>
 </div>

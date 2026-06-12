@@ -3,7 +3,6 @@
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
   import { normalizeOptionalId } from '../../shared/normalize-id';
-  import FieldShell from '../../renderer/components/fields/FieldShell.svelte';
   import MaskTilePicker from '../../renderer/components/controls/MaskTilePicker.svelte';
   import SelectField from '../../renderer/components/fields/SelectField.svelte';
   import {
@@ -37,6 +36,7 @@
     devices = [] as GeneratorDeviceNode[],
     groupDisplayNameById = {},
     deviceDisplayNameById = {},
+    onControlChange,
   }: MaskDeviceEditorProps = $props();
 
   const maskGroupOptions = $derived.by(() => {
@@ -54,6 +54,26 @@
   const maskGeneratorOptions = $derived.by(() =>
     devices.filter((item: GeneratorDeviceNode) =>
       getRendererDeviceGroup(item.kind) === 'generator'));
+  const maskGroupSelectOptions = $derived.by(() => [
+    {
+      value: '',
+      label: maskGroupOptions.length === 0 ? 'No Groups' : 'None',
+    },
+    ...maskGroupOptions.map((groupId) => ({
+      value: groupId,
+      label: groupDisplayNameById[groupId] ?? groupId,
+    })),
+  ]);
+  const maskGeneratorSelectOptions = $derived.by(() => [
+    {
+      value: '',
+      label: maskGeneratorOptions.length === 0 ? 'No Generators' : 'None',
+    },
+    ...maskGeneratorOptions.map((generator) => ({
+      value: generator.id,
+      label: deviceDisplayNameById[generator.id] ?? getRendererDeviceLabel(generator.kind),
+    })),
+  ]);
 </script>
 
 <div class="device-controls">
@@ -64,6 +84,7 @@
       options={MASK_MODE_OPTIONS}
       dataAction="set-mask-mode"
       dataId={device.id}
+      {onControlChange}
     />
     <SelectField
       label="Mask Source"
@@ -71,6 +92,7 @@
       options={MASK_SOURCE_KIND_OPTIONS}
       dataAction="set-mask-source-kind"
       dataId={device.id}
+      {onControlChange}
     />
     <SelectField
       label="Source Visibility"
@@ -78,6 +100,7 @@
       options={MASK_SOURCE_VISIBILITY_OPTIONS}
       dataAction="set-mask-source-visibility"
       dataId={device.id}
+      {onControlChange}
     />
   </div>
   <div class="column-wrapper mask-source-column">
@@ -87,42 +110,25 @@
         tiles={device.params.tiles}
       />
     {:else if device.params.sourceKind === 'group'}
-      <FieldShell label="Group">
-        <select
-          data-action="set-mask-source-id"
-          data-id={device.id}
-          disabled={maskGroupOptions.length === 0}
-        >
-          <option value="" selected={!device.params.sourceId}>
-            {maskGroupOptions.length === 0 ? 'No Groups' : 'None'}
-          </option>
-          {#each maskGroupOptions as groupId (groupId)}
-            <option value={groupId} selected={device.params.sourceId === groupId}>
-              {groupDisplayNameById[groupId] ?? groupId}
-            </option>
-          {/each}
-        </select>
-      </FieldShell>
+      <SelectField
+        label="Group"
+        value={device.params.sourceId ?? ''}
+        options={maskGroupSelectOptions}
+        dataAction="set-mask-source-id"
+        dataId={device.id}
+        disabled={maskGroupOptions.length === 0}
+        {onControlChange}
+      />
     {:else}
-      <FieldShell label="Generator">
-        <select
-          data-action="set-mask-source-id"
-          data-id={device.id}
-          disabled={maskGeneratorOptions.length === 0}
-        >
-          <option value="" selected={!device.params.sourceId}>
-            {maskGeneratorOptions.length === 0 ? 'No Generators' : 'None'}
-          </option>
-          {#each maskGeneratorOptions as generator (generator.id)}
-            <option
-              value={generator.id}
-              selected={device.params.sourceId === generator.id}
-            >
-              {deviceDisplayNameById[generator.id] ?? getRendererDeviceLabel(generator.kind)}
-            </option>
-          {/each}
-        </select>
-      </FieldShell>
+      <SelectField
+        label="Generator"
+        value={device.params.sourceId ?? ''}
+        options={maskGeneratorSelectOptions}
+        dataAction="set-mask-source-id"
+        dataId={device.id}
+        disabled={maskGeneratorOptions.length === 0}
+        {onControlChange}
+      />
     {/if}
   </div>
 </div>
@@ -137,7 +143,8 @@
       min-width: 0;
     }
 
-    :global(.control-field select) {
+    :global(.control-field .dropdown-select),
+    :global(.control-field .dropdown-select-trigger) {
       width: 100%;
     }
   }
@@ -155,7 +162,8 @@
       min-width: 0;
     }
 
-    :global(.control-field:not(.mask-tile-control) select) {
+    :global(.control-field:not(.mask-tile-control) .dropdown-select),
+    :global(.control-field:not(.mask-tile-control) .dropdown-select-trigger) {
       width: 100%;
     }
   }

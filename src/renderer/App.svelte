@@ -12,6 +12,7 @@
   import BrowserPanel from './components/browser/BrowserPanel.svelte';
   import type { ContextMenuTarget } from './components/overlays/context-menu-types';
   import Button from './components/primitives/Button.svelte';
+  import DropdownSelect from './components/primitives/DropdownSelect.svelte';
   import SidebarResizer from './components/layout/SidebarResizer.svelte';
   import DeviceRack from './components/rack/DeviceRack.svelte';
   import UndoHistoryControl from './components/history/UndoHistoryControl.svelte';
@@ -47,7 +48,7 @@
   const HISTORY_MAX_ENTRIES = 100;
   const DEFAULT_LED_RGB = '255 166 57';
   const SETTINGS_SIDEBAR_WIDTH_PX = 320;
-  const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, select, textarea, option';
+  const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, textarea';
 
   const bridgeClient = resolveCompassBridge();
   const isWebFallback = !window.compass;
@@ -206,6 +207,11 @@
   const handleRedoClick = (): void => {
     closeContextMenu();
     editorSession.commands.redo();
+  };
+
+  const handlePreviewLengthChange = (nextValue: string | number): void => {
+    uiState.autoCreateLengthLabel = String(nextValue);
+    editorSession.commands.handleAutoCreateLengthChange();
   };
 
   const handleRackScrollMetricsChange = (metrics: RackScrollMetrics): void => {
@@ -446,17 +452,15 @@
           />
           <div class="header-length-select">
             <span id="preview-bpm-text" class="header-bpm-text">{bpmText}</span>
-            <select
-              id="auto-create-length-select"
-              name="autoCreateLength"
-              aria-label="Preview length"
-              bind:value={uiState.autoCreateLengthLabel}
-              onchange={editorSession.commands.handleAutoCreateLengthChange}
-            >
-              {#each AUTO_CREATE_LENGTH_OPTIONS as option (option.label)}
-                <option value={option.label}>{option.label}</option>
-              {/each}
-            </select>
+            <DropdownSelect
+              value={uiState.autoCreateLengthLabel}
+              options={AUTO_CREATE_LENGTH_OPTIONS.map((option) => ({
+                value: option.label,
+                label: option.label,
+              }))}
+              ariaLabel="Preview length"
+              onValueChange={handlePreviewLengthChange}
+            />
           </div>
           <Button
             id="send-button"

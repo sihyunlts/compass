@@ -3,8 +3,8 @@ import {
   createDefaultNumericValueResolver,
   createMergeKeyResolver,
   createNumericParamSetter,
-  readDatasetParam,
-  resolveNumericDatasetParam,
+  readControlParam,
+  resolveNumericControlParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 import { WATERDROP_NUMERIC_PARAM_KEYS } from './schema';
@@ -19,29 +19,29 @@ const isWaterdropDevice = (
 export const waterdropDeviceControls = {
   descriptors: {
     'set-waterdrop-param': {
-      resolveMergeKey: createMergeKeyResolver('set-waterdrop-param', resolveNumericDatasetParam),
+      resolveMergeKey: createMergeKeyResolver('set-waterdrop-param', resolveNumericControlParam),
       resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readDatasetParam(input, WATERDROP_NUMERIC_PARAM_KEYS),
+        (input) => readControlParam(input, WATERDROP_NUMERIC_PARAM_KEYS),
       ),
     },
     'set-center-picker-param': {
-      resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericDatasetParam),
+      resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericControlParam),
       resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readDatasetParam(input, WATERDROP_CENTER_PICKER_PARAM_KEYS),
+        (input) => readControlParam(input, WATERDROP_CENTER_PICKER_PARAM_KEYS),
       ),
     },
   },
   createHandlers: () => ({
     'set-waterdrop-param': createNumericParamSetter({
       isKind: isWaterdropDevice,
-      readParam: (input) => readDatasetParam(input, WATERDROP_NUMERIC_PARAM_KEYS),
+      readParam: (input) => readControlParam(input, WATERDROP_NUMERIC_PARAM_KEYS),
       assign: (device, param, value) => {
         device.params[param] = value;
       },
     }),
     'set-center-picker-param': createNumericParamSetter({
       isKind: isWaterdropDevice,
-      readParam: (input) => readDatasetParam(input, WATERDROP_CENTER_PICKER_PARAM_KEYS),
+      readParam: (input) => readControlParam(input, WATERDROP_CENTER_PICKER_PARAM_KEYS),
       assign: (device, param, value) => {
         device.params[param] = value;
       },

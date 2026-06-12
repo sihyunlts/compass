@@ -44,6 +44,7 @@
     device,
     paletteRevision,
     resolvePaletteRgb,
+    onControlChange,
   }: ColorDeviceEditorProps = $props();
 
   let selectedColorSlotIndex = $state(0);
@@ -66,6 +67,16 @@
 
   const isPaletteSlotDisabled = (rgb: string): boolean => rgb.trim() === BLACK_RGB;
   const colorPaletteGridSizePx = $derived.by(() => Math.max(0, colorPaletteFrameHeight));
+
+  const selectPaletteSlot = (paletteIndex: number): void => {
+    onControlChange({
+      action: 'set-color-slot',
+      deviceId: device.id,
+      paramKey: String(selectedColorSlotIndex),
+      value: paletteIndex,
+      finalize: true,
+    });
+  };
 </script>
 
 <div class="device-controls">
@@ -85,13 +96,10 @@
               type="button"
               class="color-palette-cell"
               class:is-selected={device.params.velocities[selectedColorSlotIndex] === paletteIndex}
-              data-action="set-color-slot"
-              data-id={device.id}
-              data-slot-index={selectedColorSlotIndex}
-              data-palette-index={paletteIndex}
               disabled={isPaletteSlotDisabled(paletteRgb)}
               style={`background-color: rgb(${paletteRgb});`}
               aria-label={`Palette ${paletteIndex}`}
+              onclick={() => selectPaletteSlot(paletteIndex)}
             ></button>
           {/each}
         </div>
@@ -105,13 +113,10 @@
               type="button"
               class="color-palette-cell"
               class:is-selected={device.params.velocities[selectedColorSlotIndex] === paletteIndex}
-              data-action="set-color-slot"
-              data-id={device.id}
-              data-slot-index={selectedColorSlotIndex}
-              data-palette-index={paletteIndex}
               disabled={isPaletteSlotDisabled(paletteRgb)}
               style={`background-color: rgb(${paletteRgb});`}
               aria-label={`Palette ${paletteIndex}`}
+              onclick={() => selectPaletteSlot(paletteIndex)}
             ></button>
           {/each}
         </div>
@@ -141,6 +146,7 @@
       value={device.params.noteLengthPercent}
       dataAction="set-color-note-length-percent"
       dataId={device.id}
+      {onControlChange}
     />
 
     <NumberField
@@ -151,6 +157,7 @@
       value={device.params.gapPercent}
       dataAction="set-color-gap-percent"
       dataId={device.id}
+      {onControlChange}
     />
 
     <NumberField
@@ -161,6 +168,7 @@
       dataAction="set-color-slot-count"
       dataId={device.id}
       ariaLabel="Color slot count"
+      {onControlChange}
     />
   </div>
 </div>

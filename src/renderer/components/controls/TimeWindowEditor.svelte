@@ -1,6 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import type { RendererControlChange } from '../../../devices/control-types';
   import { clamp } from '../../../shared/math';
   import FieldShell from '../fields/FieldShell.svelte';
   import NumberField from '../fields/NumberField.svelte';
@@ -16,6 +17,7 @@
     mode,
     modeBadgeText = null,
     currentProgress01,
+    onControlChange,
   } = $props<{
     deviceId: string;
     dataAction: string;
@@ -24,6 +26,7 @@
     mode: TimeWindowEditorMode;
     modeBadgeText?: string | null;
     currentProgress01?: number;
+    onControlChange: (change: RendererControlChange) => void;
   }>();
 
   let snapDivisions = $state<number>(16);
@@ -63,6 +66,22 @@
 
   const setSnapDivisions = (nextDivisions: number): void => {
     snapDivisions = nextDivisions;
+  };
+
+  const emitControlChange = (event: Event, paramKey: string, finalize: boolean): void => {
+    const input = event.currentTarget;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+
+    onControlChange({
+      action: dataAction,
+      deviceId,
+      paramKey,
+      value: input.value,
+      finalize,
+      step: rangeStep,
+    });
   };
 </script>
 
@@ -121,10 +140,9 @@
         max="1"
         step={rangeStep}
         value={clampedStart}
-        data-action={dataAction}
-        data-id={deviceId}
-        data-param="start"
         aria-label="Window start"
+        oninput={(event) => emitControlChange(event, 'start', false)}
+        onchange={(event) => emitControlChange(event, 'start', true)}
       />
       <input
         class="time-window-range time-window-range-end"
@@ -133,10 +151,9 @@
         max="1"
         step={rangeStep}
         value={clampedEnd}
-        data-action={dataAction}
-        data-id={deviceId}
-        data-param="end"
         aria-label="Window end"
+        oninput={(event) => emitControlChange(event, 'end', false)}
+        onchange={(event) => emitControlChange(event, 'end', true)}
       />
     </div>
   </div>
@@ -151,6 +168,7 @@
       dataAction={dataAction}
       dataId={deviceId}
       dataParam="start"
+      {onControlChange}
     />
     <NumberField
       label="End"
@@ -161,6 +179,7 @@
       dataAction={dataAction}
       dataId={deviceId}
       dataParam="end"
+      {onControlChange}
     />
     <FieldShell label="Length">
       <input type="text" value={windowLengthText} readonly tabindex="-1" />

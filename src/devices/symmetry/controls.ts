@@ -1,7 +1,4 @@
-import {
-  createMergeKeyResolver,
-  requireSelect,
-} from '../control-helpers';
+import { createMergeKeyResolver } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 
 export const symmetryDeviceControls = {
@@ -17,17 +14,16 @@ export const symmetryDeviceControls = {
     },
   },
   createHandlers: () => ({
-    'set-effect-symmetry-mode': (device, target) => {
+    'set-effect-symmetry-mode': (device, change) => {
       if (device.kind !== 'symmetry') {
         return false;
       }
 
-      const select = requireSelect(target);
-      if (!select) {
+      if (typeof change.value !== 'string') {
         return false;
       }
 
-      const mode = select.value;
+      const mode = change.value;
       device.params.mode = mode === 'quad-mirror'
         || mode === 'quad-pinwheel'
         || mode === 'mirror-half'
@@ -35,30 +31,28 @@ export const symmetryDeviceControls = {
         : 'mirror-half';
       return true;
     },
-    'set-effect-symmetry-axis': (device, target) => {
+    'set-effect-symmetry-axis': (device, change) => {
       if (device.kind !== 'symmetry') {
         return false;
       }
 
-      const select = requireSelect(target);
-      if (!select) {
+      if (typeof change.value !== 'string') {
         return false;
       }
 
-      device.params.axis = select.value === 'vertical' ? 'vertical' : 'horizontal';
+      device.params.axis = change.value === 'vertical' ? 'vertical' : 'horizontal';
       return true;
     },
-    'set-effect-symmetry-anchor': (device, target) => {
+    'set-effect-symmetry-anchor': (device, change) => {
       if (device.kind !== 'symmetry') {
         return false;
       }
 
-      const select = requireSelect(target);
-      if (!select) {
+      if (typeof change.value !== 'string') {
         return false;
       }
 
-      const anchor = select.value;
+      const anchor = change.value;
       device.params.sourceAnchor = anchor === 'br' || anchor === 'tr' || anchor === 'tl'
         ? anchor
         : 'bl';

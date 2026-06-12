@@ -1,7 +1,4 @@
-import {
-  createMergeKeyResolver,
-  requireInput,
-} from '../control-helpers';
+import { createMergeKeyResolver } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 import { sanitizePathPoints } from './schema';
 
@@ -12,21 +9,20 @@ export const pathDeviceControls = {
     },
   },
   createHandlers: () => ({
-    'set-path-points': (device, target) => {
+    'set-path-points': (device, change) => {
       if (device.kind !== 'path') {
         return false;
       }
 
-      const input = requireInput(target);
-      if (!input) {
-        return false;
-      }
-
       let parsed: unknown;
-      try {
-        parsed = JSON.parse(input.value);
-      } catch {
-        return false;
+      if (typeof change.value === 'string') {
+        try {
+          parsed = JSON.parse(change.value);
+        } catch {
+          return false;
+        }
+      } else {
+        parsed = change.value;
       }
 
       device.params.points = sanitizePathPoints(parsed);

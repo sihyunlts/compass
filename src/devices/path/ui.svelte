@@ -9,12 +9,13 @@
     device: Extract<GeneratorDeviceNode, { kind: 'path' }>;
   };
 
-  let { device }: PathDeviceEditorProps = $props();
+  let { device, onControlChange }: PathDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
   <PathEditor
     deviceId={device.id}
     points={device.params.points}
+    {onControlChange}
   />
 </div>

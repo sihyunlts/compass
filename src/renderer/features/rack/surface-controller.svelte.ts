@@ -1,5 +1,6 @@
 import { clamp } from '../../../shared/math';
 import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/model';
+import type { RendererControlChange } from '../../../devices/control-types';
 import type {
   BrowserInsertSource,
   BrowserPresetInsertSource,
@@ -253,8 +254,8 @@ class RackSurfaceController {
     return true;
   }
 
-  public handleChainControlInputOrChange(event: Event): void {
-    this.interactionManager?.handleControlInputOrChange(event);
+  public handleControlChange(change: RendererControlChange): void {
+    this.interactionManager?.handleControlChange(change);
   }
 
   public handleChainFocusIn(event: FocusEvent): void {
@@ -291,7 +292,7 @@ class RackSurfaceController {
       return;
     }
 
-    if (this.interactionManager?.handleControlClick(event)) {
+    if (event.defaultPrevented) {
       return;
     }
 

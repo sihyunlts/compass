@@ -2,9 +2,9 @@ import { clamp } from '../shared/math';
 import type { GeneratorDeviceNode } from '../shared/model';
 import {
   createNumericParamSetter,
-  readDatasetParam,
+  readControlParam,
 } from './control-helpers';
-import type { RendererControlHandler } from './control-types';
+import type { RendererControlChange, RendererControlHandler } from './control-types';
 
 const TIME_WINDOW_PARAM_KEYS = ['start', 'end'] as const;
 
@@ -17,9 +17,9 @@ type TimeWindowValue = {
 const MIN_TIME_WINDOW_SPAN_FALLBACK = 0.001;
 
 const resolveMinimumTimeWindowSpan = (
-  input: HTMLInputElement,
+  change: RendererControlChange,
 ): number => {
-  const step = Number(input.step);
+  const step = Number(change.step);
   if (!Number.isFinite(step) || step <= 0) {
     return MIN_TIME_WINDOW_SPAN_FALLBACK;
   }
@@ -43,9 +43,9 @@ const resolveTimeWindowInputValue = (
   currentWindow: TimeWindowValue,
   param: TimeWindowParamKey,
   rawValue: number,
-  input: HTMLInputElement,
+  change: RendererControlChange,
 ): TimeWindowValue => {
-  const minimumSpan = resolveMinimumTimeWindowSpan(input);
+  const minimumSpan = resolveMinimumTimeWindowSpan(change);
 
   if (param === 'start') {
     const fixedEnd = clamp(currentWindow.end, minimumSpan, 1);
@@ -63,8 +63,8 @@ const resolveTimeWindowInputValue = (
 };
 
 export const readTimeWindowParamKey = (
-  input: HTMLInputElement,
-): TimeWindowParamKey | null => readDatasetParam(input, TIME_WINDOW_PARAM_KEYS);
+  change: RendererControlChange,
+): TimeWindowParamKey | null => readControlParam(change, TIME_WINDOW_PARAM_KEYS);
 
 export const createTimeWindowParamSetter = <
   Device extends GeneratorDeviceNode,
@@ -77,12 +77,12 @@ export const createTimeWindowParamSetter = <
 ): RendererControlHandler => createNumericParamSetter({
   isKind: options.isKind,
   readParam: readTimeWindowParamKey,
-  assign: (device, param, value, input) => {
+  assign: (device, param, value, change) => {
     const nextWindow = resolveTimeWindowInputValue(
       options.readWindow(device),
       param,
       value,
-      input,
+      change,
     );
     options.writeWindow(device, nextWindow);
   },

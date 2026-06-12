@@ -3,7 +3,6 @@
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
   import CurveEditor from '../../renderer/components/controls/CurveEditor.svelte';
-  import FieldShell from '../../renderer/components/fields/FieldShell.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import SelectField from '../../renderer/components/fields/SelectField.svelte';
   import { sanitizeCurveNodes } from '../../core/modulation/curve';
@@ -28,6 +27,7 @@
     deviceDisplayNameById = {},
     currentProgress01 = 0,
     modulationReadoutById = {},
+    onControlChange,
   }: ModulatorDeviceEditorProps = $props();
 
   const targetableDevices = $derived.by((): GeneratorDeviceNode[] =>
@@ -41,6 +41,20 @@
     selectedTargetDevice
       ? getRendererModulationTargetParamDefinitions(selectedTargetDevice.kind)
       : []);
+  const targetDeviceSelectOptions = $derived.by(() => [
+    { value: '', label: 'None' },
+    ...targetableDevices.map((targetDevice) => ({
+      value: targetDevice.id,
+      label: deviceDisplayNameById[targetDevice.id] ?? getRendererDeviceLabel(targetDevice.kind),
+    })),
+  ]);
+  const targetParamSelectOptions = $derived.by(() => [
+    { value: '', label: 'None' },
+    ...targetParamOptions.map((option) => ({
+      value: option.key,
+      label: option.label,
+    })),
+  ]);
   const modulationReadoutText = $derived.by(() => {
     const rawText = modulationReadoutById[device.id] ?? 'No active modulation value';
     const separatorIndex = rawText.indexOf('|');
@@ -50,36 +64,24 @@
 
 <div class="device-controls modulation-layout">
   <div class="column-wrapper modulation-sidebar">
-    <FieldShell label="Target Device">
-      <select data-action="set-modulation-target-device" data-id={device.id}>
-        <option value="" selected={!device.params.target?.deviceId}>None</option>
-        {#each targetableDevices as targetDevice (targetDevice.id)}
-          <option
-            value={targetDevice.id}
-            selected={device.params.target?.deviceId === targetDevice.id}
-          >
-            {deviceDisplayNameById[targetDevice.id] ?? getRendererDeviceLabel(targetDevice.kind)}
-          </option>
-        {/each}
-      </select>
-    </FieldShell>
-    <FieldShell label="Target Parameter" class="modulation-control-field-wide">
-      <select
-        data-action="set-modulation-target-param"
-        data-id={device.id}
-        disabled={!selectedTargetDevice}
-      >
-        <option value="" selected={!device.params.target?.paramKey}>None</option>
-        {#each targetParamOptions as option (option.key)}
-          <option
-            value={option.key}
-            selected={device.params.target?.paramKey === option.key}
-          >
-            {option.label}
-          </option>
-        {/each}
-      </select>
-    </FieldShell>
+    <SelectField
+      label="Target Device"
+      value={device.params.target?.deviceId ?? ''}
+      options={targetDeviceSelectOptions}
+      dataAction="set-modulation-target-device"
+      dataId={device.id}
+      {onControlChange}
+    />
+    <SelectField
+      label="Target Parameter"
+      value={device.params.target?.paramKey ?? ''}
+      options={targetParamSelectOptions}
+      dataAction="set-modulation-target-param"
+      dataId={device.id}
+      disabled={!selectedTargetDevice}
+      class="modulation-control-field-wide"
+      {onControlChange}
+    />
     <div class="modulation-compact-row">
       <NumberField
         label="Amount"
@@ -87,6 +89,7 @@
         value={device.params.amount}
         dataAction="set-modulation-amount"
         dataId={device.id}
+        {onControlChange}
       />
       <SelectField
         label="Divisions"
@@ -94,6 +97,7 @@
         options={MODULATION_DIVISION_OPTIONS}
         dataAction="set-modulation-divisions"
         dataId={device.id}
+        {onControlChange}
       />
     </div>
   </div>
@@ -102,11 +106,12 @@
       label={modulationReadoutText}
       deviceId={device.id}
       curve={device.params.curve}
-      hiddenInputAction="set-modulation-curve-nodes"
+      controlAction="set-modulation-curve-nodes"
       sanitizeNodes={sanitizeCurveNodes}
       guideValue={0}
       wrapperClass="modulation-curve-control"
       {currentProgress01}
+      {onControlChange}
     />
   </div>
 </div>
@@ -131,7 +136,8 @@
     }
 
     :global(.control-field input),
-    :global(.control-field select) {
+    :global(.control-field .dropdown-select),
+    :global(.control-field .dropdown-select-trigger) {
       width: 100%;
     }
   }

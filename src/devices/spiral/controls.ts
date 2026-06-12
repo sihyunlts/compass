@@ -3,8 +3,8 @@ import {
   createDefaultNumericValueResolver,
   createMergeKeyResolver,
   createNumericParamSetter,
-  readDatasetParam,
-  resolveNumericDatasetParam,
+  readControlParam,
+  resolveNumericControlParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 import { SPIRAL_NUMERIC_PARAM_KEYS } from './schema';
@@ -19,29 +19,29 @@ const isSpiralDevice = (
 export const spiralDeviceControls = {
   descriptors: {
     'set-spiral-param': {
-      resolveMergeKey: createMergeKeyResolver('set-spiral-param', resolveNumericDatasetParam),
+      resolveMergeKey: createMergeKeyResolver('set-spiral-param', resolveNumericControlParam),
       resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readDatasetParam(input, SPIRAL_NUMERIC_PARAM_KEYS),
+        (input) => readControlParam(input, SPIRAL_NUMERIC_PARAM_KEYS),
       ),
     },
     'set-center-picker-param': {
-      resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericDatasetParam),
+      resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericControlParam),
       resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readDatasetParam(input, SPIRAL_CENTER_PICKER_PARAM_KEYS),
+        (input) => readControlParam(input, SPIRAL_CENTER_PICKER_PARAM_KEYS),
       ),
     },
   },
   createHandlers: () => ({
     'set-spiral-param': createNumericParamSetter({
       isKind: isSpiralDevice,
-      readParam: (input) => readDatasetParam(input, SPIRAL_NUMERIC_PARAM_KEYS),
+      readParam: (input) => readControlParam(input, SPIRAL_NUMERIC_PARAM_KEYS),
       assign: (device, param, value) => {
         device.params[param] = value;
       },
     }),
     'set-center-picker-param': createNumericParamSetter({
       isKind: isSpiralDevice,
-      readParam: (input) => readDatasetParam(input, SPIRAL_CENTER_PICKER_PARAM_KEYS),
+      readParam: (input) => readControlParam(input, SPIRAL_CENTER_PICKER_PARAM_KEYS),
       assign: (device, param, value) => {
         device.params[param] = value;
       },

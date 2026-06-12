@@ -3,8 +3,8 @@ import {
   createDefaultNumericValueResolver,
   createMergeKeyResolver,
   createNumericParamSetter,
-  readDatasetParam,
-  resolveNumericDatasetParam,
+  readControlParam,
+  resolveNumericControlParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 import { normalizePositiveScaleFactor } from './schema';
@@ -20,29 +20,29 @@ const isScaleDevice = (
 export const scaleDeviceControls = {
   descriptors: {
     'set-scale-param': {
-      resolveMergeKey: createMergeKeyResolver('set-scale-param', resolveNumericDatasetParam),
+      resolveMergeKey: createMergeKeyResolver('set-scale-param', resolveNumericControlParam),
       resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readDatasetParam(input, SCALE_FACTOR_PARAM_KEYS),
+        (input) => readControlParam(input, SCALE_FACTOR_PARAM_KEYS),
       ),
     },
     'set-center-picker-param': {
-      resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericDatasetParam),
+      resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericControlParam),
       resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readDatasetParam(input, SCALE_CENTER_PICKER_PARAM_KEYS),
+        (input) => readControlParam(input, SCALE_CENTER_PICKER_PARAM_KEYS),
       ),
     },
   },
   createHandlers: () => ({
     'set-scale-param': createNumericParamSetter({
       isKind: isScaleDevice,
-      readParam: (input) => readDatasetParam(input, SCALE_FACTOR_PARAM_KEYS),
+      readParam: (input) => readControlParam(input, SCALE_FACTOR_PARAM_KEYS),
       assign: (device, param, value) => {
         device.params[param] = normalizePositiveScaleFactor(value, device.params[param]);
       },
     }),
     'set-center-picker-param': createNumericParamSetter({
       isKind: isScaleDevice,
-      readParam: (input) => readDatasetParam(input, SCALE_CENTER_PICKER_PARAM_KEYS),
+      readParam: (input) => readControlParam(input, SCALE_CENTER_PICKER_PARAM_KEYS),
       assign: (device, param, value) => {
         device.params[param] = value;
       },

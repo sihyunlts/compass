@@ -10,7 +10,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'waterdrop' }>;
   };
 
-  let { device }: WaterdropDeviceEditorProps = $props();
+  let { device, onControlChange }: WaterdropDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -18,6 +18,7 @@
     deviceId={device.id}
     centerX={device.params.centerX}
     centerY={device.params.centerY}
+    {onControlChange}
   />
   <NumberField
     label="Curvature"
@@ -26,5 +27,6 @@
     dataAction="set-waterdrop-param"
     dataId={device.id}
     dataParam="curvature"
+    {onControlChange}
   />
 </div>

@@ -3,8 +3,9 @@
 <script lang="ts">
   /**
    * Interactive curve editor shared by modulation and time-warp device cards.
-   * Owns node editing, segment control editing, and hidden-input synchronization for form events.
+   * Owns node editing and segment control editing for shared curve controls.
    */
+  import type { RendererControlChange } from '../../../devices/control-types';
   import {
     buildCurveSegments,
     canSegmentCurveBendAffectShape,
@@ -51,27 +52,28 @@
     deviceId,
     curve,
     currentProgress01 = 0,
-    hiddenInputAction = 'set-modulation-curve-nodes',
+    controlAction = 'set-modulation-curve-nodes',
     sanitizeNodes,
     valueMin = -1,
     valueMax = 1,
     guideValue = 0,
     wrapperClass = '',
+    onControlChange,
   } = $props<{
     label?: string;
     deviceId: string;
     curve: EditableCurve;
     currentProgress01?: number;
-    hiddenInputAction?: string;
+    controlAction?: string;
     sanitizeNodes: (rawNodes: unknown) => CurveNode[];
     valueMin?: number;
     valueMax?: number;
     guideValue?: number | null;
     wrapperClass?: string;
+    onControlChange: (change: RendererControlChange) => void;
   }>();
 
   let editorEl = $state<HTMLDivElement | null>(null);
-  let hiddenInputEl = $state<HTMLInputElement | null>(null);
   let selectedNodeId = $state<string | null>(null);
   let dragTarget = $state<DragTarget>(null);
   let activePointerNodeId = $state<string | null>(null);
@@ -240,12 +242,12 @@
 
   const emitNodes = (nodes: CurveNode[]): void => {
     localNodes = sanitizeNodes(nodes);
-    if (!hiddenInputEl) {
-      return;
-    }
-
-    hiddenInputEl.value = JSON.stringify(localNodes);
-    hiddenInputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    onControlChange({
+      action: controlAction,
+      deviceId,
+      value: localNodes,
+      finalize: false,
+    });
   };
 
   const resolvePoint = (
@@ -548,7 +550,6 @@
         && (
           target.isContentEditable
           || target.tagName === 'INPUT'
-          || target.tagName === 'SELECT'
           || target.tagName === 'TEXTAREA'
         )
       ) {
@@ -615,13 +616,6 @@
     </div>
   </ControlSurfaceFrame>
 
-  <input
-    bind:this={hiddenInputEl}
-    type="hidden"
-    value={JSON.stringify(sortedNodes)}
-    data-action={hiddenInputAction}
-    data-id={deviceId}
-  />
 </div>
 {/snippet}
 

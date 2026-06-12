@@ -1,7 +1,4 @@
-import {
-  createMergeKeyResolver,
-  requireSelect,
-} from '../control-helpers';
+import { createMergeKeyResolver } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 
 export const maskDeviceControls = {
@@ -20,46 +17,43 @@ export const maskDeviceControls = {
     },
   },
   createHandlers: (context) => ({
-    'set-mask-mode': (device, target) => {
+    'set-mask-mode': (device, change) => {
       if (device.kind !== 'mask') {
         return false;
       }
 
-      const select = requireSelect(target);
-      if (!select) {
+      if (typeof change.value !== 'string') {
         return false;
       }
 
-      device.params.mode = select.value === 'exclude' ? 'exclude' : 'include';
+      device.params.mode = change.value === 'exclude' ? 'exclude' : 'include';
       return true;
     },
-    'set-mask-source-visibility': (device, target) => {
+    'set-mask-source-visibility': (device, change) => {
       if (device.kind !== 'mask') {
         return false;
       }
 
-      const select = requireSelect(target);
-      if (!select) {
+      if (typeof change.value !== 'string') {
         return false;
       }
 
-      device.params.sourceVisibility = select.value === 'show' ? 'show' : 'hide';
+      device.params.sourceVisibility = change.value === 'show' ? 'show' : 'hide';
       return true;
     },
-    'set-mask-source-kind': (device, target) => {
+    'set-mask-source-kind': (device, change) => {
       if (device.kind !== 'mask') {
         return false;
       }
 
-      const select = requireSelect(target);
-      if (!select) {
+      if (typeof change.value !== 'string') {
         return false;
       }
 
-      const nextKind = select.value === 'group'
-        || select.value === 'generator'
-        || select.value === 'tiles'
-        ? select.value
+      const nextKind = change.value === 'group'
+        || change.value === 'generator'
+        || change.value === 'tiles'
+        ? change.value
         : 'tiles';
       device.params.sourceKind = nextKind;
 
@@ -76,17 +70,16 @@ export const maskDeviceControls = {
       }
       return true;
     },
-    'set-mask-source-id': (device, target) => {
+    'set-mask-source-id': (device, change) => {
       if (device.kind !== 'mask') {
         return false;
       }
 
-      const select = requireSelect(target);
-      if (!select) {
+      if (typeof change.value !== 'string') {
         return false;
       }
 
-      const rawId = select.value.trim();
+      const rawId = change.value.trim();
       if (!rawId) {
         device.params.sourceId = null;
         return true;

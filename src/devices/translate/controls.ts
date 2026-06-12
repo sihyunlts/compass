@@ -3,8 +3,8 @@ import {
   createDefaultNumericValueResolver,
   createMergeKeyResolver,
   createNumericParamSetter,
-  readDatasetParam,
-  resolveNumericDatasetParam,
+  readControlParam,
+  resolveNumericControlParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 import { TRANSLATE_NUMERIC_PARAM_KEYS } from './schema';
@@ -17,16 +17,16 @@ const isTranslateDevice = (
 export const translateDeviceControls = {
   descriptors: {
     'set-translate-param': {
-      resolveMergeKey: createMergeKeyResolver('set-translate-param', resolveNumericDatasetParam),
+      resolveMergeKey: createMergeKeyResolver('set-translate-param', resolveNumericControlParam),
       resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readDatasetParam(input, TRANSLATE_NUMERIC_PARAM_KEYS),
+        (input) => readControlParam(input, TRANSLATE_NUMERIC_PARAM_KEYS),
       ),
     },
   },
   createHandlers: () => ({
     'set-translate-param': createNumericParamSetter({
       isKind: isTranslateDevice,
-      readParam: (input) => readDatasetParam(input, TRANSLATE_NUMERIC_PARAM_KEYS),
+      readParam: (input) => readControlParam(input, TRANSLATE_NUMERIC_PARAM_KEYS),
       assign: (device, param, value) => {
         device.params[param] = value;
       },

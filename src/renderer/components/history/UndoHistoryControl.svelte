@@ -3,7 +3,7 @@
 <script lang="ts">
   import type { EditorHistoryListEntry } from '../../features/editor/editor-history';
   import SplitButton from '../primitives/SplitButton.svelte';
-  import UndoHistoryPopover from './UndoHistoryPopover.svelte';
+  import UndoHistoryDropdown from './UndoHistoryDropdown.svelte';
 
   let {
     canUndo,
@@ -59,7 +59,7 @@
     }}
   />
 
-  <UndoHistoryPopover
+  <UndoHistoryDropdown
     open={isOpen}
     anchorEl={rootEl}
     triggerEl={triggerEl}

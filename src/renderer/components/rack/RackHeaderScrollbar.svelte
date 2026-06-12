@@ -114,7 +114,7 @@
     root.removeAttribute('id');
     root.querySelectorAll<HTMLElement>('[id]').forEach((node) => node.removeAttribute('id'));
     root.querySelectorAll<HTMLElement>('.drop-indicator').forEach((node) => node.remove());
-    root.querySelectorAll<HTMLElement>('input, select, textarea, button').forEach((node) => {
+    root.querySelectorAll<HTMLElement>('input, textarea, button').forEach((node) => {
       node.setAttribute('tabindex', '-1');
     });
   };

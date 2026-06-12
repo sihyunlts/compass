@@ -42,33 +42,7 @@
   let target = $state<ContextMenuTarget | null>(null);
   let menuEl = $state<HTMLElement | null>(null);
   let openToken = 0;
-  const cloneContextMenuTarget = (nextTarget: ContextMenuTarget): ContextMenuTarget => {
-    switch (nextTarget.kind) {
-      case 'devices':
-        return {
-          kind: 'devices',
-          deviceIds: [...nextTarget.deviceIds],
-          canGroup: nextTarget.canGroup,
-        };
-      case 'group':
-        return {
-          kind: 'group',
-          groupId: nextTarget.groupId,
-          memberDeviceIds: [...nextTarget.memberDeviceIds],
-        };
-      case 'preset-entry':
-        return {
-          kind: 'preset-entry',
-          presetType: nextTarget.presetType,
-          relativePath: [...nextTarget.relativePath],
-          entryKind: nextTarget.entryKind,
-        };
-      case 'presets-root':
-        return {
-          kind: 'presets-root',
-        };
-    }
-  };
+
   const isPresetBrowserTarget = $derived.by(() =>
     target?.kind === 'preset-entry' || target?.kind === 'presets-root');
   const isDeletablePresetTarget = $derived.by(() =>
@@ -114,7 +88,7 @@
       return;
     }
 
-    target = cloneContextMenuTarget(nextTarget);
+    target = structuredClone(nextTarget);
     isPositioned = false;
     isOpen = true;
     const token = ++openToken;
@@ -218,15 +192,28 @@
     attachFloatingLayerDismissHandlers({
       isActive: () => isOpen,
       containsEventTarget: (eventTarget) => isEventTargetWithinFloatingLayer(eventTarget, menuEl),
-      onPointerDownOutside: () => close(),
-      onResize: () => close(),
+      onPointerDownOutside: close,
+      onResize: close,
+      onDismissRequest: close,
     }));
 </script>
+
+{#snippet menuItem(id: string, label: string, handler: () => void)}
+<button
+  {id}
+  class="context-menu-item floating-menu-item"
+  type="button"
+  role="menuitem"
+  onclick={handler}
+>
+  {label}
+</button>
+{/snippet}
 
 <div
   bind:this={menuEl}
   id="context-menu"
-  class="context-menu"
+  class="context-menu floating-menu-surface"
   class:is-open={isOpen && isPositioned}
   role="menu"
   aria-hidden={!isOpen}
@@ -236,115 +223,35 @@
   {#if target}
     {#if isPresetBrowserTarget}
       {#if canCreatePresetFolder}
-        <button
-          id="context-new-folder"
-          class="context-menu-item"
-          type="button"
-          role="menuitem"
-          onclick={handleCreatePresetFolderClick}
-        >
-          New Folder
-        </button>
+        {@render menuItem('context-new-folder', 'New Folder', handleCreatePresetFolderClick)}
       {/if}
       {#if canRenameTarget}
-        <button
-          id="context-rename"
-          class="context-menu-item"
-          type="button"
-          role="menuitem"
-          onclick={handleRenameClick}
-        >
-          Rename
-        </button>
+        {@render menuItem('context-rename', 'Rename', handleRenameClick)}
       {/if}
       {#if isDeletablePresetTarget}
         {#if canCreatePresetFolder || canRenameTarget}
-          <hr class="context-menu-separator" />
+          <hr class="context-menu-separator floating-menu-separator" />
         {/if}
-        <button
-          id="context-delete"
-          class="context-menu-item"
-          type="button"
-          role="menuitem"
-          onclick={handleDeleteClick}
-        >
-          Delete
-        </button>
-        <hr class="context-menu-separator" />
+        {@render menuItem('context-delete', 'Delete', handleDeleteClick)}
+        <hr class="context-menu-separator floating-menu-separator" />
       {/if}
-      <button
-        id="context-show-in-folder"
-        class="context-menu-item"
-        type="button"
-        role="menuitem"
-        onclick={handleShowInFolderClick}
-      >
-        Show in Folder
-      </button>
+      {@render menuItem('context-show-in-folder', 'Show in Folder', handleShowInFolderClick)}
     {:else}
       {#each visibleClipboardActions as action (action.id)}
-        <button
-          id={action.id}
-          class="context-menu-item"
-          type="button"
-          role="menuitem"
-          onclick={() => handleClipboardAction(action.kind)}
-        >
-          {action.label}
-        </button>
+        {@render menuItem(action.id, action.label, () => handleClipboardAction(action.kind))}
       {/each}
       {#if canRenameTarget}
-        <button
-          id="context-rename"
-          class="context-menu-item"
-          type="button"
-          role="menuitem"
-          onclick={handleRenameClick}
-        >
-          Rename
-        </button>
+        {@render menuItem('context-rename', 'Rename', handleRenameClick)}
       {/if}
-      <hr class="context-menu-separator" />
+      <hr class="context-menu-separator floating-menu-separator" />
       {#if target.kind === 'devices'}
-        <button
-          id="context-delete"
-          class="context-menu-item"
-          type="button"
-          role="menuitem"
-          onclick={handleDeleteClick}
-        >
-          Delete
-        </button>
+        {@render menuItem('context-delete', 'Delete', handleDeleteClick)}
         {#if target.canGroup}
-          <button
-            id="context-group"
-            class="context-menu-item"
-            type="button"
-            role="menuitem"
-            onclick={handleGroupClick}
-          >
-            Group
-          </button>
+          {@render menuItem('context-group', 'Group', handleGroupClick)}
         {/if}
       {:else}
-        <button
-          id="context-delete"
-          class="context-menu-item"
-          type="button"
-          role="menuitem"
-          onclick={handleDeleteClick}
-        >
-          Delete
-        </button>
-        <button
-          id="context-ungroup"
-          class="context-menu-item"
-          type="button"
-          role="menuitem"
-          onclick={handleUngroupClick}
-        >
-          Ungroup
-        </button>
+        {@render menuItem('context-delete', 'Delete', handleDeleteClick)}
+        {@render menuItem('context-ungroup', 'Ungroup', handleUngroupClick)}
       {/if}
     {/if}
   {/if}
@@ -352,47 +259,11 @@
 
 <style lang="scss">
   .context-menu {
-    position: fixed;
-    left: 0;
-    top: 0;
-    z-index: 42;
-    display: inline-flex;
-    flex-direction: column;
-    align-items: stretch;
-    width: fit-content;
-    min-width: 120px;
-    max-width: calc(100vw - var(--gap-16));
-    padding: var(--gap-4);
-    border: 1px solid var(--neutral-30);
-    border-radius: var(--radius-8);
-    background: var(--neutral-10);
     transform: translate3d(-9999px, -9999px, 0);
     opacity: 0;
 
     &.is-open {
       opacity: 1;
-    }
-
-    &-item {
-      border: 0;
-      border-radius: var(--radius-4);
-      background: transparent;
-      color: var(--neutral-90);
-      text-align: start;
-      font-size: var(--text-13);
-      white-space: nowrap;
-      padding: var(--gap-6) var(--gap-8);
-      cursor: pointer;
-
-      &:hover {
-        background: var(--neutral-20);
-      }
-    }
-
-    &-separator {
-      margin: var(--gap-4) var(--gap-6);
-      border: 0;
-      border-top: 1px solid var(--neutral-30);
     }
   }
 </style>

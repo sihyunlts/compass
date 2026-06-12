@@ -2,7 +2,7 @@ import type { GeneratorDeviceNode } from '../../shared/model';
 import {
   createDefaultNumericValueResolver,
   createMergeKeyResolver,
-  resolveNumericDatasetParam,
+  resolveNumericControlParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 import {
@@ -18,7 +18,7 @@ const isTrimDevice = (
 export const trimDeviceControls = {
   descriptors: {
     'set-trim-param': {
-      resolveMergeKey: createMergeKeyResolver('set-trim-param', resolveNumericDatasetParam),
+      resolveMergeKey: createMergeKeyResolver('set-trim-param', resolveNumericControlParam),
       resolveDefaultValue: createDefaultNumericValueResolver(
         readTimeWindowParamKey,
       ),

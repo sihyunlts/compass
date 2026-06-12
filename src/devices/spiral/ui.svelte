@@ -10,7 +10,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'spiral' }>;
   };
 
-  let { device }: SpiralDeviceEditorProps = $props();
+  let { device, onControlChange }: SpiralDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -18,6 +18,7 @@
     deviceId={device.id}
     centerX={device.params.centerX}
     centerY={device.params.centerY}
+    {onControlChange}
   />
   <NumberField
     label="Turns"
@@ -28,5 +29,6 @@
     dataAction="set-spiral-param"
     dataId={device.id}
     dataParam="turns"
+    {onControlChange}
   />
 </div>

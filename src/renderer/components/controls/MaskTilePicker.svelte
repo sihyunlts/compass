@@ -44,8 +44,8 @@
   >
     <div
       class="mask-tile-grid"
-      data-action="mask-tile-grid"
-      data-id={deviceId}
+      data-mask-tile-grid="true"
+      data-device-id={deviceId}
     >
       {#each cells as cell (cell.key)}
         <button

@@ -49,7 +49,7 @@ const resolveCenterPickerSurface = (target: EventTarget | null): HTMLElement | n
     return null;
   }
 
-  return target.closest<HTMLElement>('.center-picker-surface[data-action="set-center-point"]');
+  return target.closest<HTMLElement>('.center-picker-surface[data-center-picker-surface="true"]');
 };
 
 const parsePickerBound = (value: string | undefined, fallback: number): number => {
@@ -221,7 +221,7 @@ export class CenterPickerController {
     clientX: number,
     clientY: number,
   ): boolean {
-    const id = surface.dataset.id;
+    const id = surface.dataset.deviceId;
     if (!id) {
       return false;
     }
@@ -251,7 +251,7 @@ export class CenterPickerController {
   }
 
   private resetToMidpoint(surface: HTMLElement): boolean {
-    const id = surface.dataset.id;
+    const id = surface.dataset.deviceId;
     if (!id) {
       return false;
     }

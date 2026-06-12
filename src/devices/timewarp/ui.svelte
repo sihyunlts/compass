@@ -10,7 +10,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'timewarp' }>;
   };
 
-  let { device, currentProgress01 = 0 }: TimeWarpDeviceEditorProps = $props();
+  let { device, currentProgress01 = 0, onControlChange }: TimeWarpDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -18,13 +18,14 @@
     label="Curve"
     deviceId={device.id}
     curve={device.params.curve}
-    hiddenInputAction="set-timewarp-curve-nodes"
+    controlAction="set-timewarp-curve-nodes"
     sanitizeNodes={sanitizeTimeWarpCurveNodes}
     valueMin={0}
     valueMax={1}
     guideValue={null}
     wrapperClass="timewarp-curve-control"
     {currentProgress01}
+    {onControlChange}
   />
 </div>
 

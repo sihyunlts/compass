@@ -33,7 +33,8 @@
     min-height: 0;
 
     > :global(input),
-    > :global(select) {
+    > :global(.dropdown-select),
+    > :global(.dropdown-select .dropdown-select-trigger) {
       width: 6.6rem;
       height: 1.75rem;
     }

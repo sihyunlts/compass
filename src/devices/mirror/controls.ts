@@ -3,8 +3,8 @@ import {
   createDefaultNumericValueResolver,
   createMergeKeyResolver,
   createNumericParamSetter,
-  readDatasetParam,
-  resolveNumericDatasetParam,
+  readControlParam,
+  resolveNumericControlParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 import { MIRROR_NUMERIC_PARAM_KEYS } from './schema';
@@ -17,16 +17,16 @@ const isMirrorDevice = (
 export const mirrorDeviceControls = {
   descriptors: {
     'set-angle-param': {
-      resolveMergeKey: createMergeKeyResolver('set-angle-param', resolveNumericDatasetParam),
+      resolveMergeKey: createMergeKeyResolver('set-angle-param', resolveNumericControlParam),
       resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readDatasetParam(input, MIRROR_NUMERIC_PARAM_KEYS),
+        (input) => readControlParam(input, MIRROR_NUMERIC_PARAM_KEYS),
       ),
     },
   },
   createHandlers: () => ({
     'set-angle-param': createNumericParamSetter({
       isKind: isMirrorDevice,
-      readParam: (input) => readDatasetParam(input, MIRROR_NUMERIC_PARAM_KEYS),
+      readParam: (input) => readControlParam(input, MIRROR_NUMERIC_PARAM_KEYS),
       assign: (device, param, value) => {
         device.params[param] = value;
       },

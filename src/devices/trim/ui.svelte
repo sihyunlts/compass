@@ -9,7 +9,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'trim' }>;
   };
 
-  let { device, currentProgress01 }: TrimDeviceEditorProps = $props();
+  let { device, currentProgress01, onControlChange }: TrimDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -20,5 +20,6 @@
     end={device.params.end}
     mode="trim"
     {currentProgress01}
+    {onControlChange}
   />
 </div>

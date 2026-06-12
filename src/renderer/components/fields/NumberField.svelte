@@ -1,6 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import type { RendererControlChange } from '../../../devices/control-types';
   import FieldShell from '../fields/FieldShell.svelte';
 
   let {
@@ -17,6 +18,7 @@
     disabled = false,
     tabindex,
     class: className = '',
+    onControlChange,
   } = $props<{
     label: string;
     value: number;
@@ -31,7 +33,24 @@
     disabled?: boolean;
     tabindex?: number | string;
     class?: string;
+    onControlChange: (change: RendererControlChange) => void;
   }>();
+
+  const emitChange = (event: Event, finalize: boolean): void => {
+    const input = event.currentTarget;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+
+    onControlChange({
+      action: dataAction,
+      deviceId: dataId,
+      paramKey: dataParam,
+      value: input.value,
+      finalize,
+      step: Number(input.step),
+    });
+  };
 </script>
 
 <FieldShell {label} class={className}>
@@ -41,12 +60,14 @@
     {min}
     {max}
     {value}
-    data-action={dataAction}
-    data-id={dataId}
+    data-control-action={dataAction}
+    data-device-id={dataId}
     data-param={dataParam}
     aria-label={ariaLabel}
     {readonly}
     {disabled}
     {tabindex}
+    oninput={(event) => emitChange(event, false)}
+    onchange={(event) => emitChange(event, true)}
   />
 </FieldShell>

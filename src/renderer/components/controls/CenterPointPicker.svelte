@@ -1,6 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import type { RendererControlChange } from '../../../devices/control-types';
   import { clamp } from '../../../shared/math';
   import FieldShell from '../fields/FieldShell.svelte';
   import NumberField from '../fields/NumberField.svelte';
@@ -9,10 +10,12 @@
     deviceId,
     centerX,
     centerY,
+    onControlChange,
   } = $props<{
     deviceId: string;
     centerX: number;
     centerY: number;
+    onControlChange: (change: RendererControlChange) => void;
   }>();
 
   const MIN = 0;
@@ -40,8 +43,8 @@
   <div
     class="center-picker-surface"
     bind:clientHeight={surfaceHeight}
-    data-action="set-center-point"
-    data-id={deviceId}
+    data-center-picker-surface="true"
+    data-device-id={deviceId}
     data-min={MIN}
     data-max={MAX}
     data-step={STEP}
@@ -60,6 +63,7 @@
       dataAction="set-center-picker-param"
       dataId={deviceId}
       dataParam="centerX"
+      {onControlChange}
     />
     <NumberField
       label="Y"
@@ -70,6 +74,7 @@
       dataAction="set-center-picker-param"
       dataId={deviceId}
       dataParam="centerY"
+      {onControlChange}
     />
   </div>
 </FieldShell>

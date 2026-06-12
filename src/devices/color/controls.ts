@@ -1,8 +1,6 @@
 import {
   createMergeKeyResolver,
-  parseFiniteNumber,
-  requireButton,
-  requireInput,
+  parseFiniteControlNumber,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 import { DEFAULT_COLOR_PARAMS, sanitizeColorGapPercent } from './schema';
@@ -25,7 +23,7 @@ export const colorDeviceControls = {
     'set-color-slot': {
       resolveMergeKey: createMergeKeyResolver(
         'set-color-slot',
-        (control) => resolveColorSlotIndex(control.dataset.slotIndex)?.toString() ?? null,
+        (change) => change.paramKey ?? null,
       ),
     },
     'set-color-note-length-percent': {
@@ -51,18 +49,13 @@ export const colorDeviceControls = {
     },
   },
   createHandlers: () => ({
-    'set-color-slot': (device, target) => {
+    'set-color-slot': (device, change) => {
       if (device.kind !== 'color') {
         return false;
       }
 
-      const button = requireButton(target);
-      if (!button || button.disabled) {
-        return false;
-      }
-
-      const slotIndex = resolveColorSlotIndex(button.dataset.slotIndex);
-      const paletteIndex = resolveColorSlotIndex(button.dataset.paletteIndex);
+      const slotIndex = resolveColorSlotIndex(change.paramKey);
+      const paletteIndex = resolveColorSlotIndex(String(change.value));
       if (slotIndex === null || paletteIndex === null) {
         return false;
       }
@@ -76,17 +69,12 @@ export const colorDeviceControls = {
       device.params.velocities[slotIndex] = paletteIndex;
       return true;
     },
-    'set-color-note-length-percent': (device, target) => {
+    'set-color-note-length-percent': (device, change) => {
       if (device.kind !== 'color') {
         return false;
       }
 
-      const input = requireInput(target);
-      if (!input) {
-        return false;
-      }
-
-      const value = parseFiniteNumber(input.value);
+      const value = parseFiniteControlNumber(change.value);
       if (value === null) {
         return false;
       }
@@ -94,17 +82,12 @@ export const colorDeviceControls = {
       device.params.noteLengthPercent = Math.min(400, Math.max(1, value));
       return true;
     },
-    'set-color-gap-percent': (device, target) => {
+    'set-color-gap-percent': (device, change) => {
       if (device.kind !== 'color') {
         return false;
       }
 
-      const input = requireInput(target);
-      if (!input) {
-        return false;
-      }
-
-      const value = parseFiniteNumber(input.value);
+      const value = parseFiniteControlNumber(change.value);
       if (value === null) {
         return false;
       }
@@ -112,17 +95,12 @@ export const colorDeviceControls = {
       device.params.gapPercent = sanitizeColorGapPercent(value);
       return true;
     },
-    'set-color-slot-count': (device, target) => {
+    'set-color-slot-count': (device, change) => {
       if (device.kind !== 'color') {
         return false;
       }
 
-      const input = requireInput(target);
-      if (!input) {
-        return false;
-      }
-
-      const value = parseFiniteNumber(input.value);
+      const value = parseFiniteControlNumber(change.value);
       if (value === null) {
         return false;
       }

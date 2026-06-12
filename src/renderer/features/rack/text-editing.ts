@@ -14,7 +14,6 @@ export const isTextEditingElement = (element: Element | null): boolean => {
 
   if (
     element instanceof HTMLTextAreaElement
-    || element instanceof HTMLSelectElement
     || (element instanceof HTMLElement && element.isContentEditable)
   ) {
     return true;

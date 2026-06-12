@@ -4,13 +4,19 @@ import type {
   RendererModulationParamDefinition,
 } from './types';
 
-export type RendererControlTarget =
-  | HTMLButtonElement
-  | HTMLInputElement
-  | HTMLSelectElement;
+export interface RendererControlChange {
+  action: string;
+  deviceId: string;
+  paramKey?: string;
+  value: unknown;
+  finalize: boolean;
+  label?: string;
+  step?: number;
+}
+
 export type RendererControlHandler = (
   device: GeneratorDeviceNode,
-  target: RendererControlTarget,
+  change: RendererControlChange,
 ) => boolean;
 
 export interface RendererControlContext {
@@ -23,10 +29,10 @@ export interface RendererControlContext {
 }
 
 export interface RendererControlDescriptor {
-  resolveMergeKey: (control: RendererControlTarget) => string | null;
+  resolveMergeKey: (change: RendererControlChange) => string | null;
   resolveDefaultValue?: (
     defaultDevice: GeneratorDeviceNode,
-    input: HTMLInputElement,
+    change: RendererControlChange,
   ) => number | null;
 }
 

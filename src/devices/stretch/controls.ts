@@ -2,7 +2,7 @@ import type { GeneratorDeviceNode } from '../../shared/model';
 import {
   createDefaultNumericValueResolver,
   createMergeKeyResolver,
-  resolveNumericDatasetParam,
+  resolveNumericControlParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 import {
@@ -18,7 +18,7 @@ const isStretchDevice = (
 export const stretchDeviceControls = {
   descriptors: {
     'set-stretch-param': {
-      resolveMergeKey: createMergeKeyResolver('set-stretch-param', resolveNumericDatasetParam),
+      resolveMergeKey: createMergeKeyResolver('set-stretch-param', resolveNumericControlParam),
       resolveDefaultValue: createDefaultNumericValueResolver(
         readTimeWindowParamKey,
       ),

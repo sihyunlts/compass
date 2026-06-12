@@ -4,6 +4,7 @@
   /** Renders the shared device card shell and mounts the kind-specific editor body. */
   import { tick } from 'svelte';
   import type { GeneratorDeviceNode } from '../../../shared/model';
+  import type { RendererControlChange } from '../../../devices/control-types';
   import { getDeviceBrowserCategory } from '../../features/editor/device-browser-categories';
   import { getRendererDeviceDefinition } from '../../../devices';
 
@@ -28,6 +29,7 @@
     onRenameBlur,
     onRenameKeyDown,
     onSavePreset,
+    onControlChange,
     onHeaderPointerDown,
     onHeaderClick,
     onHeaderContextMenu,
@@ -53,6 +55,7 @@
     onRenameBlur?: (event: FocusEvent) => void;
     onRenameKeyDown?: (event: KeyboardEvent) => void;
     onSavePreset?: (deviceId: string) => void;
+    onControlChange: (change: RendererControlChange) => void;
     onHeaderPointerDown?: (event: PointerEvent) => void;
     onHeaderClick?: (event: MouseEvent) => void;
     onHeaderContextMenu?: (event: MouseEvent) => void;
@@ -91,6 +94,20 @@
     event.preventDefault();
     event.stopPropagation();
   };
+
+  const handleEnabledChange = (event: Event): void => {
+    const input = event.currentTarget;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+
+    onControlChange({
+      action: 'set-device-enabled',
+      deviceId: device.id,
+      value: input.checked,
+      finalize: true,
+    });
+  };
 </script>
 
 <div
@@ -121,8 +138,7 @@
           class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
-          data-action="set-device-enabled"
-          data-id={device.id}
+          onchange={handleEnabledChange}
         />
         <button
           class="preset-save-button"
@@ -167,6 +183,7 @@
     {currentProgress01}
     {modulationReadoutById}
     {resolvePaletteRgb}
+    {onControlChange}
   />
 </div>
 

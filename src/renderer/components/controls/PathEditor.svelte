@@ -1,6 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import type { RendererControlChange } from '../../../devices/control-types';
   import type { PathPoint } from '../../../shared/model';
   import ControlSurfaceFrame from './ControlSurfaceFrame.svelte';
   import FieldShell from '../fields/FieldShell.svelte';
@@ -15,13 +16,14 @@
   let {
     deviceId,
     points = [] as PathPoint[],
+    onControlChange,
   } = $props<{
     deviceId: string;
     points: PathPoint[];
+    onControlChange: (change: RendererControlChange) => void;
   }>();
 
   let editorEl = $state<HTMLDivElement | null>(null);
-  let hiddenInputEl = $state<HTMLInputElement | null>(null);
   let localPoints = $state<PathPoint[]>(sanitizePathPoints([]));
   let selectedPointIndex = $state(0);
   let draggingPointIndex = $state<number | null>(null);
@@ -76,12 +78,12 @@
 
   const emitPoints = (nextPoints: readonly PathPoint[]): void => {
     localPoints = sanitizeLocalPoints(nextPoints);
-    if (!hiddenInputEl) {
-      return;
-    }
-
-    hiddenInputEl.value = JSON.stringify(localPoints);
-    hiddenInputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    onControlChange({
+      action: 'set-path-points',
+      deviceId,
+      value: localPoints,
+      finalize: false,
+    });
   };
 
   const resolveEditorPoint = (
@@ -328,13 +330,6 @@
     </div>
   </FieldShell>
 
-  <input
-    bind:this={hiddenInputEl}
-    type="hidden"
-    value={JSON.stringify(localPoints)}
-    data-action="set-path-points"
-    data-id={deviceId}
-  />
 </div>
 
 <style lang="scss">

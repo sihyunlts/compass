@@ -1,14 +1,10 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  import FieldShell from '../fields/FieldShell.svelte';
-
-  type SelectFieldValue = string | number;
-  type SelectFieldOption = {
-    value: SelectFieldValue;
-    label: string;
-    disabled?: boolean;
-  };
+  import type { RendererControlChange } from '../../../devices/control-types';
+  import type { DropdownOption, DropdownValue } from '../primitives/dropdown-types';
+  import DropdownSelect from '../primitives/DropdownSelect.svelte';
+  import FieldShell from './FieldShell.svelte';
 
   let {
     label,
@@ -18,30 +14,34 @@
     dataId,
     disabled = false,
     class: className = '',
+    onControlChange,
   } = $props<{
     label: string;
-    value: SelectFieldValue;
-    options: readonly SelectFieldOption[];
+    value: DropdownValue;
+    options: readonly DropdownOption[];
     dataAction: string;
     dataId: string;
     disabled?: boolean;
     class?: string;
+    onControlChange: (change: RendererControlChange) => void;
   }>();
 
-  const isSelected = (optionValue: SelectFieldValue): boolean =>
-    String(optionValue) === String(value);
+  const handleValueChange = (nextValue: DropdownValue): void => {
+    onControlChange({
+      action: dataAction,
+      deviceId: dataId,
+      value: nextValue,
+      finalize: true,
+    });
+  };
 </script>
 
 <FieldShell {label} class={className}>
-  <select data-action={dataAction} data-id={dataId} {disabled}>
-    {#each options as option (option.value)}
-      <option
-        value={option.value}
-        selected={isSelected(option.value)}
-        disabled={option.disabled}
-      >
-        {option.label}
-      </option>
-    {/each}
-  </select>
+  <DropdownSelect
+    {value}
+    {options}
+    ariaLabel={label}
+    {disabled}
+    onValueChange={handleValueChange}
+  />
 </FieldShell>
