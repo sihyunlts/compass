@@ -147,6 +147,12 @@ export const registerIpcHandlers = (
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.renameRackFile,
+    (_event, request) =>
+      presetService.renameRackFile(request),
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.createPresetFolder,
     (_event, request) =>
       presetService.createPresetFolder(request),

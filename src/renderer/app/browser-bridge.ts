@@ -297,6 +297,55 @@ export const createBrowserCompassBridge = (): CompassApi => ({
       filePath: request.filePath,
     };
   },
+  renameRackFile: async (request) => {
+    const parsed = parseVirtualPresetPath(request.filePath);
+    if (!parsed || parsed.presetType !== 'rack') {
+      return {
+        status: 'error',
+        message: 'Browser rack renames require a browser preset path.',
+        filePath: request.filePath,
+      };
+    }
+
+    const fileName = ensurePresetExtension(
+      sanitizeFileStem(
+        request.fileName,
+        getFileStem(parsed.relativePath[parsed.relativePath.length - 1] ?? 'Rack', 'rack'),
+      ),
+      'rack',
+    );
+    const nextRelativePath = [...parsed.relativePath.slice(0, -1), fileName];
+    const store = readStore();
+    const fileIndex = store.files.findIndex((file) =>
+      file.presetType === 'rack' && relativePathEquals(file.relativePath, parsed.relativePath));
+    if (fileIndex === -1) {
+      return { status: 'error', message: 'Rack file does not exist.', filePath: request.filePath };
+    }
+    if (relativePathEquals(parsed.relativePath, nextRelativePath)) {
+      return { status: 'renamed', filePath: request.filePath };
+    }
+    if (
+      store.files.some((file) =>
+        file.presetType === 'rack' && relativePathEquals(file.relativePath, nextRelativePath))
+      || store.folders.rack.some((path) => relativePathEquals(path, nextRelativePath))
+    ) {
+      return {
+        status: 'error',
+        message: 'An item or folder with that name already exists.',
+        filePath: request.filePath,
+      };
+    }
+
+    store.files[fileIndex] = {
+      ...store.files[fileIndex],
+      relativePath: nextRelativePath,
+    };
+    writeStore(store);
+    return {
+      status: 'renamed',
+      filePath: toVirtualPresetPath('rack', nextRelativePath),
+    };
+  },
   createPresetFolder: async (request) => {
     const folderName = normalizePathSegment(request.folderName);
     if (!isValidPathSegment(folderName)) {

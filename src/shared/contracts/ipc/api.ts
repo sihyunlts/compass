@@ -8,6 +8,8 @@ import type {
   ListPresetBrowserTreeResponse,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
+  RenameRackFileRequest,
+  RenameRackFileResponse,
   RenamePresetFolderRequest,
   RenamePresetFolderResponse,
   SaveRackFileRequest,
@@ -66,6 +68,9 @@ export interface CompassApi {
   saveRackFile: (
     request: SaveRackFileRequest,
   ) => Promise<SaveRackFileResponse>;
+  renameRackFile: (
+    request: RenameRackFileRequest,
+  ) => Promise<RenameRackFileResponse>;
   createPresetFolder: (
     request: CreatePresetFolderRequest,
   ) => Promise<CreatePresetFolderResponse>;

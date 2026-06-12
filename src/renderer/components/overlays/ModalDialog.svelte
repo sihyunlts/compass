@@ -8,10 +8,11 @@
 </script>
 
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { tick } from 'svelte';
   import Button from '../primitives/Button.svelte';
 
-  const ACTION_BUTTON_SELECTOR = 'button:not([disabled])';
+  const FOCUSABLE_SELECTOR = 'input:not([disabled]), button:not([disabled])';
 
   let {
     open = false,
@@ -24,6 +25,7 @@
     onConfirm = () => {},
     onSecondary = () => {},
     onCancel = () => {},
+    children,
   } = $props<{
     open?: boolean;
     title: string;
@@ -35,6 +37,7 @@
     onConfirm?: () => void | Promise<void>;
     onSecondary?: () => void | Promise<void>;
     onCancel?: () => void | Promise<void>;
+    children?: Snippet;
   }>();
 
   let dialogEl = $state<HTMLDivElement | null>(null);
@@ -49,7 +52,7 @@
       return [];
     }
 
-    return [...dialogEl.querySelectorAll<HTMLElement>(ACTION_BUTTON_SELECTOR)];
+    return [...dialogEl.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)];
   };
 
   const focusInitialAction = async (): Promise<void> => {
@@ -205,6 +208,12 @@
         <p id={descriptionId} class="modal-dialog-description">{description}</p>
       {/if}
 
+      {#if children}
+        <div class="modal-dialog-body">
+          {@render children()}
+        </div>
+      {/if}
+
       <footer class="modal-dialog-actions">
         <Button
           class="modal-dialog-action-button"
@@ -259,6 +268,10 @@
       margin: 0 0 var(--gap-16);
       color: var(--neutral-50);
       font-size: var(--text-13);
+    }
+
+    &-body {
+      margin-bottom: var(--gap-16);
     }
 
     &-actions {

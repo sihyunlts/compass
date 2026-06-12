@@ -43,6 +43,22 @@ export type SaveRackFileResponse =
       filePath?: string;
     };
 
+export interface RenameRackFileRequest {
+  filePath: string;
+  fileName: string;
+}
+
+export type RenameRackFileResponse =
+  | {
+      status: 'renamed';
+      filePath: string;
+    }
+  | {
+      status: 'error';
+      message: string;
+      filePath?: string;
+    };
+
 export interface CreatePresetFolderRequest<K extends PresetFileKind = PresetFileKind> {
   presetType: K;
   relativePath: string[];

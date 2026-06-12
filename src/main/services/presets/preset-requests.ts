@@ -1,6 +1,7 @@
 import type {
   CreatePresetFolderRequest,
   ReadPresetEntryRequest,
+  RenameRackFileRequest,
   RenamePresetFolderRequest,
   SaveRackFileRequest,
   SavePresetFileRequest,
@@ -54,6 +55,24 @@ export const parseSaveRackFileRequest = (
   return {
     filePath: (value as { filePath: string }).filePath,
     payload: payload.preset,
+  };
+};
+
+export const parseRenameRackFileRequest = (
+  value: unknown,
+): RenameRackFileRequest | null => {
+  if (
+    typeof value !== 'object'
+    || value === null
+    || typeof (value as { filePath?: unknown }).filePath !== 'string'
+    || typeof (value as { fileName?: unknown }).fileName !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    filePath: (value as { filePath: string }).filePath,
+    fileName: (value as { fileName: string }).fileName,
   };
 };
 

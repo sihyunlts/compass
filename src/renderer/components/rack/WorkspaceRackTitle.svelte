@@ -15,6 +15,7 @@
     onNewRack,
     onSaveRack,
     onSaveRackAs,
+    onRenameRack,
   } = $props<{
     title: string;
     dirty?: boolean;
@@ -22,6 +23,7 @@
     onNewRack: () => void;
     onSaveRack: () => void;
     onSaveRackAs: () => void;
+    onRenameRack: () => void;
   }>();
 
   let rootEl = $state<HTMLDivElement | null>(null);
@@ -67,6 +69,7 @@
     text={displayTitle}
     title={titleText}
     label={titleLabel}
+    onClick={onRenameRack}
     menuId="rack-file-actions-trigger"
     menuDisabled={disabled}
     menuLabel="Rack actions"

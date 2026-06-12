@@ -11,6 +11,7 @@
   import { sanitizeSidebarWidth } from './features/editor/persistence-storage';
   import BrowserPanel from './components/browser/BrowserPanel.svelte';
   import type { ContextMenuTarget } from './components/overlays/context-menu-types';
+  import TextField from './components/fields/TextField.svelte';
   import Button from './components/primitives/Button.svelte';
   import DropdownSelect from './components/primitives/DropdownSelect.svelte';
   import SidebarResizer from './components/layout/SidebarResizer.svelte';
@@ -115,6 +116,9 @@
   });
   settingsController.attachPlaybackSession(playbackSession);
   const presetState = presetController.state;
+  let isRackRenameDialogOpen = $state(false);
+  let isRackRenamePending = $state(false);
+  let rackRenameDraft = $state('');
   const sendFlow = createSendFlow({
     bridgeClient,
     editorSession,
@@ -207,6 +211,44 @@
   const handleRedoClick = (): void => {
     closeContextMenu();
     editorSession.commands.redo();
+  };
+
+  const openRackRenameDialog = (): void => {
+    rackRenameDraft = presetState.currentRackDisplayName;
+    isRackRenameDialogOpen = true;
+  };
+
+  const closeRackRenameDialog = (): void => {
+    if (isRackRenamePending) {
+      return;
+    }
+
+    isRackRenameDialogOpen = false;
+  };
+
+  const confirmRackRenameDialog = async (): Promise<void> => {
+    if (isRackRenamePending) {
+      return;
+    }
+
+    isRackRenamePending = true;
+    try {
+      const renamed = await presetController.renameCurrentRack(rackRenameDraft);
+      if (renamed) {
+        isRackRenameDialogOpen = false;
+      }
+    } finally {
+      isRackRenamePending = false;
+    }
+  };
+
+  const handleRackRenameInputKeyDown = (event: KeyboardEvent): void => {
+    if (event.key !== 'Enter') {
+      return;
+    }
+
+    event.preventDefault();
+    void confirmRackRenameDialog();
   };
 
   const handlePreviewLengthChange = (nextValue: string | number): void => {
@@ -399,6 +441,7 @@
             onNewRack={() => presetController.handleNewRack()}
             onSaveRack={() => presetController.handleSaveRack()}
             onSaveRackAs={() => presetController.handleSaveRackAs()}
+            onRenameRack={openRackRenameDialog}
           />
 
           <span
@@ -512,6 +555,27 @@
     onUngroupGroup={editorSession.commands.ungroupGroup}
     clipboardAvailable={clipboardAvailable}
   />
+
+  <ModalDialog
+    open={isRackRenameDialogOpen}
+    title="Rename rack"
+    description="Set the rack file name."
+    confirmLabel="Rename"
+    cancelLabel="Cancel"
+    busy={isRackRenamePending}
+    onConfirm={confirmRackRenameDialog}
+    onCancel={closeRackRenameDialog}
+  >
+    <TextField
+      value={rackRenameDraft}
+      disabled={isRackRenamePending}
+      ariaLabel="Rack file name"
+      onValueChange={(value) => {
+        rackRenameDraft = value;
+      }}
+      onKeyDown={handleRackRenameInputKeyDown}
+    />
+  </ModalDialog>
 
   <ModalDialog
     open={presetState.pendingPresetDeleteTarget !== null}

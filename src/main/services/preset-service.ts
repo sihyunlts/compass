@@ -5,6 +5,7 @@ import type {
   DeletePresetEntryResponse,
   ListPresetBrowserTreeResponse,
   ReadPresetEntryResponse,
+  RenameRackFileResponse,
   RenamePresetFolderResponse,
   SaveRackFileResponse,
   SavePresetFileResponse,
@@ -23,6 +24,7 @@ import {
   parsePresetEntryRequest,
   parseReadPresetEntryRequest,
   parseSaveRackFileRequest,
+  parseRenameRackFileRequest,
   parseRenamePresetFolderRequest,
   parseSavePresetFileRequest,
 } from './presets/preset-requests';
@@ -111,6 +113,43 @@ export class PresetService {
       return {
         status: 'error',
         message: toErrorMessage(error, 'Failed to save rack file.'),
+        filePath: parsedRequest.filePath,
+      };
+    }
+  }
+
+  public async renameRackFile(
+    request: unknown,
+  ): Promise<RenameRackFileResponse> {
+    const parsedRequest = parseRenameRackFileRequest(request);
+    if (!parsedRequest) {
+      return {
+        status: 'error',
+        message: 'Invalid rack rename request.',
+      };
+    }
+
+    if (!hasPresetExtension(parsedRequest.filePath, PRESET_FILE_SPECS.rack.extension)) {
+      return {
+        status: 'error',
+        message: 'Unsupported rack file extension.',
+        filePath: parsedRequest.filePath,
+      };
+    }
+
+    try {
+      return {
+        status: 'renamed',
+        filePath: await this.storage.renamePresetFile(
+          parsedRequest.filePath,
+          parsedRequest.fileName,
+          PRESET_FILE_SPECS.rack.extension,
+        ),
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to rename rack file.'),
         filePath: parsedRequest.filePath,
       };
     }

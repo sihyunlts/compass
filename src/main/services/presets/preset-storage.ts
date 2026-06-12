@@ -14,6 +14,8 @@ import {
   isValidPresetPathSegment,
   normalizePresetPathSegment,
   resolvePresetPath,
+  ensurePresetExtension,
+  sanitizeFileStem,
 } from './preset-paths';
 
 const serializePresetFile = (payload: PresetFile): unknown => {
@@ -68,6 +70,49 @@ export class PresetStorage {
   public async writePresetFile(filePath: string, payload: PresetFile): Promise<void> {
     await mkdir(path.dirname(filePath), { recursive: true });
     await writeFile(filePath, `${JSON.stringify(serializePresetFile(payload), null, 2)}\n`, 'utf8');
+  }
+
+  public async renamePresetFile(
+    filePath: string,
+    fileName: string,
+    extension: string,
+  ): Promise<string> {
+    const nextFileName = ensurePresetExtension(
+      sanitizeFileStem(fileName, path.parse(filePath).name),
+      extension,
+    );
+    const targetPath = path.join(path.dirname(filePath), nextFileName);
+    if (path.resolve(filePath) === path.resolve(targetPath)) {
+      return targetPath;
+    }
+
+    try {
+      await access(targetPath);
+      throw new Error('An item or folder with that name already exists.');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        if (error instanceof Error && error.message === 'An item or folder with that name already exists.') {
+          throw error;
+        }
+        throw error;
+      }
+    }
+
+    try {
+      await rename(filePath, targetPath);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'EEXIST') {
+        throw new Error('An item or folder with that name already exists.', { cause: error });
+      }
+      if (code === 'ENOENT' || code === 'ENOTDIR') {
+        throw new Error('File does not exist.', { cause: error });
+      }
+
+      throw error;
+    }
+
+    return targetPath;
   }
 
   public async createPresetFolder(

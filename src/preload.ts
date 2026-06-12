@@ -10,6 +10,8 @@ import type {
   ListPresetBrowserTreeResponse,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
+  RenameRackFileRequest,
+  RenameRackFileResponse,
   RenamePresetFolderRequest,
   RenamePresetFolderResponse,
   ShowPresetEntryInFolderRequest,
@@ -125,6 +127,8 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.savePresetFile, request),
   saveRackFile: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.saveRackFile, request),
+  renameRackFile: (request: RenameRackFileRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.renameRackFile, request) as Promise<RenameRackFileResponse>,
   createPresetFolder: (request: CreatePresetFolderRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.createPresetFolder, request) as Promise<CreatePresetFolderResponse>,
   renamePresetFolder: (request: RenamePresetFolderRequest) =>

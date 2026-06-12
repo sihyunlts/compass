@@ -160,6 +160,8 @@ class PresetController {
 
   private cleanCollapsedDeviceIdsKey = '';
 
+  private cleanRackDisplayName = DEFAULT_RACK_FILE_DISPLAY_NAME;
+
   private lastMainWindowDocumentEdited: boolean | null = null;
 
   private lastMainWindowDocumentFilePath: string | null | undefined;
@@ -172,7 +174,8 @@ class PresetController {
     const editorState = this.options.editorSession.state;
     this.state.isRackDirty =
       editorState.chainRevision !== this.cleanRackRevision
-      || toCollapsedDeviceIdsKey(editorState.collapsedDeviceIds) !== this.cleanCollapsedDeviceIdsKey;
+      || toCollapsedDeviceIdsKey(editorState.collapsedDeviceIds) !== this.cleanCollapsedDeviceIdsKey
+      || this.state.currentRackDisplayName !== this.cleanRackDisplayName;
   }
 
   public syncMainWindowDocumentState(): void {
@@ -208,10 +211,41 @@ class PresetController {
     }, 'New rack failed.');
   }
 
+  public async renameCurrentRack(rawName: string): Promise<boolean> {
+    const nextName = resolveRackDisplayNameFromFileName(rawName);
+    if (nextName === this.state.currentRackDisplayName) {
+      return true;
+    }
+
+    const filePath = this.state.currentRackFilePath;
+    if (!filePath) {
+      this.state.currentRackDisplayName = nextName;
+      this.syncRackDirtyState();
+      return true;
+    }
+
+    const response = await this.options.bridgeClient.renameRackFile({
+      filePath,
+      fileName: nextName,
+    });
+    if (response.status === 'error') {
+      this.showMessage(`Rack rename failed | ${response.message}`);
+      return false;
+    }
+
+    this.setCurrentRackFile(response.filePath, resolveRackDisplayNameFromPath(response.filePath));
+    this.cleanRackDisplayName = this.state.currentRackDisplayName;
+    this.syncRackDirtyState();
+    await this.loadTree();
+    this.showMessage('Rack renamed.');
+    return true;
+  }
+
   private markCurrentRackClean(): void {
     const editorState = this.options.editorSession.state;
     this.cleanRackRevision = editorState.chainRevision;
     this.cleanCollapsedDeviceIdsKey = toCollapsedDeviceIdsKey(editorState.collapsedDeviceIds);
+    this.cleanRackDisplayName = this.state.currentRackDisplayName;
     this.state.isRackDirty = false;
   }
 
