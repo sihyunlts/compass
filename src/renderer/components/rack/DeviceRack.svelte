@@ -396,10 +396,11 @@
         {/if}
       </div>
     {/each}
+  </div>
+  <div class="drop-indicator-layer" aria-hidden="true">
     <div
       bind:this={dropIndicatorEl}
       class="drop-indicator"
-      aria-hidden="true"
       hidden
     ></div>
   </div>
@@ -428,6 +429,9 @@
 
 <style lang="scss">
   .device-rack {
+    --drop-indicator-edge-room: calc(var(--gap-4) + 1px);
+
+    position: relative;
     flex: 1 1 auto;
     min-width: 0;
     height: 100%;
@@ -519,6 +523,17 @@
     height: 100%;
   }
 
+  .drop-indicator-layer {
+    position: absolute;
+    top: var(--gap-10);
+    right: calc(var(--gap-10) - var(--drop-indicator-edge-room));
+    bottom: var(--gap-10);
+    left: calc(var(--gap-10) - var(--drop-indicator-edge-room));
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 50;
+  }
+
   .drop-indicator {
     position: absolute;
     top: 6px;
@@ -527,8 +542,6 @@
     transform: translateX(-1px);
     background: var(--accent-500);
     border-radius: 1px;
-    pointer-events: none;
-    z-index: 50;
   }
 
   .group-rail {

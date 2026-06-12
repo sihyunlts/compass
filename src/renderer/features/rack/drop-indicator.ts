@@ -2,12 +2,13 @@ import type { RackDropZone } from './drop-ops';
 
 type IndicatorLayout = {
   key: string;
-  leftInScrollSpace: number;
+  leftInIndicatorSpace: number;
 };
 
 const TOP_LEVEL_DROP_TARGET_SELECTOR = '.device-slot--solo, .device-group.is-rack';
 const GROUP_DROP_TARGET_SELECTOR = '.device-group.is-rack';
 const DEVICE_CARD_SELECTOR = '.device-card';
+const FALLBACK_EDGE_INDICATOR_GAP_PX = 4;
 
 export class RackDropIndicator {
   private readonly chainDevices: HTMLElement;
@@ -15,6 +16,8 @@ export class RackDropIndicator {
   private readonly indicator: HTMLElement;
 
   private lastIndicatorKey: string | null = null;
+
+  private lastIndicatorLeft: number | null = null;
 
   public constructor(options: {
     chainDevices: HTMLElement;
@@ -39,17 +42,23 @@ export class RackDropIndicator {
       return;
     }
 
-    if (layout.key === this.lastIndicatorKey) {
+    if (
+      layout.key === this.lastIndicatorKey
+      && this.lastIndicatorLeft !== null
+      && Math.abs(layout.leftInIndicatorSpace - this.lastIndicatorLeft) < 0.5
+    ) {
       return;
     }
 
-    this.indicator.style.left = `${layout.leftInScrollSpace}px`;
+    this.indicator.style.left = `${layout.leftInIndicatorSpace}px`;
     this.indicator.hidden = false;
     this.lastIndicatorKey = layout.key;
+    this.lastIndicatorLeft = layout.leftInIndicatorSpace;
   }
 
   public clear(): void {
     this.lastIndicatorKey = null;
+    this.lastIndicatorLeft = null;
     this.indicator.hidden = true;
     this.indicator.style.removeProperty('left');
   }
@@ -82,12 +91,14 @@ export class RackDropIndicator {
       return this.chainDevices.getBoundingClientRect().left;
     }
 
+    const edgeGapPx = this.resolveEdgeIndicatorGapPx(items);
+
     if (insertionIndex <= 0) {
-      return items[0].getBoundingClientRect().left;
+      return items[0].getBoundingClientRect().left - edgeGapPx;
     }
 
     if (insertionIndex >= items.length) {
-      return items[items.length - 1].getBoundingClientRect().right;
+      return items[items.length - 1].getBoundingClientRect().right + edgeGapPx;
     }
 
     const prevRect = items[insertionIndex - 1].getBoundingClientRect();
@@ -95,9 +106,24 @@ export class RackDropIndicator {
     return (prevRect.right + nextRect.left) / 2;
   }
 
-  private toScrollSpaceLeft(clientX: number): number {
-    const containerRect = this.chainDevices.getBoundingClientRect();
-    return clientX - containerRect.left + this.chainDevices.scrollLeft;
+  private resolveEdgeIndicatorGapPx(items: readonly HTMLElement[]): number {
+    for (let index = 1; index < items.length; index += 1) {
+      const prevRect = items[index - 1].getBoundingClientRect();
+      const nextRect = items[index].getBoundingClientRect();
+      const gapPx = nextRect.left - prevRect.right;
+      if (gapPx > 0) {
+        return gapPx / 2;
+      }
+    }
+
+    return FALLBACK_EDGE_INDICATOR_GAP_PX;
+  }
+
+  private toIndicatorSpaceLeft(clientX: number): number {
+    const containerRect = this.indicator.parentElement instanceof HTMLElement
+      ? this.indicator.parentElement.getBoundingClientRect()
+      : this.chainDevices.getBoundingClientRect();
+    return clientX - containerRect.left;
   }
 
   private resolveOutsideIndicatorLayout(
@@ -126,7 +152,7 @@ export class RackDropIndicator {
 
     return {
       key: `outside|${insertionIndex}`,
-      leftInScrollSpace: this.toScrollSpaceLeft(
+      leftInIndicatorSpace: this.toIndicatorSpaceLeft(
         this.resolveInsertionClientX(topLevelItems, insertionIndex),
       ),
     };
@@ -155,7 +181,7 @@ export class RackDropIndicator {
 
     return {
       key: `inside|${dropZone.groupId}|${insertionIndex}`,
-      leftInScrollSpace: this.toScrollSpaceLeft(
+      leftInIndicatorSpace: this.toIndicatorSpaceLeft(
         this.resolveInsertionClientX(slots, insertionIndex),
       ),
     };
