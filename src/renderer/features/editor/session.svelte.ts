@@ -45,6 +45,7 @@ import {
   checkoutHistory as checkoutEditorHistory,
   initializeHistoryBridge,
   redoHistory,
+  resetChainHistory,
   saveChainWithHistory,
   syncHistoryState,
   undoHistory,
@@ -443,6 +444,17 @@ export class EditorSession {
     });
   }
 
+  private replaceChainAndResetHistory(
+    nextChain: GeneratorChain,
+    meta: ChainMutationMeta,
+  ): void {
+    resetChainHistory(this.state, this.history, nextChain, meta, {
+      bumpChainRevision: () => this.bumpChainRevision(),
+      persistChainState: () => this.persistChainState(),
+      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),
+    });
+  }
+
   private undo(): boolean {
     return undoHistory(this.state, this.history, {
       bumpChainRevision: () => this.bumpChainRevision(),
@@ -686,7 +698,7 @@ export class EditorSession {
     }
 
     this.rackBinding?.clearSelection();
-    this.applyChainMutation(result.chain, EDITOR_HISTORY_META.loadRackPreset);
+    this.replaceChainAndResetHistory(result.chain, EDITOR_HISTORY_META.loadRackPreset);
     replaceCollapsedDeviceIds(this.state, result.collapsedDeviceIds);
     return result;
   }

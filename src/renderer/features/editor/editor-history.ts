@@ -28,6 +28,7 @@ interface EditorHistorySnapshotEntry extends EditorHistoryEntryMeta {
 
 export interface EditorHistory {
   push(chain: GeneratorChain, meta: ChainMutationMeta): boolean;
+  reset(chain: GeneratorChain, meta: ChainMutationMeta): void;
   undo(): GeneratorChain | null;
   redo(): GeneratorChain | null;
   list(): EditorHistoryListEntry[];
@@ -64,6 +65,11 @@ class EditorHistoryImpl implements EditorHistory {
     const changed = this.chainHistory.push(chain, meta);
     this.syncMetadata();
     return changed;
+  }
+
+  public reset(chain: GeneratorChain, meta: ChainMutationMeta): void {
+    this.chainHistory.reset(chain, meta);
+    this.syncMetadata();
   }
 
   public undo(): GeneratorChain | null {

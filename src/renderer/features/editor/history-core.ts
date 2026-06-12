@@ -141,14 +141,9 @@ export class ChainHistory {
       ? (options.mergeIdleMs as number)
       : DEFAULT_MERGE_IDLE_MS;
 
-    const initial = toSnapshot(initialChain);
-    this.entries.push({
-      id: this.createEntryId(),
-      timestampMs: Date.now(),
+    this.addEntry(initialChain, {
       kind: 'control-edit',
       label: 'Initial state',
-      chain: initial.chain,
-      signature: initial.signature,
     });
   }
 
@@ -213,14 +208,7 @@ export class ChainHistory {
       this.entries.splice(this.cursor + 1);
     }
 
-    this.entries.push({
-      id: this.createEntryId(),
-      timestampMs: Date.now(),
-      kind: meta.kind,
-      label: meta.label,
-      chain: snapshot.chain,
-      signature: snapshot.signature,
-    });
+    this.addEntry(snapshot.chain, meta, snapshot.signature);
     this.cursor = this.entries.length - 1;
     this.trimToCapacity();
 
@@ -228,6 +216,13 @@ export class ChainHistory {
       this.stagePendingMerge(chain, mergeKey, meta);
     }
     return true;
+  }
+
+  public reset(chain: GeneratorChain, meta: ChainMutationMeta): void {
+    this.flushPendingMerge();
+    this.entries.splice(0);
+    this.cursor = 0;
+    this.addEntry(chain, meta);
   }
 
   public replaceCurrent(chain: GeneratorChain, label?: string): void {
@@ -297,6 +292,24 @@ export class ChainHistory {
     const id = this.nextId;
     this.nextId += 1;
     return `chain-history-${id}`;
+  }
+
+  private addEntry(
+    chain: GeneratorChain,
+    meta: ChainMutationMeta,
+    signature?: string,
+  ): void {
+    const snapshot = signature
+      ? { chain: cloneChainForIpc(chain), signature }
+      : toSnapshot(chain);
+    this.entries.push({
+      id: this.createEntryId(),
+      timestampMs: Date.now(),
+      kind: meta.kind,
+      label: meta.label,
+      chain: snapshot.chain,
+      signature: snapshot.signature,
+    });
   }
 
   private stagePendingMerge(

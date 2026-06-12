@@ -64,6 +64,25 @@ export const applyChainMutation = (
   options.scheduleAutoPreview(0);
 };
 
+export const resetChainHistory = (
+  state: EditorSessionState,
+  history: EditorHistory,
+  nextChain: GeneratorChain,
+  meta: ChainMutationMeta,
+  options: {
+    bumpChainRevision: () => void;
+    persistChainState: () => void;
+    scheduleAutoPreview: (delayMs?: number) => void;
+  },
+): void => {
+  state.chainState = sanitizeGeneratorChain(nextChain);
+  options.persistChainState();
+  options.bumpChainRevision();
+  history.reset(state.chainState, meta);
+  syncHistoryState(state, history);
+  options.scheduleAutoPreview(0);
+};
+
 const restoreChainFromHistory = (
   state: EditorSessionState,
   history: EditorHistory,
