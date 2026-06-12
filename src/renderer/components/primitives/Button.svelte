@@ -1,6 +1,8 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { hint } from '../overlays/hint';
+
   type ButtonVariant = 'secondary' | 'primary' | 'icon';
   type ButtonType = 'button' | 'submit' | 'reset';
 
@@ -46,7 +48,7 @@
   aria-label={ariaLabel}
   aria-pressed={pressed}
   {disabled}
-  {title}
+  use:hint={title}
   onclick={onClick}
 >
   {#if isIconButton}

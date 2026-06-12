@@ -7,6 +7,7 @@
   import type { RendererControlChange } from '../../../devices/control-types';
   import { getDeviceBrowserCategory } from '../../features/editor/device-browser-categories';
   import { getRendererDeviceDefinition } from '../../../devices';
+  import { hint } from '../overlays/hint';
 
   let {
     device,
@@ -144,7 +145,7 @@
           class="preset-save-button"
           type="button"
           aria-label={`Save ${title}`}
-          title={`Save ${title}`}
+          use:hint={`Save ${title}`}
           onpointerdown={handleSavePresetPointerDown}
           onclick={handleSavePresetClick}
           oncontextmenu={handleSavePresetContextMenu}

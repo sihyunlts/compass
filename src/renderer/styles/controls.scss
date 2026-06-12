@@ -169,3 +169,19 @@ input {
   border: 0;
   border-top: 1px solid var(--neutral-30);
 }
+
+.app-hint {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: 70;
+  max-width: min(16rem, calc(100vw - var(--gap-16)));
+  padding: var(--gap-4) var(--gap-6);
+  border: 1px solid var(--neutral-30);
+  border-radius: var(--radius-6);
+  background: var(--neutral-10);
+  color: var(--neutral-90);
+  font-size: var(--text-12);
+  line-height: 1.25;
+  pointer-events: none;
+  white-space: normal;
+}

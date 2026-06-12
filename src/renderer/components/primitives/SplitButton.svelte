@@ -1,6 +1,8 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { hint } from '../overlays/hint';
+
   type SplitButtonVariant = 'secondary' | 'primary' | 'outline';
   type ButtonType = 'button' | 'submit' | 'reset';
 
@@ -63,7 +65,7 @@
       {type}
       aria-label={mainAriaLabel}
       {disabled}
-      {title}
+      use:hint={title}
       onclick={onClick}
     >
       <span class="split-button-label">{text}</span>
@@ -74,7 +76,7 @@
       {id}
       class="split-button-segment split-button-main split-button-static"
       aria-label={mainAriaLabel}
-      {title}
+      use:hint={title}
     >
       <span class="split-button-label">{text}</span>
     </span>
@@ -87,7 +89,7 @@
     aria-haspopup={menuPopupType}
     aria-expanded={menuExpanded}
     disabled={menuDisabled}
-    title={menuTitle}
+    use:hint={menuExpanded ? undefined : menuTitle}
     onclick={onMenuClick}
     onkeydown={handleMenuKeyDown}
   >

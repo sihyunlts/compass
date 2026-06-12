@@ -60,7 +60,6 @@
 <div
   bind:this={rootEl}
   class="workspace-rack-title"
-  title={titleText}
   aria-label={titleLabel}
 >
   <SplitButton

@@ -30,6 +30,7 @@
     resolveDeviceDisplayName,
     resolveGroupDisplayName,
   } from '../../features/rack/rename';
+  import { hint } from '../overlays/hint';
   import { createDeviceRackController } from '../../features/rack/device-rack-controller.svelte';
   import RackRenamePopover from './RackRenamePopover.svelte';
   import DeviceCard from './DeviceCard.svelte';
@@ -364,12 +365,13 @@
                     onHeaderDoubleClick={(event) => controller.handleDeviceHeaderDoubleClick(event, col.device.id)}
                   />
                 {:else if col.kind === 'left-rail'}
+                  {@const groupName = resolveGroupDisplayName(groupDisplayNameById, col.groupId)}
                   <div class="group-rail-controls">
                     <input
                       class="group-enabled-toggle round-checkbox"
                       type="checkbox"
                       checked={col.enabled}
-                      aria-label={`${resolveGroupDisplayName(groupDisplayNameById, col.groupId)} enabled`}
+                      aria-label={`${groupName} enabled`}
                       onpointerdown={(event) => controller.handleGroupTogglePointerDown(event)}
                       onclick={(event) => controller.handleGroupToggleClick(event)}
                       onchange={(event) => controller.handleGroupEnabledChange(event, col.groupId)}
@@ -377,8 +379,8 @@
                     <button
                       class="preset-save-button"
                       type="button"
-                      aria-label={`Save ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
-                      title={`Save ${resolveGroupDisplayName(groupDisplayNameById, col.groupId)}`}
+                      aria-label={`Save ${groupName}`}
+                      use:hint={`Save ${groupName}`}
                       onpointerdown={(event) => controller.handleGroupSavePointerDown(event)}
                       onclick={(event) => controller.handleGroupSaveClick(event, col.groupId)}
                       oncontextmenu={(event) => controller.handleGroupSaveContextMenu(event)}
@@ -386,7 +388,7 @@
                       <span class="material-symbols-rounded" aria-hidden="true">save</span>
                     </button>
                   </div>
-                  <span class="group-label">{resolveGroupDisplayName(groupDisplayNameById, col.groupId)}</span>
+                  <span class="group-label">{groupName}</span>
                 {/if}
               </div>
             {/each}
@@ -419,7 +421,7 @@
 <div
   bind:this={browserDragBadgeEl}
   id="browser-drag-badge"
-  class="browser-drag-badge"
+  class="browser-drag-badge app-hint"
   aria-hidden="true"
   hidden
 ></div>
@@ -583,15 +585,6 @@
   }
 
   .browser-drag-badge {
-    position: fixed;
-    left: 0;
-    top: 0;
-    z-index: 40;
-    border: 1px solid var(--neutral-30);
-    border-radius: var(--radius-4);
-    background: var(--neutral-20);
-    padding: var(--gap-4) var(--gap-8);
-    font-size: var(--text-12);
     transform: translate3d(-9999px, -9999px, 0);
     opacity: 0;
   }

@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import FieldShell from '../fields/FieldShell.svelte';
+  import { hint } from '../overlays/hint';
 
   const GRID_SIZE = 10;
 
@@ -48,13 +49,15 @@
       data-device-id={deviceId}
     >
       {#each cells as cell (cell.key)}
+        {@const cellLabel = `X ${cell.x} | Y ${cell.y}`}
         <button
           type="button"
           class="mask-tile"
           class:is-selected={selected.has(cell.index)}
           data-tile-index={cell.index}
           aria-pressed={selected.has(cell.index) ? 'true' : 'false'}
-          title={`X ${cell.x} | Y ${cell.y}`}
+          aria-label={cellLabel}
+          use:hint={cellLabel}
         ></button>
       {/each}
     </div>
