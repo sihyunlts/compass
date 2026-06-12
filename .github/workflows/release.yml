@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  make:
+    name: Make ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-latest
+            platform: win32
+            arch: x64
+            artifact-name: compass-windows-x64
+            artifact-path: |
+              out/make/**/*.exe
+              out/make/**/*.nupkg
+              out/make/**/RELEASES
+          - name: macOS arm64
+            os: macos-15
+            platform: darwin
+            arch: arm64
+            artifact-name: compass-macos-arm64
+            artifact-path: |
+              out/make/**/*.dmg
+              out/make/**/*.zip
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Activate npm
+        run: corepack prepare npm@11.5.1 --activate
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check
+        run: npm run check
+
+      - name: Make app
+        run: npm run make -- --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ matrix.artifact-path }}
+          if-no-files-found: error
+
+  release:
+    name: Create draft release
+    needs: make
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Add Max for Live bridge
+        run: cp max4live/*.amxd release-assets/
+
+      - name: Create draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          tag="${GITHUB_REF_NAME}"
+          title="Compass ${tag}"
+
+          mapfile -t files < <(find release-assets -type f | sort)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No release artifacts found." >&2
+            exit 1
+          fi
+
+          gh release create "${tag}" "${files[@]}" \
+            --draft \
+            --title "${title}"
