@@ -244,7 +244,7 @@
   }
 
   .modal-dialog {
-    width: min(28rem, calc(100vw - 2rem));
+    width: min(22rem, calc(100vw - 2rem));
     padding: var(--gap-16);
     border-radius: var(--radius-12);
     background: var(--neutral-10);
