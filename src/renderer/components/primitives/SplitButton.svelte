@@ -1,7 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  type SplitButtonVariant = 'secondary' | 'primary';
+  type SplitButtonVariant = 'secondary' | 'primary' | 'outline';
   type ButtonType = 'button' | 'submit' | 'reset';
 
   let {
@@ -18,6 +18,7 @@
     menuExpanded = false,
     menuPopupType = 'menu',
     type = 'button',
+    class: className = '',
     onClick,
     onMenuClick,
     ...rest
@@ -35,11 +36,12 @@
     menuExpanded?: boolean;
     menuPopupType?: 'menu' | 'dialog' | 'listbox' | 'tree' | 'grid';
     type?: ButtonType;
+    class?: string;
     onClick?: (event: MouseEvent) => void;
     onMenuClick?: (event: MouseEvent | KeyboardEvent) => void;
   } & Record<string, unknown>>();
 
-  const rootClass = $derived(`split-button split-button-${variant}`);
+  const rootClass = $derived(`split-button split-button-${variant} ${className}`.trim());
   const mainAriaLabel = $derived(label ?? text);
 
   const handleMenuKeyDown = (event: KeyboardEvent): void => {
@@ -53,18 +55,30 @@
 </script>
 
 <div class={rootClass}>
-  <button
-    {...rest}
-    {id}
-    class="split-button-segment split-button-main"
-    {type}
-    aria-label={mainAriaLabel}
-    {disabled}
-    {title}
-    onclick={onClick}
-  >
-    {text}
-  </button>
+  {#if onClick}
+    <button
+      {...rest}
+      {id}
+      class="split-button-segment split-button-main"
+      {type}
+      aria-label={mainAriaLabel}
+      {disabled}
+      {title}
+      onclick={onClick}
+    >
+      <span class="split-button-label">{text}</span>
+    </button>
+  {:else}
+    <span
+      {...rest}
+      {id}
+      class="split-button-segment split-button-main split-button-static"
+      aria-label={mainAriaLabel}
+      {title}
+    >
+      <span class="split-button-label">{text}</span>
+    </span>
+  {/if}
   <button
     id={menuId}
     type="button"
@@ -96,6 +110,15 @@
       color: var(--accent-050);
     }
 
+    &-outline {
+      background: transparent;
+      box-shadow: inset 0 0 0 1px var(--neutral-20);
+
+      .split-button-trigger {
+        border-left-color: var(--neutral-20);
+      }
+    }
+
     &-segment {
       border: 0;
       background: transparent;
@@ -112,7 +135,21 @@
     }
 
     &-main {
+      display: inline-flex;
+      align-items: center;
+      min-width: 0;
       padding: var(--gap-6) var(--gap-8);
+    }
+
+    &-static {
+      cursor: default;
+    }
+
+    &-label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     &-trigger {
@@ -124,7 +161,7 @@
       justify-content: center;
 
       &[aria-expanded='true'] {
-        background: color-mix(in srgb, currentColor 12%, transparent);
+        background: var(--neutral-30);
       }
 
       .material-symbols-rounded {

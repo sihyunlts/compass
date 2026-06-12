@@ -395,32 +395,10 @@
           <WorkspaceRackTitle
             title={presetState.currentRackDisplayName}
             dirty={presetState.isRackDirty}
-          />
-          <Button
-            id="rack-new-button"
-            text="New"
             disabled={presetState.isRackPresetLoadPending}
-            title="Create a new rack (Cmd/Ctrl+N)."
-            label="New rack"
-            onClick={() => presetController.handleNewRack()}
-          />
-          <Button
-            id="rack-save-button"
-            text="Save"
-            disabled={presetState.isRackPresetLoadPending}
-            title={presetState.currentRackFilePath
-              ? 'Save the current rack (Cmd/Ctrl+S).'
-              : 'Save the current rack as a file (Cmd/Ctrl+S).'}
-            label="Save rack"
-            onClick={() => presetController.handleSaveRack()}
-          />
-          <Button
-            id="rack-save-as-button"
-            text="Save As"
-            disabled={presetState.isRackPresetLoadPending}
-            title="Save the current rack as... (Cmd/Ctrl+Shift+S)."
-            label="Save rack as"
-            onClick={() => presetController.handleSaveRackAs()}
+            onNewRack={() => presetController.handleNewRack()}
+            onSaveRack={() => presetController.handleSaveRack()}
+            onSaveRackAs={() => presetController.handleSaveRackAs()}
           />
 
           <span
