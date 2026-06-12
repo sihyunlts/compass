@@ -58,5 +58,5 @@ npm start
 Build the renderer-only web version:
 
 ```sh
-npx vite build --config vite.renderer.config.ts
+npm run web:build
 ```
