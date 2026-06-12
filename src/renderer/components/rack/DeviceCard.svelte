@@ -253,7 +253,7 @@
     }
 
     &.is-dragging {
-      opacity: 0.86;
+      opacity: 0.75;
       z-index: 12;
       will-change: transform;
 
