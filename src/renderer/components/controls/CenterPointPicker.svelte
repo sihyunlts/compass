@@ -96,18 +96,7 @@
     cursor: crosshair;
     --picker-guide-x-color: transparent;
     --picker-guide-y-color: transparent;
-    background:
-      linear-gradient(
-        to bottom,
-        var(--picker-guide-x-color),
-        var(--picker-guide-x-color)
-      ) var(--picker-x, 50%) 0 / 1px 100% no-repeat,
-      linear-gradient(
-        to right,
-        var(--picker-guide-y-color),
-        var(--picker-guide-y-color)
-      ) 0 var(--picker-y, 50%) / 100% 1px no-repeat,
-      var(--neutral-10);
+    background: var(--neutral-10);
 
     &:active {
       --picker-guide-x-color: var(--neutral-30);
@@ -121,6 +110,25 @@
       --picker-guide-y-color: var(--device-control-accent, var(--accent-500));
     }
 
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      background:
+        linear-gradient(
+          to bottom,
+          var(--picker-guide-x-color),
+          var(--picker-guide-x-color)
+        ) var(--picker-x, 50%) 0 / 1px 100% no-repeat,
+        linear-gradient(
+          to right,
+          var(--picker-guide-y-color),
+          var(--picker-guide-y-color)
+        ) 0 var(--picker-y, 50%) / 100% 1px no-repeat;
+    }
+
     &::after {
       content: '';
       position: absolute;
@@ -131,12 +139,14 @@
       border-radius: var(--radius-round);
       background: var(--device-control-accent, var(--accent-500));
       transform: translate(-50%, -50%);
+      z-index: 3;
     }
   }
 
   .center-picker-grid-line {
     position: absolute;
     pointer-events: none;
+    z-index: 1;
     background: var(--neutral-20);
 
     &.is-vertical {
