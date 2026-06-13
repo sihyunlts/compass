@@ -2,7 +2,10 @@ import { cloneChainForIpc } from '../../shared/model';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { EditorSession } from '../features/editor/session.svelte';
 import type { HeaderIndicatorController } from './header-indicator.svelte';
-import type { PlaybackSessionController } from './playback-session.svelte';
+import {
+  createPreviewSourceKey,
+  type PlaybackSessionController,
+} from './playback-session.svelte';
 
 interface SendFlowOptions {
   bridgeClient: CompassApi;
@@ -32,9 +35,9 @@ class SendFlowController {
     try {
       const bridge = editorSession.readBridgeSettings();
       editorSession.applyBridgeSettings(bridge, { persist: true });
-      const sourceKey = `chain:${uiState.chainRevision}`;
       const launchpadModel = uiState.launchpadModel;
       const sourceChain = cloneChainForIpc(uiState.chainState);
+      const sourceKey = createPreviewSourceKey(uiState.chainRevision, sourceChain);
       const preview = await playbackSession.generatePreviewForSend({
         sourceChain,
         sourceKey,
@@ -42,19 +45,26 @@ class SendFlowController {
         launchpadModel,
       });
 
-      const response = await bridgeClient.sendGeneratedPreview({
+      playbackSession.applyPreviewResult({
         preview,
         bridge,
-      });
-
-      playbackSession.applyPreviewResult({
-        preview: response.preview,
-        bridge: response.bridge,
         source: 'send',
         sourceChain,
         sourceKey,
         launchpadModel,
+        announce: false,
       });
+
+      await bridgeClient.sendGeneratedPreview({
+        preview,
+        bridge,
+      });
+
+      if (preview.noteCount > 0) {
+        headerIndicator.show('Send complete');
+      } else {
+        headerIndicator.clear();
+      }
 
       uiState.sendButtonLabel = 'Done!';
       uiState.sendButtonDisabled = false;

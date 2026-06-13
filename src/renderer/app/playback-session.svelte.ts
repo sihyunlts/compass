@@ -31,6 +31,7 @@ interface ApplyPreviewResultInput {
   sourceChain: GeneratorChain;
   sourceKey: string;
   launchpadModel: LaunchpadModel;
+  announce?: boolean;
 }
 
 interface PlaybackSessionOptions {
@@ -69,7 +70,7 @@ const hashPreviewSource = (chain: GeneratorChain): string => {
   return `${(hash >>> 0).toString(16)}-${source.length}`;
 };
 
-const createPreviewSourceKey = (
+export const createPreviewSourceKey = (
   chainRevision: number,
   chain: GeneratorChain,
 ): string =>
@@ -197,6 +198,7 @@ export class PlaybackSessionController {
 
   public applyPreviewResult(input: ApplyPreviewResultInput): void {
     const { editorSession, previewSession } = this.options;
+    const shouldAnnounce = input.announce ?? true;
     const nextLoopLengthBeats =
       input.bridge?.autoCreateLengthBeats
       ?? editorSession.readBridgeSettings().autoCreateLengthBeats;
@@ -224,16 +226,20 @@ export class PlaybackSessionController {
     }
 
     if (input.preview.noteCount > 0) {
-      if (input.source === 'preview') {
-        this.options.headerIndicator.show(`${input.preview.noteCount} notes generated`);
-      } else {
-        this.options.headerIndicator.show('Send complete');
+      if (shouldAnnounce) {
+        if (input.source === 'preview') {
+          this.options.headerIndicator.show(`${input.preview.noteCount} notes generated`);
+        } else {
+          this.options.headerIndicator.show('Send complete');
+        }
       }
       this.startPlayback();
       return;
     }
 
-    this.options.headerIndicator.clear();
+    if (shouldAnnounce) {
+      this.options.headerIndicator.clear();
+    }
     this.stopPlayback();
   }
 

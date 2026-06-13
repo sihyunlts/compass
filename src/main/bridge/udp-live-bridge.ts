@@ -8,6 +8,7 @@ import type {
 } from '../../shared/bridge/types';
 
 const OSC_ALIGNMENT = 4;
+const DEFAULT_SEND_TIMEOUT_MS = 5000;
 
 const padLength = (value: number): number =>
   (OSC_ALIGNMENT - (value % OSC_ALIGNMENT)) % OSC_ALIGNMENT;
@@ -98,6 +99,8 @@ const splitEnvelopeBySize = (
 
 /** Sends OSC payloads to the Live bridge over UDP with replace-then-append chunking. */
 export class UdpLiveBridge {
+  public constructor(private readonly sendTimeoutMs = DEFAULT_SEND_TIMEOUT_MS) {}
+
   public async send(
     envelope: LiveBridgeEnvelope,
     target: BridgeTarget,
@@ -107,17 +110,40 @@ export class UdpLiveBridge {
 
     await new Promise<void>((resolve, reject) => {
       const socket = dgram.createSocket('udp4');
+      let settled = false;
+      let timeout: ReturnType<typeof setTimeout> | null = null;
+
+      const finish = (error?: Error): void => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
+        socket.close();
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      };
+
+      timeout = setTimeout(() => {
+        finish(new Error('Live bridge UDP send timed out'));
+      }, this.sendTimeoutMs);
 
       socket.once('error', (error) => {
-        socket.close();
-        reject(error);
+        finish(error);
       });
 
       let packetIndex = 0;
       const sendNext = (): void => {
         if (packetIndex >= packets.length) {
-          socket.close();
-          resolve();
+          finish();
           return;
         }
 
@@ -126,9 +152,12 @@ export class UdpLiveBridge {
           target.port,
           target.host,
           (error) => {
+            if (settled) {
+              return;
+            }
+
             if (error) {
-              socket.close();
-              reject(error);
+              finish(error);
               return;
             }
 
