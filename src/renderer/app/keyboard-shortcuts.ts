@@ -4,6 +4,7 @@ import { isTextEditingElement } from '../features/rack/text-editing';
 interface KeyboardShortcutOptions {
   editorSession: EditorSession;
   closeContextMenu: () => void;
+  interactiveElementSelector?: string;
   onNewRack?: () => void | Promise<void>;
   onSaveRack?: () => void | Promise<void>;
   onSaveRackAs?: () => void | Promise<void>;
@@ -11,10 +12,30 @@ interface KeyboardShortcutOptions {
 }
 
 const RACK_DEVICES_ELEMENT_ID = 'chain-devices';
+const LOCAL_RACK_KEYBOARD_SCOPE_SELECTOR = '[data-rack-keyboard-scope="local"]';
 
 const shouldPreserveRackSelection = (element: Element | null): boolean =>
   element instanceof HTMLElement
   && element.closest('[data-preserve-rack-selection="true"]') !== null;
+
+const isLocalKeyboardTarget = (
+  element: Element | null,
+  interactiveElementSelector: string | undefined,
+): boolean => {
+  if (!element) {
+    return false;
+  }
+
+  if (element.closest(LOCAL_RACK_KEYBOARD_SCOPE_SELECTOR)) {
+    return true;
+  }
+
+  if (interactiveElementSelector && element.closest(interactiveElementSelector)) {
+    return true;
+  }
+
+  return element instanceof HTMLElement && element.isContentEditable;
+};
 
 const closeContextMenuIfHandled = (
   handled: boolean,
@@ -155,6 +176,10 @@ export const mountKeyboardShortcuts = (
       return;
     }
 
+    if (isLocalKeyboardTarget(target, options.interactiveElementSelector)) {
+      return;
+    }
+
     closeContextMenuIfHandled(
       options.editorSession.commands.deleteSelection(),
       options.closeContextMenu,
@@ -164,11 +189,15 @@ export const mountKeyboardShortcuts = (
 
   const handleFocusIn = (event: FocusEvent): void => {
     const target = event.target instanceof Element ? event.target : null;
-    if (!isTextEditingElement(target)) {
+
+    if (shouldPreserveRackSelection(target)) {
       return;
     }
 
-    if (shouldPreserveRackSelection(target)) {
+    if (
+      !isTextEditingElement(target)
+      && !isLocalKeyboardTarget(target, options.interactiveElementSelector)
+    ) {
       return;
     }
 

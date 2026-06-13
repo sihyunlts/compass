@@ -174,18 +174,20 @@
     </div>
   </header>
 
-  <DeviceEditor
-    {device}
-    {devices}
-    {deviceDisplayNameById}
-    {groupDisplayNameById}
-    {paletteRevision}
-    {currentBeatBeats}
-    {currentProgress01}
-    {modulationReadoutById}
-    {resolvePaletteRgb}
-    {onControlChange}
-  />
+  <div class="device-editor-scope" data-rack-keyboard-scope="local">
+    <DeviceEditor
+      {device}
+      {devices}
+      {deviceDisplayNameById}
+      {groupDisplayNameById}
+      {paletteRevision}
+      {currentBeatBeats}
+      {currentProgress01}
+      {modulationReadoutById}
+      {resolvePaletteRgb}
+      {onControlChange}
+    />
+  </div>
 </div>
 
 <style lang="scss">
@@ -326,6 +328,10 @@
       color: inherit;
       caret-color: currentColor;
       cursor: text;
+    }
+
+    .device-editor-scope {
+      display: contents;
     }
 
     :global(.device-controls) {

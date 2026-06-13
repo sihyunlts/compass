@@ -49,6 +49,9 @@ const toScrollMetricsSignature = (metrics: RackScrollMetrics): string => (
   `${metrics.scrollLeft.toFixed(2)}|${metrics.scrollWidth.toFixed(2)}|${metrics.clientWidth.toFixed(2)}`
 );
 
+const LOCAL_RACK_KEYBOARD_SCOPE_SELECTOR = '[data-rack-keyboard-scope="local"]';
+const PRESERVE_RACK_SELECTION_SELECTOR = '[data-preserve-rack-selection="true"]';
+
 /** Owns rack-side interaction controllers and exposes a compact view API. */
 class RackSurfaceController {
   public activeDragInfo = $state<ActiveDragInfo | null>(null);
@@ -267,6 +270,12 @@ class RackSurfaceController {
   }
 
   public handleChainPointerDown(event: PointerEvent): void {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target && this.shouldClearRackSelectionForLocalTarget(target)) {
+      this.options.rackSelection.clear();
+      this.options.closeContextMenu();
+    }
+
     if (this.interactionManager?.handleChainPointerDown(event)) {
       event.preventDefault();
     }
@@ -401,6 +410,17 @@ class RackSurfaceController {
 
   public handleWindowBlur(): void {
     this.interactionManager?.handleWindowBlur();
+  }
+
+  private shouldClearRackSelectionForLocalTarget(target: Element): boolean {
+    if (target.closest(PRESERVE_RACK_SELECTION_SELECTOR)) {
+      return false;
+    }
+
+    return (
+      target.closest(LOCAL_RACK_KEYBOARD_SCOPE_SELECTOR) !== null
+      || target.closest(this.options.getInteractiveElementSelector()) !== null
+    );
   }
 
   public handleWindowMouseUp(event: MouseEvent): void {

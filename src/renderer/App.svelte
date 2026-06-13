@@ -342,6 +342,7 @@
     const disposeKeyboardShortcuts = mountKeyboardShortcuts({
       editorSession,
       closeContextMenu,
+      interactiveElementSelector: INTERACTIVE_ELEMENT_SELECTOR,
       onNewRack: () => presetController.handleNewRack(),
       onSaveRack: () => presetController.handleSaveRack(),
       onSaveRackAs: () => presetController.handleSaveRackAs(),
