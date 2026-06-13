@@ -295,8 +295,8 @@
   const handleContextMenuRename = (
     target: ContextMenuTarget,
   ): void => {
-    if (target.kind === 'preset-entry' && target.entryKind === 'directory') {
-      presetController.beginPresetFolderRename(target);
+    if (target.kind === 'preset-entry') {
+      presetController.beginPresetEntryRename(target);
       closeContextMenu();
       return;
     }

@@ -2,6 +2,7 @@ import type {
   CreatePresetFolderRequest,
   ReadPresetEntryRequest,
   RenameRackFileRequest,
+  RenamePresetFileRequest,
   RenamePresetFolderRequest,
   SaveRackFileRequest,
   SavePresetFileRequest,
@@ -154,6 +155,30 @@ export const parseCreatePresetFolderRequest = (
     presetType: (value as { presetType: PresetFileKind }).presetType,
     relativePath,
     folderName: (value as { folderName: string }).folderName,
+  };
+};
+
+export const parseRenamePresetFileRequest = (
+  value: unknown,
+): RenamePresetFileRequest | null => {
+  if (
+    typeof value !== 'object'
+    || value === null
+    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
+    || typeof (value as { fileName?: unknown }).fileName !== 'string'
+  ) {
+    return null;
+  }
+
+  const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
+  if (!relativePath || relativePath.length === 0) {
+    return null;
+  }
+
+  return {
+    presetType: (value as { presetType: PresetFileKind }).presetType,
+    relativePath,
+    fileName: (value as { fileName: string }).fileName,
   };
 };
 

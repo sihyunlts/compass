@@ -75,6 +75,7 @@
     target !== null
     && (
       (target.kind === 'preset-entry' && target.entryKind === 'directory' && target.relativePath.length > 0)
+      || (target.kind === 'preset-entry' && target.entryKind === 'file')
       || (target.kind !== 'preset-entry'
         && target.kind !== 'presets-root'
         && (target.kind === 'group' || target.deviceIds.length === 1))

@@ -59,6 +59,23 @@ export type RenameRackFileResponse =
       filePath?: string;
     };
 
+export interface RenamePresetFileRequest<K extends PresetFileKind = PresetFileKind> {
+  presetType: K;
+  relativePath: string[];
+  fileName: string;
+}
+
+export type RenamePresetFileResponse =
+  | {
+      status: 'renamed';
+      relativePath: string[];
+      filePath: string;
+    }
+  | {
+      status: 'error';
+      message: string;
+    };
+
 export interface CreatePresetFolderRequest<K extends PresetFileKind = PresetFileKind> {
   presetType: K;
   relativePath: string[];

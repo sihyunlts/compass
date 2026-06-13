@@ -6,6 +6,7 @@ import type {
   ListPresetBrowserTreeResponse,
   ReadPresetEntryResponse,
   RenameRackFileResponse,
+  RenamePresetFileResponse,
   RenamePresetFolderResponse,
   SaveRackFileResponse,
   SavePresetFileResponse,
@@ -25,6 +26,7 @@ import {
   parseReadPresetEntryRequest,
   parseSaveRackFileRequest,
   parseRenameRackFileRequest,
+  parseRenamePresetFileRequest,
   parseRenamePresetFolderRequest,
   parseSavePresetFileRequest,
 } from './presets/preset-requests';
@@ -165,6 +167,57 @@ export class PresetService {
       return {
         status: 'error',
         message: toErrorMessage(error, 'Failed to list presets.'),
+      };
+    }
+  }
+
+  public async renamePresetFile(
+    request: unknown,
+  ): Promise<RenamePresetFileResponse> {
+    const parsedRequest = parseRenamePresetFileRequest(request);
+    if (!parsedRequest) {
+      return {
+        status: 'error',
+        message: 'Invalid preset file rename request.',
+      };
+    }
+
+    const spec = PRESET_FILE_SPECS[parsedRequest.presetType];
+    const currentFileName = parsedRequest.relativePath[parsedRequest.relativePath.length - 1] ?? '';
+    if (!hasPresetExtension(currentFileName, spec.extension)) {
+      return {
+        status: 'error',
+        message: 'Unsupported preset file extension.',
+      };
+    }
+
+    try {
+      const rootDirectory = await this.storage.resolvePresetDirectory(parsedRequest.presetType);
+      const filePath = resolvePresetPath(rootDirectory, parsedRequest.relativePath);
+      if (!filePath) {
+        return {
+          status: 'error',
+          message: 'Invalid preset file path.',
+        };
+      }
+
+      const renamedPath = await this.storage.renamePresetFile(
+        filePath,
+        parsedRequest.fileName,
+        spec.extension,
+      );
+      return {
+        status: 'renamed',
+        filePath: renamedPath,
+        relativePath: [
+          ...parsedRequest.relativePath.slice(0, -1),
+          renamedPath.split(/[\\/]/).pop() ?? currentFileName,
+        ],
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to rename preset file.'),
       };
     }
   }

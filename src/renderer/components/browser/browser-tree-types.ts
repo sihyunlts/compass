@@ -37,6 +37,7 @@ export interface BrowserTreePresetLeafNode {
 
 export interface PendingPresetFolderDraft {
   mode: 'create' | 'rename';
+  entryKind: 'file' | 'directory';
   presetType: PresetFileKind;
   relativePath: string[];
   draftName: string;
@@ -47,6 +48,7 @@ export interface PresetFolderSelectionTarget {
   token: number;
   presetType: PresetFileKind;
   relativePath: string[];
+  entryKind: 'file' | 'directory';
 }
 
 export type BrowserTreeNode =

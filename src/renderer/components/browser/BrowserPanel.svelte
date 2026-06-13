@@ -36,6 +36,7 @@
     treeKind: 'preset';
     id: string;
     label: string;
+    entryKind: 'directory';
     presetType: PresetFileKind;
     relativePath: string[];
     children: [];
@@ -69,13 +70,14 @@
     treeKind: 'preset',
     id: draft.temporaryId ?? '',
     label: draft.draftName,
+    entryKind: 'directory',
     presetType: draft.presetType,
     relativePath: [...draft.relativePath, draft.draftName.trim()],
     children: [],
     isPending: true,
   });
 
-  const resolvePresetFolderNodeId = (
+  const resolvePresetNodeId = (
     presetType: PresetFileKind,
     relativePath: readonly string[],
   ): string =>
@@ -92,7 +94,17 @@
     node: VisibleBrowserTreeNode,
     draft: PendingPresetFolderDraft | null,
   ): boolean => {
-    if (!draft || node.kind !== 'folder' || node.treeKind !== 'preset') {
+    if (!draft) {
+      return false;
+    }
+
+    if (draft.entryKind === 'file') {
+      return node.kind === 'preset'
+        && node.presetType === draft.presetType
+        && areEqualRelativePaths(node.relativePath, draft.relativePath);
+    }
+
+    if (node.kind !== 'folder' || node.treeKind !== 'preset') {
       return false;
     }
 
@@ -109,7 +121,7 @@
     roots: readonly BrowserTreePresetFolderNode[],
     draft: PendingPresetFolderDraft | null,
   ): BrowserTreePresetFolderNode[] => {
-    if (!draft || draft.mode !== 'create') {
+    if (!draft || draft.mode !== 'create' || draft.entryKind !== 'directory') {
       return roots.map((root) => ({
         ...root,
         children: [...root.children],
@@ -578,7 +590,7 @@
 
     const targetRowId = draft.mode === 'create'
       ? draft.temporaryId ?? ''
-      : resolvePresetFolderNodeId(draft.presetType, draft.relativePath);
+      : resolvePresetNodeId(draft.presetType, draft.relativePath);
     const didSelectPendingRow = selectedRowId !== targetRowId;
     if (didSelectPendingRow) {
       selectedRowId = targetRowId;
@@ -599,8 +611,9 @@
     }
 
     const match = visibleRows.find((row) =>
-      row.node.kind === 'folder'
-      && row.node.treeKind === 'preset'
+      (selectionTarget.entryKind === 'directory'
+        ? row.node.kind === 'folder' && row.node.treeKind === 'preset'
+        : row.node.kind === 'preset')
       && row.node.presetType === selectionTarget.presetType
       && areEqualRelativePaths(row.node.relativePath, selectionTarget.relativePath));
     if (!match) {
@@ -759,7 +772,9 @@
                     class="browser-tree-item-input"
                     type="text"
                     value={pendingPresetFolderDraft?.draftName ?? ''}
-                    aria-label="New preset folder name"
+                    aria-label={pendingPresetFolderDraft?.entryKind === 'file'
+                      ? 'Preset file name'
+                      : 'Preset folder name'}
                     onpointerdown={(event) => event.stopPropagation()}
                     onclick={(event) => event.stopPropagation()}
                     ondblclick={(event) => event.stopPropagation()}

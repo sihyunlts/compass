@@ -185,6 +185,12 @@ export const registerIpcHandlers = (
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.renamePresetFile,
+    (_event, request) =>
+      presetService.renamePresetFile(request),
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.createPresetFolder,
     (_event, request) =>
       presetService.createPresetFolder(request),

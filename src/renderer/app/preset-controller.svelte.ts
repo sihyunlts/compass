@@ -3,10 +3,15 @@ import type {
   CreatePresetFolderRequest,
   PresetBrowserTreeNode,
   ReadPresetEntryResponse,
+  RenamePresetFileRequest,
   RenamePresetFolderRequest,
   SavePresetFileRequest,
 } from '../../shared/contracts/ipc/presets';
-import { parsePresetFileText, type RackPresetFile } from '../../shared/presets';
+import {
+  PRESET_FILE_EXTENSIONS,
+  parsePresetFileText,
+  type RackPresetFile,
+} from '../../shared/presets';
 import type {
   BrowserTreePresetFolderNode,
   BrowserTreePresetLeafNode,
@@ -254,6 +259,29 @@ class PresetController {
     this.state.currentRackDisplayName = displayName.trim() || DEFAULT_RACK_FILE_DISPLAY_NAME;
   }
 
+  private syncCurrentRackAfterPresetFileRename(
+    originalRelativePath: readonly string[],
+    response: { filePath: string },
+  ): void {
+    const currentFilePath = this.state.currentRackFilePath;
+    if (!currentFilePath || originalRelativePath.length === 0) {
+      return;
+    }
+
+    const normalizedCurrentPath = currentFilePath.replaceAll('\\', '/');
+    const normalizedOriginalPath = originalRelativePath.join('/');
+    if (
+      normalizedCurrentPath !== response.filePath.replaceAll('\\', '/')
+      && !normalizedCurrentPath.endsWith(`/${normalizedOriginalPath}`)
+    ) {
+      return;
+    }
+
+    this.setCurrentRackFile(response.filePath, resolveRackDisplayNameFromPath(response.filePath));
+    this.cleanRackDisplayName = this.state.currentRackDisplayName;
+    this.syncRackDirtyState();
+  }
+
   private buildCurrentRackFile(): RackPresetFile {
     return buildRackPresetFile(
       this.options.editorSession.state.chainState,
@@ -419,6 +447,7 @@ class PresetController {
 
     this.state.pendingPresetFolderDraft = {
       mode: 'create',
+      entryKind: 'directory',
       presetType: target.presetType,
       relativePath: [...target.relativePath],
       draftName: '',
@@ -428,10 +457,9 @@ class PresetController {
     this.state.presetFolderSelectionTarget = null;
   }
 
-  public beginPresetFolderRename(target: ContextMenuTarget): void {
+  public beginPresetEntryRename(target: ContextMenuTarget): void {
     if (
       target.kind !== 'preset-entry'
-      || target.entryKind !== 'directory'
       || target.relativePath.length === 0
     ) {
       return;
@@ -439,11 +467,22 @@ class PresetController {
 
     this.state.pendingPresetFolderDraft = {
       mode: 'rename',
+      entryKind: target.entryKind,
       presetType: target.presetType,
       relativePath: [...target.relativePath],
-      draftName: target.relativePath[target.relativePath.length - 1] ?? '',
+      draftName: target.entryKind === 'file'
+        ? this.resolvePresetFileDraftName(target)
+        : target.relativePath[target.relativePath.length - 1] ?? '',
     };
     this.state.presetFolderSelectionTarget = null;
+  }
+
+  private resolvePresetFileDraftName(target: PresetEntryTarget): string {
+    const fileName = target.relativePath[target.relativePath.length - 1] ?? '';
+    const extension = PRESET_FILE_EXTENSIONS[target.presetType];
+    return fileName.toLowerCase().endsWith(extension)
+      ? fileName.slice(0, -extension.length)
+      : fileName;
   }
 
   public updatePendingPresetFolderDraftName(nextName: string): void {
@@ -468,15 +507,23 @@ class PresetController {
       return;
     }
 
-    const folderName = draft.draftName.trim();
-    if (!folderName) {
+    const entryName = draft.draftName.trim();
+    if (!entryName) {
       this.cancelPendingPresetFolderDraft();
       return;
     }
 
+    const currentName = draft.entryKind === 'file'
+      ? this.resolvePresetFileDraftName({
+          kind: 'preset-entry',
+          presetType: draft.presetType,
+          relativePath: draft.relativePath,
+          entryKind: 'file',
+        })
+      : draft.relativePath[draft.relativePath.length - 1] ?? '';
     if (
       draft.mode === 'rename'
-      && folderName === (draft.relativePath[draft.relativePath.length - 1] ?? '')
+      && entryName === currentName
     ) {
       this.cancelPendingPresetFolderDraft();
       return;
@@ -487,23 +534,33 @@ class PresetController {
       ? await this.options.bridgeClient.createPresetFolder({
           presetType: draft.presetType,
           relativePath: [...draft.relativePath],
-          folderName,
+          folderName: entryName,
         } satisfies CreatePresetFolderRequest)
+      : draft.entryKind === 'file'
+        ? await this.options.bridgeClient.renamePresetFile({
+            presetType: draft.presetType,
+            relativePath: [...draft.relativePath],
+            fileName: entryName,
+          } satisfies RenamePresetFileRequest)
       : await this.options.bridgeClient.renamePresetFolder({
           presetType: draft.presetType,
           relativePath: [...draft.relativePath],
-          folderName,
+          folderName: entryName,
         } satisfies RenamePresetFolderRequest);
     if (response.status === 'error') {
-      this.showMessage(`Folder ${draft.mode} failed | ${response.message}`);
+      this.showMessage(`${draft.entryKind === 'file' ? 'File' : 'Folder'} ${draft.mode} failed | ${response.message}`);
       return;
     }
 
     await this.loadTree();
+    if (draft.entryKind === 'file' && draft.presetType === 'rack') {
+      this.syncCurrentRackAfterPresetFileRename(draft.relativePath, response);
+    }
     this.state.presetFolderSelectionTarget = {
       token: this.nextPresetFolderSelectionToken,
       presetType: draft.presetType,
       relativePath: [...response.relativePath],
+      entryKind: draft.entryKind,
     };
     this.nextPresetFolderSelectionToken += 1;
   }

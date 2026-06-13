@@ -350,6 +350,49 @@ export const createBrowserCompassBridge = (): CompassApi => ({
       filePath: toVirtualPresetPath('rack', nextRelativePath),
     };
   },
+  renamePresetFile: async (request) => {
+    const fileName = ensurePresetExtension(
+      sanitizeFileStem(
+        request.fileName,
+        getFileStem(request.relativePath[request.relativePath.length - 1] ?? 'Preset', request.presetType),
+      ),
+      request.presetType,
+    );
+    const nextRelativePath = [...request.relativePath.slice(0, -1), fileName];
+    const store = readStore();
+    const fileIndex = store.files.findIndex((file) =>
+      file.presetType === request.presetType
+      && relativePathEquals(file.relativePath, request.relativePath));
+    if (fileIndex === -1) {
+      return { status: 'error', message: 'Preset file does not exist.' };
+    }
+    if (relativePathEquals(request.relativePath, nextRelativePath)) {
+      return {
+        status: 'renamed',
+        relativePath: request.relativePath,
+        filePath: toVirtualPresetPath(request.presetType, request.relativePath),
+      };
+    }
+    if (
+      store.files.some((file) =>
+        file.presetType === request.presetType
+        && relativePathEquals(file.relativePath, nextRelativePath))
+      || store.folders[request.presetType].some((path) => relativePathEquals(path, nextRelativePath))
+    ) {
+      return { status: 'error', message: 'An item or folder with that name already exists.' };
+    }
+
+    store.files[fileIndex] = {
+      ...store.files[fileIndex],
+      relativePath: nextRelativePath,
+    };
+    writeStore(store);
+    return {
+      status: 'renamed',
+      relativePath: nextRelativePath,
+      filePath: toVirtualPresetPath(request.presetType, nextRelativePath),
+    };
+  },
   createPresetFolder: async (request) => {
     const folderName = normalizePathSegment(request.folderName);
     if (!isValidPathSegment(folderName)) {

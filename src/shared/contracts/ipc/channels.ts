@@ -20,6 +20,7 @@ export const IPC_CHANNELS = {
   savePresetFile: 'preset:save-file',
   saveRackFile: 'preset:save-rack-file',
   renameRackFile: 'preset:rename-rack-file',
+  renamePresetFile: 'preset:rename-file',
   createPresetFolder: 'preset:create-folder',
   renamePresetFolder: 'preset:rename-folder',
   listPresetBrowserTree: 'preset:list-browser-tree',
