@@ -54,7 +54,9 @@ const config: ForgeConfig = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      setupIcon: 'assets/compass.ico',
+    }),
     new MakerZIP({}, ['darwin']),
     new MakerDMG({}, ['darwin']),
     new MakerRpm({}),
