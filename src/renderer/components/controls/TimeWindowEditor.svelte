@@ -62,7 +62,7 @@
       index,
       ratio: index / snapDivisions,
       isMajor: index === 0 || index === snapDivisions || index % Math.max(1, snapDivisions / 4) === 0,
-    })));
+    })).filter((tick) => tick.index > 0 && tick.index < snapDivisions));
 
   const setSnapDivisions = (nextDivisions: number): void => {
     snapDivisions = nextDivisions;
@@ -117,8 +117,6 @@
     style={`--window-start:${visibleStart * 100}%;--window-end:${visibleEnd * 100}%;--playhead:${displayedPlayhead * 100}%;`}
   >
     <div class="time-window-track" aria-hidden="true">
-      <div class="time-window-outside time-window-outside-start"></div>
-      <div class="time-window-outside time-window-outside-end"></div>
       <div class="time-window-selected-span"></div>
       {#if showsPlayhead}
         <div class="time-window-playhead"></div>
@@ -213,7 +211,7 @@
     align-items: center;
     height: 1.5rem;
     padding: 0 var(--gap-8);
-    border-radius: 999px;
+    border-radius: var(--radius-round);
     background: rgb(var(--rgb-white) / 0.06);
     color: var(--neutral-00);
     font-size: var(--text-12);
@@ -260,34 +258,14 @@
     position: relative;
     height: 1.75rem;
     border-radius: var(--radius-4);
-    background:
-      linear-gradient(180deg, rgb(var(--rgb-white) / 0.02), transparent),
-      var(--neutral-20);
+    background: var(--neutral-20);
     overflow: hidden;
   }
 
-  .time-window-outside,
   .time-window-selected-span,
   .time-window-playhead,
   .time-window-tick {
     position: absolute;
-  }
-
-  .time-window-outside {
-    top: 0;
-    bottom: 0;
-    background: rgb(var(--rgb-black) / 0.18);
-    pointer-events: none;
-  }
-
-  .time-window-outside-start {
-    left: 0;
-    width: var(--window-start, 0%);
-  }
-
-  .time-window-outside-end {
-    left: var(--window-end, 0%);
-    right: 0;
   }
 
   .time-window-selected-span {
@@ -307,13 +285,8 @@
       background:
         linear-gradient(180deg, rgb(var(--rgb-white) / 0.1), rgb(var(--rgb-white) / 0.02)),
         var(--time-window-accent);
-      box-shadow:
-        inset 0 0 0 1px rgb(var(--rgb-white) / 0.12),
-        0 0 0 1px rgb(var(--rgb-black) / 0.18);
-    }
-
-    .time-window-outside {
-      background: rgb(var(--rgb-black) / 0.28);
+      outline: 1px solid rgb(var(--rgb-white) / 0.12);
+      outline-offset: -1px;
     }
   }
 
@@ -330,10 +303,6 @@
         linear-gradient(180deg, rgb(var(--rgb-white) / 0.12), rgb(var(--rgb-white) / 0.02)),
         var(--time-window-accent);
       opacity: 0.94;
-    }
-
-    .time-window-outside {
-      background: rgb(var(--rgb-black) / 0.12);
     }
   }
 
@@ -384,9 +353,9 @@
       height: 0.9rem;
       width: 0.9rem;
       border-radius: var(--radius-round);
+      border: 1px solid var(--neutral-00);
       background: var(--neutral-90);
       margin-top: 0;
-      box-shadow: 0 0 0 1px var(--neutral-00), 0 0 0 4px rgb(var(--rgb-white) / 0.04);
       opacity: 1;
     }
   }

@@ -30,7 +30,8 @@
   const yPercent = $derived(((1 - (resolvedCenterY - MIN) / RANGE) * 100).toFixed(3));
   const isCenterX = $derived(Math.abs(resolvedCenterX - MIDPOINT) < 0.0001);
   const isCenterY = $derived(Math.abs(resolvedCenterY - MIDPOINT) < 0.0001);
-  const gridStepPercent = $derived((100 / RANGE).toFixed(3));
+  const gridLineOffsets = Array.from({ length: RANGE - 1 }, (_, index) =>
+    (((index + 1) / RANGE) * 100).toFixed(3));
   let surfaceHeight = $state(0);
 </script>
 
@@ -51,8 +52,15 @@
     data-center-x-state={isCenterX ? 'center' : 'off-center'}
     data-center-y-state={isCenterY ? 'center' : 'off-center'}
     aria-label="Center point area"
-    style={`width:${surfaceHeight}px;--picker-x:${xPercent}%;--picker-y:${yPercent}%;--picker-grid-step:${gridStepPercent}%;`}
-  ></div>
+    style={`width:${surfaceHeight}px;--picker-x:${xPercent}%;--picker-y:${yPercent}%;`}
+  >
+    {#each gridLineOffsets as offset (`x:${offset}`)}
+      <span class="center-picker-grid-line is-vertical" style={`left:${offset}%;`}></span>
+    {/each}
+    {#each gridLineOffsets as offset (`y:${offset}`)}
+      <span class="center-picker-grid-line is-horizontal" style={`top:${offset}%;`}></span>
+    {/each}
+  </div>
   <div class="center-picker-inputs">
     <NumberField
       label="X"
@@ -99,20 +107,6 @@
         var(--picker-guide-y-color),
         var(--picker-guide-y-color)
       ) 0 var(--picker-y, 50%) / 100% 1px no-repeat,
-      repeating-linear-gradient(
-        to right,
-        var(--neutral-20) 0,
-        var(--neutral-20) 1px,
-        transparent 1px,
-        transparent var(--picker-grid-step, 10%)
-      ),
-      repeating-linear-gradient(
-        to bottom,
-        var(--neutral-20) 0,
-        var(--neutral-20) 1px,
-        transparent 1px,
-        transparent var(--picker-grid-step, 10%)
-      ),
       var(--neutral-10);
 
     &:active {
@@ -137,6 +131,24 @@
       border-radius: var(--radius-round);
       background: var(--device-control-accent, var(--accent-500));
       transform: translate(-50%, -50%);
+    }
+  }
+
+  .center-picker-grid-line {
+    position: absolute;
+    pointer-events: none;
+    background: var(--neutral-20);
+
+    &.is-vertical {
+      top: 0;
+      bottom: 0;
+      width: 1px;
+    }
+
+    &.is-horizontal {
+      left: 0;
+      right: 0;
+      height: 1px;
     }
   }
 

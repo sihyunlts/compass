@@ -109,8 +109,8 @@
     cursor: pointer;
 
     &:focus-visible {
-      box-shadow: inset 0 0 0 1px var(--neutral-30);
-      outline: none;
+      outline: 1px solid var(--neutral-30);
+      outline-offset: -1px;
     }
 
     &:disabled {

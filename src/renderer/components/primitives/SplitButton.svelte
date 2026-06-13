@@ -114,7 +114,8 @@
 
     &-outline {
       background: transparent;
-      box-shadow: inset 0 0 0 1px var(--neutral-20);
+      outline: 1px solid var(--neutral-20);
+      outline-offset: -1px;
 
       .split-button-trigger {
         border-left-color: var(--neutral-20);

@@ -369,7 +369,7 @@
       border: 1px solid var(--neutral-30);
       border-radius: var(--radius-4);
       background: var(--neutral-20);
-      color: var(--neutral-100);
+      color: var(--neutral-90);
       font: inherit;
       padding: var(--gap-4) var(--gap-8);
       cursor: pointer;
@@ -429,14 +429,13 @@
       width: 0.9rem;
       height: 0.9rem;
       padding: 0;
-      border-radius: 999px;
+      border-radius: var(--radius-round);
       border: 2px solid var(--neutral-10);
       background: var(--device-control-accent, var(--accent-500));
-      box-shadow: 0 0 0 1px rgb(var(--rgb-white) / 0.18);
       cursor: grab;
 
       &.is-selected {
-        background: var(--warning-400);
+        background: var(--category-generators-500);
       }
 
       &:active {
