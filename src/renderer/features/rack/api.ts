@@ -1,5 +1,5 @@
 import type { GeneratorDeviceNode } from '../../../shared/model';
-import type { BrowserInsertSource } from '../../components/rack/device-rack-types';
+import type { BrowserInsertSource } from './types';
 import type { GroupSelectionContext } from './selection.svelte';
 import type { RackSelection } from './selection.svelte';
 

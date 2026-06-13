@@ -7,12 +7,12 @@ import type {
 } from '../../../shared/presets';
 import type { RendererDeviceKind } from '../../../devices';
 import { isRendererDeviceKind } from '../../../devices';
-import type { ContextMenuTarget } from '../../components/overlays/context-menu-types';
+import type { ContextMenuTarget } from '../context-menu/types';
 import type {
   BrowserNonRackPresetInsertSource,
   BrowserInsertSource,
   RackInteractionCommit,
-} from '../../components/rack/device-rack-types';
+} from '../rack/types';
 import type { RackDropZone } from '../rack/drop-ops';
 import type { GroupSelectionContext } from '../rack/selection.svelte';
 import {

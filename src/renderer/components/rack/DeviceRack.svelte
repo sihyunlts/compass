@@ -5,14 +5,14 @@
    */
   import { onMount } from 'svelte';
   import type { GeneratorDeviceNode, GeneratorChain } from '../../../shared/model';
-  import type { ContextMenuTarget } from '../overlays/context-menu-types';
+  import type { ContextMenuTarget } from '../../features/context-menu/types';
   import type {
     BrowserNonRackPresetInsertSource,
     BrowserPresetInsertSource,
     RackInteractionCommit,
     RackPresetFileDrop,
     RackScrollMetrics,
-  } from '../rack/device-rack-types';
+  } from '../../features/rack/types';
   import type { ChainMutationMeta } from '../../features/editor/history-core';
   import {
     buildGroupColumns,

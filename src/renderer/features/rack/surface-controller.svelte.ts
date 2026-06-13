@@ -7,7 +7,7 @@ import type {
   BrowserNonRackPresetInsertSource,
   RackInteractionCommit,
   RackScrollMetrics,
-} from '../../components/rack/device-rack-types';
+} from './types';
 import type { ChainMutationMeta } from '../editor/history-core';
 import { RackDragController, type ActiveDragInfo } from './drag-controller';
 import { RackDropIndicator } from './drop-indicator';

@@ -1,7 +1,7 @@
 import type { RendererDeviceKind } from '../../../devices';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/model';
-import type { RackInteractionCommit } from '../../components/rack/device-rack-types';
+import type { RackInteractionCommit } from '../rack/types';
 import {
   createRackClipboard,
   prepareClipboardInsert,

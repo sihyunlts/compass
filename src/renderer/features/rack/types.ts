@@ -7,7 +7,7 @@ import type {
 import type {
   ChainDragSourceKind,
   RackDropZone,
-} from '../../features/rack/drop-ops';
+} from './drop-ops';
 
 export interface RackScrollMetrics {
   scrollLeft: number;

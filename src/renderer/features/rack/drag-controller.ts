@@ -1,5 +1,5 @@
 import { clamp } from '../../../shared/math';
-import type { BrowserInsertSource } from '../../components/rack/device-rack-types';
+import type { BrowserInsertSource } from './types';
 import type {
   ChainDragSourceKind,
   RackDropZone,

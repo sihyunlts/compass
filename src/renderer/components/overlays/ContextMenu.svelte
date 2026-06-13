@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import type { ContextMenuTarget } from '../overlays/context-menu-types';
+  import type { ContextMenuTarget } from '../../features/context-menu/types';
   import {
     attachFloatingLayerDismissHandlers,
     isEventTargetWithinFloatingLayer,

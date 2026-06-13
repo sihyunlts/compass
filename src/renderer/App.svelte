@@ -14,7 +14,7 @@
     saveMainWindowAlwaysOnTop,
   } from './features/editor/persistence-storage';
   import BrowserPanel from './components/browser/BrowserPanel.svelte';
-  import type { ContextMenuTarget } from './components/overlays/context-menu-types';
+  import type { ContextMenuTarget } from './features/context-menu/types';
   import TextField from './components/fields/TextField.svelte';
   import Button from './components/primitives/Button.svelte';
   import DropdownSelect from './components/primitives/DropdownSelect.svelte';
@@ -23,7 +23,7 @@
   import UndoHistoryControl from './components/history/UndoHistoryControl.svelte';
   import type {
     RackScrollMetrics,
-  } from './components/rack/device-rack-types';
+  } from './features/rack/types';
   import RackHeaderScrollbar from './components/rack/RackHeaderScrollbar.svelte';
   import PreviewPanel from './components/preview/PreviewPanel.svelte';
   import ContextMenu from './components/overlays/ContextMenu.svelte';

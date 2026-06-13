@@ -17,9 +17,9 @@
     PresetFolderSelectionTarget,
     BrowserTreePresetLeafNode,
     BrowserTreePresetFolderNode,
-  } from './browser-tree-types';
-  import type { ContextMenuTarget } from '../overlays/context-menu-types';
-  import type { BrowserInsertSource } from '../rack/device-rack-types';
+  } from '../../features/browser/types';
+  import type { ContextMenuTarget } from '../../features/context-menu/types';
+  import type { BrowserInsertSource } from '../../features/rack/types';
 
   export type BrowserPanelPage = 'devices' | 'presets' | 'settings';
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { clamp } from '../../../shared/math';
-  import type { RackScrollMetrics } from '../rack/device-rack-types';
+  import type { RackScrollMetrics } from '../../features/rack/types';
 
   const KEYBOARD_SCROLL_STEP_PX = 56;
   const PAGE_SCROLL_RATIO = 0.9;
