@@ -5,7 +5,7 @@
     attachFloatingLayerDismissHandlers,
     isEventTargetWithinFloatingLayer,
     resolveViewportFloatingLayerPosition,
-  } from '../../features/rack/floating-layer';
+  } from './floating-layer';
 
   let {
     onCopy,

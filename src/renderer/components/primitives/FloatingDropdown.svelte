@@ -7,7 +7,7 @@
     attachFloatingLayerDismissHandlers,
     isEventTargetWithinFloatingLayer,
     resolveAnchoredFloatingLayerPosition,
-  } from '../../features/rack/floating-layer';
+  } from '../overlays/floating-layer';
 
   let {
     open = false,

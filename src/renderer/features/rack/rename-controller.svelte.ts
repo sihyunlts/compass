@@ -3,7 +3,7 @@ import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/model'
 import {
   attachFloatingLayerDismissHandlers,
   resolveAdjacentFloatingLayerPosition,
-} from './floating-layer';
+} from '../../components/overlays/floating-layer';
 import {
   isRenamingDevice,
   isRenamingGroup,
