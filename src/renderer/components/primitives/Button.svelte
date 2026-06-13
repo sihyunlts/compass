@@ -60,6 +60,8 @@
 
 <style lang="scss">
   .button {
+    --button-disabled-color: color-mix(in srgb, var(--neutral-90) 60%, transparent);
+
     border: 0;
     border-radius: var(--radius-6);
     background: var(--neutral-20);
@@ -69,7 +71,14 @@
     cursor: pointer;
     white-space: nowrap;
 
+    &:disabled {
+      cursor: default;
+      color: var(--button-disabled-color);
+    }
+
     &-primary {
+      --button-disabled-color: color-mix(in srgb, var(--accent-050) 60%, transparent);
+
       background: var(--accent-500);
       color: var(--accent-050);
     }
