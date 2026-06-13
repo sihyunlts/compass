@@ -8,8 +8,10 @@ import {
   getMainWindow,
   getPreviewWindow,
   confirmMainWindowClose,
+  isMainWindowAlwaysOnTop,
   isPreviewWindowOpen,
   openPreviewWindow,
+  setMainWindowAlwaysOnTop,
   updateMainWindowDocumentState,
 } from '../app-window';
 import { GeneratorService } from '../services/generator-service';
@@ -103,6 +105,16 @@ export const registerIpcHandlers = (
   ipcMain.handle(
     IPC_CHANNELS.confirmMainWindowClose,
     () => confirmMainWindowClose(),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.requestMainWindowAlwaysOnTop,
+    () => isMainWindowAlwaysOnTop(),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.setMainWindowAlwaysOnTop,
+    (_event, enabled: unknown) => setMainWindowAlwaysOnTop(enabled === true),
   );
 
   ipcMain.on(

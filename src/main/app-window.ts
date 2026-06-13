@@ -123,6 +123,18 @@ export const createMainWindow = (): BrowserWindow => {
   return mainWindow;
 };
 
+export const isMainWindowAlwaysOnTop = (): boolean =>
+  mainWindowRef?.isAlwaysOnTop() ?? false;
+
+export const setMainWindowAlwaysOnTop = (enabled: boolean): boolean => {
+  if (!mainWindowRef || mainWindowRef.isDestroyed()) {
+    return false;
+  }
+
+  mainWindowRef.setAlwaysOnTop(enabled, enabled ? 'floating' : 'normal');
+  return mainWindowRef.isAlwaysOnTop();
+};
+
 const createPreviewWindow = (): BrowserWindow => {
   const parent = mainWindowRef && !mainWindowRef.isDestroyed()
     ? mainWindowRef

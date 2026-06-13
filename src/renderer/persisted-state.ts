@@ -12,6 +12,7 @@ export interface PersistedRendererState {
   ui?: {
     sidebarWidthPx?: number;
     launchpadModel?: LaunchpadModel;
+    mainWindowAlwaysOnTop?: boolean;
   };
   palette?: {
     name?: string;
@@ -66,6 +67,9 @@ const pickPersistedUi = (
   return {
     ...(ui.sidebarWidthPx !== undefined ? { sidebarWidthPx: ui.sidebarWidthPx } : {}),
     ...(ui.launchpadModel !== undefined ? { launchpadModel: ui.launchpadModel } : {}),
+    ...(ui.mainWindowAlwaysOnTop !== undefined
+      ? { mainWindowAlwaysOnTop: ui.mainWindowAlwaysOnTop }
+      : {}),
   };
 };
 

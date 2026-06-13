@@ -114,6 +114,10 @@ const api: CompassApi = {
     mainWindowCloseRequestListeners.subscribe(listener),
   subscribeMainWindowRackFileMenuRequest: (listener) =>
     mainWindowRackFileMenuRequestListeners.subscribe(listener),
+  requestMainWindowAlwaysOnTop: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.requestMainWindowAlwaysOnTop) as Promise<boolean>,
+  setMainWindowAlwaysOnTop: (enabled: boolean) =>
+    ipcRenderer.invoke(IPC_CHANNELS.setMainWindowAlwaysOnTop, enabled) as Promise<boolean>,
   confirmMainWindowClose: () =>
     ipcRenderer.invoke(IPC_CHANNELS.confirmMainWindowClose),
   pushMainWindowDocumentState: (state: MainWindowDocumentState) => {

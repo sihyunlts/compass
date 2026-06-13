@@ -8,7 +8,11 @@
   import { clamp } from '../shared/math';
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
   import { DEVICE_BROWSER_TREE } from './features/editor/device-browser-categories';
-  import { sanitizeSidebarWidth } from './features/editor/persistence-storage';
+  import {
+    loadMainWindowAlwaysOnTop,
+    sanitizeSidebarWidth,
+    saveMainWindowAlwaysOnTop,
+  } from './features/editor/persistence-storage';
   import BrowserPanel from './components/browser/BrowserPanel.svelte';
   import type { ContextMenuTarget } from './components/overlays/context-menu-types';
   import TextField from './components/fields/TextField.svelte';
@@ -57,6 +61,7 @@
   const reserveBrowserTitlebarSpace = !isWebFallback && !hasWindowsTitlebarControls;
   let rackViewApi: RackViewApi | null = $state(null);
   let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
+  let mainWindowAlwaysOnTop = $state(loadMainWindowAlwaysOnTop());
 
   const closeContextMenu = (): void => {
     contextMenuComponent?.close();
@@ -299,6 +304,28 @@
     editorSession.commands.beginRenameFromContextTarget(target);
   };
 
+  const syncMainWindowAlwaysOnTop = async (): Promise<void> => {
+    if (isWebFallback) {
+      return;
+    }
+
+    const actual = mainWindowAlwaysOnTop
+      ? await bridgeClient.setMainWindowAlwaysOnTop(true)
+      : await bridgeClient.requestMainWindowAlwaysOnTop();
+    mainWindowAlwaysOnTop = actual;
+    saveMainWindowAlwaysOnTop(actual);
+  };
+
+  const handleMainWindowAlwaysOnTopToggle = async (): Promise<void> => {
+    if (isWebFallback) {
+      return;
+    }
+
+    const actual = await bridgeClient.setMainWindowAlwaysOnTop(!mainWindowAlwaysOnTop);
+    mainWindowAlwaysOnTop = actual;
+    saveMainWindowAlwaysOnTop(actual);
+  };
+
   onMount(() => {
     editorSession.initialize();
     playbackSession.initialize();
@@ -340,6 +367,7 @@
     );
 
     settingsController.initialize();
+    void syncMainWindowAlwaysOnTop();
     playbackSession.renderPreviewFrame();
     editorSession.scheduleAutoPreview(0);
 
@@ -378,6 +406,8 @@
 >
     <BrowserPanel
       reserveTitlebarSpace={reserveBrowserTitlebarSpace}
+      canToggleWindowLayer={!isWebFallback}
+      {mainWindowAlwaysOnTop}
       activePage={uiState.sidebarPage}
       deviceTree={DEVICE_BROWSER_TREE}
       presetTree={presetState.presetTree}
@@ -395,6 +425,7 @@
       onPageSelect={(nextPage) => {
         uiState.sidebarPage = nextPage;
       }}
+      onMainWindowAlwaysOnTopToggle={() => void handleMainWindowAlwaysOnTopToggle()}
       onDeviceAdd={editorSession.commands.addBrowserDevice}
       onBrowserPointerDown={editorSession.commands.handleBrowserPointerDown}
       onOpenContextMenu={(x, y, target) => contextMenuComponent?.open(x, y, target)}

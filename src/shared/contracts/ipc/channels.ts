@@ -11,6 +11,8 @@ export const IPC_CHANNELS = {
   previewWindowVisibilityUpdate: 'preview:window-visibility-update',
   mainWindowCloseRequest: 'app:main-window-close-request',
   mainWindowRackFileMenuRequest: 'app:main-window-rack-file-menu-request',
+  requestMainWindowAlwaysOnTop: 'app:request-main-window-always-on-top',
+  setMainWindowAlwaysOnTop: 'app:set-main-window-always-on-top',
   confirmMainWindowClose: 'app:confirm-main-window-close',
   pushMainWindowDocumentState: 'app:push-main-window-document-state',
   openExternal: 'bridge:open-external',

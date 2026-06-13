@@ -56,6 +56,8 @@ export interface CompassApi {
   subscribeMainWindowRackFileMenuRequest: (
     listener: (action: RackFileMenuAction) => void,
   ) => () => void;
+  requestMainWindowAlwaysOnTop: () => Promise<boolean>;
+  setMainWindowAlwaysOnTop: (enabled: boolean) => Promise<boolean>;
   confirmMainWindowClose: () => Promise<void>;
   pushMainWindowDocumentState: (state: MainWindowDocumentState) => void;
   subscribeLiveTempo: (

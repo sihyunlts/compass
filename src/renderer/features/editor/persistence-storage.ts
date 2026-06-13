@@ -128,3 +128,16 @@ export const saveLaunchpadModel = (model: LaunchpadModel): void => {
     },
   });
 };
+
+/** Loads the main window layer pin flag with `false` fallback for missing or invalid values. */
+export const loadMainWindowAlwaysOnTop = (): boolean =>
+  toBoolean(readPersistedRendererState().ui?.mainWindowAlwaysOnTop, false);
+
+/** Persists the main window layer pin flag as a strict boolean. */
+export const saveMainWindowAlwaysOnTop = (enabled: boolean): void => {
+  writePersistedRendererState({
+    ui: {
+      mainWindowAlwaysOnTop: enabled === true,
+    },
+  });
+};

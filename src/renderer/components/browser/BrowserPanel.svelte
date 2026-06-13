@@ -216,6 +216,8 @@
     pendingPresetFolderDraft = null,
     presetFolderSelectionTarget = null,
     reserveTitlebarSpace = true,
+    canToggleWindowLayer = false,
+    mainWindowAlwaysOnTop = false,
     launchpadMk2Enabled = false,
     paletteDescription = 'Default palette',
     paletteDescriptionTone = 'neutral',
@@ -224,6 +226,7 @@
     aboutDescriptionTone = 'neutral',
     githubDescription = '',
     onPageSelect = () => {},
+    onMainWindowAlwaysOnTopToggle = () => {},
     onDeviceAdd,
     onBrowserPointerDown,
     onOpenContextMenu = () => {},
@@ -247,6 +250,8 @@
     pendingPresetFolderDraft?: PendingPresetFolderDraft | null;
     presetFolderSelectionTarget?: PresetFolderSelectionTarget | null;
     reserveTitlebarSpace?: boolean;
+    canToggleWindowLayer?: boolean;
+    mainWindowAlwaysOnTop?: boolean;
     launchpadMk2Enabled?: boolean;
     paletteDescription?: string;
     paletteDescriptionTone?: 'neutral' | 'error';
@@ -255,6 +260,7 @@
     aboutDescriptionTone?: 'neutral' | 'error';
     githubDescription?: string;
     onPageSelect?: (page: BrowserPanelPage) => void;
+    onMainWindowAlwaysOnTopToggle?: () => void;
     onDeviceAdd: (kind: RendererDeviceKind) => void;
     onBrowserPointerDown: (payload: BrowserPointerDownPayload) => void;
     onOpenContextMenu?: (
@@ -637,6 +643,18 @@
         />
       </div>
       <div class="browser-page-switch-group">
+        {#if canToggleWindowLayer}
+          <Button
+            class="browser-page-switch-button"
+            style="--browser-page-accent:var(--accent-500);"
+            variant="icon"
+            label={mainWindowAlwaysOnTop ? 'Unpin window' : 'Pin window on top'}
+            title={mainWindowAlwaysOnTop ? 'Unpin window' : 'Pin window on top'}
+            icon="push_pin"
+            pressed={mainWindowAlwaysOnTop}
+            onClick={onMainWindowAlwaysOnTopToggle}
+          />
+        {/if}
         <Button
           class="browser-page-switch-button"
           style="--browser-page-accent:var(--category-utility-500);"

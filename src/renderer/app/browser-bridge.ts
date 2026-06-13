@@ -257,6 +257,8 @@ export const createBrowserCompassBridge = (): CompassApi => ({
   subscribePreviewWindowVisibility: () => createNoopSubscription(),
   subscribeMainWindowCloseRequest: () => createNoopSubscription(),
   subscribeMainWindowRackFileMenuRequest: () => createNoopSubscription(),
+  requestMainWindowAlwaysOnTop: async () => false,
+  setMainWindowAlwaysOnTop: async () => false,
   confirmMainWindowClose: async () => {},
   pushMainWindowDocumentState: () => {},
   subscribeLiveTempo: () => createNoopSubscription(),
