@@ -34,6 +34,31 @@ export interface MainWindowDocumentState {
 
 export type RackFileMenuAction = 'new' | 'save' | 'save-as';
 
+export type PreviewWindowControlRequest =
+  | { action: 'toggle-playback' }
+  | { action: 'toggle-loop' }
+  | { action: 'seek'; scrubValue: number };
+
+export const parsePreviewWindowControlRequest = (
+  value: unknown,
+): PreviewWindowControlRequest | null => {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const action = (value as { action?: unknown }).action;
+  if (action === 'toggle-playback' || action === 'toggle-loop') {
+    return { action };
+  }
+
+  const scrubValue = (value as { scrubValue?: unknown }).scrubValue;
+  if (action === 'seek' && typeof scrubValue === 'number' && Number.isFinite(scrubValue)) {
+    return { action, scrubValue };
+  }
+
+  return null;
+};
+
 export interface CompassApi {
   sendGeneratedPreview: (
     request: SendGeneratedPreviewRequest,
@@ -41,6 +66,7 @@ export interface CompassApi {
   requestAppVersion: () => Promise<string>;
   requestLiveTempo: () => Promise<RequestLiveTempoResponse>;
   openPreviewWindow: () => Promise<void>;
+  sendPreviewWindowControlRequest: (request: PreviewWindowControlRequest) => void;
   pushPreviewWindowState: (state: PreviewWindowState) => void;
   requestPreviewWindowState: () => Promise<PreviewWindowState | null>;
   requestPreviewWindowVisibility: () => Promise<boolean>;
@@ -49,6 +75,9 @@ export interface CompassApi {
   ) => () => void;
   subscribePreviewWindowVisibility: (
     listener: (isOpen: boolean) => void,
+  ) => () => void;
+  subscribePreviewWindowControlRequest: (
+    listener: (request: PreviewWindowControlRequest) => void,
   ) => () => void;
   subscribeMainWindowCloseRequest: (
     listener: () => void,

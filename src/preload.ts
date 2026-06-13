@@ -19,10 +19,12 @@ import type {
   ShowPresetsRootInFolderResponse,
 } from './shared/contracts/ipc/presets';
 import type { PreviewWindowState } from './shared/contracts/preview/window-state';
-import type {
-  CompassApi,
-  MainWindowDocumentState,
-  RackFileMenuAction,
+import {
+  parsePreviewWindowControlRequest,
+  type CompassApi,
+  type MainWindowDocumentState,
+  type PreviewWindowControlRequest,
+  type RackFileMenuAction,
 } from './shared/contracts/ipc/api';
 import type { LiveTempoUpdate } from './shared/bridge/types';
 
@@ -56,6 +58,7 @@ const createListenerSet = <T>(): ListenerSet<T> => {
 const liveTempoListeners = createListenerSet<LiveTempoUpdate>();
 const previewWindowStateListeners = createListenerSet<PreviewWindowState>();
 const previewWindowVisibilityListeners = createListenerSet<boolean>();
+const previewWindowControlRequestListeners = createListenerSet<PreviewWindowControlRequest>();
 const mainWindowCloseRequestListeners = createListenerSet<void>();
 const mainWindowRackFileMenuRequestListeners = createListenerSet<RackFileMenuAction>();
 
@@ -74,6 +77,16 @@ ipcRenderer.on(
   IPC_CHANNELS.previewWindowVisibilityUpdate,
   (_event, payload: boolean) => {
     previewWindowVisibilityListeners.emit(payload === true);
+  },
+);
+
+ipcRenderer.on(
+  IPC_CHANNELS.previewWindowControlRequest,
+  (_event, payload: PreviewWindowControlRequest) => {
+    const parsedPayload = parsePreviewWindowControlRequest(payload);
+    if (parsedPayload) {
+      previewWindowControlRequestListeners.emit(parsedPayload);
+    }
   },
 );
 
@@ -99,6 +112,9 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.requestLiveTempo),
   openPreviewWindow: () =>
     ipcRenderer.invoke(IPC_CHANNELS.openPreviewWindow),
+  sendPreviewWindowControlRequest: (request: PreviewWindowControlRequest) => {
+    ipcRenderer.send(IPC_CHANNELS.previewWindowControlRequest, request);
+  },
   pushPreviewWindowState: (state) => {
     ipcRenderer.send(IPC_CHANNELS.pushPreviewWindowState, state);
   },
@@ -110,6 +126,8 @@ const api: CompassApi = {
     previewWindowStateListeners.subscribe(listener),
   subscribePreviewWindowVisibility: (listener) =>
     previewWindowVisibilityListeners.subscribe(listener),
+  subscribePreviewWindowControlRequest: (listener) =>
+    previewWindowControlRequestListeners.subscribe(listener),
   subscribeMainWindowCloseRequest: (listener) =>
     mainWindowCloseRequestListeners.subscribe(listener),
   subscribeMainWindowRackFileMenuRequest: (listener) =>

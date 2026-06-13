@@ -139,15 +139,33 @@ const createPreviewWindow = (): BrowserWindow => {
   const parent = mainWindowRef && !mainWindowRef.isDestroyed()
     ? mainWindowRef
     : undefined;
+  const isMac = process.platform === 'darwin';
+  const isWindows = process.platform === 'win32';
   const previewWindow = new BrowserWindow({
-    width: 480,
-    height: 560,
+    width: 320,
+    height: 420,
     minWidth: 320,
     minHeight: 360,
     title: 'Compass Preview',
     show: false,
     backgroundColor: WINDOW_BACKGROUND_COLOR,
     parent,
+    ...(isMac
+      ? {
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: { x: 12, y: 12 },
+        }
+      : {}),
+    ...(isWindows
+      ? {
+          titleBarStyle: 'hidden' as const,
+          titleBarOverlay: {
+            color: WINDOW_BACKGROUND_COLOR,
+            symbolColor: '#d7dde4',
+            height: 32,
+          },
+        }
+      : {}),
     webPreferences: {
       preload: PRELOAD_ENTRY_PATH,
       contextIsolation: true,

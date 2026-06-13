@@ -250,11 +250,13 @@ export const createBrowserCompassBridge = (): CompassApi => ({
   openPreviewWindow: async () => {
     throw new Error('Preview popout is only available in the Electron app.');
   },
+  sendPreviewWindowControlRequest: () => {},
   pushPreviewWindowState: () => {},
   requestPreviewWindowState: async () => null,
   requestPreviewWindowVisibility: async () => false,
   subscribePreviewWindowState: () => createNoopSubscription(),
   subscribePreviewWindowVisibility: () => createNoopSubscription(),
+  subscribePreviewWindowControlRequest: () => createNoopSubscription(),
   subscribeMainWindowCloseRequest: () => createNoopSubscription(),
   subscribeMainWindowRackFileMenuRequest: () => createNoopSubscription(),
   requestMainWindowAlwaysOnTop: async () => false,

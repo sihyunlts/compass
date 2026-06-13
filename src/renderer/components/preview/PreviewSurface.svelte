@@ -9,13 +9,42 @@
 
   type PreviewSurfaceMode = "rack" | "popout";
 
-  let { surfaceModel = createEmptyPreviewSurfaceViewModel(), mode = "rack" } =
-    $props<{
+  let {
+    surfaceModel = createEmptyPreviewSurfaceViewModel(),
+    mode = "rack",
+    sizePx = null,
+  } = $props<{
       surfaceModel?: PreviewSurfaceViewModel;
       mode: PreviewSurfaceMode;
+      sizePx?: number | null;
     }>();
 
   let surfaceHeight = $state(0);
+  const surfaceSize = $derived(
+    mode === "popout" && sizePx !== null && sizePx > 0
+      ? sizePx
+      : surfaceHeight,
+  );
+  const surfaceScale = $derived(
+    mode === "popout" && surfaceSize > 0
+      ? Math.min(Math.max(surfaceSize / 280, 1), 3)
+      : 1,
+  );
+  const surfaceStyle = $derived.by(() => {
+    if (surfaceSize <= 0) {
+      return `--preview-surface-scale:${surfaceScale.toFixed(3)};`;
+    }
+
+    if (mode === "popout") {
+      return [
+        `width: ${surfaceSize}px`,
+        `height: ${surfaceSize}px`,
+        `--preview-surface-scale:${surfaceScale.toFixed(3)}`,
+      ].join(";");
+    }
+
+    return `width: ${surfaceHeight}px`;
+  });
 
   const resolveLedRgbByCellKey = (
     nextSurfaceModel: PreviewSurfaceViewModel,
@@ -64,7 +93,7 @@
   class="preview-launchpad"
   class:mode-popout={mode === "popout"}
   bind:clientHeight={surfaceHeight}
-  style={surfaceHeight > 0 ? `width: ${surfaceHeight}px` : ""}
+  style={surfaceStyle}
   role="img"
   aria-label="Launchpad LED preview"
 >
@@ -83,18 +112,30 @@
 
 <style lang="scss">
   .preview-launchpad {
-    border: 1px solid var(--neutral-20);
-    border-radius: var(--radius-4);
+    --preview-border-width: 1px;
+    --preview-gap: var(--gap-2);
+    --preview-padding: var(--gap-8);
+    --preview-edge-inset: var(--gap-2);
+    --preview-radius: var(--radius-4);
+
+    border: var(--preview-border-width) solid var(--neutral-20);
+    border-radius: var(--preview-radius);
     background: var(--neutral-00);
     flex: 1;
     display: grid;
     grid-template-columns: repeat(10, minmax(0, 1fr));
     grid-template-rows: repeat(10, minmax(0, 1fr));
-    gap: var(--gap-2);
-    padding: var(--gap-8);
+    gap: var(--preview-gap);
+    padding: var(--preview-padding);
 
     &.mode-popout {
-      width: 100%;
+      --preview-border-width: max(1px, calc(1px * var(--preview-surface-scale)));
+      --preview-gap: calc(var(--gap-2) * var(--preview-surface-scale));
+      --preview-padding: calc(var(--gap-8) * var(--preview-surface-scale));
+      --preview-edge-inset: calc(var(--gap-2) * var(--preview-surface-scale));
+      --preview-radius: calc(var(--radius-4) * var(--preview-surface-scale));
+
+      flex: 0 0 auto;
       min-height: 0;
       max-width: 100%;
       max-height: 100%;
@@ -117,7 +158,7 @@
         &::after {
           content: "";
           position: absolute;
-          inset: 0.125rem;
+          inset: var(--preview-edge-inset);
           background: var(--neutral-00);
           pointer-events: none;
         }

@@ -1,5 +1,7 @@
 import type { GeneratorChain, LaunchpadModel } from '../../model';
 
+export const PREVIEW_SCRUB_MAX = 1000;
+
 export interface PreviewWindowState {
   activeCells: Array<{
     pitch: number;

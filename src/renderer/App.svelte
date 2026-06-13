@@ -365,6 +365,22 @@
         void presetController.handleSaveRackAs();
       },
     );
+    const disposePreviewWindowControlRequest = bridgeClient.subscribePreviewWindowControlRequest(
+      (request) => {
+        if (request.action === 'toggle-playback') {
+          playbackSession.togglePlayback();
+          return;
+        }
+
+        if (request.action === 'toggle-loop') {
+          playbackSession.togglePreviewLoop();
+          return;
+        }
+
+        uiState.previewScrubValue = request.scrubValue;
+        playbackSession.seekPreview(uiState.previewScrubValue);
+      },
+    );
 
     settingsController.initialize();
     void syncMainWindowAlwaysOnTop();
@@ -372,6 +388,7 @@
     editorSession.scheduleAutoPreview(0);
 
     return () => {
+      disposePreviewWindowControlRequest();
       disposeMainWindowRackFileMenuRequest();
       disposeMainWindowCloseRequest();
       disposeKeyboardShortcuts();

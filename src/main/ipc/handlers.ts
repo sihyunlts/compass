@@ -3,7 +3,10 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { IPC_CHANNELS } from '../../shared/contracts/ipc/channels';
 import type { PreviewWindowState } from '../../shared/contracts/preview/window-state';
 import type { SendGeneratedPreviewRequest } from '../../shared/contracts/ipc/generator';
-import type { MainWindowDocumentState } from '../../shared/contracts/ipc/api';
+import {
+  parsePreviewWindowControlRequest,
+  type MainWindowDocumentState,
+} from '../../shared/contracts/ipc/api';
 import {
   getMainWindow,
   getPreviewWindow,
@@ -91,6 +94,23 @@ export const registerIpcHandlers = (
 
     sendState();
   });
+
+  ipcMain.on(
+    IPC_CHANNELS.previewWindowControlRequest,
+    (_event, request) => {
+      const parsedRequest = parsePreviewWindowControlRequest(request);
+      if (!parsedRequest) {
+        return;
+      }
+
+      const mainWindow = getMainWindow();
+      if (!mainWindow) {
+        return;
+      }
+
+      mainWindow.webContents.send(IPC_CHANNELS.previewWindowControlRequest, parsedRequest);
+    },
+  );
 
   ipcMain.handle(
     IPC_CHANNELS.requestPreviewWindowState,

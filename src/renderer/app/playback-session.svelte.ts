@@ -1,6 +1,7 @@
 import type { BridgeSettings } from '../../shared/bridge/types';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { GeneratorPreview } from '../../shared/contracts/preview/generator-preview';
+import { PREVIEW_SCRUB_MAX } from '../../shared/contracts/preview/window-state';
 import { clamp } from '../../shared/math';
 import {
   cloneChainForIpc,
@@ -57,7 +58,6 @@ interface CachedGeneratedPreview {
 }
 
 const DEFAULT_PREVIEW_WINDOW_STATE_MAX_FPS = 120;
-const DEFAULT_SCRUB_MAX = 1000;
 
 const hashPreviewSource = (chain: GeneratorChain): string => {
   const source = JSON.stringify(chain);
@@ -146,7 +146,7 @@ export class PlaybackSessionController {
 
     const progress = nextPreviewWindowState.currentBeat / nextPreviewWindowState.sourceTimelineEndBeat;
     const nextPreviewScrubValue = Math.round(
-      clamp(progress, 0, 1) * (this.options.scrubMax ?? DEFAULT_SCRUB_MAX),
+      clamp(progress, 0, 1) * (this.options.scrubMax ?? PREVIEW_SCRUB_MAX),
     );
     if (uiState.previewScrubValue !== nextPreviewScrubValue) {
       uiState.previewScrubValue = nextPreviewScrubValue;
@@ -280,7 +280,7 @@ export class PlaybackSessionController {
 
   public seekPreview(scrubValue: number): void {
     const scrubProgress = clamp(
-      Number(scrubValue) / (this.options.scrubMax ?? DEFAULT_SCRUB_MAX),
+      Number(scrubValue) / (this.options.scrubMax ?? PREVIEW_SCRUB_MAX),
       0,
       1,
     );

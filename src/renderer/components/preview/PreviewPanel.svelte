@@ -1,10 +1,9 @@
 <script lang="ts">
   import { clamp } from '../../../shared/math';
+  import { PREVIEW_SCRUB_MAX } from '../../../shared/contracts/preview/window-state';
   import type { PreviewSurfaceViewModel } from '../../features/preview/view-model';
   import Button from '../primitives/Button.svelte';
   import PreviewSurface from './PreviewSurface.svelte';
-
-  const SCRUB_MAX = 1000;
 
   let {
     surfaceModel,
@@ -54,9 +53,9 @@
         class="preview-panel-scrub"
         type="range"
         min="0"
-        max={SCRUB_MAX}
+        max={PREVIEW_SCRUB_MAX}
         bind:value={scrubValue}
-        style={`--range-fill:${clamp((scrubValue / SCRUB_MAX) * 100, 0, 100)}%`}
+        style={`--range-fill:${clamp((scrubValue / PREVIEW_SCRUB_MAX) * 100, 0, 100)}%`}
         oninput={onScrubInput}
       />
       {#if isGenerating}

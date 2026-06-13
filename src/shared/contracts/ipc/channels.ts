@@ -4,6 +4,7 @@ export const IPC_CHANNELS = {
   requestLiveTempo: 'bridge:request-live-tempo',
   liveTempoUpdate: 'live:tempo-update',
   openPreviewWindow: 'preview:open-window',
+  previewWindowControlRequest: 'preview:control-request',
   pushPreviewWindowState: 'preview:push-state',
   previewWindowStateUpdate: 'preview:state-update',
   requestPreviewWindowState: 'preview:request-state',

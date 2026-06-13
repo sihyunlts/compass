@@ -53,4 +53,9 @@ body[data-runtime='web'] {
     border-top: 1px solid var(--neutral-20);
     border-bottom: 1px solid var(--neutral-20);
   }
+
+  &.is-preview-popout {
+    width: 100%;
+    max-height: none;
+  }
 }
