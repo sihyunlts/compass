@@ -302,6 +302,7 @@
   let selectedRowId = $state<string | null>(null);
   let pendingPresetFolderInputEl = $state<HTMLInputElement | null>(null);
   let skipPendingPresetFolderBlurId = $state<string | null>(null);
+  let focusedPresetDraftKey = $state<string | null>(null);
 
   const activeTreeRoots = $derived.by(() => {
     if (activePage === 'devices') {
@@ -317,6 +318,17 @@
   const expandedFolderIdSet = $derived.by(() => new Set(expandedFolderIds));
   const visibleRows = $derived.by(() =>
     collectVisibleRows(activeTreeRoots, expandedFolderIdSet));
+  const pendingPresetDraftKey = $derived(
+    pendingPresetFolderDraft
+      ? [
+          pendingPresetFolderDraft.mode,
+          pendingPresetFolderDraft.entryKind,
+          pendingPresetFolderDraft.presetType,
+          pendingPresetFolderDraft.relativePath.join('/'),
+          pendingPresetFolderDraft.temporaryId ?? '',
+        ].join(':')
+      : null,
+  );
 
   const isFolderExpanded = (folderId: string): boolean =>
     expandedFolderIdSet.has(folderId);
@@ -571,6 +583,7 @@
   $effect(() => {
     const draft = pendingPresetFolderDraft;
     if (!draft) {
+      focusedPresetDraftKey = null;
       return;
     }
 
@@ -596,7 +609,8 @@
       selectedRowId = targetRowId;
     }
 
-    if (didExpandFolders || didSelectPendingRow) {
+    if (focusedPresetDraftKey !== pendingPresetDraftKey) {
+      focusedPresetDraftKey = pendingPresetDraftKey;
       void tick().then(() => {
         pendingPresetFolderInputEl?.focus();
         pendingPresetFolderInputEl?.select();
@@ -956,6 +970,7 @@
     }
 
     &-label {
+      flex: 1 1 auto;
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -963,8 +978,11 @@
     }
 
     &-input {
+      flex: 1 1 0;
       min-width: 0;
-      width: 100%;
+      width: 0;
+      height: 1.5rem;
+      padding: 0;
       font: inherit;
     }
   }
