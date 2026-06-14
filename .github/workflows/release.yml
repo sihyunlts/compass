@@ -23,8 +23,6 @@ jobs:
             artifact-name: compass-windows-x64
             artifact-path: |
               out/make/**/*.exe
-              out/make/**/*.nupkg
-              out/make/**/RELEASES
           - name: macOS arm64
             os: macos-26
             platform: darwin
@@ -32,7 +30,6 @@ jobs:
             artifact-name: compass-macos-arm64
             artifact-path: |
               out/make/**/*.dmg
-              out/make/**/*.zip
 
     steps:
       - name: Checkout repository
