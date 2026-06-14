@@ -2,7 +2,10 @@
 
 Compass is a Launchpad lightshow tool for experimenting with the lights you have imagined, built to be used together with Ableton Live.
 
-## A Few Things to Know
+> [!WARNING]
+> I will explain this in more detail below, but Compass is not polished software or a stable project. On top of that, I am not thinking about backward compatibility at all right now, so racks you make today may stop working in the next version.
+
+## A few things to know
 
 **Pretty much everything here was written by AI.** I can read markup and stylesheets like HTML and CSS to some extent, but outside of that I basically cannot read code at all.
 
@@ -12,7 +15,7 @@ The reason I started making this software was to test whether an idea I had alwa
 
 That said, you are totally welcome to take this and plug it into your own project, or use it as a starting point for something else. (0BSD license.)
 
-## Why Does This Even Exist?
+## Why does this even exist?
 
 Most lightshow software works by having you draw patterns frame by frame, then paint colors onto them. It is simple, clean, and gets the job done, but stacking multiple effects on top of each other is a pain. For example, if you want to rotate an effect while preserving the output properly, you can only rotate it in 90-degree steps.
 
@@ -20,17 +23,25 @@ Compass does things differently. While racks are being processed, it does not ba
 
 https://github.com/user-attachments/assets/eca40f46-12f4-406c-8c69-3ab6e7293a05
 
-## How to Use It With Ableton Live
+## How to use it
 
 Compass is not a standalone app. It generates MIDI notes and sends them into Ableton Live through a Max for Live bridge.
 
-1. Open Ableton Live and add `CompassBridge-v1.0.1.amxd` to your set.
+The minimum supported version is Ableton Live 10 with Max 8.
+
+1. Open Ableton Live and add `CompassBridge-vX.X.X.amxd` to any MIDI track in your set.
 2. Open the Compass desktop app.
 3. Build a rack in Compass and preview the result.
 4. Select a MIDI clip in Ableton Live if you want Compass to replace that clip's notes. If no MIDI clip is open, select a MIDI track and Compass will try to create an arrangement clip at the current playhead position.
 5. Press `Send` in Compass.
 
-## Can It Replace Plugins Like Eyedrop?
+Because the macOS build is not signed, you will likely need to remove the quarantine flag manually after installing it:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Compass.app
+```
+
+## Can it replace plugins like Eyedrop?
 
 **No.** Like I said, Compass generates visuals from a completely different foundation, and that cuts both ways. Honestly, drawing effects frame by frame in Ableton Live still gets you cleaner, sharper results most of the time.
 
