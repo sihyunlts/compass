@@ -14,5 +14,8 @@ export const LIVE_TEMPO_ENDPOINT = Object.freeze({
   address: '/compass/live-tempo',
 });
 
+/** Diagnostic status messages emitted by the M4L bridge on the shared app UDP port. */
+export const LIVE_BRIDGE_STATUS_ADDRESS = '/compass/bridge-status';
+
 /** Maximum UDP packet payload size used when chunking OSC clip-note messages. */
 export const MAX_UDP_PACKET_BYTES = 8 * 1024;

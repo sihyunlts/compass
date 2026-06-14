@@ -1,6 +1,9 @@
 import dgram from 'node:dgram';
 
-import { LIVE_TEMPO_ENDPOINT } from '../../shared/bridge/protocol';
+import {
+  LIVE_BRIDGE_STATUS_ADDRESS,
+  LIVE_TEMPO_ENDPOINT,
+} from '../../shared/bridge/protocol';
 import type { LiveTempoUpdate } from '../../shared/bridge/types';
 
 const OSC_ALIGNMENT = 4;
@@ -67,9 +70,40 @@ const parseTempoBpmFromJson = (raw: string): number | null => {
   return Number.isFinite(bpm) ? bpm : null;
 };
 
+const reportBridgeStatusFromJson = (raw: string): void => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return;
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return;
+  }
+
+  const event = (parsed as { event?: unknown }).event;
+  if (event !== 'bridge_status') {
+    return;
+  }
+
+  const level = (parsed as { level?: unknown }).level === 'error' ? 'error' : 'status';
+  const messageValue = (parsed as { message?: unknown }).message;
+  const message = typeof messageValue === 'string' && messageValue.trim()
+    ? messageValue.trim()
+    : raw;
+  const prefix = '[m4l-bridge]';
+  if (level === 'error') {
+    console.error(prefix, message);
+    return;
+  }
+
+  console.log(prefix, message);
+};
+
 const parseTempoBpmFromOsc = (buffer: Buffer): number | null => {
   const addressField = readOscString(buffer, 0);
-  if (!addressField || addressField.value !== LIVE_TEMPO_ENDPOINT.address) {
+  if (!addressField) {
     return null;
   }
 
@@ -80,6 +114,15 @@ const parseTempoBpmFromOsc = (buffer: Buffer): number | null => {
 
   const argumentField = readOscString(buffer, typeField.nextOffset);
   if (!argumentField) {
+    return null;
+  }
+
+  if (addressField.value === LIVE_BRIDGE_STATUS_ADDRESS) {
+    reportBridgeStatusFromJson(argumentField.value);
+    return null;
+  }
+
+  if (addressField.value !== LIVE_TEMPO_ENDPOINT.address) {
     return null;
   }
 

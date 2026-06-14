@@ -10,6 +10,7 @@ outlets = 3;
 
 var DEFAULT_INCOMING_OSC_PATH = "/compass/clip-notes";
 var TEMPO_OSC_PATH = "/compass/live-tempo";
+var STATUS_OSC_PATH = "/compass/bridge-status";
 
 var AUTO_TARGET_TTL_MS = 5000;
 var TEMPO_POLL_INTERVAL_MS = 250;
@@ -692,13 +693,38 @@ function sendTempoUpdate(forceSend) {
 }
 
 function status() {
-  outlet(0, arrayfromargs(arguments));
+  var args = arrayfromargs(arguments);
+  outlet(0, args);
+  emitBridgeStatus("status", args);
 }
 
 function errorOut(code, message) {
   var msg = code + ": " + message;
   outlet(0, "error", msg);
   outlet(1, "error", msg);
+  emitBridgeStatus("error", [msg]);
+}
+
+function emitBridgeStatus(level, args) {
+  try {
+    outlet(2, STATUS_OSC_PATH, JSON.stringify({
+      event: "bridge_status",
+      level: level,
+      message: argsToStatusMessage(args),
+      args: args,
+    }));
+  } catch (_e) {}
+}
+
+function argsToStatusMessage(args) {
+  if (!args || !args.length) {
+    return "";
+  }
+  var out = [];
+  for (var i = 0; i < args.length; i++) {
+    out.push(String(args[i]));
+  }
+  return out.join(" ");
 }
 
 function nowMs() {
