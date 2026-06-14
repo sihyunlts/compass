@@ -1,3 +1,6 @@
+import path from 'node:path';
+import { rename, rm } from 'node:fs/promises';
+
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
@@ -7,6 +10,10 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { version } from './package.json';
+
+const RELEASE_VERSION = `v${version}`;
+const ARTIFACT_NAME = `Compass-${RELEASE_VERSION}`;
 
 const PRESET_DOCUMENT_TYPES = [
   {
@@ -55,13 +62,42 @@ const config: ForgeConfig = {
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
+      setupExe: `${ARTIFACT_NAME}-Setup.exe`,
       setupIcon: 'assets/compass.ico',
     }),
     new MakerZIP({}, ['darwin']),
-    new MakerDMG({}, ['darwin']),
+    new MakerDMG({
+      name: ARTIFACT_NAME,
+    }, ['darwin']),
     new MakerRpm({}),
     new MakerDeb({}),
   ],
+  hooks: {
+    postMake: async (_forgeConfig, makeResults) => Promise.all(makeResults.map(async (result) => {
+      result.artifacts = await Promise.all(result.artifacts.map(async (artifact) => {
+        const extension = path.extname(artifact);
+        if (extension !== '.dmg' && extension !== '.zip' && extension !== '.exe') {
+          return artifact;
+        }
+
+        const suffix = extension === '.exe'
+          ? `-${result.arch}-Setup.exe`
+          : `-${result.arch}${extension}`;
+        const nextArtifact = path.join(
+          path.dirname(artifact),
+          `${ARTIFACT_NAME}${suffix}`,
+        );
+        if (nextArtifact === artifact) {
+          return artifact;
+        }
+
+        await rm(nextArtifact, { force: true });
+        await rename(artifact, nextArtifact);
+        return nextArtifact;
+      }));
+      return result;
+    })),
+  },
   plugins: [
     new VitePlugin({
       // `build` can specify multiple entry builds, which can be Main process, Preload scripts, Worker process, etc.
