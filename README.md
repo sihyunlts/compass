@@ -24,7 +24,7 @@ https://github.com/user-attachments/assets/eca40f46-12f4-406c-8c69-3ab6e7293a05
 
 Compass is not a standalone app. It generates MIDI notes and sends them into Ableton Live through a Max for Live bridge.
 
-1. Open Ableton Live and add `max4live/CompassBridge.amxd` to your set.
+1. Open Ableton Live and add `CompassBridge-v1.0.1.amxd` to your set.
 2. Open the Compass desktop app.
 3. Build a rack in Compass and preview the result.
 4. Select a MIDI clip in Ableton Live if you want Compass to replace that clip's notes. If no MIDI clip is open, select a MIDI track and Compass will try to create an arrangement clip at the current playhead position.

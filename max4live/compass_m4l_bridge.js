@@ -1,6 +1,6 @@
 /**
  * Bridges Compass OSC envelopes with Live clip and tempo operations in Max for Live.
- * Minimum supported: Ableton Live 11 + Max 8.
+ * Minimum supported: Ableton Live 10 + Max 8.
  */
 
 autowatch = 1;
@@ -11,8 +11,8 @@ outlets = 3;
 var DEFAULT_INCOMING_OSC_PATH = "/compass/clip-notes";
 var TEMPO_OSC_PATH = "/compass/live-tempo";
 var STATUS_OSC_PATH = "/compass/bridge-status";
+var BRIDGE_VERSION = "v1.0.1";
 
-var AUTO_TARGET_TTL_MS = 5000;
 var TEMPO_POLL_INTERVAL_MS = 250;
 var CREATE_MIDI_CLIP_SUPPORT_UNKNOWN = -1;
 var CREATE_MIDI_CLIP_SUPPORT_NO = 0;
@@ -20,24 +20,31 @@ var CREATE_MIDI_CLIP_SUPPORT_YES = 1;
 
 // Retry LiveAPI root resolution to avoid noisy failures during device boot.
 var LIVEAPI_RESOLVE_RETRY_MS = 1000;
+var LIVE10_DETAIL_CLIP_RETRY_MS = 120;
 
 var MIN_CLIP_LENGTH_BEATS = 0.25;
 var DEFAULT_AUTO_CREATE_LENGTH_BEATS = 4.0;
 
 var expectedOscPath = DEFAULT_INCOMING_OSC_PATH;
 
-var lastAutoTargetClipId = 0;
-var lastAutoTargetTimestampMs = 0;
+var pendingChunkTransferId = "";
+var pendingChunkCount = 0;
+var pendingChunkNotesByIndex = [];
+var pendingChunkReceived = 0;
 
 var lastSentTempo = null;
 var tempoPollTask = null;
+var selectionRetryTask = null;
 var createMidiClipSupport = CREATE_MIDI_CLIP_SUPPORT_UNKNOWN;
 
 // Cache root LiveAPI objects after the first successful resolve.
 var liveSetApi = null;
 var liveSetViewApi = null;
+var liveAppApi = null;
+var liveMajorVersion = null;
 var lastLiveSetResolveAttemptMs = 0;
 var lastViewResolveAttemptMs = 0;
+var lastLiveAppResolveAttemptMs = 0;
 
 function set_path(path) {
   expectedOscPath = path || DEFAULT_INCOMING_OSC_PATH;
@@ -45,7 +52,7 @@ function set_path(path) {
 }
 
 function bang() {
-  status("ready", "path", expectedOscPath);
+  status("ready", BRIDGE_VERSION, "path", expectedOscPath);
 }
 
 function loadbang() {
@@ -140,7 +147,10 @@ function parseJsonEnvelope(payloadText) {
 }
 
 function applyClipNotesEnvelope(envelope) {
-  var applyMode = envelope.applyMode === "append" ? "append" : "replace";
+  envelope = collectChunkedClipNotesEnvelope(envelope);
+  if (!envelope) {
+    return;
+  }
 
   if (!envelope.notes || !envelope.notes.length) {
     status("empty_notes");
@@ -152,39 +162,132 @@ function applyClipNotesEnvelope(envelope) {
     status("empty_notes");
     return;
   }
-  var sourceLength = computeSourceLengthBeats(envelope, normalized);
+  var requiredClipLength = resolveRequiredClipLength(envelope, normalized);
+  var shouldRetrySelection = shouldUseLegacyNoteApi();
 
-  var autoCreateLength = toNumber(envelope.autoCreateLengthBeats, DEFAULT_AUTO_CREATE_LENGTH_BEATS);
-  if (!isFinite(autoCreateLength) || autoCreateLength <= 0) {
-    autoCreateLength = DEFAULT_AUTO_CREATE_LENGTH_BEATS;
-  }
-  autoCreateLength = Math.max(autoCreateLength, MIN_CLIP_LENGTH_BEATS);
-  var requiredClipLength = Math.max(
-    roundBeat(autoCreateLength * sourceLength),
-    MIN_CLIP_LENGTH_BEATS
+  applyResolvedClipNotes(
+    normalized.notes,
+    requiredClipLength,
+    shouldRetrySelection
   );
+}
 
-  var targetClip = resolveTargetMidiClip(applyMode, requiredClipLength);
-  if (!targetClip) {
+function applyResolvedClipNotes(notes, requiredClipLength, shouldRetrySelection) {
+  var target = resolveSelectedMidiClipTarget();
+  if (target) {
+    applyNotesToSelectedTarget(target, notes, requiredClipLength);
     return;
   }
 
-  if (applyMode === "replace") {
-    var existingLength = readClipLengthBeats(targetClip, requiredClipLength);
-    if (existingLength + 1e-6 < requiredClipLength) {
-      safeSetClipMarkers(targetClip, requiredClipLength);
+  if (shouldRetrySelection) {
+    deferApplyResolvedClipNotes(notes, requiredClipLength);
+    return;
+  }
+
+  applyNotesToNewArrangementClipOnSelectedTrack(
+    notes,
+    requiredClipLength
+  );
+}
+
+function deferApplyResolvedClipNotes(notes, requiredClipLength) {
+  if (typeof Task !== "function") {
+    applyResolvedClipNotes(notes, requiredClipLength, false);
+    return;
+  }
+
+  if (selectionRetryTask) {
+    try {
+      selectionRetryTask.cancel();
+    } catch (_e) {}
+    selectionRetryTask = null;
+  }
+
+  selectionRetryTask = new Task(function () {
+    selectionRetryTask = null;
+    applyResolvedClipNotes(notes, requiredClipLength, false);
+  }, this);
+  selectionRetryTask.schedule(LIVE10_DETAIL_CLIP_RETRY_MS);
+  status("selection_retry_scheduled", LIVE10_DETAIL_CLIP_RETRY_MS);
+}
+
+function collectChunkedClipNotesEnvelope(envelope) {
+  // Live 10's legacy note sequence is replace-based, so transport chunks must be
+  // reassembled before writing notes to avoid later chunks replacing earlier ones.
+  var chunkCount = Math.floor(toNumber(envelope.chunkCount, 1));
+  if (!isFinite(chunkCount) || chunkCount <= 1) {
+    return envelope;
+  }
+
+  var chunkIndex = Math.floor(toNumber(envelope.chunkIndex, -1));
+  var transferId =
+    typeof envelope.chunkTransferId === "string" ? envelope.chunkTransferId : "";
+  if (!transferId || !isFinite(chunkIndex) || chunkIndex < 0 || chunkIndex >= chunkCount) {
+    resetPendingChunkTransfer();
+    errorOut("invalid_chunk", chunkIndex, "count", chunkCount);
+    return null;
+  }
+
+  if (pendingChunkTransferId !== transferId) {
+    pendingChunkTransferId = transferId;
+    pendingChunkCount = chunkCount;
+    pendingChunkNotesByIndex = [];
+    pendingChunkReceived = 0;
+  }
+
+  if (pendingChunkCount !== chunkCount) {
+    resetPendingChunkTransfer();
+    errorOut("chunk_count_changed", transferId);
+    return null;
+  }
+
+  if (!(pendingChunkNotesByIndex[chunkIndex] instanceof Array)) {
+    pendingChunkReceived += 1;
+  }
+  pendingChunkNotesByIndex[chunkIndex] = envelope.notes ? envelope.notes.slice(0) : [];
+
+  if (pendingChunkReceived < pendingChunkCount) {
+    status("chunk_received", chunkIndex + 1, "of", pendingChunkCount);
+    return null;
+  }
+
+  var notes = [];
+  for (var i = 0; i < pendingChunkCount; i++) {
+    var chunkNotes = pendingChunkNotesByIndex[i];
+    if (!(chunkNotes instanceof Array)) {
+      resetPendingChunkTransfer();
+      errorOut("missing_chunk", transferId, i);
+      return null;
+    }
+
+    for (var j = 0; j < chunkNotes.length; j++) {
+      notes.push(chunkNotes[j]);
     }
   }
 
-  var clipLength = readClipLengthBeats(targetClip, requiredClipLength);
-  var scaledNotes = scaleNotesToClip(normalized.notes, sourceLength, clipLength);
+  envelope.notes = notes;
+  resetPendingChunkTransfer();
+  status("chunk_assembled", "chunks", chunkCount, "notes", notes.length);
+  return envelope;
+}
 
-  if (applyMode === "replace") {
-    clearClipNotes(targetClip, clipLength);
-  }
+function resetPendingChunkTransfer() {
+  pendingChunkTransferId = "";
+  pendingChunkCount = 0;
+  pendingChunkNotesByIndex = [];
+  pendingChunkReceived = 0;
+}
 
-  writeNotesToClip(targetClip, scaledNotes);
-  status("applied", applyMode, "notes", scaledNotes.length);
+function applyNotesToSelectedClip(targetClip, notes, sourceLength) {
+  var clipLength = readClipLengthBeats(targetClip, sourceLength);
+  applyNotesToClip(targetClip, notes, sourceLength, clipLength);
+}
+
+function applyNotesToClip(targetClip, notes, sourceLength, clipLength) {
+  var fittedNotes = fitNotesToClipLength(notes, sourceLength, clipLength);
+
+  replaceClipNotes(targetClip, fittedNotes, clipLength);
+  status("applied", "replace", "notes", fittedNotes.length);
 }
 
 function normalizeNotes(notes) {
@@ -235,25 +338,29 @@ function normalizeNotes(notes) {
   };
 }
 
-function computeSourceLengthBeats(envelope, normalized) {
-  var explicit = toNumber(envelope.targetLengthBeats, normalized.maxEnd);
-  var length = Math.max(explicit, normalized.maxEnd, MIN_CLIP_LENGTH_BEATS);
-  return Math.max(length, MIN_CLIP_LENGTH_BEATS);
+function resolveRequiredClipLength(envelope, normalized) {
+  var autoCreateLength = toNumber(envelope.autoCreateLengthBeats, NaN);
+  var targetLength = toNumber(envelope.targetLengthBeats, NaN);
+  var length = isFinite(autoCreateLength) && autoCreateLength > 0
+    ? autoCreateLength
+    : targetLength;
+  if (!isFinite(length) || length <= 0) {
+    length = normalized.maxEnd;
+  }
+
+  return Math.max(
+    roundBeat(Math.max(length, normalized.maxEnd, MIN_CLIP_LENGTH_BEATS)),
+    MIN_CLIP_LENGTH_BEATS
+  );
 }
 
-function scaleNotesToClip(notes, sourceLength, clipLength) {
+function fitNotesToClipLength(notes, sourceLength, clipLength) {
   var out = [];
   var src = Math.max(sourceLength, MIN_CLIP_LENGTH_BEATS);
   var dst = Math.max(clipLength, MIN_CLIP_LENGTH_BEATS);
-
   var scale = dst / src;
   if (!isFinite(scale) || scale <= 0) {
     scale = 1.0;
-  }
-
-  // Skip scaling when lengths are effectively equal.
-  if (Math.abs(scale - 1.0) < 1e-6) {
-    return notes.slice(0);
   }
 
   for (var i = 0; i < notes.length; i++) {
@@ -280,12 +387,37 @@ function scaleNotesToClip(notes, sourceLength, clipLength) {
   return out;
 }
 
-function clearClipNotes(clipApi, clipLength) {
-  // Live 11+: remove notes across full pitch range and clip span.
+function replaceClipNotes(clipApi, notes, clipLength) {
+  var live11Error = null;
+
+  if (!shouldUseLegacyNoteApi()) {
+    try {
+      clearClipNotesExtended(clipApi, clipLength);
+      addNewNotesToClip(clipApi, notes);
+      return;
+    } catch (e1) {
+      live11Error = e1;
+    }
+  }
+
+  try {
+    replaceSelectedNotesLegacy(clipApi, notes);
+    return;
+  } catch (e2) {
+    throw new Error(
+      "replace notes failed: live11=" +
+        safeErrorMessage(live11Error) +
+        " legacy=" +
+        safeErrorMessage(e2)
+    );
+  }
+}
+
+function clearClipNotesExtended(clipApi, clipLength) {
   clipApi.call("remove_notes_extended", 0, 128, 0, clipLength);
 }
 
-function writeNotesToClip(clipApi, notes) {
+function addNewNotesToClip(clipApi, notes) {
   // Max usually accepts objects here; keep JSON fallback for compatibility edges.
   var payload = { notes: notes };
 
@@ -304,120 +436,231 @@ function writeNotesToClip(clipApi, notes) {
   }
 }
 
-function resolveTargetMidiClip(applyMode, requiredClipLength) {
+function replaceSelectedNotesLegacy(clipApi, notes) {
+  clipApi.call("select_all_notes");
+  writeSelectedNotesLegacy(clipApi, notes);
+}
+
+function writeSelectedNotesLegacy(clipApi, notes) {
+  status("legacy_note_sequence", "replace_selected_notes", "notes", notes.length);
+  clipApi.call("replace_selected_notes");
+  clipApi.call("notes", notes.length);
+
+  for (var i = 0; i < notes.length; i++) {
+    var n = notes[i];
+    clipApi.call(
+      "note",
+      n.pitch,
+      legacyBeatArg(n.start_time),
+      legacyBeatArg(n.duration),
+      n.velocity,
+      n.mute ? 1 : 0
+    );
+  }
+
+  clipApi.call("done");
+}
+
+function legacyBeatArg(value) {
+  var n = toNumber(value, 0);
+  if (!isFinite(n) || n <= 0) {
+    return "0.0";
+  }
+  return n.toFixed(4);
+}
+
+function shouldUseLegacyNoteApi() {
+  var major = getLiveMajorVersion();
+  return major > 0 && major < 11;
+}
+
+function resolveSelectedMidiClipTarget() {
   var view = getLiveSetViewApi();
   if (!view) {
     return null;
   }
+
   var detailId = readLiveId(view.get("detail_clip"));
+  var detailClip = resolveMidiClipById(detailId);
+  if (detailClip) {
+    status("target", "detail_clip", detailId);
+    return {
+      mode: "direct",
+      clip: detailClip,
+      clipId: detailId,
+    };
+  }
+
   if (detailId > 0) {
-    var detailClip = new LiveAPI("id " + detailId);
-    if (isMidiClip(detailClip)) {
-      clearAutoTarget();
-      status("target", "detail_clip", detailId);
-      return detailClip;
+    if (shouldUseLegacyNoteApi()) {
+      try {
+        // In Live 10 the selected Arrangement clip can fail MIDI checks when
+        // opened by id, but the detail_clip path still accepts legacy note calls.
+        var legacyDetailClip = new LiveAPI("live_set view detail_clip");
+        status("target", "legacy_detail_clip", detailId);
+        return {
+          mode: "direct",
+          clip: legacyDetailClip,
+          clipId: detailId,
+        };
+      } catch (e) {
+        status("legacy_detail_clip_unresolved", detailId, safeErrorMessage(e));
+        return {
+          mode: "unusable_live10_detail_clip",
+          clip: null,
+          clipId: detailId,
+        };
+      }
     }
 
     status("detail_clip_not_midi", detailId);
     return null;
   }
 
-  if (applyMode === "append") {
-    var cached = getCachedAutoTargetClip();
-    if (cached) {
-      status("target", "cached_auto_clip", lastAutoTargetClipId);
-      return cached;
-    }
-  }
-
-  var created = createArrangementMidiClipOnSelectedTrack(requiredClipLength);
-  if (created) {
-    status("target", "created_arrangement_clip", created.id);
-  }
-  return created;
-}
-
-function getCachedAutoTargetClip() {
-  if (!lastAutoTargetClipId) {
+  if (!shouldUseLegacyNoteApi()) {
     return null;
   }
+  return null;
+}
 
-  var now = nowMs();
-  if (now - lastAutoTargetTimestampMs > AUTO_TARGET_TTL_MS) {
-    clearAutoTarget();
+function applyNotesToSelectedTarget(target, notes, sourceLength) {
+  if (target.mode === "unusable_live10_detail_clip") {
+    errorOut(
+      "live10_detail_clip_unavailable",
+      "Live 10 detail_clip was present but its LiveAPI path could not be resolved"
+    );
+    return;
+  }
+
+  applyNotesToSelectedClip(target.clip, notes, sourceLength);
+}
+
+function resolveMidiClipById(clipId) {
+  if (clipId <= 0) {
     return null;
   }
 
   try {
-    var clip = new LiveAPI("id " + lastAutoTargetClipId);
-    if (!isMidiClip(clip)) {
-      clearAutoTarget();
-      return null;
-    }
-    return clip;
-  } catch (e) {
-    clearAutoTarget();
+    var clip = new LiveAPI("id " + clipId);
+    return isMidiClip(clip) ? clip : null;
+  } catch (_e) {
     return null;
   }
 }
 
-function clearAutoTarget() {
-  lastAutoTargetClipId = 0;
-  lastAutoTargetTimestampMs = 0;
-}
-
-function rememberAutoTarget(clipId) {
-  lastAutoTargetClipId = clipId;
-  lastAutoTargetTimestampMs = nowMs();
-}
-
-function createArrangementMidiClipOnSelectedTrack(clipLength) {
+function applyNotesToNewArrangementClipOnSelectedTrack(
+  notes,
+  requiredClipLength
+) {
   var view = getLiveSetViewApi();
   if (!view) {
-    return null;
+    return;
   }
   var trackId = readLiveId(view.get("selected_track"));
   if (!trackId) {
     errorOut("no_selected_track", "Select a MIDI track in Live");
-    return null;
+    return;
   }
 
   var track = new LiveAPI("id " + trackId);
   if (!isMidiTrack(track)) {
     errorOut("selected_track_not_midi", trackId);
-    return null;
+    return;
   }
 
   var song = getLiveSetApi();
   if (!song) {
-    return null;
+    return;
   }
   var startTime = roundBeat(Math.max(0.0, toNumber(song.get("current_song_time"), 0.0)));
-  var length = roundBeat(Math.max(clipLength, MIN_CLIP_LENGTH_BEATS));
+  var length = roundBeat(Math.max(requiredClipLength, MIN_CLIP_LENGTH_BEATS));
+
+  if (!canResolveArrangementClips()) {
+    // Live 10 cannot resolve newly-created Arrangement clip ids reliably, but it
+    // can duplicate a populated Session clip into the Arrangement.
+    applyNotesToSessionClipThenDuplicate(track, startTime, length, notes);
+    return;
+  }
 
   var createdId = tryCreateArrangementClip(track, startTime, length);
 
   if (!createdId) {
-    errorOut("create_clip_failed", "Could not resolve new arrangement clip id");
-    return null;
+    applyNotesToSessionClipThenDuplicate(track, startTime, length, notes);
+    return;
   }
 
   var clip = new LiveAPI("id " + createdId);
   if (!isMidiClip(clip)) {
     errorOut("created_clip_not_midi", createdId);
-    return null;
+    return;
   }
 
   // Keep clip loop and marker boundaries aligned to the generated length.
   safeSetClipMarkers(clip, length);
 
-  rememberAutoTarget(createdId);
-  return clip;
+  status("target", "created_arrangement_clip", createdId);
+  applyNotesToClip(clip, notes, length, length);
+}
+
+function applyNotesToSessionClipThenDuplicate(trackApi, startTime, length, notes) {
+  var temp = createSessionClipOnTrack(trackApi, length);
+  if (!temp) {
+    return;
+  }
+
+  try {
+    applyNotesToClip(temp.clip, notes, length, length);
+  } catch (e1) {
+    safeDeleteClipInSlot(temp.slot);
+    errorOut("write_session_clip_failed", safeErrorMessage(e1));
+    return;
+  }
+
+  try {
+    trackApi.call("duplicate_clip_to_arrangement", "id " + temp.clipId, startTime);
+  } catch (e2) {
+    safeDeleteClipInSlot(temp.slot);
+    errorOut("duplicate_clip_to_arrangement_failed", safeErrorMessage(e2));
+    return;
+  }
+
+  safeDeleteClipInSlot(temp.slot);
+  status("target", "created_arrangement_clip_from_session");
+}
+
+function createSessionClipOnTrack(trackApi, length) {
+  var slotIndex = findEmptyClipSlotIndex(trackApi);
+  if (slotIndex < 0) {
+    errorOut("no_empty_clip_slot", "No empty clip slot found on selected track");
+    return null;
+  }
+
+  var slot = new LiveAPI(trackApi.unquotedpath + " clip_slots " + slotIndex);
+  var clipId = 0;
+  try {
+    slot.call("create_clip", length);
+    clipId = readLiveId(slot.get("clip"));
+  } catch (e) {
+    errorOut("create_session_clip_failed", safeErrorMessage(e));
+    return null;
+  }
+
+  if (!clipId) {
+    errorOut("temp_clip_missing", "create_clip did not yield a clip id");
+    return null;
+  }
+
+  var clip = new LiveAPI("id " + clipId);
+  safeSetClipMarkers(clip, length);
+
+  return {
+    slot: slot,
+    clip: clip,
+    clipId: clipId,
+  };
 }
 
 function tryCreateArrangementClip(trackApi, startTime, length) {
-  // Prefer direct arrangement creation, then fallback to session-clip duplication.
-
   var before = readArrangementClipIds(trackApi);
 
   if (tryCallCreateMidiClip(trackApi, startTime, length)) {
@@ -428,45 +671,7 @@ function tryCreateArrangementClip(trackApi, startTime, length) {
     }
   }
 
-  var tempClipId = 0;
-  var slotIndex = findEmptyClipSlotIndex(trackApi);
-  if (slotIndex < 0) {
-    errorOut("no_empty_clip_slot", "No empty clip slot found on selected track");
-    return 0;
-  }
-
-  var slot = new LiveAPI(trackApi.unquotedpath + " clip_slots " + slotIndex);
-  try {
-    slot.call("create_clip", length);
-    tempClipId = readLiveId(slot.get("clip"));
-  } catch (e) {
-    errorOut("create_session_clip_failed", safeErrorMessage(e));
-    return 0;
-  }
-
-  if (!tempClipId) {
-    errorOut("temp_clip_missing", "create_clip did not yield a clip id");
-    return 0;
-  }
-
-  var tempClip = new LiveAPI("id " + tempClipId);
-  safeSetClipMarkers(tempClip, length);
-
-  try {
-    trackApi.call("duplicate_clip_to_arrangement", "id " + tempClipId, startTime);
-  } catch (e2) {
-    safeDeleteClipInSlot(slot);
-    errorOut("duplicate_clip_to_arrangement_failed", safeErrorMessage(e2));
-    return 0;
-  }
-
-  safeDeleteClipInSlot(slot);
-
-  var createdFallback = resolveNewArrangementClipId(trackApi, before, startTime);
-  if (createdFallback) {
-    status("created_arrangement_clip_fallback", createdFallback);
-  }
-  return createdFallback;
+  return 0;
 }
 
 function tryCallCreateMidiClip(trackApi, startTime, length) {
@@ -550,6 +755,11 @@ function pickClipByStartTime(trackApi, ids, startTime) {
   }
 
   return bestId;
+}
+
+function canResolveArrangementClips() {
+  var major = getLiveMajorVersion();
+  return major >= 11;
 }
 
 function readArrangementClipIds(trackApi) {
@@ -785,12 +995,15 @@ function toNumber(v, fallback) {
     return isNaN(f) ? fallback : f;
   }
 
-  // LiveAPI often returns [value] arrays for scalar properties.
+  // LiveAPI may return [value] or [propertyName, value] arrays for scalar properties.
   if (v instanceof Array) {
-    if (v.length === 0) {
-      return fallback;
+    for (var i = 0; i < v.length; i++) {
+      var candidate = toNumber(v[i], null);
+      if (typeof candidate === "number" && isFinite(candidate)) {
+        return candidate;
+      }
     }
-    return toNumber(v[0], fallback);
+    return fallback;
   }
 
   return fallback;
@@ -945,6 +1158,71 @@ function getLiveSetViewApi() {
 
   return isLiveApiValid(liveSetViewApi) ? liveSetViewApi : null;
 }
+
+function getLiveAppApi() {
+  if (typeof LiveAPI !== "function") {
+    return null;
+  }
+
+  if (liveAppApi) {
+    return liveAppApi;
+  }
+
+  var now = nowMs();
+  if (lastLiveAppResolveAttemptMs && now - lastLiveAppResolveAttemptMs < LIVEAPI_RESOLVE_RETRY_MS) {
+    return null;
+  }
+  lastLiveAppResolveAttemptMs = now;
+
+  try {
+    liveAppApi = new LiveAPI("live_app");
+  } catch (_e4) {
+    liveAppApi = null;
+    return null;
+  }
+
+  return liveAppApi;
+}
+
+function getLiveMajorVersion() {
+  if (liveMajorVersion !== null) {
+    return liveMajorVersion;
+  }
+
+  var app = getLiveAppApi();
+  if (!app) {
+    return 0;
+  }
+
+  try {
+    var major = firstFiniteNumber(app.call("get_major_version"), 0);
+    if (major > 0) {
+      liveMajorVersion = major;
+    }
+    return major;
+  } catch (_e5) {
+    return 0;
+  }
+}
+
+function firstFiniteNumber(v, fallback) {
+  var direct = toNumber(v, null);
+  if (typeof direct === "number" && isFinite(direct)) {
+    return direct;
+  }
+
+  if (v instanceof Array) {
+    for (var i = 0; i < v.length; i++) {
+      var candidate = firstFiniteNumber(v[i], null);
+      if (typeof candidate === "number" && isFinite(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  return fallback;
+}
+
 function roundBeat(v) {
   return Math.round(v * 1000) / 1000;
 }

@@ -1,4 +1,5 @@
 import dgram from 'node:dgram';
+import { randomUUID } from 'node:crypto';
 
 import { MAX_UDP_PACKET_BYTES } from '../../shared/bridge/protocol';
 import type {
@@ -56,27 +57,31 @@ const splitEnvelopeBySize = (
 
   const chunks: LiveBridgeNotesEnvelope[] = [];
   let currentNotes: LiveBridgeNotesEnvelope['notes'] = [];
+  const chunkTransferId = randomUUID();
+
+  const toChunkEnvelope = (
+    notes: LiveBridgeNotesEnvelope['notes'],
+  ): LiveBridgeNotesEnvelope => ({
+    ...baseEnvelope,
+    applyMode: 'replace',
+    chunkTransferId,
+    chunkIndex: chunks.length,
+    chunkCount: 9999,
+    notes,
+  });
 
   const flushChunk = (): void => {
     if (currentNotes.length === 0) {
       return;
     }
 
-    chunks.push({
-      ...baseEnvelope,
-      applyMode: chunks.length === 0 ? 'replace' : 'append',
-      notes: currentNotes,
-    });
+    chunks.push(toChunkEnvelope(currentNotes));
     currentNotes = [];
   };
 
   for (const note of envelope.notes) {
     const candidateNotes = [...currentNotes, note];
-    const candidateEnvelope: LiveBridgeNotesEnvelope = {
-      ...baseEnvelope,
-      applyMode: chunks.length === 0 ? 'replace' : 'append',
-      notes: candidateNotes,
-    };
+    const candidateEnvelope = toChunkEnvelope(candidateNotes);
 
     if (toPacket(candidateEnvelope).byteLength <= MAX_UDP_PACKET_BYTES) {
       currentNotes = candidateNotes;
@@ -94,10 +99,14 @@ const splitEnvelopeBySize = (
   }
 
   flushChunk();
-  return chunks;
+  return chunks.map((chunk, chunkIndex) => ({
+    ...chunk,
+    chunkIndex,
+    chunkCount: chunks.length,
+  }));
 };
 
-/** Sends OSC payloads to the Live bridge over UDP with replace-then-append chunking. */
+/** Sends OSC payloads to the Live bridge over UDP, splitting large note payloads for transport. */
 export class UdpLiveBridge {
   public constructor(private readonly sendTimeoutMs = DEFAULT_SEND_TIMEOUT_MS) {}
 

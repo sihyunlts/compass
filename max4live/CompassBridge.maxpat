@@ -58,7 +58,7 @@
 						300,
 						20
 					],
-					"text": "Compass M4L Bridge (UDP -> Clip Notes)"
+					"text": "Compass M4L Bridge v1.0.1 (UDP -> Clip Notes)"
 				}
 			},
 			{

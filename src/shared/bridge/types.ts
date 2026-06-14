@@ -22,7 +22,10 @@ interface LiveBridgeBaseEnvelope {
 
 export interface LiveBridgeNotesEnvelope extends LiveBridgeBaseEnvelope {
   event: 'clip_notes.replace';
-  applyMode?: 'replace' | 'append';
+  applyMode?: 'replace';
+  chunkTransferId?: string;
+  chunkIndex?: number;
+  chunkCount?: number;
   targetLengthBeats?: number;
   autoCreateLengthBeats?: number;
   notes: Array<{
