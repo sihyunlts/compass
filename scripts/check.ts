@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 const isFullRun = process.argv.slice(2).includes('--full');
 const repoRoot = path.resolve(__dirname, '..');
 const binSuffix = process.platform === 'win32' ? '.cmd' : '';
+const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 const run = (
   command: string,
@@ -12,8 +13,14 @@ const run = (
 ): void => {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
+    shell: process.platform === 'win32',
     stdio: 'inherit',
   });
+
+  if (result.error) {
+    console.error(`Failed to run ${command}: ${result.error.message}`);
+    process.exit(1);
+  }
 
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
@@ -41,7 +48,7 @@ const collectTestFiles = (
   return testFiles.sort();
 };
 
-run('npm', ['run', 'lint']);
+run(npmCommand, ['run', 'lint']);
 const testFiles = collectTestFiles(path.join(repoRoot, 'src'));
 if (testFiles.length > 0) {
   run(path.join(repoRoot, 'node_modules', '.bin', `tsx${binSuffix}`), [
