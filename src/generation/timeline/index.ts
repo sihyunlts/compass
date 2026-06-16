@@ -4,7 +4,9 @@ import type { BeatRange } from '../analysis/types';
 import type {
   GeometryFrame,
   GeometryMask,
+  GeometrySample,
   GeometryStroke,
+  GeometryTimingSample,
   GeometryTimeline,
 } from '../types';
 
@@ -31,6 +33,9 @@ export const createEmptyTimeline = (
   sampleStepBeats,
   timeDomainEndBeat: Math.max(endBeat, 1),
   frames: createEmptyFrames(toFrameCount(Math.max(endBeat, 1), sampleStepBeats)),
+  originGroupIdByOriginId: new Map(),
+  geometrySamplesByOriginId: new Map(),
+  timingSamplesByOriginId: new Map(),
   nextWriteId: 1,
 });
 
@@ -70,6 +75,102 @@ const createFramesFromBase = (
   (_, index) => sourceFrames[index] ?? { strokes: [] as GeometryStroke[] },
 );
 
+const cloneTimingSamplesByOriginId = (
+  timingSamplesByOriginId: ReadonlyMap<string, ReadonlyArray<GeometryTimingSample>>,
+): Map<string, GeometryTimingSample[]> => new Map(
+  Array.from(timingSamplesByOriginId.entries(), ([originId, samples]) => [
+    originId,
+    samples.map((sample) => ({
+      beat: sample.beat,
+      strokes: sample.strokes.map((stroke) => ({ ...stroke })),
+    })),
+  ]),
+);
+
+const cloneGeometrySamplesByOriginId = (
+  geometrySamplesByOriginId: ReadonlyMap<string, ReadonlyArray<GeometrySample>>,
+): Map<string, GeometrySample[]> => new Map(
+  Array.from(geometrySamplesByOriginId.entries(), ([originId, samples]) => [
+    originId,
+    samples.map((sample) => ({
+      beat: sample.beat,
+      strokes: sample.strokes.map(cloneStroke),
+    })),
+  ]),
+);
+
+const registerStrokeOrigin = (
+  timeline: GeometryTimeline | TimelineStageBuffer,
+  stroke: Pick<GeometryStroke, 'polyline' | 'originGroupId'>,
+): void => {
+  timeline.originGroupIdByOriginId.set(stroke.polyline.originId, stroke.originGroupId);
+};
+
+const addGeometrySampleStroke = (
+  timeline: GeometryTimeline | TimelineStageBuffer,
+  originId: string,
+  beat: number,
+  stroke: GeometryStroke,
+): void => {
+  let samples = timeline.geometrySamplesByOriginId.get(originId);
+  if (!samples) {
+    samples = [];
+    timeline.geometrySamplesByOriginId.set(originId, samples);
+  }
+
+  let sample = samples.find((candidate) => candidate.beat === beat);
+  if (!sample) {
+    sample = {
+      beat,
+      strokes: [],
+    };
+    samples.push(sample);
+  }
+
+  sample.strokes.push(stroke);
+};
+
+const addTimingSampleStrokeToTimeline = (
+  timeline: GeometryTimeline | TimelineStageBuffer,
+  originId: string,
+  beat: number,
+  stroke: GeometryTimingSample['strokes'][number],
+): void => {
+  let samples = timeline.timingSamplesByOriginId.get(originId);
+  if (!samples) {
+    samples = [];
+    timeline.timingSamplesByOriginId.set(originId, samples);
+  }
+
+  let sample = samples.find((candidate) => candidate.beat === beat);
+  if (!sample) {
+    sample = {
+      beat,
+      strokes: [],
+    };
+    samples.push(sample);
+  }
+
+  sample.strokes.push({ ...stroke });
+};
+
+const addStrokeTimingSample = (
+  timeline: GeometryTimeline | TimelineStageBuffer,
+  beat: number,
+  stroke: GeometryStroke,
+): void => {
+  addTimingSampleStrokeToTimeline(
+    timeline,
+    stroke.polyline.originId,
+    beat,
+    {
+      id: String(stroke.writeId),
+      activationStepBeats: stroke.polyline.activationStepBeats,
+      activationSignature: stroke.polyline.activationSignature,
+    },
+  );
+};
+
 export const beginTimelineStage = (
   sourceTimeline: GeometryTimeline,
   endBeat = sourceTimeline.timeDomainEndBeat,
@@ -83,6 +184,9 @@ export const beginTimelineStage = (
     sampleStepBeats: sourceTimeline.sampleStepBeats,
     timeDomainEndBeat: safeEndBeat,
     frames: createFramesFromBase(sourceTimeline.frames, frameCount),
+    originGroupIdByOriginId: new Map(sourceTimeline.originGroupIdByOriginId),
+    geometrySamplesByOriginId: cloneGeometrySamplesByOriginId(sourceTimeline.geometrySamplesByOriginId),
+    timingSamplesByOriginId: cloneTimingSamplesByOriginId(sourceTimeline.timingSamplesByOriginId),
     nextWriteId: sourceTimeline.nextWriteId,
     sourceFrames: sourceTimeline.frames,
   };
@@ -191,11 +295,24 @@ export const addStrokeToFrame = (
   stroke: Omit<GeometryStroke, 'writeId' | 'masks'> & { masks?: GeometryMask[] },
 ): void => {
   const writableFrame = getWritableFrame(timeline, frameIndex);
-  writableFrame.strokes.push({
+  const nextStroke = {
     ...stroke,
     writeId: timeline.nextWriteId,
     masks: stroke.masks?.map(cloneMask) ?? [],
-  });
+  };
+  writableFrame.strokes.push(nextStroke);
+  registerStrokeOrigin(timeline, nextStroke);
+  addStrokeTimingSample(
+    timeline,
+    frameIndex * timeline.sampleStepBeats,
+    nextStroke,
+  );
+  addGeometrySampleStroke(
+    timeline,
+    nextStroke.polyline.originId,
+    frameIndex * timeline.sampleStepBeats,
+    nextStroke,
+  );
   timeline.nextWriteId += 1;
 };
 
@@ -214,9 +331,21 @@ export const addStrokeToFrames = (
     masks: stroke.masks?.map(cloneMask) ?? [],
   };
   timeline.nextWriteId += 1;
+  registerStrokeOrigin(timeline, sharedStroke);
 
   for (const frameIndex of frameIndexes) {
     getWritableFrame(timeline, frameIndex).strokes.push(sharedStroke);
+    addStrokeTimingSample(
+      timeline,
+      frameIndex * timeline.sampleStepBeats,
+      sharedStroke,
+    );
+    addGeometrySampleStroke(
+      timeline,
+      sharedStroke.polyline.originId,
+      frameIndex * timeline.sampleStepBeats,
+      sharedStroke,
+    );
   }
 };
 
@@ -226,8 +355,48 @@ export const addExistingStrokeToFrame = (
   stroke: GeometryStroke,
 ): void => {
   const writableFrame = getWritableFrame(timeline, frameIndex);
-  writableFrame.strokes.push(cloneStroke(stroke));
+  const nextStroke = cloneStroke(stroke);
+  writableFrame.strokes.push(nextStroke);
+  registerStrokeOrigin(timeline, nextStroke);
+  addStrokeTimingSample(
+    timeline,
+    frameIndex * timeline.sampleStepBeats,
+    nextStroke,
+  );
+  addGeometrySampleStroke(
+    timeline,
+    nextStroke.polyline.originId,
+    frameIndex * timeline.sampleStepBeats,
+    nextStroke,
+  );
   timeline.nextWriteId = Math.max(timeline.nextWriteId, stroke.writeId + 1);
+};
+
+export const deleteOrigins = (
+  timeline: GeometryTimeline | TimelineStageBuffer,
+  originIds: Iterable<string>,
+): void => {
+  for (const originId of originIds) {
+    timeline.originGroupIdByOriginId.delete(originId);
+  }
+};
+
+export const deleteGeometrySamplesForOrigins = (
+  timeline: GeometryTimeline | TimelineStageBuffer,
+  originIds: Iterable<string>,
+): void => {
+  for (const originId of originIds) {
+    timeline.geometrySamplesByOriginId.delete(originId);
+  }
+};
+
+export const deleteTimingSamplesForOrigins = (
+  timeline: GeometryTimeline | TimelineStageBuffer,
+  originIds: Iterable<string>,
+): void => {
+  for (const originId of originIds) {
+    timeline.timingSamplesByOriginId.delete(originId);
+  }
 };
 
 export const completeTimelineStage = (
@@ -236,6 +405,9 @@ export const completeTimelineStage = (
   sampleStepBeats: timeline.sampleStepBeats,
   timeDomainEndBeat: timeline.timeDomainEndBeat,
   frames: timeline.frames.slice(),
+  originGroupIdByOriginId: new Map(timeline.originGroupIdByOriginId),
+  geometrySamplesByOriginId: cloneGeometrySamplesByOriginId(timeline.geometrySamplesByOriginId),
+  timingSamplesByOriginId: cloneTimingSamplesByOriginId(timeline.timingSamplesByOriginId),
   nextWriteId: timeline.nextWriteId,
 });
 
@@ -257,7 +429,10 @@ export const finalizeTimeline = (
       : [
           ...timeline.frames,
           ...createEmptyFrames(frameCount - timeline.frames.length),
-        ],
+    ],
+    originGroupIdByOriginId: new Map(timeline.originGroupIdByOriginId),
+    geometrySamplesByOriginId: cloneGeometrySamplesByOriginId(timeline.geometrySamplesByOriginId),
+    timingSamplesByOriginId: cloneTimingSamplesByOriginId(timeline.timingSamplesByOriginId),
     nextWriteId: timeline.nextWriteId,
   };
 };

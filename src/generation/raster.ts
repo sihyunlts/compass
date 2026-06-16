@@ -10,7 +10,9 @@ import { toBounds } from './analysis/bounds';
 import type { SpatialRequirement } from './analysis/types';
 import { collectOccupiedCoordinates } from './timeline/analysis';
 import type { GeometryTimeline } from './types';
-import { addStrokeToFrame } from './timeline';
+import {
+  addStrokeToFrame,
+} from './timeline';
 
 const buildGeneratorPolyline = (
   device: Exclude<GeneratorNode, Extract<GeneratorNode, { kind: 'scanner' }>>,
@@ -94,10 +96,11 @@ export const rasterizeGeneratorFrame = (
     return;
   }
 
+  const activationSignature = resolveActivationSignature(polyline);
   addStrokeToFrame(timeline, frameIndex, {
     polyline: {
       ...polyline,
-      activationSignature: resolveActivationSignature(polyline),
+      activationSignature,
     },
     originGroupId: normalizeOptionalId(device.groupId),
     writeOrder,

@@ -10,6 +10,9 @@ import {
 } from '../../timeline/analysis';
 import {
   addStrokeToFrame,
+  deleteGeometrySamplesForOrigins,
+  deleteOrigins,
+  deleteTimingSamplesForOrigins,
   setFrameStrokes,
   type FrameWindow,
 } from '../../timeline';
@@ -104,6 +107,28 @@ export const buildTargetOriginIds = (
   const excludeMutedSources = options.excludeMutedSources === true;
   const mutedGroupIds = options.mutedGroupIds ?? new Set<string>();
   const mutedGeneratorIds = options.mutedGeneratorIds ?? new Set<string>();
+
+  if (timeline.originGroupIdByOriginId.size > 0) {
+    for (const [originId, originGroupId] of timeline.originGroupIdByOriginId.entries()) {
+      if (targetGroupId !== null && originGroupId !== targetGroupId) {
+        continue;
+      }
+
+      if (
+        excludeMutedSources
+        && (
+          mutedGeneratorIds.has(originId)
+          || (originGroupId !== null && mutedGroupIds.has(originGroupId))
+        )
+      ) {
+        continue;
+      }
+
+      originIds.add(originId);
+    }
+
+    return originIds;
+  }
 
   for (const frame of timeline.frames) {
     for (const stroke of frame.strokes) {
@@ -363,6 +388,10 @@ export const stripOriginFrames = (
   sourceFrameCount: number,
   targetOriginIds: ReadonlySet<string>,
 ): void => {
+  deleteOrigins(timeline, targetOriginIds);
+  deleteGeometrySamplesForOrigins(timeline, targetOriginIds);
+  deleteTimingSamplesForOrigins(timeline, targetOriginIds);
+
   for (let frameIndex = 0; frameIndex < sourceFrameCount; frameIndex += 1) {
     takeOriginStrokesFromFrame(timeline, frameIndex, targetOriginIds);
   }

@@ -1,4 +1,5 @@
 export * from './runtime/final-normalization';
+export * from './runtime/color-materialization';
 export * from './runtime/frame-window';
 export * from './runtime/frame-remap';
 export * from './runtime/materialization';

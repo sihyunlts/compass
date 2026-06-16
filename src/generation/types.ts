@@ -22,10 +22,29 @@ export interface GeometryFrame {
   strokes: GeometryStroke[];
 }
 
+export interface GeometryTimingSampleStroke {
+  id: string;
+  activationStepBeats?: number;
+  activationSignature?: string;
+}
+
+export interface GeometryTimingSample {
+  beat: number;
+  strokes: GeometryTimingSampleStroke[];
+}
+
+export interface GeometrySample {
+  beat: number;
+  strokes: GeometryStroke[];
+}
+
 export interface GeometryTimeline {
   sampleStepBeats: number;
   timeDomainEndBeat: number;
   frames: GeometryFrame[];
+  originGroupIdByOriginId: Map<string, string | null>;
+  geometrySamplesByOriginId: Map<string, GeometrySample[]>;
+  timingSamplesByOriginId: Map<string, GeometryTimingSample[]>;
   nextWriteId: number;
 }
 

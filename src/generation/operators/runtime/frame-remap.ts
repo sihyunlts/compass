@@ -4,9 +4,7 @@ import {
   beginTimelineStage,
   completeTimelineStage,
 } from '../../timeline';
-import type {
-  GeometryTimeline,
-} from '../../types';
+import type { GeometryTimeline } from '../../types';
 import { isFrameWithinWindow, resolveFrameWindow } from './frame-window';
 import {
   addRemappedStrokeToFrame,

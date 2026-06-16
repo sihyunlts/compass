@@ -10,7 +10,6 @@ import {
   appendPendingColorApplication,
   buildTargetOriginIds,
   createPendingGeometryApplicationOperator,
-  materializeTemporalCheckpointTimeline,
   mergePlaybackWindowOverridesIntoTimelineState,
   resolvePendingColorPlaybackWindowOverrides,
   resolveStageExecutionPlan,
@@ -45,15 +44,10 @@ const applyColorEffect = (
     colorConfig,
     writeOrder,
   };
-  const playbackSourceTimeline = input.precedingTemporalCheckpoint
-    ? materializeTemporalCheckpointTimeline(
-        state.timeline,
-        input.precedingTemporalCheckpoint,
-      )
-    : state.timeline;
   const playbackWindowByOriginId = resolvePendingColorPlaybackWindowOverrides(
-    playbackSourceTimeline,
+    state.timeline,
     colorApplication,
+    input.precedingTemporalCheckpoint,
   );
 
   return appendPendingColorApplication(
