@@ -58,7 +58,6 @@ export interface MutableGenerationState {
   timelineStateByOriginId: Map<string, OriginTimelineState>;
   pendingTemporalWriteOrderByOriginId: Map<string, number>;
   pendingFrameApplications: PendingFrameApplication[];
-  sealedOriginIds: Set<string>;
 }
 
 export const createEmptyGenerationState = (): MutableGenerationState => ({
@@ -66,7 +65,6 @@ export const createEmptyGenerationState = (): MutableGenerationState => ({
   timelineStateByOriginId: new Map<string, OriginTimelineState>(),
   pendingTemporalWriteOrderByOriginId: new Map<string, number>(),
   pendingFrameApplications: [],
-  sealedOriginIds: new Set<string>(),
 });
 
 export const cloneTimelineStateByOriginId = (
@@ -84,6 +82,7 @@ export const cloneTimelineStateByOriginId = (
         end: timelineState.playbackWindow.end,
       },
       temporal: cloneSceneTemporalState(timelineState.temporal),
+      finalCleanupMode: timelineState.finalCleanupMode,
     },
   ]),
 );
@@ -166,19 +165,3 @@ export const clonePendingFrameApplications = (
     })),
   };
 });
-
-export const cloneSealedOriginIds = (
-  sealedOriginIds: ReadonlySet<string>,
-): Set<string> => new Set(sealedOriginIds);
-
-export const cloneSealedOriginIdsWithout = (
-  sealedOriginIds: ReadonlySet<string>,
-  originIds: Iterable<string>,
-): Set<string> => {
-  const nextSealedOriginIds = cloneSealedOriginIds(sealedOriginIds);
-  for (const originId of originIds) {
-    nextSealedOriginIds.delete(originId);
-  }
-
-  return nextSealedOriginIds;
-};

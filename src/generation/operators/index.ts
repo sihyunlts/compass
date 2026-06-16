@@ -12,7 +12,7 @@ import { symmetryOperator } from './symmetry';
 import {
   createModulationContext,
   createRackStageExecutionContext,
-  materializeAndSealRackState,
+  materializeAndNormalizeRackState,
   resolveMaskReferenceMutedGeneratorIds,
   resolveMaskReferenceMutedGroupIds,
   shouldApplyReferenceStage,
@@ -104,8 +104,8 @@ const resolveMaskSourceReferenceTimeline = (
       );
     }
 
-    const sealedState = materializeAndSealRackState(currentState, stageExecutionContext);
-    const timeline = sealedState.timeline;
+    const normalizedState = materializeAndNormalizeRackState(currentState, stageExecutionContext);
+    const timeline = normalizedState.timeline;
     context.timelineBySourceKey.set(sourceKey, timeline);
     return timeline;
   } finally {
@@ -149,5 +149,5 @@ export const executeCompiledRackPlan = (
     );
   }
 
-  return materializeAndSealRackState(currentState, stageExecutionContext);
+  return materializeAndNormalizeRackState(currentState, stageExecutionContext);
 };

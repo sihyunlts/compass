@@ -11,8 +11,15 @@ import {
   TIMELINE_WINDOW_EPSILON,
   type TimelineWindow,
 } from '../../timeline/temporal-window';
-import type { OriginTimelineState } from '../../timeline/state';
-import type { CanonicalOutputAdapter, GeometryTimeline } from '../../types';
+import {
+  cloneTimelineStateByOriginId,
+  type OriginTimelineState,
+} from '../../timeline/state';
+import type {
+  CanonicalOutputAdapter,
+  GenerationFinalCleanupMode,
+  GeometryTimeline,
+} from '../../types';
 
 const buildTimelineStateMap = (
   originIds: Iterable<string>,
@@ -22,6 +29,7 @@ const buildTimelineStateMap = (
     _originId,
     observedWindow,
   ) => observedWindow,
+  resolveFinalCleanupMode: (originId: string) => GenerationFinalCleanupMode = () => 'cleanup',
 ): Map<string, OriginTimelineState> => {
   const timelineStateByOriginId = new Map<string, OriginTimelineState>();
 
@@ -34,6 +42,7 @@ const buildTimelineStateMap = (
       observedWindow,
       playbackWindow,
       temporal: resolveTemporalState(originId, observedWindow),
+      finalCleanupMode: resolveFinalCleanupMode(originId),
     });
   }
 
@@ -89,6 +98,7 @@ export const buildTimelineStateByOriginId = (
 
       return observedWindow;
     },
+    (originId) => previousTimelineStateByOriginId.get(originId)?.finalCleanupMode ?? 'cleanup',
   );
 };
 
@@ -125,5 +135,42 @@ export const buildTimelineStateAfterTemporalMaterialization = (
       );
     },
     (_originId, observedWindow) => observedWindow,
+    (originId) => previousTimelineStateByOriginId.get(originId)?.finalCleanupMode ?? 'cleanup',
   );
+};
+
+export const mergePlaybackWindowOverridesIntoTimelineState = (
+  timelineStateByOriginId: ReadonlyMap<string, OriginTimelineState>,
+  playbackWindowOverrides: ReadonlyMap<string, TimelineWindow>,
+): Map<string, OriginTimelineState> => {
+  const nextTimelineStateByOriginId = cloneTimelineStateByOriginId(timelineStateByOriginId);
+
+  for (const [originId, playbackWindow] of playbackWindowOverrides.entries()) {
+    const current = nextTimelineStateByOriginId.get(originId);
+    if (!current) {
+      continue;
+    }
+
+    nextTimelineStateByOriginId.set(originId, {
+      ...current,
+      playbackWindow: mergeTimelineWindows(current.playbackWindow, playbackWindow),
+    });
+  }
+
+  return nextTimelineStateByOriginId;
+};
+
+export const seedGeneratedOriginTimelineState = (
+  timelineStateByOriginId: ReadonlyMap<string, OriginTimelineState>,
+  originId: string,
+): Map<string, OriginTimelineState> => {
+  const nextTimelineStateByOriginId = cloneTimelineStateByOriginId(timelineStateByOriginId);
+  nextTimelineStateByOriginId.set(originId, {
+    observedWindow: EMPTY_TIMELINE_WINDOW,
+    playbackWindow: EMPTY_TIMELINE_WINDOW,
+    temporal: createIdentitySceneTemporalState(),
+    finalCleanupMode: 'cleanup',
+  });
+
+  return nextTimelineStateByOriginId;
 };

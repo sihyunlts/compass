@@ -1,15 +1,14 @@
 import {
   buildTargetOriginIds,
   buildPendingStrokeRewriteFrameWrites,
-  createRackOperator,
+  createPendingFrameApplicationOperator,
   appendPendingStrokeRewriteApplication,
   isDeviceModulated,
-  preparePendingFrameApplicationInput,
-  preservePendingRackOperatorInput,
   resolveModulatedDeviceAtFrame,
   resolveFrameWindow,
   resolveStageExecutionPlan,
   transformStroke,
+  type PendingFrameApplicationOperatorInput,
   type SpatialTransformStageKind,
 } from './runtime';
 import {
@@ -21,8 +20,6 @@ import {
 } from '../../core/geometry';
 import type { GeneratorEffectNode } from '../../shared/model';
 import {
-  cloneSealedOriginIdsWithout,
-  type PendingFrameApplication,
   type MutableGenerationState,
 } from '../timeline/state';
 import type { BeatRange } from '../analysis/types';
@@ -57,14 +54,13 @@ const resolveEffectTransform = (
 };
 
 const applyPendingSpatialTransform = (
-  state: MutableGenerationState,
-  sourceState: MutableGenerationState,
+  input: PendingFrameApplicationOperatorInput,
   targetGroupId: string | null,
   writeOrder: number,
   resolveTransformAtFrame: (frameIndex: number) => ReturnType<typeof toTranslationTransform> | null,
   requiredFrameWindow: BeatRange | 'all',
-  precedingTemporalCheckpoint: PendingFrameApplication['precedingTemporalCheckpoint'],
 ): MutableGenerationState => {
+  const { sourceState } = input;
   const frameWindow = resolveFrameWindow(
     requiredFrameWindow,
     sourceState.timeline.sampleStepBeats,
@@ -82,30 +78,22 @@ const applyPendingSpatialTransform = (
   );
 
   return appendPendingStrokeRewriteApplication(
-    state,
-    sourceState,
+    input,
     targetOriginIds,
     writes,
-    precedingTemporalCheckpoint,
-    cloneSealedOriginIdsWithout(state.sealedOriginIds, targetOriginIds),
+    { mode: 'cleanup', originIds: targetOriginIds },
   );
 };
 
-export const spatialTransformOperator = createRackOperator<SpatialTransformStageKind>(
-  preservePendingRackOperatorInput,
-  (state, stage, context) => {
+export const spatialTransformOperator = createPendingFrameApplicationOperator<SpatialTransformStageKind>(
+  (input, stage, context) => {
+    const { sourceState } = input;
     const device = stage.device;
     const executionPlan = resolveStageExecutionPlan(context, stage);
     const isModulated = isDeviceModulated(context.modulationContext, stage.deviceId);
-    const {
-      baseState,
-      sourceState,
-      precedingTemporalCheckpoint,
-    } = preparePendingFrameApplicationInput(state, context);
 
     return applyPendingSpatialTransform(
-      baseState,
-      sourceState,
+      input,
       stage.groupId,
       stage.stageIndex,
       (frameIndex) => resolveEffectTransform(
@@ -120,7 +108,6 @@ export const spatialTransformOperator = createRackOperator<SpatialTransformStage
           : device,
       ),
       executionPlan.requiredFrameWindow,
-      precedingTemporalCheckpoint,
     );
   },
 );

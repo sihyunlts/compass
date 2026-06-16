@@ -1,29 +1,103 @@
 import type { SceneTemporalState } from '../../../core/core-types';
 import {
   cloneSceneTemporalState,
-  evaluateTemporalRemap,
 } from '../../../core/scene-operators/temporal';
 import {
-  clonePendingFrameApplications,
   clonePendingTemporalWriteOrderByOriginId,
-  cloneSealedOriginIds,
   cloneTimelineStateByOriginId,
   type MutableGenerationState,
+  type OriginTimelineState,
   type PendingTemporalMaterializationCheckpoint,
 } from '../../timeline/state';
 import {
   cloneTimelineWindow,
   createMaterializedTemporalState,
-  FIXED_TIMELINE_END_BEAT,
   hasPendingTemporalState,
   resolveTemporalPlacementWindow,
+  resolveTemporalSourceWindow,
+  type TimelineWindow,
 } from '../../timeline/temporal-window';
-import { toFrameCount } from '../../timeline';
+import type { FrameWindow } from '../../timeline';
 import type { CanonicalOutputAdapter, GeometryTimeline } from '../../types';
+import type { BeatRange } from '../../analysis/types';
 import { buildTimelineStateAfterTemporalMaterialization } from './timeline-state';
-import { toSourceFrameIndex } from './timeline-strokes';
-import { remapTimeline } from './frame-remap';
-import type { OriginFrameRemap } from './types';
+import { buildTargetOriginIds } from './timeline-strokes';
+import { resolveFrameWindow } from './frame-window';
+import {
+  createRackOperator,
+  type OriginFrameRemap,
+  type RackOperator,
+  type RackStageExecutionContext,
+  type RackStageOfKind,
+} from './types';
+import type { RackStageDeviceKind } from '../../plan/types';
+import { transitionGenerationState } from './state-transition';
+import { buildTemporalOriginFrameRemap } from './origin-frame-remap';
+import {
+  buildTimelineRemapPlan,
+  createFixedTimelineRemapPolicy,
+  type TimelineRemapPlan,
+  type TimelineRemapPolicy,
+} from './timeline-remap-plan';
+
+export interface PendingAwareTemporalOriginInput {
+  originId: string;
+  timelineState: OriginTimelineState;
+  currentTemporal: SceneTemporalState;
+  frameWindow: FrameWindow;
+  placementWindow: TimelineWindow;
+  sourceWindow: TimelineWindow;
+}
+
+const resolvePendingAwareTemporalSourceWindow = (
+  state: MutableGenerationState,
+  originId: string,
+  timelineState: OriginTimelineState,
+): TimelineWindow | null => (
+  hasPendingTemporalState(timelineState)
+    ? resolveTemporalPlacementWindow(timelineState)
+    : resolveTemporalSourceWindow(state.timelineStateByOriginId, originId)
+);
+
+export const buildTemporalStateUpdatesForTargetOrigins = (
+  state: MutableGenerationState,
+  targetGroupId: string | null,
+  requiredFrameWindow: BeatRange | 'all',
+  resolveTemporalState: (input: PendingAwareTemporalOriginInput) => SceneTemporalState | null,
+): Map<string, SceneTemporalState> => {
+  const temporalUpdates = new Map<string, SceneTemporalState>();
+  const frameWindow = resolveFrameWindow(
+    requiredFrameWindow,
+    state.timeline.sampleStepBeats,
+    state.timeline.frames.length,
+  );
+
+  for (const originId of buildTargetOriginIds(state.timeline, targetGroupId)) {
+    const timelineState = state.timelineStateByOriginId.get(originId);
+    if (!timelineState) {
+      continue;
+    }
+
+    const sourceWindow = resolvePendingAwareTemporalSourceWindow(state, originId, timelineState);
+    if (!sourceWindow) {
+      continue;
+    }
+
+    const nextTemporal = resolveTemporalState({
+      originId,
+      timelineState,
+      currentTemporal: timelineState.temporal,
+      frameWindow,
+      placementWindow: resolveTemporalPlacementWindow(timelineState),
+      sourceWindow,
+    });
+    if (nextTemporal) {
+      temporalUpdates.set(originId, nextTemporal);
+    }
+  }
+
+  return temporalUpdates;
+};
 
 export const applyTemporalStateUpdates = (
   state: MutableGenerationState,
@@ -49,102 +123,168 @@ export const applyTemporalStateUpdates = (
       observedWindow: cloneTimelineWindow(existing.observedWindow),
       playbackWindow: cloneTimelineWindow(existing.playbackWindow),
       temporal: cloneSceneTemporalState(nextTemporal),
+      finalCleanupMode: existing.finalCleanupMode,
     });
     pendingTemporalWriteOrderByOriginId.set(originId, writeOrder);
   }
 
-  return {
-    timeline: state.timeline,
+  return transitionGenerationState(state, {
     timelineStateByOriginId,
     pendingTemporalWriteOrderByOriginId,
-    pendingFrameApplications: clonePendingFrameApplications(state.pendingFrameApplications),
-    sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
-  };
+  });
 };
+
+export const applyTemporalStateUpdatesForStage = (
+  state: MutableGenerationState,
+  temporalUpdates: ReadonlyMap<string, SceneTemporalState>,
+  stage: { stageIndex: number },
+): MutableGenerationState => (
+  temporalUpdates.size > 0
+    ? applyTemporalStateUpdates(
+        state,
+        temporalUpdates,
+        stage.stageIndex,
+      )
+    : state
+);
+
+export const createTemporalStateUpdateOperator = <TKind extends RackStageDeviceKind>(
+  buildTemporalUpdates: (
+    state: MutableGenerationState,
+    stage: RackStageOfKind<TKind>,
+    context: RackStageExecutionContext,
+  ) => ReadonlyMap<string, SceneTemporalState>,
+): RackOperator => createRackOperator<TKind>(
+  (state) => state,
+  (state, stage, context) => applyTemporalStateUpdatesForStage(
+    state,
+    buildTemporalUpdates(state, stage, context),
+    stage,
+  ),
+);
 
 const buildTemporalMaterializationRemaps = (
   timeline: GeometryTimeline,
+  outputEndBeat: number,
   temporalByOriginId: ReadonlyMap<string, SceneTemporalState>,
   writeOrderByOriginId: ReadonlyMap<string, number>,
 ): Map<string, OriginFrameRemap> => {
   const remaps = new Map<string, OriginFrameRemap>();
-  const outputFrameCount = toFrameCount(FIXED_TIMELINE_END_BEAT, timeline.sampleStepBeats);
 
   for (const [originId, temporal] of temporalByOriginId.entries()) {
-    const placementWindow = temporal.visibilityWindow;
-    const placementSpan = placementWindow.end - placementWindow.start;
-    const sourceFrameIndexByOutputFrame: Array<number | null> = !Number.isFinite(placementSpan) || placementSpan <= 0
-      ? Array.from({ length: outputFrameCount }, (): number | null => null)
-      : Array.from(
-          { length: outputFrameCount },
-          (_, frameIndex) => {
-            const outputBeat = frameIndex * timeline.sampleStepBeats;
-            if (outputBeat < placementWindow.start || outputBeat >= placementWindow.end) {
-              return null;
-            }
-
-            const sourceBeat = evaluateTemporalRemap(temporal.remap, outputBeat);
-            if (sourceBeat === null || !Number.isFinite(sourceBeat)) {
-              return null;
-            }
-
-            return toSourceFrameIndex(sourceBeat, timeline);
-          },
-        );
-
-    remaps.set(originId, {
-      nextTemporal: createMaterializedTemporalState(placementWindow),
-      sourceFrameIndexByOutputFrame,
-      writeOrder: writeOrderByOriginId.get(originId) ?? 0,
-    });
+    remaps.set(
+      originId,
+      buildTemporalOriginFrameRemap(
+        timeline,
+        outputEndBeat,
+        temporal,
+        writeOrderByOriginId.get(originId) ?? 0,
+      ),
+    );
   }
 
   return remaps;
 };
 
-const buildPendingTemporalMaterializationRemaps = (
+interface TemporalMaterializationPlan extends TimelineRemapPlan {
+  materializedTemporalByOriginId: ReadonlyMap<string, SceneTemporalState>;
+}
+
+const buildTemporalMaterializationPlan = (
+  timeline: GeometryTimeline,
+  remapPolicy: TimelineRemapPolicy,
+  temporalByOriginId: ReadonlyMap<string, SceneTemporalState>,
+  writeOrderByOriginId: ReadonlyMap<string, number>,
+): TemporalMaterializationPlan => {
+  const originRemaps = buildTemporalMaterializationRemaps(
+    timeline,
+    remapPolicy.outputEndBeat,
+    temporalByOriginId,
+    writeOrderByOriginId,
+  );
+  const remapPlan = buildTimelineRemapPlan(timeline, originRemaps, remapPolicy);
+
+  return {
+    ...remapPlan,
+    materializedTemporalByOriginId: new Map(
+      Array.from(originRemaps.entries(), ([originId, remap]) => [originId, remap.nextTemporal] as const),
+    ),
+  };
+};
+
+interface PendingTemporalMaterializationPlan extends TemporalMaterializationPlan {
+  pendingTemporalWriteOrderByOriginId: Map<string, number>;
+}
+
+interface PendingTemporalCheckpointExtractionPlan {
+  checkpoint: PendingTemporalMaterializationCheckpoint;
+  timelineStateByOriginId: Map<string, OriginTimelineState>;
+  pendingTemporalWriteOrderByOriginId: Map<string, number>;
+}
+
+const buildPendingTemporalByOriginId = (
+  timelineStateByOriginId: ReadonlyMap<string, OriginTimelineState>,
+): Map<string, SceneTemporalState> => {
+  const temporalByOriginId = new Map<string, SceneTemporalState>();
+  for (const [originId, timelineState] of timelineStateByOriginId.entries()) {
+    if (hasPendingTemporalState(timelineState)) {
+      temporalByOriginId.set(originId, timelineState.temporal);
+    }
+  }
+
+  return temporalByOriginId;
+};
+
+const buildPendingTemporalWriteOrderAfterMaterialization = (
   state: MutableGenerationState,
-): Map<string, OriginFrameRemap> => buildTemporalMaterializationRemaps(
-  state.timeline,
-  new Map(
-    Array.from(state.timelineStateByOriginId.entries())
-      .filter(([, timelineState]) => hasPendingTemporalState(timelineState))
-      .map(([originId, timelineState]) => [originId, timelineState.temporal] as const),
-  ),
-  state.pendingTemporalWriteOrderByOriginId,
-);
+  materializedOriginIds: ReadonlySet<string>,
+): Map<string, number> => {
+  const pendingTemporalWriteOrderByOriginId = clonePendingTemporalWriteOrderByOriginId(
+    state.pendingTemporalWriteOrderByOriginId,
+  );
+  for (const originId of materializedOriginIds) {
+    pendingTemporalWriteOrderByOriginId.delete(originId);
+  }
+
+  return pendingTemporalWriteOrderByOriginId;
+};
+
+const buildPendingTemporalMaterializationPlan = (
+  state: MutableGenerationState,
+): PendingTemporalMaterializationPlan => {
+  const materializationPlan = buildTemporalMaterializationPlan(
+    state.timeline,
+    createFixedTimelineRemapPolicy(),
+    buildPendingTemporalByOriginId(state.timelineStateByOriginId),
+    state.pendingTemporalWriteOrderByOriginId,
+  );
+
+  return {
+    ...materializationPlan,
+    pendingTemporalWriteOrderByOriginId: buildPendingTemporalWriteOrderAfterMaterialization(
+      state,
+      materializationPlan.originIds,
+    ),
+  };
+};
 
 export const materializeTemporalCheckpointTimeline = (
   timeline: GeometryTimeline,
   checkpoint: PendingTemporalMaterializationCheckpoint,
 ): GeometryTimeline => {
-  if (checkpoint.temporalByOriginId.size === 0) {
-    return timeline;
-  }
-
-  const remaps = buildTemporalMaterializationRemaps(
+  const materializationPlan = buildTemporalMaterializationPlan(
     timeline,
+    createFixedTimelineRemapPolicy(),
     checkpoint.temporalByOriginId,
     checkpoint.writeOrderByOriginId,
   );
 
-  return remaps.size > 0
-    ? remapTimeline(
-        timeline,
-        remaps,
-        'all',
-        FIXED_TIMELINE_END_BEAT,
-        false,
-      )
-    : timeline;
+  return materializationPlan.timeline;
 };
 
-export const extractPendingTemporalCheckpoint = (
+const buildPendingTemporalCheckpointExtractionPlan = (
   state: MutableGenerationState,
-): {
-  checkpoint: PendingTemporalMaterializationCheckpoint;
-  state: MutableGenerationState;
-} | null => {
+): PendingTemporalCheckpointExtractionPlan | null => {
   const temporalByOriginId = new Map<string, SceneTemporalState>();
   const writeOrderByOriginId = new Map<string, number>();
   const timelineStateByOriginId = cloneTimelineStateByOriginId(state.timelineStateByOriginId);
@@ -163,6 +303,7 @@ export const extractPendingTemporalCheckpoint = (
       observedWindow: cloneTimelineWindow(timelineState.observedWindow),
       playbackWindow: cloneTimelineWindow(timelineState.playbackWindow),
       temporal: createMaterializedTemporalState(resolveTemporalPlacementWindow(timelineState)),
+      finalCleanupMode: timelineState.finalCleanupMode,
     });
     pendingTemporalWriteOrderByOriginId.delete(originId);
   }
@@ -176,13 +317,28 @@ export const extractPendingTemporalCheckpoint = (
       temporalByOriginId,
       writeOrderByOriginId,
     },
-    state: {
-      timeline: state.timeline,
-      timelineStateByOriginId,
-      pendingTemporalWriteOrderByOriginId,
-      pendingFrameApplications: clonePendingFrameApplications(state.pendingFrameApplications),
-      sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
-    },
+    timelineStateByOriginId,
+    pendingTemporalWriteOrderByOriginId,
+  };
+};
+
+export const extractPendingTemporalCheckpoint = (
+  state: MutableGenerationState,
+): {
+  checkpoint: PendingTemporalMaterializationCheckpoint;
+  state: MutableGenerationState;
+} | null => {
+  const extractionPlan = buildPendingTemporalCheckpointExtractionPlan(state);
+  if (!extractionPlan) {
+    return null;
+  }
+
+  return {
+    checkpoint: extractionPlan.checkpoint,
+    state: transitionGenerationState(state, {
+      timelineStateByOriginId: extractionPlan.timelineStateByOriginId,
+      pendingTemporalWriteOrderByOriginId: extractionPlan.pendingTemporalWriteOrderByOriginId,
+    }),
   };
 };
 
@@ -192,49 +348,22 @@ export const materializePendingTemporalState = (
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): MutableGenerationState => {
-  const pendingOriginIds = new Set<string>();
-  for (const [originId, timelineState] of state.timelineStateByOriginId.entries()) {
-    if (hasPendingTemporalState(timelineState)) {
-      pendingOriginIds.add(originId);
-    }
-  }
-  if (pendingOriginIds.size === 0) {
+  const materializationPlan = buildPendingTemporalMaterializationPlan(state);
+  if (materializationPlan.originIds.size === 0) {
     return state;
   }
 
-  const remaps = buildPendingTemporalMaterializationRemaps(state);
-  const timeline = remaps.size > 0
-    ? remapTimeline(
-        state.timeline,
-        remaps,
-        'all',
-        FIXED_TIMELINE_END_BEAT,
-        false,
-      )
-    : state.timeline;
-  const pendingTemporalWriteOrderByOriginId = clonePendingTemporalWriteOrderByOriginId(
-    state.pendingTemporalWriteOrderByOriginId,
-  );
-  for (const originId of pendingOriginIds) {
-    pendingTemporalWriteOrderByOriginId.delete(originId);
-  }
-  const materializedTemporalByOriginId = new Map(
-    Array.from(remaps.entries(), ([originId, remap]) => [originId, remap.nextTemporal] as const),
-  );
-
-  return {
-    timeline,
+  return transitionGenerationState(state, {
+    timeline: materializationPlan.timeline,
     timelineStateByOriginId: buildTimelineStateAfterTemporalMaterialization(
-      timeline,
+      materializationPlan.timeline,
       state.timelineStateByOriginId,
-      pendingOriginIds,
+      materializationPlan.originIds,
       outputAdapter,
       mutedGroupIds,
       mutedGeneratorIds,
-      materializedTemporalByOriginId,
+      materializationPlan.materializedTemporalByOriginId,
     ),
-    pendingTemporalWriteOrderByOriginId,
-    pendingFrameApplications: clonePendingFrameApplications(state.pendingFrameApplications),
-    sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
-  };
+    pendingTemporalWriteOrderByOriginId: materializationPlan.pendingTemporalWriteOrderByOriginId,
+  });
 };

@@ -7,14 +7,8 @@ import {
 import type { ColorEffectNode } from '../../shared/model';
 import type { BeatRange } from '../analysis/types';
 import {
-  clonePendingTemporalWriteOrderByOriginId,
-  clonePendingFrameApplications,
-  cloneSealedOriginIdsWithout,
-  cloneTimelineStateByOriginId,
-  type PendingFrameApplication,
   type PendingColorFrameWrite,
   type MutableGenerationState,
-  type PendingTemporalMaterializationCheckpoint,
 } from '../timeline/state';
 import {
   toFrameWindow,
@@ -23,17 +17,20 @@ import {
 } from '../timeline';
 import type { GeometryStroke } from '../types';
 import {
-  createRackOperator,
+  createPendingFrameApplicationOperator,
   isFrameWithinWindow,
-  preparePendingFrameApplicationInput,
-  preservePendingRackOperatorInput,
+  mergePlaybackWindowOverridesIntoTimelineState,
   resolveColorSlotDestinationFrameIndexes,
   resolveColorSlotWriteOrder,
   resolveFrameWindow,
   resolveStageExecutionPlan,
+  type PendingFrameApplicationOperatorInput,
 } from './runtime';
-import { mergeTimelineWindows, type TimelineWindow } from '../timeline/temporal-window';
-import { buildColorSourceSnapshot } from './runtime/pending-frame-applications';
+import type { TimelineWindow } from '../timeline/temporal-window';
+import {
+  appendPendingFrameApplication,
+  buildColorSourceSnapshot,
+} from './runtime/pending-frame-applications';
 
 const buildSourceFrameIndexesByOriginId = (
   sourceStrokesByOriginAndFrame: ReadonlyMap<string, ReadonlyMap<number, ReadonlyArray<GeometryStroke>>>,
@@ -344,41 +341,16 @@ const resolveColorPlaybackWindow = <T extends TimedColorSource>(
     : null;
 };
 
-const applyPlaybackWindowOverrides = (
-  state: MutableGenerationState,
-  playbackWindowByOriginId: ReadonlyMap<string, TimelineWindow>,
-): MutableGenerationState['timelineStateByOriginId'] => {
-  if (playbackWindowByOriginId.size === 0) {
-    return cloneTimelineStateByOriginId(state.timelineStateByOriginId);
-  }
-
-  const timelineStateByOriginId = cloneTimelineStateByOriginId(state.timelineStateByOriginId);
-  for (const [originId, playbackWindow] of playbackWindowByOriginId.entries()) {
-    const current = timelineStateByOriginId.get(originId);
-    if (!current) {
-      continue;
-    }
-
-    timelineStateByOriginId.set(originId, {
-      ...current,
-      playbackWindow: mergeTimelineWindows(current.playbackWindow, playbackWindow),
-    });
-  }
-
-  return timelineStateByOriginId;
-};
-
 const applyColorEffect = (
-  state: MutableGenerationState,
-  sourceState: MutableGenerationState,
+  input: PendingFrameApplicationOperatorInput,
   effect: ColorEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
   requiredFrameWindow: BeatRange | 'all',
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
-  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null,
 ): MutableGenerationState => {
+  const { baseState: state, sourceState } = input;
   const colorConfig = buildColorConfig(effect);
   const sourceSnapshot = buildColorSourceSnapshot(
     sourceState.timeline,
@@ -550,53 +522,41 @@ const applyColorEffect = (
     }
   }
 
-  const pendingFrameApplication: PendingFrameApplication = {
-    kind: 'color',
-    precedingTemporalCheckpoint,
+  const pendingFrameApplication = {
+    kind: 'color' as const,
     targetOriginIds,
     sourceFrameCount: sourceSnapshot.frameCount,
     endBeat: colorTimelineEndBeat,
     playbackWindowByOriginId,
     writes,
   };
-  const pendingFrameApplications = clonePendingFrameApplications(state.pendingFrameApplications);
-  if (targetOriginIds.size > 0) {
-    pendingFrameApplications.push(pendingFrameApplication);
-  }
-
-  return {
-    timeline: state.timeline,
-    timelineStateByOriginId: applyPlaybackWindowOverrides(state, playbackWindowByOriginId),
-    pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
-      state.pendingTemporalWriteOrderByOriginId,
-    ),
-    pendingFrameApplications,
-    sealedOriginIds: cloneSealedOriginIdsWithout(state.sealedOriginIds, targetOriginIds),
-  };
+  return appendPendingFrameApplication(
+    input,
+    pendingFrameApplication,
+    {
+      timelineStateByOriginId: mergePlaybackWindowOverridesIntoTimelineState(
+        state.timelineStateByOriginId,
+        playbackWindowByOriginId,
+      ),
+      finalCleanupModeUpdate: { mode: 'cleanup', originIds: targetOriginIds },
+    },
+  );
 };
 
 
-export const colorOperator = createRackOperator<'color'>(
-  preservePendingRackOperatorInput,
-  (state, stage, context) => {
+export const colorOperator = createPendingFrameApplicationOperator<'color'>(
+  (input, stage, context) => {
     const device = stage.device;
     const executionPlan = resolveStageExecutionPlan(context, stage);
-    const {
-      baseState,
-      sourceState,
-      precedingTemporalCheckpoint,
-    } = preparePendingFrameApplicationInput(state, context);
 
     return applyColorEffect(
-      baseState,
-      sourceState,
+      input,
       device,
       stage.groupId,
       stage.stageIndex,
       executionPlan.requiredFrameWindow,
       context.mutedGroupIds,
       context.mutedGeneratorIds,
-      precedingTemporalCheckpoint,
     );
   },
 );

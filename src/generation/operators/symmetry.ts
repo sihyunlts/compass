@@ -3,13 +3,12 @@ import {
   buildPendingStrokeRewriteFrameWrites,
   cloneMask,
   cloneStrokeWithWriteOrder,
-  createRackOperator,
+  createPendingFrameApplicationOperator,
   appendPendingStrokeRewriteApplication,
-  preparePendingFrameApplicationInput,
-  preservePendingRackOperatorInput,
   resolveFrameWindow,
   resolveStageExecutionPlan,
   transformStroke,
+  type PendingFrameApplicationOperatorInput,
 } from './runtime';
 import {
   composeAffine,
@@ -20,9 +19,7 @@ import {
 } from '../../core/geometry';
 import type { SymmetryEffectNode } from '../../shared/model';
 import {
-  cloneSealedOriginIdsWithout,
   type MutableGenerationState,
-  type PendingFrameApplication,
 } from '../timeline/state';
 import {
   createIdentityMask,
@@ -151,14 +148,13 @@ const buildSymmetryStrokeRewrite = (
 };
 
 const applyPendingSymmetryEffect = (
-  state: MutableGenerationState,
-  sourceState: MutableGenerationState,
+  input: PendingFrameApplicationOperatorInput,
   effect: SymmetryEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
   requiredFrameWindow: BeatRange | 'all',
-  precedingTemporalCheckpoint: PendingFrameApplication['precedingTemporalCheckpoint'],
 ): MutableGenerationState => {
+  const { sourceState } = input;
   const frameWindow = resolveFrameWindow(
     requiredFrameWindow,
     sourceState.timeline.sampleStepBeats,
@@ -174,33 +170,23 @@ const applyPendingSymmetryEffect = (
   );
 
   return appendPendingStrokeRewriteApplication(
-    state,
-    sourceState,
+    input,
     targetOriginIds,
     writes,
-    precedingTemporalCheckpoint,
-    cloneSealedOriginIdsWithout(state.sealedOriginIds, targetOriginIds),
+    { mode: 'cleanup', originIds: targetOriginIds },
   );
 };
 
-export const symmetryOperator = createRackOperator<'symmetry'>(
-  preservePendingRackOperatorInput,
-  (state, stage, context) => {
-    const {
-      baseState,
-      sourceState,
-      precedingTemporalCheckpoint,
-    } = preparePendingFrameApplicationInput(state, context);
+export const symmetryOperator = createPendingFrameApplicationOperator<'symmetry'>(
+  (input, stage, context) => {
     const executionPlan = resolveStageExecutionPlan(context, stage);
 
     return applyPendingSymmetryEffect(
-      baseState,
-      sourceState,
+      input,
       stage.device,
       stage.groupId,
       stage.stageIndex,
       executionPlan.requiredFrameWindow,
-      precedingTemporalCheckpoint,
     );
   },
 );

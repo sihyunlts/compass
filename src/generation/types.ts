@@ -34,6 +34,8 @@ export interface GenerationTimelineWindow {
   end: number;
 }
 
+export type GenerationFinalCleanupMode = 'cleanup' | 'preserve';
+
 export interface GenerationOriginTimelineState {
   /** Observed note-output occupancy from the most recent baked timeline. */
   observedWindow: GenerationTimelineWindow;
@@ -41,6 +43,8 @@ export interface GenerationOriginTimelineState {
   playbackWindow: GenerationTimelineWindow;
   /** Pending temporal intent relative to the current baked source timeline. */
   temporal: SceneTemporalState;
+  /** Final front/back cleanup policy for this origin. */
+  finalCleanupMode: GenerationFinalCleanupMode;
 }
 
 export type LedFrameVelocityEntry = readonly [pitch: number, velocity: number];

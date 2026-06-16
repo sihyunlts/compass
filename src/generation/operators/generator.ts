@@ -1,24 +1,19 @@
 import {
-  buildTimelineStateByOriginId,
   createRackOperator,
   preservePendingRackOperatorInput,
+  replaceTimelineAndRefreshRackState,
   resolveFrameWindow,
   resolveModulatedDeviceAtFrame,
+  seedGeneratedOriginTimelineState,
   resolveStageExecutionPlan,
   type GeneratorStageKind,
   type RackStageExecutionContext,
   type RackStageOfKind,
 } from './runtime';
-import { createIdentitySceneTemporalState } from '../../core/scene-operators/temporal';
 import { rasterizeGeneratorFrame } from '../raster';
 import {
-  clonePendingFrameApplications,
-  clonePendingTemporalWriteOrderByOriginId,
-  cloneSealedOriginIdsWithout,
-  cloneTimelineStateByOriginId,
   type MutableGenerationState,
 } from '../timeline/state';
-import { EMPTY_TIMELINE_WINDOW } from '../timeline/temporal-window';
 import {
   beginTimelineStage,
   completeTimelineStage,
@@ -56,28 +51,14 @@ const applyGeneratorDevice = (
     );
   }
 
-  const sealedTimeline = completeTimelineStage(nextTimeline);
-  const seededTimelineStateByOriginId = cloneTimelineStateByOriginId(state.timelineStateByOriginId);
-  seededTimelineStateByOriginId.set(stage.deviceId, {
-    observedWindow: EMPTY_TIMELINE_WINDOW,
-    playbackWindow: EMPTY_TIMELINE_WINDOW,
-    temporal: createIdentitySceneTemporalState(),
-  });
-  return {
-    timeline: sealedTimeline,
-    timelineStateByOriginId: buildTimelineStateByOriginId(
-      sealedTimeline,
-      seededTimelineStateByOriginId,
-      context.outputAdapter,
-      context.mutedGroupIds,
-      context.mutedGeneratorIds,
-    ),
-    pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
-      state.pendingTemporalWriteOrderByOriginId,
-    ),
-    pendingFrameApplications: clonePendingFrameApplications(state.pendingFrameApplications),
-    sealedOriginIds: cloneSealedOriginIdsWithout(state.sealedOriginIds, [stage.deviceId]),
-  };
+  const completedTimeline = completeTimelineStage(nextTimeline);
+  return replaceTimelineAndRefreshRackState(
+    state,
+    completedTimeline,
+    seedGeneratedOriginTimelineState(state.timelineStateByOriginId, stage.deviceId),
+    context,
+    [stage.deviceId],
+  );
 };
 
 export const generatorOperator = createRackOperator<GeneratorStageKind>(

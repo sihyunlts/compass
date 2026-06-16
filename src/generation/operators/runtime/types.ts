@@ -12,7 +12,10 @@ import type {
   RackStageDeviceKind,
   RackStageDeviceNode,
 } from '../../plan/types';
-import type { MutableGenerationState } from '../../timeline/state';
+import type {
+  MutableGenerationState,
+  PendingTemporalMaterializationCheckpoint,
+} from '../../timeline/state';
 import type { CanonicalOutputAdapter, GeometryTimeline } from '../../types';
 
 export interface ModulationContext {
@@ -47,6 +50,12 @@ export type RackOperatorInputPreparation = (
   state: MutableGenerationState,
   context: RackStageExecutionContext,
 ) => MutableGenerationState;
+
+export interface PendingFrameApplicationOperatorInput {
+  baseState: MutableGenerationState;
+  sourceState: MutableGenerationState;
+  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
+}
 
 export interface RackOperator {
   prepareInput: RackOperatorInputPreparation;

@@ -1,11 +1,10 @@
 import {
-  clonePendingTemporalWriteOrderByOriginId,
   clonePendingFrameApplications,
-  cloneSealedOriginIds,
+  type PendingColorApplication,
   type PendingFrameApplication,
   type MutableGenerationState,
+  type PendingStrokeRewriteApplication,
   type PendingStrokeRewriteFrameWrite,
-  type PendingTemporalMaterializationCheckpoint,
 } from '../../timeline/state';
 import {
   addStrokeToFrame,
@@ -28,6 +27,13 @@ import {
 import { buildTimelineStateByOriginId } from './timeline-state';
 import type { GeometryStroke, GeometryTimeline } from '../../types';
 import { materializeTemporalCheckpointTimeline } from './pending-temporal';
+import type { PendingFrameApplicationOperatorInput } from './types';
+import {
+  applyFinalCleanupModeUpdate,
+  transitionGenerationState,
+  type FinalCleanupModeUpdate,
+  type GenerationStateTransitionOverrides,
+} from './state-transition';
 
 const mergePlaybackWindowOverrides = (
   applications: ReadonlyArray<MutableGenerationState['pendingFrameApplications'][number]>,
@@ -57,6 +63,48 @@ interface ColorSourceSnapshot {
   timeDomainEndBeat: number;
 }
 
+type PendingFrameApplicationDraft =
+  | Omit<PendingColorApplication, 'precedingTemporalCheckpoint'>
+  | Omit<PendingStrokeRewriteApplication, 'precedingTemporalCheckpoint'>;
+
+const attachTemporalCheckpoint = (
+  input: PendingFrameApplicationOperatorInput,
+  application: PendingFrameApplicationDraft,
+): PendingFrameApplication => ({
+  ...application,
+  precedingTemporalCheckpoint: input.precedingTemporalCheckpoint,
+});
+
+export const appendPendingFrameApplication = (
+  input: PendingFrameApplicationOperatorInput,
+  application: PendingFrameApplicationDraft,
+  options: {
+    timelineStateByOriginId?: MutableGenerationState['timelineStateByOriginId'];
+    finalCleanupModeUpdate?: FinalCleanupModeUpdate;
+  } = {},
+): MutableGenerationState => {
+  const state = input.baseState;
+  const pendingFrameApplications = clonePendingFrameApplications(state.pendingFrameApplications);
+  if (application.targetOriginIds.size > 0) {
+    pendingFrameApplications.push(attachTemporalCheckpoint(input, application));
+  }
+
+  const timelineStateByOriginId = options.finalCleanupModeUpdate
+    ? applyFinalCleanupModeUpdate(
+        options.timelineStateByOriginId ?? state.timelineStateByOriginId,
+        options.finalCleanupModeUpdate,
+      )
+    : options.timelineStateByOriginId;
+  const overrides: GenerationStateTransitionOverrides = {
+    pendingFrameApplications,
+  };
+  if (timelineStateByOriginId) {
+    overrides.timelineStateByOriginId = timelineStateByOriginId;
+  }
+
+  return transitionGenerationState(state, overrides);
+};
+
 export const buildColorSourceSnapshot = (
   timeline: GeometryTimeline,
   targetGroupId: string | null,
@@ -85,34 +133,22 @@ export const buildColorSourceSnapshot = (
 };
 
 export const appendPendingStrokeRewriteApplication = (
-  state: MutableGenerationState,
-  sourceState: MutableGenerationState,
+  input: PendingFrameApplicationOperatorInput,
   targetOriginIds: ReadonlySet<string>,
   writes: ReadonlyArray<PendingStrokeRewriteFrameWrite>,
-  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null,
-  sealedOriginIds: ReadonlySet<string>,
+  finalCleanupModeUpdate: FinalCleanupModeUpdate,
 ): MutableGenerationState => {
-  const pendingFrameApplications = clonePendingFrameApplications(state.pendingFrameApplications);
-  if (targetOriginIds.size > 0) {
-    pendingFrameApplications.push({
+  return appendPendingFrameApplication(
+    input,
+    {
       kind: 'stroke-rewrite',
-      precedingTemporalCheckpoint,
       targetOriginIds: new Set(targetOriginIds),
-      sourceFrameCount: sourceState.timeline.frames.length,
-      endBeat: sourceState.timeline.timeDomainEndBeat,
+      sourceFrameCount: input.sourceState.timeline.frames.length,
+      endBeat: input.sourceState.timeline.timeDomainEndBeat,
       writes,
-    });
-  }
-
-  return {
-    timeline: state.timeline,
-    timelineStateByOriginId: state.timelineStateByOriginId,
-    pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
-      state.pendingTemporalWriteOrderByOriginId,
-    ),
-    pendingFrameApplications,
-    sealedOriginIds: cloneSealedOriginIds(sealedOriginIds),
-  };
+    },
+    { finalCleanupModeUpdate },
+  );
 };
 
 export const buildPendingStrokeRewriteFrameWrites = (
@@ -156,9 +192,22 @@ export const buildPendingStrokeRewriteFrameWrites = (
   return writes;
 };
 
-const materializePendingStrokeRewriteApplication = (
+type PendingFrameApplicationStage = ReturnType<typeof beginTimelineStage>;
+
+const isFrameIndexWithinTimeline = (
   timeline: GeometryTimeline,
-  application: Extract<PendingFrameApplication, { kind: 'stroke-rewrite' }>,
+  frameIndex: number,
+): boolean => frameIndex >= 0 && frameIndex < timeline.frames.length;
+
+const filterFrameIndexesWithinTimeline = (
+  timeline: GeometryTimeline,
+  frameIndexes: ReadonlyArray<number>,
+): number[] => frameIndexes.filter((frameIndex) => isFrameIndexWithinTimeline(timeline, frameIndex));
+
+const materializePendingFrameApplicationStage = (
+  timeline: GeometryTimeline,
+  application: PendingFrameApplication,
+  applyWrites: (timeline: PendingFrameApplicationStage) => void,
 ): GeometryTimeline => {
   const nextTimeline = beginTimelineStage(
     timeline,
@@ -170,11 +219,17 @@ const materializePendingStrokeRewriteApplication = (
     application.targetOriginIds,
   );
 
+  applyWrites(nextTimeline);
+
+  return completeTimelineStage(nextTimeline);
+};
+
+const materializePendingStrokeRewriteApplication = (
+  timeline: GeometryTimeline,
+  application: Extract<PendingFrameApplication, { kind: 'stroke-rewrite' }>,
+): GeometryTimeline => materializePendingFrameApplicationStage(timeline, application, (nextTimeline) => {
   for (const write of application.writes) {
-    if (
-      write.destinationFrameIndex < 0
-      || write.destinationFrameIndex >= nextTimeline.frames.length
-    ) {
+    if (!isFrameIndexWithinTimeline(nextTimeline, write.destinationFrameIndex)) {
       continue;
     }
 
@@ -182,8 +237,54 @@ const materializePendingStrokeRewriteApplication = (
       addStrokeToFrame(nextTimeline, write.destinationFrameIndex, stroke);
     }
   }
+});
 
-  return completeTimelineStage(nextTimeline);
+const materializePendingColorApplication = (
+  timeline: GeometryTimeline,
+  application: Extract<PendingFrameApplication, { kind: 'color' }>,
+): GeometryTimeline => materializePendingFrameApplicationStage(timeline, application, (nextTimeline) => {
+  for (const write of application.writes) {
+    const destinationFrameIndexes = filterFrameIndexesWithinTimeline(
+      nextTimeline,
+      write.destinationFrameIndexes,
+    );
+    if (destinationFrameIndexes.length === 0) {
+      continue;
+    }
+
+    for (const stroke of write.sourceStrokes) {
+      addStrokeToFrames(
+        nextTimeline,
+        destinationFrameIndexes,
+        cloneStrokeWithVelocityAndWriteOrder(
+          stroke,
+          write.velocity,
+          write.writeOrder,
+          write.slotIndex,
+          write.slotCount,
+          write.colorSlotGapFill,
+        ),
+      );
+    }
+  }
+});
+
+const materializePendingFrameApplication = (
+  timeline: GeometryTimeline,
+  application: PendingFrameApplication,
+): GeometryTimeline => {
+  const sourceTimeline = application.precedingTemporalCheckpoint
+    ? materializeTemporalCheckpointTimeline(
+        timeline,
+        application.precedingTemporalCheckpoint,
+      )
+    : timeline;
+
+  if (application.kind === 'stroke-rewrite') {
+    return materializePendingStrokeRewriteApplication(sourceTimeline, application);
+  }
+
+  return materializePendingColorApplication(sourceTimeline, application);
 };
 
 export const materializePendingFrameApplications = (
@@ -198,56 +299,10 @@ export const materializePendingFrameApplications = (
 
   let timeline = state.timeline;
   for (const application of state.pendingFrameApplications) {
-    if (application.precedingTemporalCheckpoint) {
-      timeline = materializeTemporalCheckpointTimeline(
-        timeline,
-        application.precedingTemporalCheckpoint,
-      );
-    }
-
-    if (application.kind === 'stroke-rewrite') {
-      timeline = materializePendingStrokeRewriteApplication(timeline, application);
-      continue;
-    }
-
-    const nextTimeline = beginTimelineStage(
-      timeline,
-      Math.max(timeline.timeDomainEndBeat, application.endBeat),
-    );
-    stripOriginFrames(
-      nextTimeline,
-      Math.min(application.sourceFrameCount, nextTimeline.frames.length),
-      application.targetOriginIds,
-    );
-
-    for (const write of application.writes) {
-      const destinationFrameIndexes = write.destinationFrameIndexes.filter((frameIndex) => (
-        frameIndex >= 0 && frameIndex < nextTimeline.frames.length
-      ));
-      if (destinationFrameIndexes.length === 0) {
-        continue;
-      }
-
-      for (const stroke of write.sourceStrokes) {
-        addStrokeToFrames(
-          nextTimeline,
-          destinationFrameIndexes,
-          cloneStrokeWithVelocityAndWriteOrder(
-            stroke,
-            write.velocity,
-            write.writeOrder,
-            write.slotIndex,
-            write.slotCount,
-            write.colorSlotGapFill,
-          ),
-        );
-      }
-    }
-
-    timeline = completeTimelineStage(nextTimeline);
+    timeline = materializePendingFrameApplication(timeline, application);
   }
 
-  return {
+  return transitionGenerationState(state, {
     timeline,
     timelineStateByOriginId: buildTimelineStateByOriginId(
       timeline,
@@ -258,10 +313,6 @@ export const materializePendingFrameApplications = (
       undefined,
       mergePlaybackWindowOverrides(state.pendingFrameApplications),
     ),
-    pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
-      state.pendingTemporalWriteOrderByOriginId,
-    ),
     pendingFrameApplications: [],
-    sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
-  };
+  });
 };

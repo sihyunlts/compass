@@ -226,6 +226,16 @@ export const buildSourceWindowTimeWarpTransform = (
   };
 };
 
+export const buildTimeWarpTransform = (
+  sourceWindow: TimelineWindow,
+  placementWindow: TimelineWindow,
+  remap: TemporalRemap,
+): TemporalTransform => (
+  isFixedTimelineWindow(sourceWindow)
+    ? buildPlacementPreservingTimeWarpTransform(placementWindow, remap)
+    : buildSourceWindowTimeWarpTransform(sourceWindow, placementWindow, remap)
+);
+
 export const clampSceneTemporalStateToFixedLoop = (
   sceneTemporal: SceneTemporalState,
 ): SceneTemporalState => ({
