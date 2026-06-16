@@ -1,12 +1,12 @@
-import { IDENTITY_AFFINE } from '../core/geometry';
-import { NOTE_SAMPLES_PER_BEAT } from '../core/pipeline/constants';
-import type { BeatRange } from './analysis/types';
+import { IDENTITY_AFFINE } from '../../core/geometry';
+import { NOTE_SAMPLES_PER_BEAT } from '../../core/pipeline/constants';
+import type { BeatRange } from '../analysis/types';
 import type {
   GeometryFrame,
   GeometryMask,
   GeometryStroke,
   GeometryTimeline,
-} from './types';
+} from '../types';
 
 export const DEFAULT_SAMPLE_STEP_BEATS = 1 / NOTE_SAMPLES_PER_BEAT;
 

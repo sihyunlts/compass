@@ -1,10 +1,10 @@
-import { THICKNESS } from '../core/pipeline/constants';
-import { applyAffine, distanceToPolylineSquared } from '../core/geometry';
-import { toRoundedCoordinateKey } from './coordinates';
+import { THICKNESS } from '../../core/pipeline/constants';
+import { applyAffine, distanceToPolylineSquared } from '../../core/geometry';
+import { toRoundedCoordinateKey } from '../coordinates';
 import type {
   GeometryMask,
   GeometryStroke,
-} from './types';
+} from '../types';
 
 interface OccupiedCoordinate {
   originId: string;

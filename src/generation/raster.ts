@@ -8,7 +8,7 @@ import { normalizeOptionalId } from '../shared/normalize-id';
 import type { GeneratorNode } from '../shared/model';
 import { toBounds } from './analysis/bounds';
 import type { SpatialRequirement } from './analysis/types';
-import { collectOccupiedCoordinates } from './timeline-analysis';
+import { collectOccupiedCoordinates } from './timeline/analysis';
 import type { GeometryTimeline } from './types';
 import { addStrokeToFrame } from './timeline';
 

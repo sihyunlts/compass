@@ -10,7 +10,7 @@ import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 import type { LaunchpadButton } from '../shared/model';
 import { createSpatialBounds } from './analysis/bounds';
 import type { CanonicalExecutionRequest } from './analysis/types';
-import { collectOccupiedCoordinates } from './timeline-analysis';
+import { collectOccupiedCoordinates } from './timeline/analysis';
 import {
   type CanonicalOutputAdapter,
   type CanonicalSpatialMask,
