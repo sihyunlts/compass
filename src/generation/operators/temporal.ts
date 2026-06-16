@@ -16,8 +16,10 @@ import type { OriginTimelineState, MutableGenerationState } from '../timeline/st
 import {
   buildPlacementPreservingTimeWarpTransform,
   buildReverseTransform,
+  buildSourceWindowTimeWarpTransform,
   buildStretchTransform,
   buildTrimTransform,
+  hasPendingTemporalState,
   isFixedTimelineWindow,
   resolveTemporalPlacementWindow,
   resolveTemporalSourceWindow,
@@ -29,11 +31,25 @@ import {
   buildTargetOriginIds,
   createRackOperator,
   isFrameWithinWindow,
-  prepareTemporalRackOperatorInput,
+  preservePendingRackOperatorInput,
   resolveFrameWindow,
   resolveModulatedDeviceAtFrame,
   type ModulationContext,
 } from './runtime';
+
+const resolveTemporalOperatorSourceWindow = (
+  state: MutableGenerationState,
+  originId: string,
+  timelineState: OriginTimelineState | undefined,
+): ReturnType<typeof resolveTemporalSourceWindow> => {
+  if (!timelineState) {
+    return null;
+  }
+
+  return hasPendingTemporalState(timelineState)
+    ? resolveTemporalPlacementWindow(timelineState)
+    : resolveTemporalSourceWindow(state.timelineStateByOriginId, originId);
+};
 
 const buildTemporalStateUpdatesForTargetOrigins = (
   state: MutableGenerationState,
@@ -125,9 +141,7 @@ const buildReverseRemaps = (
   requiredFrameWindow,
   (originId, timelineState, frameWindow) => {
     const placementWindow = resolveTemporalPlacementWindow(timelineState);
-    const sourceWindow = timelineState?.temporal.hasAuthoredTimeline === true
-      ? placementWindow
-      : resolveTemporalSourceWindow(state.timelineStateByOriginId, originId);
+    const sourceWindow = resolveTemporalOperatorSourceWindow(state, originId, timelineState);
     if (!sourceWindow) {
       return null;
     }
@@ -169,7 +183,7 @@ const buildTrimRemaps = (
   targetGroupId,
   requiredFrameWindow,
   (originId, timelineState, frameWindow) => {
-    const sourceWindow = resolveTemporalSourceWindow(state.timelineStateByOriginId, originId);
+    const sourceWindow = resolveTemporalOperatorSourceWindow(state, originId, timelineState);
     if (!sourceWindow) {
       return null;
     }
@@ -209,7 +223,7 @@ const buildStretchRemaps = (
   targetGroupId,
   requiredFrameWindow,
   (originId, timelineState, frameWindow) => {
-    const sourceWindow = resolveTemporalSourceWindow(state.timelineStateByOriginId, originId);
+    const sourceWindow = resolveTemporalOperatorSourceWindow(state, originId, timelineState);
     if (!sourceWindow) {
       return null;
     }
@@ -259,10 +273,19 @@ const buildTimeWarpRemaps = (
     state,
     targetGroupId,
     requiredFrameWindow,
-    (_originId, timelineState, frameWindow) => {
+    (originId, timelineState, frameWindow) => {
       const placementWindow = resolveTemporalPlacementWindow(timelineState);
+      const sourceWindow = resolveTemporalOperatorSourceWindow(state, originId, timelineState);
+      if (!sourceWindow) {
+        return null;
+      }
+
       const placementSpan = placementWindow.end - placementWindow.start;
+      const sourceSpan = sourceWindow.end - sourceWindow.start;
       if (!Number.isFinite(placementSpan) || placementSpan <= 0) {
+        return null;
+      }
+      if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
         return null;
       }
 
@@ -284,7 +307,9 @@ const buildTimeWarpRemaps = (
 
       return composeSceneTemporalState(
         timelineState?.temporal ?? createIdentitySceneTemporalState(),
-        buildPlacementPreservingTimeWarpTransform(placementWindow, remap),
+        isFixedTimelineWindow(sourceWindow)
+          ? buildPlacementPreservingTimeWarpTransform(placementWindow, remap)
+          : buildSourceWindowTimeWarpTransform(sourceWindow, placementWindow, remap),
       );
     },
   );
@@ -305,7 +330,7 @@ const applyTemporalUpdatesForStage = (
 );
 
 export const reverseOperator = createRackOperator<'reverse'>(
-  prepareTemporalRackOperatorInput,
+  preservePendingRackOperatorInput,
   (state, stage) => {
     return applyTemporalUpdatesForStage(
       state,
@@ -320,7 +345,7 @@ export const reverseOperator = createRackOperator<'reverse'>(
 );
 
 export const trimOperator = createRackOperator<'trim'>(
-  prepareTemporalRackOperatorInput,
+  preservePendingRackOperatorInput,
   (state, stage, context) => {
     const device = stage.device;
     return applyTemporalUpdatesForStage(
@@ -338,7 +363,7 @@ export const trimOperator = createRackOperator<'trim'>(
 );
 
 export const stretchOperator = createRackOperator<'stretch'>(
-  prepareTemporalRackOperatorInput,
+  preservePendingRackOperatorInput,
   (state, stage, context) => {
     const device = stage.device;
     return applyTemporalUpdatesForStage(
@@ -356,7 +381,7 @@ export const stretchOperator = createRackOperator<'stretch'>(
 );
 
 export const timeWarpOperator = createRackOperator<'timewarp'>(
-  prepareTemporalRackOperatorInput,
+  preservePendingRackOperatorInput,
   (state, stage) => {
     const device = stage.device;
     return applyTemporalUpdatesForStage(

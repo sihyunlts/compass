@@ -1,7 +1,7 @@
 import {
   buildTimelineStateByOriginId,
   createRackOperator,
-  materializeRackOperatorInput,
+  preservePendingRackOperatorInput,
   resolveFrameWindow,
   resolveModulatedDeviceAtFrame,
   resolveStageExecutionPlan,
@@ -12,8 +12,9 @@ import {
 import { createIdentitySceneTemporalState } from '../../core/scene-operators/temporal';
 import { rasterizeGeneratorFrame } from '../raster';
 import {
+  clonePendingFrameApplications,
   clonePendingTemporalWriteOrderByOriginId,
-  cloneSealedOriginIds,
+  cloneSealedOriginIdsWithout,
   cloneTimelineStateByOriginId,
   type MutableGenerationState,
 } from '../timeline/state';
@@ -59,10 +60,9 @@ const applyGeneratorDevice = (
   const seededTimelineStateByOriginId = cloneTimelineStateByOriginId(state.timelineStateByOriginId);
   seededTimelineStateByOriginId.set(stage.deviceId, {
     observedWindow: EMPTY_TIMELINE_WINDOW,
+    playbackWindow: EMPTY_TIMELINE_WINDOW,
     temporal: createIdentitySceneTemporalState(),
   });
-  const sealedOriginIds = cloneSealedOriginIds(state.sealedOriginIds);
-  sealedOriginIds.delete(stage.deviceId);
   return {
     timeline: sealedTimeline,
     timelineStateByOriginId: buildTimelineStateByOriginId(
@@ -75,11 +75,12 @@ const applyGeneratorDevice = (
     pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
       state.pendingTemporalWriteOrderByOriginId,
     ),
-    sealedOriginIds,
+    pendingFrameApplications: clonePendingFrameApplications(state.pendingFrameApplications),
+    sealedOriginIds: cloneSealedOriginIdsWithout(state.sealedOriginIds, [stage.deviceId]),
   };
 };
 
 export const generatorOperator = createRackOperator<GeneratorStageKind>(
-  materializeRackOperatorInput,
+  preservePendingRackOperatorInput,
   (state, stage, context) => applyGeneratorDevice(state, stage, context),
 );

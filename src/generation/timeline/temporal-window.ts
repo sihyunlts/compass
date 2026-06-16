@@ -36,6 +36,23 @@ export const isWindowEmpty = (
   window: TimelineWindow | null,
 ): boolean => !window || window.end <= window.start + TIMELINE_WINDOW_EPSILON;
 
+export const mergeTimelineWindows = (
+  left: TimelineWindow | null | undefined,
+  right: TimelineWindow | null | undefined,
+): TimelineWindow => {
+  if (isWindowEmpty(left)) {
+    return cloneTimelineWindow(right ?? EMPTY_TIMELINE_WINDOW);
+  }
+  if (isWindowEmpty(right)) {
+    return cloneTimelineWindow(left);
+  }
+
+  return {
+    start: Math.min(left.start, right.start),
+    end: Math.max(left.end, right.end),
+  };
+};
+
 const isIdentityTemporalRemap = (
   remap: TemporalRemap,
 ): boolean => remap.kind === 'affine'
@@ -107,8 +124,8 @@ export const resolveTemporalSourceWindow = (
     return cloneTimelineWindow(DEFAULT_TIMELINE_WINDOW);
   }
 
-  return timelineState.observedWindow.end > timelineState.observedWindow.start
-    ? cloneTimelineWindow(timelineState.observedWindow)
+  return timelineState.playbackWindow.end > timelineState.playbackWindow.start
+    ? cloneTimelineWindow(timelineState.playbackWindow)
     : cloneTimelineWindow(timelineState.temporal.visibilityWindow);
 };
 
@@ -177,6 +194,37 @@ export const buildPlacementPreservingTimeWarpTransform = (
   remapToInput: createSampledPlacementRemap(placementWindow, remap),
   visibilityWindow: cloneTimelineWindow(placementWindow),
 });
+
+export const buildSourceWindowTimeWarpTransform = (
+  sourceWindow: TimelineWindow,
+  placementWindow: TimelineWindow,
+  remap: TemporalRemap,
+): TemporalTransform => {
+  const sourceSpan = sourceWindow.end - sourceWindow.start;
+  if (remap.kind === 'affine') {
+    const placementSpan = placementWindow.end - placementWindow.start;
+    return {
+      remapToInput: createAffineTemporalRemap(
+        (sourceSpan * remap.alpha) / placementSpan,
+        sourceWindow.start + sourceSpan * remap.beta
+          - ((sourceSpan * remap.alpha * placementWindow.start) / placementSpan),
+      ),
+      visibilityWindow: cloneTimelineWindow(placementWindow),
+    };
+  }
+
+  return {
+    remapToInput: {
+      kind: 'sampled',
+      domainStart: placementWindow.start,
+      domainEnd: placementWindow.end,
+      samples: remap.samples.map((sample) => (
+        sample === null ? null : sourceWindow.start + sourceSpan * sample
+      )),
+    },
+    visibilityWindow: cloneTimelineWindow(placementWindow),
+  };
+};
 
 export const clampSceneTemporalStateToFixedLoop = (
   sceneTemporal: SceneTemporalState,

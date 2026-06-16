@@ -8,33 +8,32 @@ import type { ColorEffectNode } from '../../shared/model';
 import type { BeatRange } from '../analysis/types';
 import {
   clonePendingTemporalWriteOrderByOriginId,
-  cloneSealedOriginIds,
+  clonePendingFrameApplications,
+  cloneSealedOriginIdsWithout,
+  cloneTimelineStateByOriginId,
+  type PendingFrameApplication,
+  type PendingColorFrameWrite,
   type MutableGenerationState,
+  type PendingTemporalMaterializationCheckpoint,
 } from '../timeline/state';
 import {
-  addStrokeToFrame,
-  addStrokeToFrames,
-  beginTimelineStage,
-  completeTimelineStage,
-  ensureTimelineFrameCount,
   toFrameWindow,
+  toFrameCount,
   type FrameWindow,
 } from '../timeline';
-import type { CanonicalOutputAdapter, GeometryStroke, GeometryTimeline } from '../types';
+import type { GeometryStroke } from '../types';
 import {
-  buildSourceStrokesByOriginAndFrame,
-  buildTargetOriginIds,
-  buildTimelineStateByOriginId,
-  cloneStrokeWithVelocityAndWriteOrder,
   createRackOperator,
   isFrameWithinWindow,
-  materializeRackOperatorInput,
+  preparePendingFrameApplicationInput,
+  preservePendingRackOperatorInput,
   resolveColorSlotDestinationFrameIndexes,
   resolveColorSlotWriteOrder,
   resolveFrameWindow,
   resolveStageExecutionPlan,
-  stripOriginFrames,
 } from './runtime';
+import { mergeTimelineWindows, type TimelineWindow } from '../timeline/temporal-window';
+import { buildColorSourceSnapshot } from './runtime/pending-frame-applications';
 
 const buildSourceFrameIndexesByOriginId = (
   sourceStrokesByOriginAndFrame: ReadonlyMap<string, ReadonlyMap<number, ReadonlyArray<GeometryStroke>>>,
@@ -190,17 +189,18 @@ const resolveColorSlotSourceEndBeat = <T extends TimedColorSource>(
 
 const resolveColorSlotSourceFrameWindow = <T extends TimedColorSource>(
   slot: PlannedColorSlot<T>,
-  timeline: GeometryTimeline,
+  sampleStepBeats: number,
+  frameCount: number,
 ): FrameWindow => {
   const startBeat = slot.sourceStartBeat;
   const endBeat = resolveColorSlotSourceEndBeat(slot);
   const startFrame = Math.min(
-    Math.max(Math.round(startBeat / timeline.sampleStepBeats), 0),
-    timeline.frames.length,
+    Math.max(Math.round(startBeat / sampleStepBeats), 0),
+    frameCount,
   );
   const endFrameExclusive = Math.min(
-    Math.max(Math.ceil((endBeat / timeline.sampleStepBeats) - 1e-9), startFrame),
-    timeline.frames.length,
+    Math.max(Math.ceil((endBeat / sampleStepBeats) - 1e-9), startFrame),
+    frameCount,
   );
 
   return {
@@ -211,7 +211,8 @@ const resolveColorSlotSourceFrameWindow = <T extends TimedColorSource>(
 
 const resolveColorSlotDestinationFrameWindow = <T extends TimedColorSource>(
   slot: PlannedColorSlot<T>,
-  timeline: GeometryTimeline,
+  sampleStepBeats: number,
+  frameCount: number,
 ): FrameWindow => {
   if (slot.source.referenceDuration === undefined) {
     return toFrameWindow(
@@ -219,8 +220,8 @@ const resolveColorSlotDestinationFrameWindow = <T extends TimedColorSource>(
         start: slot.startBeat,
         end: slot.endBeat,
       },
-      timeline.sampleStepBeats,
-      timeline.frames.length,
+      sampleStepBeats,
+      frameCount,
     );
   }
 
@@ -229,10 +230,10 @@ const resolveColorSlotDestinationFrameWindow = <T extends TimedColorSource>(
   return toFrameWindow(
     {
       start: slot.startBeat,
-      end: slot.startBeat + timeline.sampleStepBeats + extraDuration,
+      end: slot.startBeat + sampleStepBeats + extraDuration,
     },
-    timeline.sampleStepBeats,
-    timeline.frames.length,
+    sampleStepBeats,
+    frameCount,
   );
 };
 
@@ -304,26 +305,83 @@ const isNonSteppedMovingColorSource = (
 ): boolean => sourceSegments.length > 1
   && sourceSegments.every((sourceSegment) => sourceSegment.referenceDuration === undefined);
 
+const hasActivationColorSlots = (
+  sourceSegments: ReadonlyArray<ColorTimingSegment>,
+): boolean => sourceSegments.some(
+  (sourceSegment) => sourceSegment.referenceDuration !== undefined,
+);
+
+const hasExtendedColorSlots = (
+  sourceSegments: ReadonlyArray<ColorTimingSegment>,
+  colorConfig: { gapPercent: number },
+): boolean => hasActivationColorSlots(sourceSegments)
+  || (colorConfig.gapPercent > 0 && isNonSteppedMovingColorSource(sourceSegments));
+
+const resolveColorPlaybackEndBeat = <T extends TimedColorSource>(
+  slots: ReadonlyArray<PlannedColorSlot<T>>,
+  fallbackEndBeat: number,
+): number => slots.reduce(
+  (maxEndBeat, slot) => Math.max(maxEndBeat, slot.endBeat),
+  fallbackEndBeat,
+);
+
+const resolveColorPlaybackWindow = <T extends TimedColorSource>(
+  slots: ReadonlyArray<PlannedColorSlot<T>>,
+): TimelineWindow | null => {
+  if (slots.length === 0) {
+    return null;
+  }
+
+  let start = Number.POSITIVE_INFINITY;
+  let end = Number.NEGATIVE_INFINITY;
+  for (const slot of slots) {
+    start = Math.min(start, slot.startBeat);
+    end = Math.max(end, slot.endBeat);
+  }
+
+  return Number.isFinite(start) && Number.isFinite(end) && end > start
+    ? { start, end }
+    : null;
+};
+
+const applyPlaybackWindowOverrides = (
+  state: MutableGenerationState,
+  playbackWindowByOriginId: ReadonlyMap<string, TimelineWindow>,
+): MutableGenerationState['timelineStateByOriginId'] => {
+  if (playbackWindowByOriginId.size === 0) {
+    return cloneTimelineStateByOriginId(state.timelineStateByOriginId);
+  }
+
+  const timelineStateByOriginId = cloneTimelineStateByOriginId(state.timelineStateByOriginId);
+  for (const [originId, playbackWindow] of playbackWindowByOriginId.entries()) {
+    const current = timelineStateByOriginId.get(originId);
+    if (!current) {
+      continue;
+    }
+
+    timelineStateByOriginId.set(originId, {
+      ...current,
+      playbackWindow: mergeTimelineWindows(current.playbackWindow, playbackWindow),
+    });
+  }
+
+  return timelineStateByOriginId;
+};
 
 const applyColorEffect = (
   state: MutableGenerationState,
+  sourceState: MutableGenerationState,
   effect: ColorEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
   requiredFrameWindow: BeatRange | 'all',
-  outputAdapter: CanonicalOutputAdapter,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
+  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null,
 ): MutableGenerationState => {
-  const nextTimeline = beginTimelineStage(state.timeline);
   const colorConfig = buildColorConfig(effect);
-  const frameWindow = resolveFrameWindow(
-    requiredFrameWindow,
-    state.timeline.sampleStepBeats,
-    state.timeline.frames.length,
-  );
-  const targetOriginIds = buildTargetOriginIds(
-    state.timeline,
+  const sourceSnapshot = buildColorSourceSnapshot(
+    sourceState.timeline,
     targetGroupId,
     {
       excludeMutedSources: targetGroupId === null,
@@ -331,19 +389,38 @@ const applyColorEffect = (
       mutedGeneratorIds,
     },
   );
-  const sourceStrokesByOriginAndFrame = buildSourceStrokesByOriginAndFrame(
-    state.timeline,
-    targetOriginIds,
+  const frameWindow = resolveFrameWindow(
+    requiredFrameWindow,
+    sourceState.timeline.sampleStepBeats,
+    sourceSnapshot.frameCount,
   );
+  const targetOriginIds = sourceSnapshot.targetOriginIds;
+  const sourceStrokesByOriginAndFrame = sourceSnapshot.sourceStrokesByOriginAndFrame;
   const targetSegmentsByOriginId = buildSourceTimingSegmentsByOriginId(
     sourceStrokesByOriginAndFrame,
-    state.timeline.sampleStepBeats,
+    sourceState.timeline.sampleStepBeats,
   );
   const sourceFrameIndexesByOriginId = buildSourceFrameIndexesByOriginId(
     sourceStrokesByOriginAndFrame,
   );
+  const colorSlotsByOriginId = new Map<string, PlannedColorSlot<ColorTimingSegment>[]>();
+  let colorTimelineEndBeat = sourceSnapshot.timeDomainEndBeat;
 
-  stripOriginFrames(nextTimeline, state.timeline.frames.length, targetOriginIds);
+  for (const [originId, sourceSegments] of targetSegmentsByOriginId.entries()) {
+    if (isStaticColorSource(sourceSegments, sourceState.timeline.sampleStepBeats)) {
+      continue;
+    }
+
+    const slots = planColorProgramSlots(sourceSegments, colorConfig);
+    colorSlotsByOriginId.set(originId, slots);
+    if (hasExtendedColorSlots(sourceSegments, colorConfig)) {
+      colorTimelineEndBeat = resolveColorPlaybackEndBeat(slots, colorTimelineEndBeat);
+    }
+  }
+
+  const colorFrameCount = toFrameCount(colorTimelineEndBeat, sourceState.timeline.sampleStepBeats);
+  const writes: PendingColorFrameWrite[] = [];
+  const playbackWindowByOriginId = new Map<string, TimelineWindow>();
 
   for (const [originId, sourceSegments] of targetSegmentsByOriginId.entries()) {
     const sourceStrokesByFrame = sourceStrokesByOriginAndFrame.get(originId);
@@ -352,7 +429,7 @@ const applyColorEffect = (
       continue;
     }
 
-    if (isStaticColorSource(sourceSegments, state.timeline.sampleStepBeats)) {
+    if (isStaticColorSource(sourceSegments, sourceState.timeline.sampleStepBeats)) {
       const staticSourceSegment = sourceSegments[0];
       for (const sourceFrameIndex of sourceFrameIndexes) {
         if (!isFrameWithinWindow(sourceFrameIndex, frameWindow)) {
@@ -362,7 +439,7 @@ const applyColorEffect = (
         const staticSlot = resolveStaticColorSlotAtFrame(
           staticSourceSegment,
           sourceFrameIndex,
-          state.timeline.sampleStepBeats,
+          sourceState.timeline.sampleStepBeats,
           colorConfig,
         );
         if (!staticSlot) {
@@ -375,50 +452,51 @@ const applyColorEffect = (
         }
 
         for (const stroke of sourceStrokes) {
-          addStrokeToFrame(
-            nextTimeline,
-            sourceFrameIndex,
-            cloneStrokeWithVelocityAndWriteOrder(
-              stroke,
-              staticSlot.velocity,
-              resolveColorSlotWriteOrder(writeOrder, staticSlot.slotIndex, staticSlot.slotCount),
-              staticSlot.slotIndex,
-              staticSlot.slotCount,
-              false,
-            ),
-          );
+          writes.push({
+            sourceStrokes: [stroke],
+            destinationFrameIndexes: [sourceFrameIndex],
+            velocity: staticSlot.velocity,
+            writeOrder: resolveColorSlotWriteOrder(writeOrder, staticSlot.slotIndex, staticSlot.slotCount),
+            slotIndex: staticSlot.slotIndex,
+            slotCount: staticSlot.slotCount,
+            colorSlotGapFill: false,
+          });
         }
       }
 
       continue;
     }
 
-    const slots = planColorProgramSlots(sourceSegments, colorConfig);
+    const slots = colorSlotsByOriginId.get(originId) ?? [];
     if (slots.length === 0) {
       continue;
     }
 
-    const hasActivationColorSlots = sourceSegments.some(
-      (sourceSegment) => sourceSegment.referenceDuration !== undefined,
-    );
     const isMovingColorSource = isNonSteppedMovingColorSource(sourceSegments);
-    const hasExtendedColorSlots = hasActivationColorSlots
-      || (colorConfig.gapPercent > 0 && isMovingColorSource);
-    if (hasExtendedColorSlots) {
-      const colorEndBeat = slots.reduce(
-        (maxEndBeat, slot) => Math.max(maxEndBeat, slot.endBeat),
-        nextTimeline.timeDomainEndBeat,
-      );
-      ensureTimelineFrameCount(nextTimeline, colorEndBeat);
-    }
-    const colorFrameWindow = hasExtendedColorSlots
-      ? resolveFrameWindow('all', nextTimeline.sampleStepBeats, nextTimeline.frames.length)
+    const hasExtendedSlots = hasExtendedColorSlots(sourceSegments, colorConfig);
+    const colorFrameWindow = hasExtendedSlots
+      ? resolveFrameWindow('all', sourceState.timeline.sampleStepBeats, colorFrameCount)
       : frameWindow;
+    if (hasExtendedSlots) {
+      const playbackWindow = resolveColorPlaybackWindow(slots);
+      if (playbackWindow) {
+        playbackWindowByOriginId.set(originId, playbackWindow);
+      }
+    }
+
     const shouldWrapColorSlots = colorConfig.gapPercent <= 0
       && isMovingColorSource;
     for (const slot of slots) {
-      const sourceFrameWindow = resolveColorSlotSourceFrameWindow(slot, state.timeline);
-      const destinationFrameWindow = resolveColorSlotDestinationFrameWindow(slot, nextTimeline);
+      const sourceFrameWindow = resolveColorSlotSourceFrameWindow(
+        slot,
+        sourceState.timeline.sampleStepBeats,
+        sourceSnapshot.frameCount,
+      );
+      const destinationFrameWindow = resolveColorSlotDestinationFrameWindow(
+        slot,
+        sourceState.timeline.sampleStepBeats,
+        colorFrameCount,
+      );
 
       for (const sourceFrameIndex of sourceFrameIndexes) {
         if (sourceFrameIndex < sourceFrameWindow.startFrame) {
@@ -430,13 +508,13 @@ const applyColorEffect = (
 
         const destinationFrameIndex = resolveColorDestinationFrameIndex(
           slot.startBeat,
-          nextTimeline.sampleStepBeats,
+          sourceState.timeline.sampleStepBeats,
         );
         const destinationFrameIndexes = resolveColorSlotDestinationFrameIndexes(
           slot.source,
           destinationFrameIndex,
           destinationFrameWindow,
-          nextTimeline.frames.length,
+          colorFrameCount,
           shouldWrapColorSlots,
         );
 
@@ -459,61 +537,66 @@ const applyColorEffect = (
           continue;
         }
 
-        for (const stroke of sourceStrokes) {
-          addStrokeToFrames(
-            nextTimeline,
-            resolvedDestinationFrameIndexes,
-            cloneStrokeWithVelocityAndWriteOrder(
-              stroke,
-              slot.velocity,
-              resolveColorSlotWriteOrder(writeOrder, slot.slotIndex, colorConfig.velocities.length),
-              slot.slotIndex,
-              colorConfig.velocities.length,
-              slot.source.referenceDuration !== undefined && colorConfig.gapPercent <= 0,
-            ),
-          );
-        }
+        writes.push({
+          sourceStrokes,
+          destinationFrameIndexes: resolvedDestinationFrameIndexes,
+          velocity: slot.velocity,
+          writeOrder: resolveColorSlotWriteOrder(writeOrder, slot.slotIndex, colorConfig.velocities.length),
+          slotIndex: slot.slotIndex,
+          slotCount: colorConfig.velocities.length,
+          colorSlotGapFill: slot.source.referenceDuration !== undefined && colorConfig.gapPercent <= 0,
+        });
       }
     }
   }
 
-  const sealedTimeline = completeTimelineStage(nextTimeline);
-  const sealedOriginIds = cloneSealedOriginIds(state.sealedOriginIds);
-  for (const originId of targetOriginIds) {
-    sealedOriginIds.delete(originId);
+  const pendingFrameApplication: PendingFrameApplication = {
+    kind: 'color',
+    precedingTemporalCheckpoint,
+    targetOriginIds,
+    sourceFrameCount: sourceSnapshot.frameCount,
+    endBeat: colorTimelineEndBeat,
+    playbackWindowByOriginId,
+    writes,
+  };
+  const pendingFrameApplications = clonePendingFrameApplications(state.pendingFrameApplications);
+  if (targetOriginIds.size > 0) {
+    pendingFrameApplications.push(pendingFrameApplication);
   }
+
   return {
-    timeline: sealedTimeline,
-    timelineStateByOriginId: buildTimelineStateByOriginId(
-      sealedTimeline,
-      state.timelineStateByOriginId,
-      outputAdapter,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    ),
+    timeline: state.timeline,
+    timelineStateByOriginId: applyPlaybackWindowOverrides(state, playbackWindowByOriginId),
     pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
       state.pendingTemporalWriteOrderByOriginId,
     ),
-    sealedOriginIds,
+    pendingFrameApplications,
+    sealedOriginIds: cloneSealedOriginIdsWithout(state.sealedOriginIds, targetOriginIds),
   };
 };
 
 
 export const colorOperator = createRackOperator<'color'>(
-  materializeRackOperatorInput,
+  preservePendingRackOperatorInput,
   (state, stage, context) => {
     const device = stage.device;
     const executionPlan = resolveStageExecutionPlan(context, stage);
+    const {
+      baseState,
+      sourceState,
+      precedingTemporalCheckpoint,
+    } = preparePendingFrameApplicationInput(state, context);
 
     return applyColorEffect(
-      state,
+      baseState,
+      sourceState,
       device,
       stage.groupId,
       stage.stageIndex,
       executionPlan.requiredFrameWindow,
-      context.outputAdapter,
       context.mutedGroupIds,
       context.mutedGeneratorIds,
+      precedingTemporalCheckpoint,
     );
   },
 );

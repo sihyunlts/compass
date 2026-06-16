@@ -1,7 +1,7 @@
 import type { GeneratorChain } from '../../shared/model';
 import type { OperatorExecutionPlan } from '../analysis/types';
 import type { CompiledRackPlan, CompiledRackStage, RackStageDeviceKind } from '../plan/types';
-import type { MutableGenerationState, OriginTimelineState } from '../timeline/state';
+import { createEmptyGenerationState, type MutableGenerationState } from '../timeline/state';
 import { createEmptyTimeline } from '../timeline';
 import type { CanonicalOutputAdapter, GeometryTimeline } from '../types';
 import { colorOperator } from './color';
@@ -90,12 +90,7 @@ const resolveMaskSourceReferenceTimeline = (
       mutedGeneratorIds: referenceMutedGeneratorIds,
     };
     const stageExecutionContext = createRackStageExecutionContext(referenceContext);
-    let currentState: MutableGenerationState = {
-      timeline: createEmptyTimeline(),
-      timelineStateByOriginId: new Map<string, OriginTimelineState>(),
-      pendingTemporalWriteOrderByOriginId: new Map<string, number>(),
-      sealedOriginIds: new Set<string>(),
-    };
+    let currentState = createEmptyGenerationState();
 
     for (const stage of context.compiledPlan.stages) {
       if (!shouldApplyReferenceStage(stage, context, sourceKind, sourceId)) {
@@ -144,12 +139,7 @@ export const executeCompiledRackPlan = (
     ),
   };
   const stageExecutionContext = createRackStageExecutionContext(referenceContext);
-  let currentState: MutableGenerationState = {
-    timeline: createEmptyTimeline(),
-    timelineStateByOriginId: new Map<string, OriginTimelineState>(),
-    pendingTemporalWriteOrderByOriginId: new Map<string, number>(),
-    sealedOriginIds: new Set<string>(),
-  };
+  let currentState = createEmptyGenerationState();
 
   for (const stage of compiledPlan.stages) {
     currentState = applyCompiledRackStage(

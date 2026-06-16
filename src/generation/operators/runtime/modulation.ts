@@ -18,6 +18,11 @@ export const createModulationContext = (
   deviceByFrameKey: new Map<string, GeneratorDeviceNode>(),
 });
 
+export const isDeviceModulated = (
+  context: ModulationContext,
+  deviceId: string,
+): boolean => context.program.routes.some((route) => route.targetDeviceId === deviceId);
+
 export const resolveModulatedDeviceAtFrame = <T extends GeneratorDeviceNode>(
   context: ModulationContext,
   device: T,

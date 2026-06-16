@@ -8,26 +8,25 @@ import {
   createCoordinateMask,
 } from '../timeline/analysis';
 import {
-  addStrokeToFrame,
-  beginTimelineStage,
-  completeTimelineStage,
   createIdentityMask,
 } from '../timeline';
 import type { CanonicalOutputAdapter, GeometryMask, GeometryTimeline } from '../types';
 import {
-  clonePendingTemporalWriteOrderByOriginId,
   cloneSealedOriginIds,
   type MutableGenerationState,
+  type PendingFrameApplication,
 } from '../timeline/state';
 import {
-  buildTimelineStateByOriginId,
+  buildTargetOriginIds,
+  buildPendingStrokeRewriteFrameWrites,
   cloneMask,
   cloneStrokeWithWriteOrder,
   createRackOperator,
-  forEachTargetedFrame,
+  appendPendingStrokeRewriteApplication,
+  preparePendingFrameApplicationInput,
+  preservePendingRackOperatorInput,
   resolveFrameWindow,
   resolveStageExecutionPlan,
-  sealRackOperatorInput,
   type MaskSourceReferenceContext,
 } from './runtime';
 
@@ -120,6 +119,7 @@ const resolveMaskSourceMask = (
 
 const applyMaskEffect = (
   state: MutableGenerationState,
+  sourceState: MutableGenerationState,
   chain: GeneratorChain,
   effect: MaskEffectNode,
   targetGroupId: string | null,
@@ -127,35 +127,36 @@ const applyMaskEffect = (
   consumingDeviceIndex: number,
   outputAdapter: CanonicalOutputAdapter,
   executionPlan: OperatorExecutionPlan,
-  mutedGroupIds: ReadonlySet<string>,
-  mutedGeneratorIds: ReadonlySet<string>,
   referenceContext: MaskSourceReferenceContext,
+  precedingTemporalCheckpoint: PendingFrameApplication['precedingTemporalCheckpoint'],
 ): MutableGenerationState => {
   const sourceTimeline = resolveMaskSourceTimeline(
-    state.timeline,
+    sourceState.timeline,
     effect,
     referenceContext,
   );
-  const nextTimeline = beginTimelineStage(state.timeline);
   const targetFrameWindow = resolveFrameWindow(
     executionPlan.requiredFrameWindow,
-    state.timeline.sampleStepBeats,
+    sourceState.timeline.sampleStepBeats,
     sourceTimeline.frames.length,
   );
+  const targetOriginIds = buildTargetOriginIds(sourceState.timeline, targetGroupId);
+  const writes = buildPendingStrokeRewriteFrameWrites(
+    sourceState.timeline,
+    targetOriginIds,
+    targetFrameWindow,
+    (frameIndex, strokes) => {
+      const mask = resolveMaskSourceMask(
+        sourceTimeline,
+        chain,
+        effect,
+        consumingDeviceIndex,
+        outputAdapter,
+        targetGroupId,
+        frameIndex,
+      );
 
-  forEachTargetedFrame(nextTimeline, sourceTimeline.frames.length, targetGroupId, targetFrameWindow, (frameIndex, targeted) => {
-    const mask = resolveMaskSourceMask(
-      sourceTimeline,
-      chain,
-      effect,
-      consumingDeviceIndex,
-      outputAdapter,
-      targetGroupId,
-      frameIndex,
-    );
-
-    for (const stroke of targeted) {
-      addStrokeToFrame(nextTimeline, frameIndex, {
+      return strokes.map((stroke) => ({
         ...cloneStrokeWithWriteOrder(stroke, writeOrder),
         masks: [
           ...stroke.masks.map(cloneMask),
@@ -163,36 +164,40 @@ const applyMaskEffect = (
             ? mask
             : createIdentityMask((x, y) => !mask.contains(x, y)),
         ],
-      });
-    }
-  });
+      }));
+    },
+  );
 
-  const sealedTimeline = completeTimelineStage(nextTimeline);
-  return {
-    timeline: sealedTimeline,
-    timelineStateByOriginId: buildTimelineStateByOriginId(
-      sealedTimeline,
-      state.timelineStateByOriginId,
-      outputAdapter,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    ),
-    pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
-      state.pendingTemporalWriteOrderByOriginId,
-    ),
-    sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
-  };
+  const sealedOriginIds = cloneSealedOriginIds(state.sealedOriginIds);
+  for (const originId of state.timelineStateByOriginId.keys()) {
+    sealedOriginIds.add(originId);
+  }
+
+  return appendPendingStrokeRewriteApplication(
+    state,
+    sourceState,
+    targetOriginIds,
+    writes,
+    precedingTemporalCheckpoint,
+    sealedOriginIds,
+  );
 };
 
 
 export const maskOperator = createRackOperator<'mask'>(
-  sealRackOperatorInput,
+  preservePendingRackOperatorInput,
   (state, stage, context) => {
     const device = stage.device;
     const executionPlan = resolveStageExecutionPlan(context, stage);
+    const {
+      baseState,
+      sourceState,
+      precedingTemporalCheckpoint,
+    } = preparePendingFrameApplicationInput(state, context);
 
     return applyMaskEffect(
-      state,
+      baseState,
+      sourceState,
       context.compiledPlan.baseChain,
       device,
       stage.groupId,
@@ -200,9 +205,8 @@ export const maskOperator = createRackOperator<'mask'>(
       stage.stageIndex,
       context.outputAdapter,
       executionPlan,
-      context.mutedGroupIds,
-      context.mutedGeneratorIds,
       context.referenceContext,
+      precedingTemporalCheckpoint,
     );
   },
 );

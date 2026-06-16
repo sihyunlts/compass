@@ -37,6 +37,8 @@ export interface GenerationTimelineWindow {
 export interface GenerationOriginTimelineState {
   /** Observed note-output occupancy from the most recent baked timeline. */
   observedWindow: GenerationTimelineWindow;
+  /** Time range preserved by front/back cleanup and temporal source-window lookup. */
+  playbackWindow: GenerationTimelineWindow;
   /** Pending temporal intent relative to the current baked source timeline. */
   temporal: SceneTemporalState;
 }

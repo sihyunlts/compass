@@ -1,8 +1,11 @@
 import {
-  buildTimelineStateByOriginId,
+  buildTargetOriginIds,
+  buildPendingStrokeRewriteFrameWrites,
   createRackOperator,
-  forEachTargetedFrame,
-  materializeRackOperatorInput,
+  appendPendingStrokeRewriteApplication,
+  isDeviceModulated,
+  preparePendingFrameApplicationInput,
+  preservePendingRackOperatorInput,
   resolveModulatedDeviceAtFrame,
   resolveFrameWindow,
   resolveStageExecutionPlan,
@@ -18,17 +21,11 @@ import {
 } from '../../core/geometry';
 import type { GeneratorEffectNode } from '../../shared/model';
 import {
-  clonePendingTemporalWriteOrderByOriginId,
-  cloneSealedOriginIds,
+  cloneSealedOriginIdsWithout,
+  type PendingFrameApplication,
   type MutableGenerationState,
 } from '../timeline/state';
-import {
-  addStrokeToFrame,
-  beginTimelineStage,
-  completeTimelineStage,
-} from '../timeline';
 import type { BeatRange } from '../analysis/types';
-import type { CanonicalOutputAdapter } from '../types';
 
 const resolveEffectTransform = (
   effect: GeneratorEffectNode,
@@ -59,70 +56,71 @@ const resolveEffectTransform = (
   return null;
 };
 
-const applySpatialTransform = (
+const applyPendingSpatialTransform = (
   state: MutableGenerationState,
+  sourceState: MutableGenerationState,
   targetGroupId: string | null,
   writeOrder: number,
   resolveTransformAtFrame: (frameIndex: number) => ReturnType<typeof toTranslationTransform> | null,
   requiredFrameWindow: BeatRange | 'all',
-  outputAdapter: CanonicalOutputAdapter,
-  mutedGroupIds: ReadonlySet<string>,
-  mutedGeneratorIds: ReadonlySet<string>,
+  precedingTemporalCheckpoint: PendingFrameApplication['precedingTemporalCheckpoint'],
 ): MutableGenerationState => {
-  const nextTimeline = beginTimelineStage(state.timeline);
   const frameWindow = resolveFrameWindow(
     requiredFrameWindow,
-    state.timeline.sampleStepBeats,
-    state.timeline.frames.length,
+    sourceState.timeline.sampleStepBeats,
+    sourceState.timeline.frames.length,
+  );
+  const targetOriginIds = buildTargetOriginIds(sourceState.timeline, targetGroupId);
+  const writes = buildPendingStrokeRewriteFrameWrites(
+    sourceState.timeline,
+    targetOriginIds,
+    frameWindow,
+    (frameIndex, strokes) => {
+      const transform = resolveTransformAtFrame(frameIndex);
+      return strokes.map((stroke) => transformStroke(stroke, transform, writeOrder));
+    },
   );
 
-  forEachTargetedFrame(nextTimeline, state.timeline.frames.length, targetGroupId, frameWindow, (frameIndex, targeted) => {
-    const transform = resolveTransformAtFrame(frameIndex);
-    for (const stroke of targeted) {
-      addStrokeToFrame(nextTimeline, frameIndex, transformStroke(stroke, transform, writeOrder));
-    }
-  });
-
-  const sealedTimeline = completeTimelineStage(nextTimeline);
-  return {
-    timeline: sealedTimeline,
-    timelineStateByOriginId: buildTimelineStateByOriginId(
-      sealedTimeline,
-      state.timelineStateByOriginId,
-      outputAdapter,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    ),
-    pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
-      state.pendingTemporalWriteOrderByOriginId,
-    ),
-    sealedOriginIds: cloneSealedOriginIds(state.sealedOriginIds),
-  };
+  return appendPendingStrokeRewriteApplication(
+    state,
+    sourceState,
+    targetOriginIds,
+    writes,
+    precedingTemporalCheckpoint,
+    cloneSealedOriginIdsWithout(state.sealedOriginIds, targetOriginIds),
+  );
 };
 
 export const spatialTransformOperator = createRackOperator<SpatialTransformStageKind>(
-  materializeRackOperatorInput,
+  preservePendingRackOperatorInput,
   (state, stage, context) => {
     const device = stage.device;
     const executionPlan = resolveStageExecutionPlan(context, stage);
+    const isModulated = isDeviceModulated(context.modulationContext, stage.deviceId);
+    const {
+      baseState,
+      sourceState,
+      precedingTemporalCheckpoint,
+    } = preparePendingFrameApplicationInput(state, context);
 
-    return applySpatialTransform(
-      state,
+    return applyPendingSpatialTransform(
+      baseState,
+      sourceState,
       stage.groupId,
       stage.stageIndex,
       (frameIndex) => resolveEffectTransform(
-        resolveModulatedDeviceAtFrame(
-          context.modulationContext,
-          device,
-          frameIndex,
-          state.timeline.sampleStepBeats,
-          state.timeline.timeDomainEndBeat,
-        ),
+        isModulated
+          ? resolveModulatedDeviceAtFrame(
+              context.modulationContext,
+              device,
+              frameIndex,
+              sourceState.timeline.sampleStepBeats,
+              sourceState.timeline.timeDomainEndBeat,
+            )
+          : device,
       ),
       executionPlan.requiredFrameWindow,
-      context.outputAdapter,
-      context.mutedGroupIds,
-      context.mutedGeneratorIds,
+      precedingTemporalCheckpoint,
     );
   },
 );
