@@ -5,6 +5,7 @@ import type {
 } from '../../core/core-types';
 import {
   cloneSceneTemporalState,
+  composeSceneTemporalState,
   type TemporalTransform,
 } from '../../core/scene-operators/temporal';
 import type { GenerationTimelineWindow } from '../types';
@@ -184,6 +185,10 @@ export const buildReverseTransform = (
         - alpha * placementWindow.start,
     ),
     visibilityWindow: cloneTimelineWindow(placementWindow),
+    inputVisibilityWindow: {
+      start: sourceFrameSpan > 0 ? sourceWindow.start - sampleStepBeats : sourceWindow.start,
+      end: sourceWindow.end,
+    },
   };
 };
 
@@ -234,6 +239,20 @@ export const buildTimeWarpTransform = (
   isFixedTimelineWindow(sourceWindow)
     ? buildPlacementPreservingTimeWarpTransform(placementWindow, remap)
     : buildSourceWindowTimeWarpTransform(sourceWindow, placementWindow, remap)
+);
+
+export const composeTimelineWindowTemporalState = (
+  timelineState: OriginTimelineState,
+  currentTemporal: SceneTemporalState,
+  transform: TemporalTransform,
+): SceneTemporalState => composeSceneTemporalState(
+  currentTemporal,
+  transform,
+  {
+    inputWindow: timelineState.temporal.hasAuthoredTimeline
+      ? DEFAULT_TIMELINE_WINDOW
+      : timelineState.playbackWindow,
+  },
 );
 
 export const clampSceneTemporalStateToFixedLoop = (

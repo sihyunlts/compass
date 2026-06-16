@@ -8,7 +8,12 @@ import type {
 export interface TemporalTransform {
   remapToInput: TemporalRemap;
   visibilityWindow: TemporalVisibilityWindow;
+  inputVisibilityWindow?: TemporalVisibilityWindow;
   marksAuthoredTimeline?: boolean;
+}
+
+export interface SceneTemporalCompositionOptions {
+  inputWindow?: TemporalVisibilityWindow;
 }
 
 const DEFAULT_TEMPORAL_SAMPLE_COUNT = 129;
@@ -161,13 +166,19 @@ export const evaluateTemporalRemap = (
 const resolveSceneTemporalInputTime = (
   sceneTemporal: SceneTemporalState,
   t01: number,
+  inputWindow: TemporalVisibilityWindow,
+  inputVisibilityWindow: TemporalVisibilityWindow,
 ): number | null => {
-  if (!Number.isFinite(t01) || !isTimeVisibleInWindow(sceneTemporal.visibilityWindow, t01)) {
+  if (!Number.isFinite(t01) || !isTimeVisibleInWindow(inputVisibilityWindow, t01)) {
     return null;
   }
 
   const localT = evaluateTemporalRemap(sceneTemporal.remap, t01);
-  if (localT === null || !Number.isFinite(localT) || localT < 0 || localT > 1) {
+  if (
+    localT === null
+    || !Number.isFinite(localT)
+    || !isTimeVisibleInWindow(inputWindow, localT)
+  ) {
     return null;
   }
 
@@ -224,6 +235,7 @@ const resolveComposedVisibilityWindow = (
 const composeSceneTemporalStateBySampling = (
   sceneTemporal: SceneTemporalState,
   transform: TemporalTransform,
+  options: SceneTemporalCompositionOptions,
 ): SceneTemporalState => {
   const sampleCount = resolveTemporalSampleCount(
     sceneTemporal.remap,
@@ -254,7 +266,12 @@ const composeSceneTemporalStateBySampling = (
       return null;
     }
 
-    return resolveSceneTemporalInputTime(sceneTemporal, transformedT);
+    return resolveSceneTemporalInputTime(
+      sceneTemporal,
+      transformedT,
+      options.inputWindow ?? NORMALIZED_TIMELINE_WINDOW,
+      transform.inputVisibilityWindow ?? sceneTemporal.visibilityWindow,
+    );
   });
 
   return {
@@ -276,6 +293,7 @@ const composeSceneTemporalStateBySampling = (
 export const composeSceneTemporalState = (
   sceneTemporal: SceneTemporalState,
   transform: TemporalTransform,
+  options: SceneTemporalCompositionOptions = {},
 ): SceneTemporalState => {
   if (isAffineTemporalRemap(sceneTemporal.remap) && isAffineTemporalRemap(transform.remapToInput)) {
     return {
@@ -285,7 +303,7 @@ export const composeSceneTemporalState = (
     };
   }
 
-  return composeSceneTemporalStateBySampling(sceneTemporal, transform);
+  return composeSceneTemporalStateBySampling(sceneTemporal, transform, options);
 };
 
 export const isNonWrapping01TemporalWindow = (

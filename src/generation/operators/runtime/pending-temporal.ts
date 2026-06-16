@@ -59,6 +59,21 @@ const resolvePendingAwareTemporalSourceWindow = (
     : resolveTemporalSourceWindow(state.timelineStateByOriginId, originId)
 );
 
+const resolvePendingAwareCurrentTemporal = (
+  timelineState: OriginTimelineState,
+  sourceWindow: TimelineWindow,
+): SceneTemporalState => {
+  const currentTemporal = cloneSceneTemporalState(timelineState.temporal);
+  if (hasPendingTemporalState(timelineState)) {
+    return currentTemporal;
+  }
+
+  return {
+    ...currentTemporal,
+    visibilityWindow: cloneTimelineWindow(sourceWindow),
+  };
+};
+
 export const buildTemporalStateUpdatesForTargetOrigins = (
   state: MutableGenerationState,
   targetGroupId: string | null,
@@ -86,7 +101,7 @@ export const buildTemporalStateUpdatesForTargetOrigins = (
     const nextTemporal = resolveTemporalState({
       originId,
       timelineState,
-      currentTemporal: timelineState.temporal,
+      currentTemporal: resolvePendingAwareCurrentTemporal(timelineState, sourceWindow),
       frameWindow,
       placementWindow: resolveTemporalPlacementWindow(timelineState),
       sourceWindow,

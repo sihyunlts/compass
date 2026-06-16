@@ -1,6 +1,5 @@
 import type { SceneTemporalState } from '../../core/core-types';
 import {
-  composeSceneTemporalState,
   evaluateTemporalRemap,
 } from '../../core/scene-operators/temporal';
 import { createSampledRemapFromTimeWarpCurve, isIdentityTimeWarpCurve } from '../../core/timewarp/curve';
@@ -17,6 +16,7 @@ import {
   buildStretchTransform,
   buildTimeWarpTransform,
   buildTrimTransform,
+  composeTimelineWindowTemporalState,
   isFixedTimelineWindow,
 } from '../timeline/temporal-window';
 import type { FrameWindow } from '../timeline';
@@ -86,7 +86,7 @@ const buildReverseTemporalUpdates = (
   state,
   targetGroupId,
   requiredFrameWindow,
-  ({ currentTemporal, frameWindow, placementWindow, sourceWindow }) => {
+  ({ currentTemporal, frameWindow, placementWindow, sourceWindow, timelineState }) => {
     const sourceSpan = sourceWindow.end - sourceWindow.start;
     const placementSpan = placementWindow.end - placementWindow.start;
     if (
@@ -106,7 +106,8 @@ const buildReverseTemporalUpdates = (
       return null;
     }
 
-    return composeSceneTemporalState(
+    return composeTimelineWindowTemporalState(
+      timelineState,
       currentTemporal,
       buildReverseTransform(sourceWindow, placementWindow, state.timeline.sampleStepBeats),
     );
@@ -123,7 +124,7 @@ const buildTrimTemporalUpdates = (
   state,
   targetGroupId,
   requiredFrameWindow,
-  ({ currentTemporal, frameWindow, sourceWindow }) => {
+  ({ currentTemporal, frameWindow, sourceWindow, timelineState }) => {
     return resolveLastModulatedTemporalState(
       state,
       effect,
@@ -139,7 +140,8 @@ const buildTrimTemporalUpdates = (
           return null;
         }
 
-        return composeSceneTemporalState(
+        return composeTimelineWindowTemporalState(
+          timelineState,
           currentTemporal,
           buildTrimTransform(sourceWindow, start, end),
         );
@@ -158,7 +160,7 @@ const buildStretchTemporalUpdates = (
   state,
   targetGroupId,
   requiredFrameWindow,
-  ({ currentTemporal, frameWindow, sourceWindow }) => {
+  ({ currentTemporal, frameWindow, sourceWindow, timelineState }) => {
     const sourceSpan = sourceWindow.end - sourceWindow.start;
     if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
       return null;
@@ -180,7 +182,8 @@ const buildStretchTemporalUpdates = (
           return null;
         }
 
-        return composeSceneTemporalState(
+        return composeTimelineWindowTemporalState(
+          timelineState,
           currentTemporal,
           buildStretchTransform(sourceWindow, start, end),
         );
@@ -204,7 +207,7 @@ const buildTimeWarpTemporalUpdates = (
     state,
     targetGroupId,
     requiredFrameWindow,
-    ({ currentTemporal, frameWindow, placementWindow, sourceWindow }) => {
+    ({ currentTemporal, frameWindow, placementWindow, sourceWindow, timelineState }) => {
       const placementSpan = placementWindow.end - placementWindow.start;
       const sourceSpan = sourceWindow.end - sourceWindow.start;
       if (!Number.isFinite(placementSpan) || placementSpan <= 0) {
@@ -230,7 +233,8 @@ const buildTimeWarpTemporalUpdates = (
         return null;
       }
 
-      return composeSceneTemporalState(
+      return composeTimelineWindowTemporalState(
+        timelineState,
         currentTemporal,
         buildTimeWarpTransform(sourceWindow, placementWindow, remap),
       );
