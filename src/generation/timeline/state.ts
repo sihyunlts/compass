@@ -1,5 +1,6 @@
 import { cloneSceneTemporalState } from '../../core/scene-operators/temporal';
 import type { SceneTemporalState } from '../../core/core-types';
+import type { BeatRange } from '../analysis/types';
 import type {
   GenerationTimelineWindow,
   GenerationOriginTimelineState,
@@ -49,9 +50,26 @@ export interface PendingStrokeRewriteApplication {
   writes: ReadonlyArray<PendingStrokeRewriteFrameWrite>;
 }
 
+export interface PendingGeometryRewriteInput {
+  timeline: GeometryTimeline;
+  frameIndex: number;
+  strokes: ReadonlyArray<GeometryStroke>;
+}
+
+export interface PendingGeometryRewriteApplication {
+  kind: 'geometry-rewrite';
+  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
+  targetOriginIds: ReadonlySet<string>;
+  requiredFrameWindow: BeatRange | 'all';
+  rewriteFrameStrokes: (
+    input: PendingGeometryRewriteInput,
+  ) => ReadonlyArray<Omit<GeometryStroke, 'writeId'>>;
+}
+
 export type PendingFrameApplication =
   | PendingColorApplication
-  | PendingStrokeRewriteApplication;
+  | PendingStrokeRewriteApplication
+  | PendingGeometryRewriteApplication;
 
 export interface MutableGenerationState {
   timeline: GeometryTimeline;
@@ -124,6 +142,21 @@ export const clonePendingFrameApplications = (
         writeOrderByOriginId: new Map(application.precedingTemporalCheckpoint.writeOrderByOriginId),
       }
     : null;
+
+  if (application.kind === 'geometry-rewrite') {
+    return {
+      kind: 'geometry-rewrite',
+      precedingTemporalCheckpoint,
+      targetOriginIds: new Set(application.targetOriginIds),
+      requiredFrameWindow: application.requiredFrameWindow === 'all'
+        ? 'all'
+        : {
+            start: application.requiredFrameWindow.start,
+            end: application.requiredFrameWindow.end,
+          },
+      rewriteFrameStrokes: application.rewriteFrameStrokes,
+    };
+  }
 
   if (application.kind === 'stroke-rewrite') {
     return {

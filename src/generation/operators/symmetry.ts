@@ -1,14 +1,12 @@
 import {
   buildTargetOriginIds,
-  buildPendingStrokeRewriteFrameWrites,
   cloneMask,
   cloneStrokeWithWriteOrder,
-  createPendingFrameApplicationOperator,
-  appendPendingStrokeRewriteApplication,
-  resolveFrameWindow,
+  createPendingGeometryApplicationOperator,
+  appendPendingGeometryRewriteApplication,
   resolveStageExecutionPlan,
   transformStroke,
-  type PendingFrameApplicationOperatorInput,
+  type PendingGeometryApplicationOperatorInput,
 } from './runtime';
 import {
   composeAffine,
@@ -148,36 +146,26 @@ const buildSymmetryStrokeRewrite = (
 };
 
 const applyPendingSymmetryEffect = (
-  input: PendingFrameApplicationOperatorInput,
+  input: PendingGeometryApplicationOperatorInput,
   effect: SymmetryEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
   requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
-  const { sourceState } = input;
-  const frameWindow = resolveFrameWindow(
-    requiredFrameWindow,
-    sourceState.timeline.sampleStepBeats,
-    sourceState.timeline.frames.length,
-  );
-  const targetOriginIds = buildTargetOriginIds(sourceState.timeline, targetGroupId);
+  const { baseState } = input;
+  const targetOriginIds = buildTargetOriginIds(baseState.timeline, targetGroupId);
   const rewriteStroke = buildSymmetryStrokeRewrite(effect, writeOrder);
-  const writes = buildPendingStrokeRewriteFrameWrites(
-    sourceState.timeline,
-    targetOriginIds,
-    frameWindow,
-    (_frameIndex, strokes) => strokes.flatMap((stroke) => rewriteStroke(stroke)),
-  );
 
-  return appendPendingStrokeRewriteApplication(
+  return appendPendingGeometryRewriteApplication(
     input,
     targetOriginIds,
-    writes,
+    requiredFrameWindow,
+    ({ strokes }) => strokes.flatMap((stroke) => rewriteStroke(stroke)),
     { mode: 'cleanup', originIds: targetOriginIds },
   );
 };
 
-export const symmetryOperator = createPendingFrameApplicationOperator<'symmetry'>(
+export const symmetryOperator = createPendingGeometryApplicationOperator<'symmetry'>(
   (input, stage, context) => {
     const executionPlan = resolveStageExecutionPlan(context, stage);
 

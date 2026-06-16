@@ -1,14 +1,12 @@
 import {
   buildTargetOriginIds,
-  buildPendingStrokeRewriteFrameWrites,
-  createPendingFrameApplicationOperator,
-  appendPendingStrokeRewriteApplication,
+  createPendingGeometryApplicationOperator,
+  appendPendingGeometryRewriteApplication,
   isDeviceModulated,
   resolveModulatedDeviceAtFrame,
-  resolveFrameWindow,
   resolveStageExecutionPlan,
   transformStroke,
-  type PendingFrameApplicationOperatorInput,
+  type PendingGeometryApplicationOperatorInput,
   type SpatialTransformStageKind,
 } from './runtime';
 import {
@@ -54,59 +52,59 @@ const resolveEffectTransform = (
 };
 
 const applyPendingSpatialTransform = (
-  input: PendingFrameApplicationOperatorInput,
+  input: PendingGeometryApplicationOperatorInput,
+  effect: GeneratorEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
-  resolveTransformAtFrame: (frameIndex: number) => ReturnType<typeof toTranslationTransform> | null,
+  isModulated: boolean,
+  resolveDeviceAtFrame: (
+    frameIndex: number,
+    sampleStepBeats: number,
+    timeDomainEndBeat: number,
+  ) => GeneratorEffectNode,
   requiredFrameWindow: BeatRange | 'all',
 ): MutableGenerationState => {
-  const { sourceState } = input;
-  const frameWindow = resolveFrameWindow(
-    requiredFrameWindow,
-    sourceState.timeline.sampleStepBeats,
-    sourceState.timeline.frames.length,
-  );
-  const targetOriginIds = buildTargetOriginIds(sourceState.timeline, targetGroupId);
-  const writes = buildPendingStrokeRewriteFrameWrites(
-    sourceState.timeline,
-    targetOriginIds,
-    frameWindow,
-    (frameIndex, strokes) => {
-      const transform = resolveTransformAtFrame(frameIndex);
-      return strokes.map((stroke) => transformStroke(stroke, transform, writeOrder));
-    },
-  );
+  const { baseState } = input;
+  const targetOriginIds = buildTargetOriginIds(baseState.timeline, targetGroupId);
 
-  return appendPendingStrokeRewriteApplication(
+  return appendPendingGeometryRewriteApplication(
     input,
     targetOriginIds,
-    writes,
+    requiredFrameWindow,
+    ({ timeline, frameIndex, strokes }) => {
+      const deviceAtFrame = isModulated
+        ? resolveDeviceAtFrame(
+            frameIndex,
+            timeline.sampleStepBeats,
+            timeline.timeDomainEndBeat,
+          )
+        : effect;
+      const transform = resolveEffectTransform(deviceAtFrame);
+      return strokes.map((stroke) => transformStroke(stroke, transform, writeOrder));
+    },
     { mode: 'cleanup', originIds: targetOriginIds },
   );
 };
 
-export const spatialTransformOperator = createPendingFrameApplicationOperator<SpatialTransformStageKind>(
+export const spatialTransformOperator = createPendingGeometryApplicationOperator<SpatialTransformStageKind>(
   (input, stage, context) => {
-    const { sourceState } = input;
     const device = stage.device;
     const executionPlan = resolveStageExecutionPlan(context, stage);
     const isModulated = isDeviceModulated(context.modulationContext, stage.deviceId);
 
     return applyPendingSpatialTransform(
       input,
+      device,
       stage.groupId,
       stage.stageIndex,
-      (frameIndex) => resolveEffectTransform(
-        isModulated
-          ? resolveModulatedDeviceAtFrame(
-              context.modulationContext,
-              device,
-              frameIndex,
-              sourceState.timeline.sampleStepBeats,
-              sourceState.timeline.timeDomainEndBeat,
-            )
-          : device,
-      ),
+      isModulated,
+      (frameIndex, sampleStepBeats, timeDomainEndBeat) => resolveModulatedDeviceAtFrame(
+        context.modulationContext,
+        device,
+        frameIndex,
+        sampleStepBeats,
+        timeDomainEndBeat,
+      ) as GeneratorEffectNode,
       executionPlan.requiredFrameWindow,
     );
   },

@@ -35,6 +35,11 @@ interface PendingFrameApplicationInputPlan {
   precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
 }
 
+export interface PendingGeometryApplicationOperatorInput {
+  baseState: MutableGenerationState;
+  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
+}
+
 export const materializePendingRackOperatorInput: RackOperatorInputPreparation = (
   state: MutableGenerationState,
   context: RackStageExecutionContext,
@@ -80,6 +85,17 @@ export const preparePendingFrameApplicationInput = (
   context,
 );
 
+export const preparePendingGeometryApplicationInput = (
+  state: MutableGenerationState,
+): PendingGeometryApplicationOperatorInput => {
+  const pendingTemporalExtraction = extractPendingTemporalCheckpoint(state);
+
+  return {
+    baseState: pendingTemporalExtraction?.state ?? state,
+    precedingTemporalCheckpoint: pendingTemporalExtraction?.checkpoint ?? null,
+  };
+};
+
 export const replaceTimelineAndRefreshRackState = (
   state: MutableGenerationState,
   timeline: GeometryTimeline,
@@ -124,6 +140,21 @@ export const createPendingFrameApplicationOperator = <TKind extends RackStageDev
   preservePendingRackOperatorInput,
   (state, stage, context) => execute(
     preparePendingFrameApplicationInput(state, context),
+    stage,
+    context,
+  ),
+);
+
+export const createPendingGeometryApplicationOperator = <TKind extends RackStageDeviceKind>(
+  execute: (
+    input: PendingGeometryApplicationOperatorInput,
+    stage: RackStageOfKind<TKind>,
+    context: RackStageExecutionContext,
+  ) => MutableGenerationState,
+): RackOperator => createRackOperator<TKind>(
+  preservePendingRackOperatorInput,
+  (state, stage, context) => execute(
+    preparePendingGeometryApplicationInput(state),
     stage,
     context,
   ),
