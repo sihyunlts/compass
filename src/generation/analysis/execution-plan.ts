@@ -17,11 +17,13 @@ import type {
 } from './types';
 import { transformSpatialRequirement, unionSpatialRequirements } from './bounds';
 import { normalizeOptionalId } from '../../shared/normalize-id';
-import type {
-  GeneratorChain,
-  GeneratorDeviceNode,
-  GeneratorEffectNode,
-  SymmetryEffectNode,
+import {
+  isCurveModulatorNode,
+  isGeneratorNode,
+  type GeneratorChain,
+  type GeneratorDeviceNode,
+  type GeneratorEffectNode,
+  type SymmetryEffectNode,
 } from '../../shared/model';
 
 const NONE_REQUIREMENT: SpatialRequirement = 'none';
@@ -191,7 +193,7 @@ const buildOperatorExecutionPlan = (
   requiredFrameWindow: BeatRange | 'all',
   generatorOutputBounds: SpatialRequirement,
 ): OperatorExecutionPlan => {
-  if (device.kind === 'modulator') {
+  if (isCurveModulatorNode(device)) {
     return {
       requiredOutputBounds,
       generatorOutputBounds,
@@ -202,12 +204,7 @@ const buildOperatorExecutionPlan = (
     };
   }
 
-  if (
-    device.kind === 'waterdrop'
-    || device.kind === 'scanner'
-    || device.kind === 'spiral'
-    || device.kind === 'path'
-  ) {
+  if (isGeneratorNode(device)) {
     return {
       requiredOutputBounds,
       generatorOutputBounds,
@@ -340,7 +337,7 @@ export const buildCanonicalExecutionPlan = (
 
   for (let index = chain.devices.length - 1; index >= 0; index -= 1) {
     const device = chain.devices[index];
-    if (!isDeviceEffectivelyEnabled(chain, device) || device.kind === 'modulator') {
+    if (!isDeviceEffectivelyEnabled(chain, device) || isCurveModulatorNode(device)) {
       continue;
     }
 
@@ -352,12 +349,7 @@ export const buildCanonicalExecutionPlan = (
     );
     byDeviceId.set(device.id, devicePlan);
 
-    if (
-      device.kind === 'waterdrop'
-      || device.kind === 'scanner'
-      || device.kind === 'spiral'
-      || device.kind === 'path'
-    ) {
+    if (isGeneratorNode(device)) {
       continue;
     }
 

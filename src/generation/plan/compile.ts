@@ -1,7 +1,7 @@
 import { buildCanonicalAnalysisResult } from '../analysis/operators';
 import { stripModulationDevicesFromChain } from '../../core/modulation/routing';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
-import { cloneDeviceNode } from '../../shared/model';
+import { cloneDeviceNode, isCurveModulatorNode, type GeneratorChain } from '../../shared/model';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import type { CompiledRackPlan, CompiledRackStage } from './types';
 
@@ -11,15 +11,13 @@ const buildStageId = (
 ): string => `stage:${stageIndex}:${deviceId}`;
 
 export const buildCompiledRackPlan = (
-  chain: CompiledRackPlan['baseChain'],
-  loopLengthBeats: number,
+  chain: GeneratorChain,
 ): CompiledRackPlan => {
-  void loopLengthBeats;
   const baseChain = stripModulationDevicesFromChain(chain);
   const stages: CompiledRackStage[] = [];
 
   for (const device of baseChain.devices) {
-    if (!isDeviceEffectivelyEnabled(baseChain, device) || device.kind === 'modulator') {
+    if (!isDeviceEffectivelyEnabled(baseChain, device) || isCurveModulatorNode(device)) {
       continue;
     }
 

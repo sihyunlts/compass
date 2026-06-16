@@ -39,6 +39,11 @@ export type { ClipNote } from './clip';
 export { cloneChainForIpc } from './chain-clone';
 export { cloneDeviceNode } from './device-clone';
 export {
+  isCurveModulatorNode,
+  isGeneratorDeviceKind,
+  isGeneratorNode,
+} from './device-kind';
+export {
   DEFAULT_GROUP_NAME_TEMPLATE,
   DEFAULT_RACK_NAME,
   applyNameIndex,

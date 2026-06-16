@@ -36,24 +36,31 @@ import {
 } from '../devices/color/color-program';
 import { doesDeviceToggleTimelineParity } from '../devices/timeline-parity';
 import { isDeviceEffectivelyEnabled } from '../shared/group-state';
-import { cloneDeviceNode } from '../shared/model';
-import type {
-  ColorEffectNode,
-  GeneratorChain,
-  GeneratorDeviceNode,
-  GeneratorEffectNode,
-  GeneratorNode,
-  MaskEffectNode,
-  StretchEffectNode,
-  SymmetryEffectNode,
-  TimeWarpEffectNode,
-  TrimEffectNode,
+import {
+  cloneDeviceNode,
+  isGeneratorDeviceKind,
+  isGeneratorNode,
+  type ColorEffectNode,
+  type GeneratorChain,
+  type GeneratorDeviceNode,
+  type GeneratorEffectNode,
+  type GeneratorNode,
+  type MaskEffectNode,
+  type StretchEffectNode,
+  type SymmetryEffectNode,
+  type TimeWarpEffectNode,
+  type TrimEffectNode,
 } from '../shared/model';
 import { normalizeOptionalId } from '../shared/normalize-id';
 import { rasterizeGeneratorFrame } from './raster';
 import { buildCanonicalExecutionPlan } from './analysis/execution-plan';
 import { buildCompiledRackPlan } from './plan/compile';
-import type { CompiledRackPlan, CompiledRackStage } from './plan/types';
+import type {
+  CompiledRackPlan,
+  CompiledRackStage,
+  RackStageDeviceKind,
+  RackStageDeviceNode,
+} from './plan/types';
 import type {
   BeatRange,
   CanonicalExecutionRequest,
@@ -116,6 +123,54 @@ interface MaskSourceReferenceContext {
   resolvingSourceKeys: Set<string>;
 }
 
+interface RackStageExecutionContext {
+  compiledPlan: CompiledRackPlan;
+  outputAdapter: CanonicalOutputAdapter;
+  modulationContext: ModulationContext;
+  executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>;
+  mutedGroupIds: ReadonlySet<string>;
+  mutedGeneratorIds: ReadonlySet<string>;
+  referenceContext: MaskSourceReferenceContext;
+}
+
+type RackOperatorInputPreparation = (
+  state: MutableGenerationState,
+  context: RackStageExecutionContext,
+) => MutableGenerationState;
+
+interface RackOperator {
+  prepareInput: RackOperatorInputPreparation;
+  execute(
+    state: MutableGenerationState,
+    stage: CompiledRackStage,
+    context: RackStageExecutionContext,
+  ): MutableGenerationState;
+}
+
+type RackStageOfKind<TKind extends RackStageDeviceKind> = CompiledRackStage & {
+  deviceKind: TKind;
+  device: Extract<RackStageDeviceNode, { kind: TKind }>;
+};
+
+type GeneratorStageKind = GeneratorNode['kind'];
+type SpatialTransformStageKind = Extract<GeneratorEffectNode['kind'], 'mirror' | 'rotate' | 'translate' | 'scale'>;
+
+const createRackOperator = <TKind extends RackStageDeviceKind>(
+  prepareInput: RackOperatorInputPreparation,
+  execute: (
+    state: MutableGenerationState,
+    stage: RackStageOfKind<TKind>,
+    context: RackStageExecutionContext,
+  ) => MutableGenerationState,
+): RackOperator => ({
+  prepareInput,
+  execute: (state, stage, context) => execute(
+    state,
+    stage as RackStageOfKind<TKind>,
+    context,
+  ),
+});
+
 interface OriginFrameRemap {
   nextTemporal: SceneTemporalState;
   sourceFrameIndexByOutputFrame: ReadonlyArray<number | null>;
@@ -145,10 +200,10 @@ const EMPTY_EXECUTION_PLAN: OperatorExecutionPlan = Object.freeze({
   requiredSourceFrameWindow: 'none',
 });
 
-const resolveDeviceExecutionPlan = (
-  executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
-  deviceId: string,
-): OperatorExecutionPlan => executionPlanByDeviceId.get(deviceId) ?? EMPTY_EXECUTION_PLAN;
+const resolveStageExecutionPlan = (
+  context: RackStageExecutionContext,
+  stage: CompiledRackStage,
+): OperatorExecutionPlan => context.executionPlanByDeviceId.get(stage.deviceId) ?? EMPTY_EXECUTION_PLAN;
 
 const resolveFrameWindow = (
   requirement: BeatRange | 'all' | 'none',
@@ -265,13 +320,15 @@ const createSampledPlacementRemap = (
   };
 };
 
-const resolvePlacementWindow = (
+const resolveTemporalPlacementWindow = (
   timelineState: OriginTimelineState | undefined,
 ): TimelineWindow => cloneTimelineWindow(timelineState?.temporal.visibilityWindow ?? DEFAULT_TIMELINE_WINDOW);
 
-const resolveSemanticSourceWindow = (
-  timelineState: OriginTimelineState | undefined,
+const resolveTemporalSourceWindow = (
+  timelineStateByOriginId: ReadonlyMap<string, OriginTimelineState>,
+  originId: string,
 ): TimelineWindow | null => {
+  const timelineState = timelineStateByOriginId.get(originId);
   if (!timelineState) {
     return null;
   }
@@ -507,15 +564,6 @@ const buildTargetOriginIds = (
 
   return originIds;
 };
-
-const resolveSourceWindow = (
-  timelineStateByOriginId: ReadonlyMap<string, OriginTimelineState>,
-  originId: string,
-): TimelineWindow | null => resolveSemanticSourceWindow(timelineStateByOriginId.get(originId));
-
-const resolveOutputWindow = (
-  timelineState: OriginTimelineState | undefined,
-): TimelineWindow => resolvePlacementWindow(timelineState);
 
 const buildTimelineStateMap = (
   originIds: Iterable<string>,
@@ -1567,7 +1615,7 @@ const buildPendingTemporalMaterializationRemaps = (
       continue;
     }
 
-    const placementWindow = resolveOutputWindow(timelineState);
+    const placementWindow = resolveTemporalPlacementWindow(timelineState);
     const placementSpan = placementWindow.end - placementWindow.start;
     const sourceFrameIndexByOutputFrame: Array<number | null> = !Number.isFinite(placementSpan) || placementSpan <= 0
       ? Array.from({ length: outputFrameCount }, (): number | null => null)
@@ -1821,10 +1869,10 @@ const buildReverseRemaps = (
   targetGroupId,
   requiredFrameWindow,
   (originId, timelineState, frameWindow) => {
-    const placementWindow = resolveOutputWindow(timelineState);
+    const placementWindow = resolveTemporalPlacementWindow(timelineState);
     const sourceWindow = timelineState?.temporal.hasAuthoredTimeline === true
       ? placementWindow
-      : resolveSourceWindow(state.timelineStateByOriginId, originId);
+      : resolveTemporalSourceWindow(state.timelineStateByOriginId, originId);
     if (!sourceWindow) {
       return null;
     }
@@ -1866,7 +1914,7 @@ const buildTrimRemaps = (
   targetGroupId,
   requiredFrameWindow,
   (originId, timelineState, frameWindow) => {
-    const sourceWindow = resolveSourceWindow(state.timelineStateByOriginId, originId);
+    const sourceWindow = resolveTemporalSourceWindow(state.timelineStateByOriginId, originId);
     if (!sourceWindow) {
       return null;
     }
@@ -1906,7 +1954,7 @@ const buildStretchRemaps = (
   targetGroupId,
   requiredFrameWindow,
   (originId, timelineState, frameWindow) => {
-    const sourceWindow = resolveSourceWindow(state.timelineStateByOriginId, originId);
+    const sourceWindow = resolveTemporalSourceWindow(state.timelineStateByOriginId, originId);
     if (!sourceWindow) {
       return null;
     }
@@ -1957,7 +2005,7 @@ const buildTimeWarpRemaps = (
     targetGroupId,
     requiredFrameWindow,
     (_originId, timelineState, frameWindow) => {
-      const placementWindow = resolveOutputWindow(timelineState);
+      const placementWindow = resolveTemporalPlacementWindow(timelineState);
       const placementSpan = placementWindow.end - placementWindow.start;
       if (!Number.isFinite(placementSpan) || placementSpan <= 0) {
         return null;
@@ -2363,187 +2411,15 @@ const resolveEffectTransform = (
   return null;
 };
 
-const isGeneratorStage = (
-  stage: CompiledRackStage,
-): boolean => stage.deviceKind === 'waterdrop'
-  || stage.deviceKind === 'scanner'
-  || stage.deviceKind === 'spiral'
-  || stage.deviceKind === 'path';
-
-const isTemporalEffectDevice = (
-  device: GeneratorEffectNode,
-): boolean => device.kind === 'reverse'
-  || device.kind === 'trim'
-  || device.kind === 'stretch'
-  || device.kind === 'timewarp';
-
-const applyEffectDevice = (
-  state: MutableGenerationState,
-  chain: GeneratorChain,
-  stage: CompiledRackStage,
-  outputAdapter: CanonicalOutputAdapter,
-  modulationContext: ModulationContext,
-  executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
-  mutedGroupIds: ReadonlySet<string>,
-  mutedGeneratorIds: ReadonlySet<string>,
-  referenceContext: MaskSourceReferenceContext,
-): MutableGenerationState => {
-  const device = stage.device as GeneratorEffectNode;
-  const deviceIndex = stage.stageIndex;
-  const targetGroupId = normalizeOptionalId(device.groupId);
-  const executionPlan = resolveDeviceExecutionPlan(executionPlanByDeviceId, device.id);
-
-  if (device.kind === 'mask') {
-    return applyMaskEffect(
-      sealStageWithTemporalInvariant(
-        materializePendingTemporalState(
-          state,
-          outputAdapter,
-          mutedGroupIds,
-          mutedGeneratorIds,
-        ),
-        outputAdapter,
-        mutedGroupIds,
-        mutedGeneratorIds,
-      ),
-      chain,
-      device,
-      targetGroupId,
-      deviceIndex,
-      deviceIndex,
-      outputAdapter,
-      executionPlan,
-      mutedGroupIds,
-      mutedGeneratorIds,
-      referenceContext,
-    );
-  }
-
-  if (device.kind === 'color') {
-    return applyColorEffect(
-      state,
-      device,
-      targetGroupId,
-      deviceIndex,
-      executionPlan.requiredFrameWindow,
-      outputAdapter,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    );
-  }
-
-  if (device.kind === 'symmetry') {
-    return applySymmetryEffect(
-      state,
-      device,
-      targetGroupId,
-      deviceIndex,
-      executionPlan.requiredFrameWindow,
-      outputAdapter,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    );
-  }
-
-  if (device.kind === 'reverse') {
-    const temporalUpdates = buildReverseRemaps(
-      state,
-      targetGroupId,
-      'all',
-    );
-    return temporalUpdates.size > 0
-      ? applyTemporalStateUpdates(
-          state,
-          temporalUpdates,
-          deviceIndex,
-        )
-      : state;
-  }
-
-  if (device.kind === 'trim') {
-    const temporalUpdates = buildTrimRemaps(
-      state,
-      device,
-      targetGroupId,
-      modulationContext,
-      'all',
-    );
-    return temporalUpdates.size > 0
-      ? applyTemporalStateUpdates(
-          state,
-          temporalUpdates,
-          deviceIndex,
-        )
-      : state;
-  }
-
-  if (device.kind === 'stretch') {
-    const temporalUpdates = buildStretchRemaps(
-      state,
-      device,
-      targetGroupId,
-      modulationContext,
-      'all',
-    );
-    return temporalUpdates.size > 0
-      ? applyTemporalStateUpdates(
-          state,
-          temporalUpdates,
-          deviceIndex,
-        )
-      : state;
-  }
-
-  if (device.kind === 'timewarp') {
-    const temporalUpdates = buildTimeWarpRemaps(
-      state,
-      device,
-      targetGroupId,
-      'all',
-    );
-    return temporalUpdates.size > 0
-      ? applyTemporalStateUpdates(
-          state,
-          temporalUpdates,
-          deviceIndex,
-        )
-      : state;
-  }
-
-  return applySpatialTransform(
-    state,
-    targetGroupId,
-    deviceIndex,
-    (frameIndex) => resolveEffectTransform(
-      resolveModulatedDeviceAtFrame(
-        modulationContext,
-        device,
-        frameIndex,
-        state.timeline.sampleStepBeats,
-        state.timeline.timeDomainEndBeat,
-      ) as GeneratorEffectNode,
-    ),
-    executionPlan.requiredFrameWindow,
-    outputAdapter,
-    mutedGroupIds,
-    mutedGeneratorIds,
-  );
-};
-
 const applyGeneratorDevice = (
   state: MutableGenerationState,
-  stage: CompiledRackStage,
-  modulationContext: ModulationContext,
-  executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
-  outputAdapter: CanonicalOutputAdapter,
-  mutedGroupIds: ReadonlySet<string>,
-  mutedGeneratorIds: ReadonlySet<string>,
+  stage: RackStageOfKind<GeneratorStageKind>,
+  context: RackStageExecutionContext,
 ): MutableGenerationState => {
-  const device = stage.device as GeneratorNode;
-  const deviceIndex = stage.stageIndex;
+  const device = stage.device;
   const nextTimeline = beginTimelineStage(state.timeline);
   ensureTimelineFrameCount(nextTimeline, 1);
-  const executionPlan = resolveDeviceExecutionPlan(executionPlanByDeviceId, device.id);
+  const executionPlan = resolveStageExecutionPlan(context, stage);
   const frameWindow = resolveFrameWindow(
     executionPlan.requiredFrameWindow,
     nextTimeline.sampleStepBeats,
@@ -2555,33 +2431,33 @@ const applyGeneratorDevice = (
       nextTimeline,
       frameIndex,
       resolveModulatedDeviceAtFrame(
-        modulationContext,
+        context.modulationContext,
         device,
         frameIndex,
         nextTimeline.sampleStepBeats,
         nextTimeline.timeDomainEndBeat,
-      ) as GeneratorNode,
-      deviceIndex,
+      ),
+      stage.stageIndex,
       executionPlan.generatorOutputBounds,
     );
   }
 
   const sealedTimeline = completeTimelineStage(nextTimeline);
   const seededTimelineStateByOriginId = cloneTimelineStateByOriginId(state.timelineStateByOriginId);
-  seededTimelineStateByOriginId.set(device.id, {
+  seededTimelineStateByOriginId.set(stage.deviceId, {
     observedWindow: EMPTY_TIMELINE_WINDOW,
     temporal: createIdentitySceneTemporalState(),
   });
   const sealedOriginIds = cloneSealedOriginIds(state.sealedOriginIds);
-  sealedOriginIds.delete(device.id);
+  sealedOriginIds.delete(stage.deviceId);
   return {
     timeline: sealedTimeline,
     timelineStateByOriginId: buildTimelineStateByOriginId(
       sealedTimeline,
       seededTimelineStateByOriginId,
-      outputAdapter,
-      mutedGroupIds,
-      mutedGeneratorIds,
+      context.outputAdapter,
+      context.mutedGroupIds,
+      context.mutedGeneratorIds,
     ),
     pendingTemporalWriteOrderByOriginId: clonePendingTemporalWriteOrderByOriginId(
       state.pendingTemporalWriteOrderByOriginId,
@@ -2590,92 +2466,267 @@ const applyGeneratorDevice = (
   };
 };
 
-const prepareStateForTemporalEffect = (
+const applyTemporalUpdatesForStage = (
   state: MutableGenerationState,
-  outputAdapter: CanonicalOutputAdapter,
-  mutedGroupIds: ReadonlySet<string>,
-  mutedGeneratorIds: ReadonlySet<string>,
-): MutableGenerationState => {
-  if (state.timeline.timeDomainEndBeat <= FIXED_TIMELINE_END_BEAT + TIMELINE_WINDOW_EPSILON) {
-    return state;
-  }
+  temporalUpdates: ReadonlyMap<string, SceneTemporalState>,
+  stage: CompiledRackStage,
+): MutableGenerationState => (
+  temporalUpdates.size > 0
+    ? applyTemporalStateUpdates(
+        state,
+        temporalUpdates,
+        stage.stageIndex,
+      )
+    : state
+);
 
-  return sealStageWithTemporalInvariant(
-    materializePendingTemporalState(
+const materializeRackOperatorInput: RackOperatorInputPreparation = (
+  state: MutableGenerationState,
+  context: RackStageExecutionContext,
+): MutableGenerationState => materializePendingTemporalState(
+  state,
+  context.outputAdapter,
+  context.mutedGroupIds,
+  context.mutedGeneratorIds,
+);
+
+const sealRackState = (
+  state: MutableGenerationState,
+  context: RackStageExecutionContext,
+): MutableGenerationState => sealStageWithTemporalInvariant(
+  state,
+  context.outputAdapter,
+  context.mutedGroupIds,
+  context.mutedGeneratorIds,
+);
+
+const materializeAndSealRackState = (
+  state: MutableGenerationState,
+  context: RackStageExecutionContext,
+): MutableGenerationState => sealRackState(
+  materializeRackOperatorInput(state, context),
+  context,
+);
+
+const prepareTemporalRackOperatorInput: RackOperatorInputPreparation = (
+  state: MutableGenerationState,
+  context: RackStageExecutionContext,
+): MutableGenerationState => (
+  state.timeline.timeDomainEndBeat <= FIXED_TIMELINE_END_BEAT + TIMELINE_WINDOW_EPSILON
+    ? state
+    : materializeAndSealRackState(state, context)
+);
+
+const sealRackOperatorInput: RackOperatorInputPreparation = materializeAndSealRackState;
+
+const generatorOperator = createRackOperator<GeneratorStageKind>(
+  materializeRackOperatorInput,
+  (state, stage, context) => applyGeneratorDevice(state, stage, context),
+);
+
+const spatialTransformOperator = createRackOperator<SpatialTransformStageKind>(
+  materializeRackOperatorInput,
+  (state, stage, context) => {
+    const device = stage.device;
+    const executionPlan = resolveStageExecutionPlan(context, stage);
+
+    return applySpatialTransform(
       state,
-      outputAdapter,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    ),
-    outputAdapter,
-    mutedGroupIds,
-    mutedGeneratorIds,
-  );
+      stage.groupId,
+      stage.stageIndex,
+      (frameIndex) => resolveEffectTransform(
+        resolveModulatedDeviceAtFrame(
+          context.modulationContext,
+          device,
+          frameIndex,
+          state.timeline.sampleStepBeats,
+          state.timeline.timeDomainEndBeat,
+        ),
+      ),
+      executionPlan.requiredFrameWindow,
+      context.outputAdapter,
+      context.mutedGroupIds,
+      context.mutedGeneratorIds,
+    );
+  },
+);
+
+const symmetryOperator = createRackOperator<'symmetry'>(
+  materializeRackOperatorInput,
+  (state, stage, context) => {
+    const device = stage.device;
+    const executionPlan = resolveStageExecutionPlan(context, stage);
+
+    return applySymmetryEffect(
+      state,
+      device,
+      stage.groupId,
+      stage.stageIndex,
+      executionPlan.requiredFrameWindow,
+      context.outputAdapter,
+      context.mutedGroupIds,
+      context.mutedGeneratorIds,
+    );
+  },
+);
+
+const colorOperator = createRackOperator<'color'>(
+  materializeRackOperatorInput,
+  (state, stage, context) => {
+    const device = stage.device;
+    const executionPlan = resolveStageExecutionPlan(context, stage);
+
+    return applyColorEffect(
+      state,
+      device,
+      stage.groupId,
+      stage.stageIndex,
+      executionPlan.requiredFrameWindow,
+      context.outputAdapter,
+      context.mutedGroupIds,
+      context.mutedGeneratorIds,
+    );
+  },
+);
+
+const maskOperator = createRackOperator<'mask'>(
+  sealRackOperatorInput,
+  (state, stage, context) => {
+    const device = stage.device;
+    const executionPlan = resolveStageExecutionPlan(context, stage);
+
+    return applyMaskEffect(
+      state,
+      context.compiledPlan.baseChain,
+      device,
+      stage.groupId,
+      stage.stageIndex,
+      stage.stageIndex,
+      context.outputAdapter,
+      executionPlan,
+      context.mutedGroupIds,
+      context.mutedGeneratorIds,
+      context.referenceContext,
+    );
+  },
+);
+
+const reverseOperator = createRackOperator<'reverse'>(
+  prepareTemporalRackOperatorInput,
+  (state, stage) => {
+    return applyTemporalUpdatesForStage(
+      state,
+      buildReverseRemaps(
+        state,
+        stage.groupId,
+        'all',
+      ),
+      stage,
+    );
+  },
+);
+
+const trimOperator = createRackOperator<'trim'>(
+  prepareTemporalRackOperatorInput,
+  (state, stage, context) => {
+    const device = stage.device;
+    return applyTemporalUpdatesForStage(
+      state,
+      buildTrimRemaps(
+        state,
+        device,
+        stage.groupId,
+        context.modulationContext,
+        'all',
+      ),
+      stage,
+    );
+  },
+);
+
+const stretchOperator = createRackOperator<'stretch'>(
+  prepareTemporalRackOperatorInput,
+  (state, stage, context) => {
+    const device = stage.device;
+    return applyTemporalUpdatesForStage(
+      state,
+      buildStretchRemaps(
+        state,
+        device,
+        stage.groupId,
+        context.modulationContext,
+        'all',
+      ),
+      stage,
+    );
+  },
+);
+
+const timeWarpOperator = createRackOperator<'timewarp'>(
+  prepareTemporalRackOperatorInput,
+  (state, stage) => {
+    const device = stage.device;
+    return applyTemporalUpdatesForStage(
+      state,
+      buildTimeWarpRemaps(
+        state,
+        device,
+        stage.groupId,
+        'all',
+      ),
+      stage,
+    );
+  },
+);
+
+const RACK_OPERATORS: Record<RackStageDeviceKind, RackOperator> = {
+  waterdrop: generatorOperator,
+  scanner: generatorOperator,
+  spiral: generatorOperator,
+  path: generatorOperator,
+  mirror: spatialTransformOperator,
+  rotate: spatialTransformOperator,
+  translate: spatialTransformOperator,
+  scale: spatialTransformOperator,
+  symmetry: symmetryOperator,
+  color: colorOperator,
+  mask: maskOperator,
+  reverse: reverseOperator,
+  trim: trimOperator,
+  stretch: stretchOperator,
+  timewarp: timeWarpOperator,
 };
+
+const getRackOperator = (
+  deviceKind: RackStageDeviceKind,
+): RackOperator => RACK_OPERATORS[deviceKind];
+
+const createRackStageExecutionContext = (
+  referenceContext: MaskSourceReferenceContext,
+): RackStageExecutionContext => ({
+  compiledPlan: referenceContext.compiledPlan,
+  outputAdapter: referenceContext.outputAdapter,
+  modulationContext: referenceContext.modulationContext,
+  executionPlanByDeviceId: referenceContext.executionPlanByDeviceId,
+  mutedGroupIds: referenceContext.mutedGroupIds,
+  mutedGeneratorIds: referenceContext.mutedGeneratorIds,
+  referenceContext,
+});
+
+const isGeneratorStage = (
+  stage: CompiledRackStage,
+): stage is RackStageOfKind<GeneratorStageKind> => isGeneratorDeviceKind(stage.deviceKind);
 
 const applyCompiledRackStage = (
   state: MutableGenerationState,
-  compiledPlan: CompiledRackPlan,
   stage: CompiledRackStage,
-  outputAdapter: CanonicalOutputAdapter,
-  modulationContext: ModulationContext,
-  executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
-  mutedGroupIds: ReadonlySet<string>,
-  mutedGeneratorIds: ReadonlySet<string>,
-  referenceContext: MaskSourceReferenceContext,
+  context: RackStageExecutionContext,
 ): MutableGenerationState => {
-  if (isGeneratorStage(stage)) {
-    return applyGeneratorDevice(
-      materializePendingTemporalState(
-        state,
-        outputAdapter,
-        mutedGroupIds,
-        mutedGeneratorIds,
-      ),
-      stage,
-      modulationContext,
-      executionPlanByDeviceId,
-      outputAdapter,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    );
-  }
-
-  const device = stage.device as GeneratorEffectNode;
-  if (isTemporalEffectDevice(device)) {
-    return applyEffectDevice(
-      prepareStateForTemporalEffect(
-        state,
-        outputAdapter,
-        mutedGroupIds,
-        mutedGeneratorIds,
-      ),
-      compiledPlan.baseChain,
-      stage,
-      outputAdapter,
-      modulationContext,
-      executionPlanByDeviceId,
-      mutedGroupIds,
-      mutedGeneratorIds,
-      referenceContext,
-    );
-  }
-
-  return applyEffectDevice(
-    materializePendingTemporalState(
-      state,
-      outputAdapter,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    ),
-    compiledPlan.baseChain,
+  const operator = getRackOperator(stage.deviceKind);
+  return operator.execute(
+    operator.prepareInput(state, context),
     stage,
-    outputAdapter,
-    modulationContext,
-    executionPlanByDeviceId,
-    mutedGroupIds,
-    mutedGeneratorIds,
-    referenceContext,
+    context,
   );
 };
 
@@ -2699,12 +2750,7 @@ const resolveGeneratorGroupId = (
 ): string | null | undefined => {
   const generator = chain.devices.find((device) => (
     device.id === generatorId
-    && (
-      device.kind === 'waterdrop'
-      || device.kind === 'scanner'
-      || device.kind === 'spiral'
-      || device.kind === 'path'
-    )
+    && isGeneratorNode(device)
   ));
 
   return generator ? normalizeOptionalId(generator.groupId) : undefined;
@@ -2802,6 +2848,7 @@ const resolveMaskSourceReferenceTimeline = (
       mutedGroupIds: referenceMutedGroupIds,
       mutedGeneratorIds: referenceMutedGeneratorIds,
     };
+    const stageExecutionContext = createRackStageExecutionContext(referenceContext);
     let currentState: MutableGenerationState = {
       timeline: createEmptyTimeline(),
       timelineStateByOriginId: new Map<string, OriginTimelineState>(),
@@ -2816,28 +2863,12 @@ const resolveMaskSourceReferenceTimeline = (
 
       currentState = applyCompiledRackStage(
         currentState,
-        context.compiledPlan,
         stage,
-        context.outputAdapter,
-        context.modulationContext,
-        context.executionPlanByDeviceId,
-        referenceMutedGroupIds,
-        referenceMutedGeneratorIds,
-        referenceContext,
+        stageExecutionContext,
       );
     }
 
-    const sealedState = sealStageWithTemporalInvariant(
-      materializePendingTemporalState(
-        currentState,
-        context.outputAdapter,
-        referenceMutedGroupIds,
-        referenceMutedGeneratorIds,
-      ),
-      context.outputAdapter,
-      referenceMutedGroupIds,
-      referenceMutedGeneratorIds,
-    );
+    const sealedState = materializeAndSealRackState(currentState, stageExecutionContext);
     const timeline = sealedState.timeline;
     context.timelineBySourceKey.set(sourceKey, timeline);
     return timeline;
@@ -2866,6 +2897,7 @@ const executeCompiledRackPlan = (
     timelineBySourceKey: new Map<string, GeometryTimeline>(),
     resolvingSourceKeys: new Set<string>(),
   };
+  const stageExecutionContext = createRackStageExecutionContext(referenceContext);
   let currentState: MutableGenerationState = {
     timeline: createEmptyTimeline(),
     timelineStateByOriginId: new Map<string, OriginTimelineState>(),
@@ -2876,28 +2908,12 @@ const executeCompiledRackPlan = (
   for (const stage of compiledPlan.stages) {
     currentState = applyCompiledRackStage(
       currentState,
-      compiledPlan,
       stage,
-      outputAdapter,
-      modulationContext,
-      executionPlanByDeviceId,
-      mutedGroupIds,
-      mutedGeneratorIds,
-      referenceContext,
+      stageExecutionContext,
     );
   }
 
-  return sealStageWithTemporalInvariant(
-    materializePendingTemporalState(
-      currentState,
-      outputAdapter,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    ),
-    outputAdapter,
-    mutedGroupIds,
-    mutedGeneratorIds,
-  );
+  return materializeAndSealRackState(currentState, stageExecutionContext);
 };
 
 export const buildCanonicalFieldResult = (
@@ -2906,7 +2922,7 @@ export const buildCanonicalFieldResult = (
   outputAdapter: CanonicalOutputAdapter,
   executionRequest: CanonicalExecutionRequest,
 ): CanonicalFieldResult => {
-  const compiledPlan = buildCompiledRackPlan(chain, loopLengthBeats);
+  const compiledPlan = buildCompiledRackPlan(chain);
   const executionPlan = buildCanonicalExecutionPlan(compiledPlan.baseChain, executionRequest);
   const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(compiledPlan.baseChain);
   const executionState = executeCompiledRackPlan(

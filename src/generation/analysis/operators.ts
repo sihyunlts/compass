@@ -12,11 +12,13 @@ import type { BeatRange } from './types';
 import { createSpatialBounds, transformSpatialRequirement, unionSpatialRequirements } from './bounds';
 import type { CanonicalAnalysisResult, OperatorAnalysis, SpatialRequirement } from './types';
 import { normalizeOptionalId } from '../../shared/normalize-id';
-import type {
-  GeneratorEffectNode,
-  GeneratorNode,
-  GeneratorChain,
-  MaskEffectNode,
+import {
+  isCurveModulatorNode,
+  isGeneratorNode,
+  type GeneratorEffectNode,
+  type GeneratorNode,
+  type GeneratorChain,
+  type MaskEffectNode,
 } from '../../shared/model';
 
 const DEFAULT_TIME_DOMAIN: BeatRange = Object.freeze({
@@ -363,14 +365,11 @@ export const buildCanonicalAnalysisResult = (
   });
 
   for (const device of chain.devices) {
-    if (!isDeviceEffectivelyEnabled(chain, device) || device.kind === 'modulator') {
+    if (!isDeviceEffectivelyEnabled(chain, device) || isCurveModulatorNode(device)) {
       continue;
     }
 
-    if (device.kind === 'waterdrop'
-      || device.kind === 'scanner'
-      || device.kind === 'spiral'
-      || device.kind === 'path') {
+    if (isGeneratorNode(device)) {
       const generatorAnalysis = buildGeneratorAnalysis(device);
       currentAnalysis = createOperatorAnalysis({
         ...generatorAnalysis,

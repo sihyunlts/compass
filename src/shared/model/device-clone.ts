@@ -28,9 +28,10 @@ const assertUnsupportedDeviceKind = (device: never): never => {
   throw new Error(`Unsupported device kind: ${String(kind ?? 'unknown')}`);
 };
 
-export const cloneDeviceNode = (
+export function cloneDeviceNode<TDevice extends GeneratorDeviceNode>(device: TDevice): TDevice;
+export function cloneDeviceNode(
   device: GeneratorDeviceNode,
-): GeneratorDeviceNode => {
+): GeneratorDeviceNode {
   if (device.kind === 'waterdrop') {
     return {
       id: device.id,
@@ -235,4 +236,4 @@ export const cloneDeviceNode = (
   }
 
   return assertUnsupportedDeviceKind(device);
-};
+}
