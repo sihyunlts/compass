@@ -2,24 +2,14 @@ import { cloneSceneTemporalState } from '../../core/scene-operators/temporal';
 import type { SceneTemporalState } from '../../core/core-types';
 import type { BeatRange } from '../analysis/types';
 import type {
-  GenerationTimelineWindow,
   GenerationOriginTimelineState,
   GeometryStroke,
   GeometryTimeline,
 } from '../types';
+import type { ColorDeviceConfig } from '../../devices/color/color-program';
 import { createEmptyTimeline } from './index';
 
 export type OriginTimelineState = GenerationOriginTimelineState;
-
-export interface PendingColorFrameWrite {
-  sourceStrokes: ReadonlyArray<GeometryStroke>;
-  destinationFrameIndexes: ReadonlyArray<number>;
-  velocity: number;
-  writeOrder: number;
-  slotIndex: number;
-  slotCount: number;
-  colorSlotGapFill: boolean;
-}
 
 export interface PendingTemporalMaterializationCheckpoint {
   temporalByOriginId: ReadonlyMap<string, SceneTemporalState>;
@@ -30,10 +20,10 @@ export interface PendingColorApplication {
   kind: 'color';
   precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
   targetOriginIds: ReadonlySet<string>;
-  sourceFrameCount: number;
-  endBeat: number;
-  playbackWindowByOriginId: ReadonlyMap<string, GenerationTimelineWindow>;
-  writes: ReadonlyArray<PendingColorFrameWrite>;
+  targetGroupId: string | null;
+  requiredFrameWindow: BeatRange | 'all';
+  colorConfig: ColorDeviceConfig;
+  writeOrder: number;
 }
 
 export interface PendingStrokeRewriteFrameWrite {
@@ -176,25 +166,18 @@ export const clonePendingFrameApplications = (
     kind: 'color',
     precedingTemporalCheckpoint,
     targetOriginIds: new Set(application.targetOriginIds),
-    sourceFrameCount: application.sourceFrameCount,
-    endBeat: application.endBeat,
-    playbackWindowByOriginId: new Map(
-      Array.from(application.playbackWindowByOriginId.entries(), ([originId, window]) => [
-        originId,
-        {
-          start: window.start,
-          end: window.end,
+    targetGroupId: application.targetGroupId,
+    requiredFrameWindow: application.requiredFrameWindow === 'all'
+      ? 'all'
+      : {
+          start: application.requiredFrameWindow.start,
+          end: application.requiredFrameWindow.end,
         },
-      ]),
-    ),
-    writes: application.writes.map((write) => ({
-      sourceStrokes: [...write.sourceStrokes],
-      destinationFrameIndexes: [...write.destinationFrameIndexes],
-      velocity: write.velocity,
-      writeOrder: write.writeOrder,
-      slotIndex: write.slotIndex,
-      slotCount: write.slotCount,
-      colorSlotGapFill: write.colorSlotGapFill,
-    })),
+    colorConfig: {
+      velocities: [...application.colorConfig.velocities],
+      noteLengthPercent: application.colorConfig.noteLengthPercent,
+      gapPercent: application.colorConfig.gapPercent,
+    },
+    writeOrder: application.writeOrder,
   };
 });

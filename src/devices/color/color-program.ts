@@ -5,7 +5,7 @@ export interface ClipNoteWithOrigin extends ClipNote {
   originId?: string;
 }
 
-interface ColorDeviceConfig {
+export interface ColorDeviceConfig {
   velocities: number[];
   noteLengthPercent: number;
   gapPercent: number;
