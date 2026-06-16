@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-06-16T04:07:02.439Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-order-waterdrop",
+        "kind": "waterdrop",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 2.5,
+          "centerY": 4.5,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-order-rotate",
+        "kind": "rotate",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "angleDeg": 90
+        }
+      },
+      {
+        "id": "effect-order-color",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            13,
+            15
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

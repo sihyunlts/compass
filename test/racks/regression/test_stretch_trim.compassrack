@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-06-16T03:28:54.963Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-1",
+        "kind": "waterdrop",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-3",
+        "kind": "stretch",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "start": 0,
+          "end": 0.5
+        }
+      },
+      {
+        "id": "effect-1",
+        "kind": "trim",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "start": 0,
+          "end": 0.5
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-06-16T03:37:47.081Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-8",
+        "kind": "waterdrop",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-12",
+        "kind": "reverse",
+        "enabled": true,
+        "groupId": null,
+        "name": null
+      },
+      {
+        "id": "effect-13",
+        "kind": "translate",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "offsetX": 0,
+          "offsetY": 0
+        }
+      },
+      {
+        "id": "effect-14",
+        "kind": "modulator",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "amount": 4.5,
+          "target": {
+            "deviceId": "effect-13",
+            "paramKey": "offsetX"
+          },
+          "curve": {
+            "domain": "loop01",
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "curve-node-start",
+                "t": 0,
+                "v": 0
+              },
+              {
+                "id": "curve-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

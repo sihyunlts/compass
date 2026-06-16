@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-06-16T03:29:28.167Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-5",
+        "kind": "waterdrop",
+        "enabled": true,
+        "groupId": "group-1",
+        "name": null,
+        "params": {
+          "centerX": 0,
+          "centerY": 4.5,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-9",
+        "kind": "color",
+        "enabled": true,
+        "groupId": "group-1",
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            33,
+            34,
+            35,
+            3,
+            33,
+            34,
+            35,
+            3,
+            33,
+            34,
+            35
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      },
+      {
+        "id": "effect-11",
+        "kind": "mask",
+        "enabled": true,
+        "groupId": "group-1",
+        "name": null,
+        "params": {
+          "mode": "include",
+          "tiles": [],
+          "sourceKind": "group",
+          "sourceDomain": "activation",
+          "sourceId": "group-2",
+          "sourceVisibility": "hide"
+        }
+      },
+      {
+        "id": "generator-6",
+        "kind": "scanner",
+        "enabled": true,
+        "groupId": "group-2",
+        "name": null,
+        "params": {
+          "angleDeg": 0
+        }
+      },
+      {
+        "id": "effect-12",
+        "kind": "color",
+        "enabled": true,
+        "groupId": "group-2",
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            3,
+            3
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      }
+    ],
+    "groupStateById": {
+      "group-1": {
+        "enabled": true,
+        "name": null
+      },
+      "group-2": {
+        "enabled": true,
+        "name": null
+      }
+    }
+  }
+}

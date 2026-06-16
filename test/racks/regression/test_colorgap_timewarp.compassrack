@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-06-16T03:26:49.337Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-9",
+        "kind": "waterdrop",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 0,
+          "centerY": 0,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-15",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            13,
+            9,
+            5,
+            6,
+            7
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 200
+        }
+      },
+      {
+        "id": "effect-17",
+        "kind": "timewarp",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "curve": {
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "timewarp-node-start",
+                "t": 0,
+                "v": 0,
+                "nextCurveBend": 0.125546
+              },
+              {
+                "id": "curve-node-pj08ct-mq7vmcwa",
+                "t": 0.375,
+                "v": 0.799131,
+                "nextCurveBend": -0.082543
+              },
+              {
+                "id": "curve-node-98a241-mq7vmdh3",
+                "t": 0.6875,
+                "v": 0.284908,
+                "nextCurveBend": -0.182463
+              },
+              {
+                "id": "timewarp-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "effect-18",
+        "kind": "reverse",
+        "enabled": true,
+        "groupId": null,
+        "name": null
+      }
+    ],
+    "groupStateById": {}
+  }
+}

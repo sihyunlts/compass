@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-06-16T03:59:39.336Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-active-waterdrop",
+        "kind": "waterdrop",
+        "enabled": true,
+        "groupId": "group-active",
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-disabled-translate",
+        "kind": "translate",
+        "enabled": false,
+        "groupId": "group-active",
+        "name": null,
+        "params": {
+          "offsetX": 8,
+          "offsetY": -8
+        }
+      },
+      {
+        "id": "effect-active-color",
+        "kind": "color",
+        "enabled": true,
+        "groupId": "group-active",
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            5,
+            6
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      },
+      {
+        "id": "generator-muted-scanner",
+        "kind": "scanner",
+        "enabled": true,
+        "groupId": "group-muted",
+        "name": null,
+        "params": {
+          "angleDeg": 0
+        }
+      },
+      {
+        "id": "effect-muted-color",
+        "kind": "color",
+        "enabled": true,
+        "groupId": "group-muted",
+        "name": null,
+        "params": {
+          "velocities": [
+            120
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      }
+    ],
+    "groupStateById": {
+      "group-active": {
+        "enabled": true,
+        "name": "Active group"
+      },
+      "group-muted": {
+        "enabled": false,
+        "name": "Muted group"
+      }
+    }
+  }
+}

@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-06-16T03:40:34.343Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-11",
+        "kind": "path",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "points": [
+            {
+              "x": 2,
+              "y": 4.5
+            },
+            {
+              "x": 7,
+              "y": 4.5
+            }
+          ],
+          "closed": false
+        }
+      },
+      {
+        "id": "effect-19",
+        "kind": "translate",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "offsetX": 0,
+          "offsetY": -5
+        }
+      },
+      {
+        "id": "effect-21",
+        "kind": "rotate",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "angleDeg": 90
+        }
+      },
+      {
+        "id": "effect-23",
+        "kind": "scale",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "scaleX": 1,
+          "scaleY": 1
+        }
+      },
+      {
+        "id": "effect-20",
+        "kind": "modulator",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "amount": 10,
+          "target": {
+            "deviceId": "effect-19",
+            "paramKey": "offsetY"
+          },
+          "curve": {
+            "domain": "loop01",
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "curve-node-start",
+                "t": 0,
+                "v": 0
+              },
+              {
+                "id": "curve-node-1m5z27-mqg3ejn0",
+                "t": 0.25,
+                "v": 0.403692
+              },
+              {
+                "id": "curve-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "effect-24",
+        "kind": "modulator",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "amount": 1,
+          "target": {
+            "deviceId": "effect-23",
+            "paramKey": "scaleX"
+          },
+          "curve": {
+            "domain": "loop01",
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "curve-node-start",
+                "t": 0,
+                "v": 0
+              },
+              {
+                "id": "curve-node-wlbph6-mqg3g0zs",
+                "t": 0.5,
+                "v": 0
+              },
+              {
+                "id": "curve-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "effect-22",
+        "kind": "modulator",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "amount": 90,
+          "target": {
+            "deviceId": "effect-21",
+            "paramKey": "angleDeg"
+          },
+          "curve": {
+            "domain": "loop01",
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "curve-node-start",
+                "t": 0,
+                "v": 0
+              },
+              {
+                "id": "curve-node-1m5z27-mqg3ejn0",
+                "t": 0.25,
+                "v": 1
+              },
+              {
+                "id": "curve-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

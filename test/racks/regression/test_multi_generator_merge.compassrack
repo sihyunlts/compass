@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-06-16T03:59:24.965Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-merge-waterdrop",
+        "kind": "waterdrop",
+        "enabled": true,
+        "groupId": "group-1",
+        "name": null,
+        "params": {
+          "centerX": 2,
+          "centerY": 4.5,
+          "curvature": 1.5
+        }
+      },
+      {
+        "id": "effect-merge-color-a",
+        "kind": "color",
+        "enabled": true,
+        "groupId": "group-1",
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            53,
+            55
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      },
+      {
+        "id": "generator-merge-scanner",
+        "kind": "scanner",
+        "enabled": true,
+        "groupId": "group-2",
+        "name": null,
+        "params": {
+          "angleDeg": 90
+        }
+      },
+      {
+        "id": "effect-merge-translate",
+        "kind": "translate",
+        "enabled": true,
+        "groupId": "group-2",
+        "name": null,
+        "params": {
+          "offsetX": 1,
+          "offsetY": -1
+        }
+      },
+      {
+        "id": "effect-merge-color-b",
+        "kind": "color",
+        "enabled": true,
+        "groupId": "group-2",
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            45,
+            47
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      }
+    ],
+    "groupStateById": {
+      "group-1": {
+        "enabled": true,
+        "name": null
+      },
+      "group-2": {
+        "enabled": true,
+        "name": null
+      }
+    }
+  }
+}

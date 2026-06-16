@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-06-16T03:57:43.412Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-mask-waterdrop",
+        "kind": "waterdrop",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-mask-color",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            49,
+            51
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      },
+      {
+        "id": "effect-mask-tiles",
+        "kind": "mask",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "mode": "include",
+          "tiles": [
+            4,
+            5,
+            11,
+            14,
+            15,
+            18,
+            22,
+            24,
+            25,
+            27,
+            33,
+            34,
+            35,
+            36,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            63,
+            64,
+            65,
+            66,
+            72,
+            74,
+            75,
+            77,
+            81,
+            84,
+            85,
+            88,
+            94,
+            95
+          ],
+          "sourceKind": "tiles",
+          "sourceDomain": "activation",
+          "sourceId": null,
+          "sourceVisibility": "hide"
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

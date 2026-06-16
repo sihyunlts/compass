@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-06-16T03:56:27.080Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-edge-path",
+        "kind": "path",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 8,
+              "y": 0
+            },
+            {
+              "x": 8,
+              "y": 8
+            },
+            {
+              "x": 0,
+              "y": 8
+            },
+            {
+              "x": 4.5,
+              "y": 4.5
+            }
+          ],
+          "closed": false
+        }
+      },
+      {
+        "id": "effect-edge-translate",
+        "kind": "translate",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "offsetX": -0.5,
+          "offsetY": 0.5
+        }
+      },
+      {
+        "id": "effect-edge-scale",
+        "kind": "scale",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "scaleX": 1.2,
+          "scaleY": 0.8
+        }
+      },
+      {
+        "id": "effect-edge-color",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            13,
+            15
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}
