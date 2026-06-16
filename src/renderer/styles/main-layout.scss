@@ -65,7 +65,7 @@
 }
 .header {
   &-bpm-text {
-    color: var(--neutral-50);
+    color: var(--neutral-60);
     font-size: var(--text-12);
     white-space: nowrap;
   }
@@ -74,7 +74,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--gap-6);
-    color: var(--neutral-50);
+    color: var(--neutral-60);
     font-size: var(--text-12);
 
     .dropdown-select,
@@ -84,7 +84,7 @@
   }
 
   &-preview-meta {
-    color: var(--neutral-50);
+    color: var(--neutral-60);
     font-size: var(--text-12);
     max-width: min(36vw, 420px);
     min-width: 0;

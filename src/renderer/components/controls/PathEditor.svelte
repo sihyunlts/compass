@@ -124,7 +124,9 @@
   })));
 
   const gridLineOffsets = $derived.by(() =>
-    GRID_POSITIONS.map((position) => Number(toPlotX(position).toFixed(3))));
+    GRID_POSITIONS
+      .slice(1, -1)
+      .map((position) => Number(toPlotX(position).toFixed(3))));
 
   const pathLine = $derived.by(() => {
     const [firstPoint, ...restPoints] = plottedPoints;
@@ -297,7 +299,6 @@
         {/each}
 
         {#if pathLine}
-          <path class="path-editor-line-halo" d={pathLine}></path>
           <path class="path-editor-line" d={pathLine}></path>
         {/if}
       </svg>
@@ -359,14 +360,14 @@
     &-count {
       min-width: 1.75rem;
       text-align: left;
-      color: var(--neutral-50);
+      color: var(--neutral-60);
       font-size: var(--text-12);
     }
 
     &-delete {
       width: 100%;
       appearance: none;
-      border: 1px solid var(--neutral-30);
+      border: 1px solid var(--neutral-40);
       border-radius: var(--radius-4);
       background: var(--neutral-20);
       color: var(--neutral-90);
@@ -376,7 +377,7 @@
 
       &:disabled {
         cursor: default;
-        color: var(--neutral-50);
+        color: var(--neutral-60);
         opacity: 0.6;
       }
     }
@@ -385,7 +386,7 @@
       position: relative;
       aspect-ratio: 1 / 1;
       border-radius: var(--radius-6);
-      border: 1px solid var(--neutral-30);
+      border: 1px solid var(--neutral-40);
       background: var(--neutral-10);
       overflow: hidden;
       cursor: crosshair;
@@ -400,24 +401,15 @@
     }
 
     &-grid-line {
-      stroke: rgb(var(--rgb-white) / 0.08);
-      stroke-width: 0.6;
-      vector-effect: non-scaling-stroke;
-    }
-
-    &-line-halo {
-      fill: none;
-      stroke: rgb(var(--rgb-white) / 0.24);
-      stroke-width: 3;
-      stroke-linecap: round;
-      stroke-linejoin: round;
+      stroke: var(--neutral-20);
+      stroke-width: 1;
       vector-effect: non-scaling-stroke;
     }
 
     &-line {
       fill: none;
-      stroke: var(--device-control-accent, var(--accent-500));
-      stroke-width: 1.4;
+      stroke: var(--device-control-accent, var(--neutral-90));
+      stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
       vector-effect: non-scaling-stroke;
@@ -431,11 +423,11 @@
       padding: 0;
       border-radius: var(--radius-round);
       border: 2px solid var(--neutral-10);
-      background: var(--device-control-accent, var(--accent-500));
+      background: var(--neutral-90);
       cursor: grab;
 
       &.is-selected {
-        background: var(--category-generators-500);
+        background: var(--device-control-accent, var(--neutral-90));
       }
 
       &:active {

@@ -52,7 +52,7 @@
     display: grid;
     gap: var(--gap-6);
     min-width: 0;
-    color: var(--neutral-50);
+    color: var(--neutral-60);
     font-size: var(--text-12);
 
     input {
@@ -65,6 +65,6 @@
   }
 
   .text-field-label {
-    color: var(--neutral-50);
+    color: var(--neutral-60);
   }
 </style>

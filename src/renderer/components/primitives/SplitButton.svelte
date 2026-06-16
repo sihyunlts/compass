@@ -108,8 +108,8 @@
     }
 
     &-primary {
-      background: var(--accent-500);
-      color: var(--accent-050);
+      background: var(--neutral-90);
+      color: var(--neutral-00);
     }
 
     &-outline {
@@ -158,7 +158,7 @@
     &-trigger {
       width: 1.75rem;
       padding: 0;
-      border-left: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+      border-left: 1px solid color-mix(in oklch, currentColor 16%, transparent);
       display: inline-flex;
       align-items: center;
       justify-content: center;

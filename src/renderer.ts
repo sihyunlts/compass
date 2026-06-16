@@ -36,7 +36,7 @@ const renderFatal = (message: string): void => {
   fallback.style.margin = '24px';
   fallback.style.whiteSpace = 'pre-wrap';
   fallback.style.fontFamily = 'Menlo, Monaco, Consolas, monospace';
-  fallback.style.color = '#ff8f8f';
+  fallback.style.color = 'oklch(77% 0.136 21)';
   fallback.textContent = `Renderer bootstrap failed:\n${message}`;
   document.body.innerHTML = '';
   document.body.appendChild(fallback);

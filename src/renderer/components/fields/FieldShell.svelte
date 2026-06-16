@@ -41,7 +41,7 @@
   }
 
   .field-label {
-    color: var(--neutral-50);
+    color: var(--neutral-60);
     font-size: var(--text-12);
   }
 </style>

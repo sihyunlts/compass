@@ -68,6 +68,7 @@
   <div class="preview-panel-controls">
     <Button
       id="preview-play"
+      class="preview-panel-control-button"
       variant="icon"
       label={resolvePlayButtonLabel()}
       icon={resolvePlayIcon()}
@@ -75,6 +76,7 @@
     />
     <Button
       id="preview-loop-toggle"
+      class="preview-panel-control-button"
       variant="icon"
       label={resolveLoopButtonLabel()}
       icon="repeat"
@@ -83,7 +85,7 @@
     />
     <Button
       id="preview-popout"
-      class="preview-popout-toggle"
+      class="preview-panel-control-button preview-popout-toggle"
       variant="icon"
       label="Open preview in a separate window"
       icon="open_in_new"
@@ -112,6 +114,16 @@
       gap: var(--gap-6);
     }
 
+    :global(.button.preview-panel-control-button) {
+      color: var(--neutral-90);
+      background: var(--neutral-20);
+    }
+
+    :global(.button.preview-panel-control-button.is-active) {
+      color: var(--neutral-00);
+      background: var(--neutral-90);
+    }
+
     &-scrub-frame {
       position: relative;
       height: 1rem;
@@ -138,7 +150,7 @@
       height: 0.28rem;
       overflow: hidden;
       border-radius: var(--radius-2);
-      background: var(--neutral-30);
+      background: var(--neutral-40);
       transform: translateY(-50%);
       pointer-events: none;
     }
@@ -148,7 +160,7 @@
       inset-block: 0;
       width: 34%;
       border-radius: inherit;
-      background: var(--neutral-50);
+      background: var(--neutral-60);
       transform: translateX(-120%);
       will-change: transform;
       animation: preview-loader-slide 1.1s ease-in-out infinite;

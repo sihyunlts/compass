@@ -249,7 +249,7 @@
     align-items: center;
     justify-content: center;
     padding: var(--gap-16);
-    background: rgb(0 0 0 / 0.4);
+    background: oklch(0% 0 0 / 0.4);
   }
 
   .modal-dialog {
@@ -266,7 +266,7 @@
 
     &-description {
       margin: 0 0 var(--gap-16);
-      color: var(--neutral-50);
+      color: var(--neutral-60);
       font-size: var(--text-13);
     }
 

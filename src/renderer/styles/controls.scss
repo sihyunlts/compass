@@ -9,9 +9,9 @@
   padding: 0;
   border-radius: var(--radius-round);
   background: var(--neutral-20);
-  color: var(--neutral-50);
+  color: var(--neutral-60);
   line-height: 1;
-  outline: 1px solid var(--neutral-30);
+  outline: 1px solid var(--neutral-40);
   cursor: pointer;
   -webkit-app-region: no-drag;
 
@@ -35,7 +35,7 @@ input {
 
 input {
   &[type='checkbox'] {
-    accent-color: var(--device-control-accent, var(--accent-500));
+    accent-color: var(--device-control-accent, var(--neutral-90));
 
     &.round-checkbox {
       appearance: none;
@@ -43,11 +43,11 @@ input {
       width: 0.875rem;
       height: 0.875rem;
       border-radius: var(--radius-round);
-      background-color: var(--neutral-30);
+      background-color: var(--neutral-40);
       margin: 0;
 
       &:checked {
-        background-color: var(--device-control-accent, var(--accent-500));
+        background-color: var(--device-control-accent, var(--neutral-90));
       }
     }
   }
@@ -61,7 +61,7 @@ input {
     }
 
     &:focus {
-      outline: 1px solid var(--neutral-30);
+      outline: 1px solid var(--neutral-40);
       outline-offset: -1px;
       caret-color: transparent;
     }
@@ -86,8 +86,8 @@ input {
     width: 100%;
     cursor: pointer;
     --range-fill: 0%;
-    --range-fill-color: var(--device-control-accent, var(--accent-500));
-    --range-track-color: var(--neutral-30);
+    --range-fill-color: var(--device-control-accent, var(--neutral-90));
+    --range-track-color: var(--neutral-40);
 
     &::-webkit-slider-runnable-track {
       width: 100%;
@@ -133,7 +133,7 @@ input {
   min-width: 6rem;
   max-width: calc(100vw - var(--gap-16));
   padding: var(--gap-4);
-  border: 1px solid var(--neutral-30);
+  border: 1px solid var(--neutral-40);
   border-radius: var(--radius-8);
   background: var(--neutral-10);
 }
@@ -167,7 +167,7 @@ input {
 .floating-menu-separator {
   margin: var(--gap-4) var(--gap-6);
   border: 0;
-  border-top: 1px solid var(--neutral-30);
+  border-top: 1px solid var(--neutral-40);
 }
 
 .app-hint {
@@ -176,7 +176,7 @@ input {
   z-index: 70;
   max-width: min(16rem, calc(100vw - var(--gap-16)));
   padding: var(--gap-4) var(--gap-6);
-  border: 1px solid var(--neutral-30);
+  border: 1px solid var(--neutral-40);
   border-radius: var(--radius-6);
   background: var(--neutral-10);
   color: var(--neutral-90);

@@ -65,7 +65,7 @@
     z-index: 43;
     min-width: 120px;
     padding: var(--gap-4);
-    border: 1px solid var(--neutral-30);
+    border: 1px solid var(--neutral-40);
     border-radius: var(--radius-8);
     background: var(--neutral-10);
   }

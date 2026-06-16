@@ -141,7 +141,7 @@
     &-title {
       font-size: var(--text-12);
       font-weight: 500;
-      color: var(--neutral-40);
+      color: var(--neutral-50);
       padding-left: var(--gap-2);
     }
   }
@@ -177,11 +177,11 @@
 
   .sidebar-settings-description {
     font-size: var(--text-12);
-    color: var(--neutral-50);
+    color: var(--neutral-60);
     word-break: break-word;
 
     &.is-error {
-      color: var(--accent-500);
+      color: var(--neutral-90);
     }
   }
 

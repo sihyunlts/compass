@@ -192,30 +192,32 @@
 
 <style lang="scss">
   .device-card {
-    --device-category-accent: var(--category-generators-500);
+    --device-category-accent: var(--yellow-50);
     --device-control-accent: var(--device-category-accent);
+    --device-card-radius: var(--radius-8);
+    --device-head-radius: max(0px, calc(var(--device-card-radius) - 1px));
     display: flex;
     flex-direction: column;
     flex: 0 0 auto;
     border: 1px solid var(--neutral-20);
-    border-radius: var(--radius-8);
+    border-radius: var(--device-card-radius);
     background: var(--neutral-10);
     transition: transform 130ms ease, opacity 130ms ease;
 
     &.is-selected {
-      border-color: var(--neutral-30);
+      border-color: var(--neutral-40);
 
       .device-head {
-        border-bottom-color: var(--neutral-30);
-        background-color: rgb(var(--rgb-white) / var(--alpha-04));
+        border-bottom-color: var(--neutral-40);
+        background-color: var(--neutral-20);
       }
     }
 
-    box-shadow: inset 0 .125rem 0 0 var(--device-category-accent);
-
     .device-head {
-      padding: var(--gap-8) var(--gap-8) var(--gap-4);
+      padding: var(--gap-6) var(--gap-8);
+      border-top: 0.125rem solid var(--device-category-accent);
       border-bottom: 1px solid var(--neutral-20);
+      border-radius: var(--device-head-radius) var(--device-head-radius) 0 0;
       display: flex;
       align-items: flex-start;
       gap: var(--gap-10);
@@ -295,6 +297,7 @@
         align-items: center;
         padding: var(--gap-10) var(--gap-6);
         border-bottom: none;
+        border-radius: var(--device-head-radius);
       }
 
       .device-head-left {
@@ -366,7 +369,7 @@
       }
 
       :global(.color-slot.is-selected) {
-        outline: 2px solid var(--accent-500);
+        outline: 2px solid var(--neutral-90);
       }
 
       :global(.color-palette-container) {
@@ -392,7 +395,7 @@
       }
 
       :global(.color-palette-cell.is-selected) {
-        outline: 2px solid var(--accent-500);
+        outline: 2px solid var(--neutral-90);
       }
     }
 

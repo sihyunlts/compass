@@ -60,7 +60,7 @@
 
 <style lang="scss">
   .button {
-    --button-disabled-color: color-mix(in srgb, var(--neutral-90) 60%, transparent);
+    --button-disabled-color: color-mix(in oklch, var(--neutral-90) 60%, transparent);
 
     border: 0;
     border-radius: var(--radius-6);
@@ -77,10 +77,10 @@
     }
 
     &-primary {
-      --button-disabled-color: color-mix(in srgb, var(--accent-050) 60%, transparent);
+      --button-disabled-color: color-mix(in oklch, var(--neutral-00) 60%, transparent);
 
-      background: var(--accent-500);
-      color: var(--accent-050);
+      background: var(--neutral-90);
+      color: var(--neutral-00);
     }
 
     &-icon {
@@ -92,8 +92,8 @@
       justify-content: center;
 
       &.is-active {
-        background: var(--accent-500);
-        color: var(--accent-050);
+        background: var(--neutral-30);
+        color: var(--neutral-90);
       }
 
       .material-symbols-rounded {

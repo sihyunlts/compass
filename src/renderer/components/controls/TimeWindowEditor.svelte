@@ -111,8 +111,6 @@
 
   <div
     class="time-window-surface"
-    class:is-stretch={mode === 'stretch'}
-    class:is-trim={mode === 'trim'}
     class:is-invalid={!hasValidWindow}
     style={`--window-start:${visibleStart * 100}%;--window-end:${visibleEnd * 100}%;--playhead:${displayedPlayhead * 100}%;`}
   >
@@ -187,7 +185,7 @@
 
 <style lang="scss">
   .time-window-editor {
-    --time-window-accent: var(--device-category-accent, var(--category-time-500));
+    --time-window-accent: var(--device-category-accent, var(--mint-50));
     display: flex;
     flex-direction: column;
     gap: var(--gap-8);
@@ -212,7 +210,7 @@
     height: 1.5rem;
     padding: 0 var(--gap-8);
     border-radius: var(--radius-round);
-    background: rgb(var(--rgb-white) / 0.06);
+    background: var(--neutral-90);
     color: var(--neutral-00);
     font-size: var(--text-12);
     white-space: nowrap;
@@ -228,7 +226,7 @@
       height: 1.5rem;
       border-radius: var(--radius-4);
       background: var(--neutral-20);
-      color: var(--neutral-50);
+      color: var(--neutral-60);
       cursor: pointer;
 
       &.selected {
@@ -240,7 +238,7 @@
 
   .time-window-ruler {
     justify-content: space-between;
-    color: var(--neutral-50);
+    color: var(--neutral-60);
     font-size: var(--text-12);
   }
 
@@ -274,36 +272,8 @@
     left: var(--window-start, 0%);
     width: calc(var(--window-end, 0%) - var(--window-start, 0%));
     min-width: 0;
-    background:
-      linear-gradient(180deg, rgb(var(--rgb-white) / 0.14), rgb(var(--rgb-white) / 0.04)),
-      var(--time-window-accent);
-    opacity: 0.88;
-  }
-
-  .time-window-surface.is-stretch {
-    .time-window-selected-span {
-      background:
-        linear-gradient(180deg, rgb(var(--rgb-white) / 0.1), rgb(var(--rgb-white) / 0.02)),
-        var(--time-window-accent);
-      outline: 1px solid rgb(var(--rgb-white) / 0.12);
-      outline-offset: -1px;
-    }
-  }
-
-  .time-window-surface.is-trim {
-    .time-window-selected-span {
-      background:
-        repeating-linear-gradient(
-          135deg,
-          rgb(var(--rgb-white) / 0.18) 0,
-          rgb(var(--rgb-white) / 0.18) 6px,
-          rgb(var(--rgb-white) / 0.04) 6px,
-          rgb(var(--rgb-white) / 0.04) 12px
-        ),
-        linear-gradient(180deg, rgb(var(--rgb-white) / 0.12), rgb(var(--rgb-white) / 0.02)),
-        var(--time-window-accent);
-      opacity: 0.94;
-    }
+    background: var(--time-window-accent);
+    opacity: 0.75;
   }
 
   .time-window-playhead {
@@ -311,7 +281,7 @@
     bottom: 0;
     left: var(--playhead, 0%);
     width: 2px;
-    background: rgb(var(--rgb-white));
+    background: var(--neutral-90);
     transform: translateX(-1px);
   }
 
@@ -319,11 +289,11 @@
     top: 0;
     bottom: 0;
     width: 1px;
-    background: rgb(var(--rgb-white) / 0.05);
+    background: var(--white-overlay-18);
     transform: translateX(-0.5px);
 
     &.is-major {
-      background: rgb(var(--rgb-white) / 0.14);
+      background: var(--white-overlay-32);
     }
   }
 
@@ -331,7 +301,7 @@
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: var(--gap-8);
+    gap: var(--gap-2);
     margin-top: calc(-1 * var(--gap-16));
     padding-top: var(--gap-4);
   }
@@ -339,6 +309,9 @@
   .time-window-range {
     position: relative;
     z-index: 1;
+    width: calc(100% + 0.9rem);
+    max-width: none;
+    margin-left: -0.45rem;
     --range-fill: 0%;
     --range-fill-color: transparent;
     --range-track-color: transparent;
@@ -353,7 +326,7 @@
       height: 0.9rem;
       width: 0.9rem;
       border-radius: var(--radius-round);
-      border: 1px solid var(--neutral-00);
+      border: 2px solid var(--neutral-10);
       background: var(--neutral-90);
       margin-top: 0;
       opacity: 1;
@@ -368,7 +341,7 @@
     }
 
     :global(input[readonly]) {
-      color: var(--neutral-50);
+      color: var(--neutral-60);
       cursor: default;
     }
   }

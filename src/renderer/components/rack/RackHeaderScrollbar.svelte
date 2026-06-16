@@ -431,14 +431,14 @@
       position: absolute;
       top: 0;
       bottom: 0;
-      border: 1px solid var(--neutral-40);
+      border: 1px solid var(--neutral-50);
       background: transparent;
       border-radius: var(--radius-4);
       z-index: 1;
     }
 
     &:focus-visible {
-      --scrollbar-track-border-color: var(--accent-500);
+      --scrollbar-track-border-color: var(--neutral-90);
     }
   }
 </style>

@@ -109,7 +109,7 @@
     cursor: pointer;
 
     &:focus-visible {
-      outline: 1px solid var(--neutral-30);
+      outline: 1px solid var(--neutral-40);
       outline-offset: -1px;
     }
 

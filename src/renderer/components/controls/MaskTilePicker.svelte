@@ -94,7 +94,7 @@
     gap: var(--gap-2);
     padding: var(--gap-6);
     border-radius: var(--radius-6);
-    border: 1px solid var(--neutral-30);
+    border: 1px solid var(--neutral-40);
     user-select: none;
     touch-action: none;
   }
@@ -109,7 +109,7 @@
     cursor: pointer;
 
     &.is-selected {
-      background: var(--device-control-accent, var(--accent-500));
+      background: var(--device-control-accent, var(--neutral-90));
     }
   }
 </style>

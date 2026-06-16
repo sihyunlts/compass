@@ -452,7 +452,7 @@
       top: 50%;
       margin: 0;
       transform: translate(-50%, -50%);
-      color: var(--neutral-50);
+      color: var(--neutral-60);
       font-size: var(--text-13);
       white-space: nowrap;
       pointer-events: none;
@@ -473,15 +473,15 @@
   }
 
   .device-group.is-rack.is-selected {
-    border-color: var(--neutral-30);
+    border-color: var(--neutral-40);
   }
 
   .device-group.is-rack.is-selected .group-rail-left {
-    background: rgb(var(--rgb-white) / var(--alpha-04));
+    background: var(--neutral-20);
   }
 
   .device-group.is-rack.is-selected .group-rail-right {
-    background: rgb(var(--rgb-white) / var(--alpha-04));
+    background: var(--neutral-20);
   }
 
   /* Visual state when group toggle is disabled. */
@@ -498,6 +498,7 @@
   }
 
   .device-group.is-rack :global(.device-card) {
+    --device-card-radius: 0;
     border-radius: 0;
     border-top: none;
     border-bottom: none;
@@ -511,7 +512,7 @@
 
   .device-group.is-rack .device-slot.is-selected :global(.device-card),
   .device-group.is-rack .device-slot.is-selected + .device-slot :global(.device-card) {
-    --group-device-divider-color: var(--neutral-30);
+    --group-device-divider-color: var(--neutral-40);
   }
   .device-slot {
     position: relative;
@@ -540,7 +541,7 @@
     bottom: 6px;
     width: 2px;
     transform: translateX(-1px);
-    background: var(--accent-500);
+    background: var(--neutral-90);
     border-radius: 1px;
   }
 
@@ -568,7 +569,7 @@
       border-bottom-left-radius: var(--radius-8);
 
       &.is-selected {
-        border-right-color: var(--neutral-30);
+        border-right-color: var(--neutral-40);
       }
     }
 
@@ -579,7 +580,7 @@
       border-bottom-right-radius: var(--radius-8);
 
       &.is-selected {
-        border-left-color: var(--neutral-30);
+        border-left-color: var(--neutral-40);
       }
     }
   }

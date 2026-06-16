@@ -118,6 +118,11 @@
   };
 
   const divisions = $derived(Math.max(2, Math.round(curve.divisions)));
+  const curveGridLineOffsets = $derived.by(() =>
+    Array.from(
+      { length: Math.max(divisions - 1, 0) },
+      (_, index) => Number((((index + 1) / divisions) * 100).toFixed(3)),
+    ));
   const curveValueMin = $derived(Math.min(valueMin, valueMax));
   const curveValueMax = $derived(Math.max(valueMin, valueMax));
   const curveValueSpan = $derived(Math.max(curveValueMax - curveValueMin, 0.000001));
@@ -578,11 +583,13 @@
       ondblclick={handleEditorDoubleClick}
     >
       <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+        {#each curveGridLineOffsets as offset (`x:${offset}`)}
+          <line class="curve-grid-line" x1={offset} y1="0" x2={offset} y2="100"></line>
+        {/each}
         {#if curveFillPath}
           <path class="curve-fill" d={curveFillPath} />
         {/if}
         {#if curveLinePath}
-          <path class="curve-line-halo" d={curveLinePath} />
           <path class="curve-line" d={curveLinePath} />
         {/if}
       </svg>
@@ -591,7 +598,6 @@
           <button
             type="button"
             class="curve-editor-segment-control"
-            class:is-stub={control.isStub}
             data-curve-segment-control-id={control.key}
             style={`left:${control.x}%;top:${control.y}%;`}
             onmousedown={(event) => handleSegmentControlMouseDown(event, control.startNodeId)}
@@ -640,21 +646,14 @@
 
     position: relative;
     min-height: 0;
-    border: 1px solid var(--neutral-30);
+    border: 1px solid var(--neutral-40);
     border-radius: var(--radius-6);
     background:
-      repeating-linear-gradient(
-        to right,
-        rgb(var(--rgb-white) / 0.03) 0,
-        rgb(var(--rgb-white) / 0.03) 1px,
-        transparent 1px,
-        transparent calc(100% / var(--curve-divisions, 16))
-      ),
       linear-gradient(
         to bottom,
         transparent calc(var(--curve-guide-y, -100%) - 0.5px),
-        rgb(var(--rgb-white) / 0.14) calc(var(--curve-guide-y, -100%) - 0.5px),
-        rgb(var(--rgb-white) / 0.14) calc(var(--curve-guide-y, -100%) + 0.5px),
+        var(--neutral-40) calc(var(--curve-guide-y, -100%) - 0.5px),
+        var(--neutral-40) calc(var(--curve-guide-y, -100%) + 0.5px),
         transparent calc(var(--curve-guide-y, -100%) + 0.5px)
       ),
       var(--neutral-10);
@@ -666,21 +665,20 @@
       display: block;
     }
 
-    .curve-fill {
-      fill: color-mix(in srgb, var(--device-control-accent, var(--accent-500)) 22%, transparent);
+    .curve-grid-line {
+      stroke: var(--neutral-20);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
     }
 
-    .curve-line-halo {
-      fill: none;
-      stroke: rgb(var(--rgb-white) / 0.2);
-      stroke-width: 2.6;
-      vector-effect: non-scaling-stroke;
+    .curve-fill {
+      fill: color-mix(in oklch, var(--device-control-accent, var(--neutral-90)) 22%, transparent);
     }
 
     .curve-line {
       fill: none;
-      stroke: var(--device-control-accent, var(--accent-500));
-      stroke-width: 1.4;
+      stroke: var(--device-control-accent, var(--neutral-90));
+      stroke-width: 2;
       stroke-linejoin: round;
       stroke-linecap: round;
       vector-effect: non-scaling-stroke;
@@ -704,29 +702,24 @@
 
     &-segment-control {
       z-index: 1;
-      width: 0.75rem;
-      height: 0.75rem;
-      border: 1px solid rgb(var(--rgb-white) / 0.4);
+      width: 0.5rem;
+      height: 0.5rem;
+      border: 2px solid var(--device-control-accent, var(--neutral-90));
       border-radius: var(--radius-round);
-      background: rgb(var(--rgb-white) / 0.2);
+      background: var(--neutral-10);
 
       &::before {
         content: '';
         position: absolute;
         inset: -0.3rem;
       }
-
-      &.is-stub {
-        background: rgb(var(--rgb-white) / 0.1);
-        border-color: rgb(var(--rgb-white) / 0.25);
-      }
     }
 
     &-node {
       z-index: 2;
-      width: 0.75rem;
-      height: 0.75rem;
-      border: 1px solid var(--neutral-10);
+      width: 0.9rem;
+      height: 0.9rem;
+      border: 2px solid var(--neutral-10);
       border-radius: var(--radius-round);
       background: var(--neutral-90);
 
@@ -737,8 +730,7 @@
       }
 
       &.selected {
-        background: var(--device-control-accent, var(--accent-500));
-        border-width: 1.5px;
+        background: var(--device-control-accent, var(--neutral-90));
       }
     }
 
@@ -747,7 +739,7 @@
       top: 0;
       bottom: 0;
       width: 1px;
-      background: rgb(var(--rgb-white) / 0.25);
+      background: var(--neutral-60);
       pointer-events: none;
       transform: translateX(-50%);
     }

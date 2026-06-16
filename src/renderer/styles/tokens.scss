@@ -1,22 +1,21 @@
 :root {
   /* Colors */
   color-scheme: dark;
-  --neutral-00: #0d0e0f;
-  --neutral-10: #1a1c21;
-  --neutral-20: #2b2e37;
-  --neutral-30: #4a5160;
-  --neutral-40: #6b7280;
-  --neutral-50: #9ca4b5;
-  --neutral-90: #e6e9ef;
-  --accent-500: #d8dee8;
-  --accent-050: #13161b;
-  --category-generators-500: #f5d442;
-  --category-transform-500: #2dd1ff;
-  --category-time-500: #3cffba;
-  --category-utility-500: #d94fff;
-  --rgb-white: 255 255 255;
+  --neutral-00: oklch(16% 0.003 265);
+  --neutral-10: oklch(23% 0.010 265);
+  --neutral-20: oklch(30% 0.017 265);
+  --neutral-30: oklch(36% 0.022 265);
+  --neutral-40: oklch(43% 0.026 265);
+  --neutral-50: oklch(55% 0.023 265);
+  --neutral-60: oklch(72% 0.026 265);
+  --neutral-90: oklch(93% 0.009 265);
+  --yellow-50: oklch(87% 0.160 96);
+  --cyan-50: oklch(80% 0.140 223);
+  --mint-50: oklch(89% 0.178 164);
+  --magenta-50: oklch(68% 0.262 318);
+  --white-overlay-18: oklch(100% 0 0 / 0.18);
+  --white-overlay-32: oklch(100% 0 0 / 0.32);
   --rgb-led-default: 255 166 57;
-  --alpha-04: 0.04;
 
   /* Font sizes */
   --text-12: 0.75rem;

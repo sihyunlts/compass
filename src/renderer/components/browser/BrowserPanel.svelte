@@ -646,7 +646,6 @@
       <div class="browser-page-switch-group">
         <Button
           class="browser-page-switch-button"
-          style="--browser-page-accent:var(--category-generators-500);"
           variant="icon"
           label="Devices"
           icon="widgets"
@@ -655,7 +654,6 @@
         />
         <Button
           class="browser-page-switch-button"
-          style="--browser-page-accent:var(--category-transform-500);"
           variant="icon"
           label="Presets"
           icon="inventory_2"
@@ -673,7 +671,6 @@
         {#if canToggleWindowLayer}
           <Button
             class="browser-page-switch-button"
-            style="--browser-page-accent:var(--accent-500);"
             variant="icon"
             label={mainWindowAlwaysOnTop ? 'Unpin window' : 'Pin window on top'}
             title={mainWindowAlwaysOnTop ? 'Unpin window' : 'Pin window on top'}
@@ -684,7 +681,6 @@
         {/if}
         <Button
           class="browser-page-switch-button"
-          style="--browser-page-accent:var(--category-utility-500);"
           variant="icon"
           label="Settings"
           icon="settings"
@@ -884,18 +880,14 @@
     }
   }
 
-  :global(.browser-page-switch-button) {
-    color: var(--browser-page-accent, var(--neutral-50));
-    background: transparent;
+  :global(.button.browser-page-switch-button) {
+    color: var(--neutral-90);
+    background: var(--neutral-20);
   }
 
-  :global(.browser-page-switch-button.is-active) {
-    color: var(--browser-page-accent, var(--neutral-90));
-    background: color-mix(
-      in srgb,
-      var(--browser-page-accent, var(--accent-500)) 18%,
-      transparent
-    );
+  :global(.button.browser-page-switch-button.is-active) {
+    color: var(--neutral-00);
+    background: var(--neutral-90);
   }
 
   .browser-page-panel {
@@ -931,7 +923,7 @@
     border: 0;
     padding: 0;
     background: transparent;
-    color: var(--neutral-50);
+    color: var(--neutral-60);
     cursor: pointer;
 
     .material-symbols-rounded {
@@ -965,7 +957,7 @@
     &-icon {
       font-size: var(--text-14);
       line-height: 1;
-      color: var(--browser-icon-accent, var(--neutral-50));
+      color: var(--browser-icon-accent, var(--neutral-60));
       font-variation-settings: 'FILL' 1, 'wght' 400;
     }
 
@@ -989,10 +981,10 @@
 
   .browser-status {
     font-size: var(--text-12);
-    color: var(--neutral-50);
+    color: var(--neutral-60);
 
     &-error {
-      color: var(--accent-500);
+      color: var(--neutral-90);
     }
   }
 </style>
