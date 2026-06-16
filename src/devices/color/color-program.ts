@@ -290,7 +290,7 @@ const resolveNonSteppedMovingReferenceDuration = <T extends TimedColorSource>(
     : null;
 };
 
-export const planColorProgramSlots = <T extends TimedColorSource>(
+const planColorProgramSlots = <T extends TimedColorSource>(
   sourceSegments: ReadonlyArray<T>,
   colorConfig: ColorDeviceConfig,
 ): PlannedColorSlot<T>[] => {

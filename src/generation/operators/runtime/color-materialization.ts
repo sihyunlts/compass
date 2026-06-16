@@ -33,7 +33,7 @@ import {
   resolveColorSlotWriteOrder,
 } from './timeline-strokes';
 
-export type PendingColorProgramApplication = Omit<PendingColorApplication, 'precedingTemporalCheckpoint'>;
+type PendingColorProgramApplication = Omit<PendingColorApplication, 'precedingTemporalCheckpoint'>;
 
 type ColorMaterializationStage = Parameters<typeof addStrokeToFrames>[0];
 
@@ -217,7 +217,7 @@ interface ColorMaterializationSource {
   timing: ColorTimingSource;
 }
 
-export interface ColorGeometrySource {
+interface ColorGeometrySource {
   samplesByOriginId: ReadonlyMap<string, ReadonlyArray<ColorGeometrySample>>;
 }
 
@@ -307,7 +307,7 @@ const resolveColorProgramDestinationFrameIndexes = (
   );
 };
 
-export interface PendingColorProgramMaterializationPlan {
+interface PendingColorProgramMaterializationPlan {
   slotsByOriginId: Map<string, ColorProgramSlot[]>;
   colorTimelineEndBeat: number;
   playbackWindowByOriginId: Map<string, TimelineWindow>;
@@ -336,7 +336,7 @@ const buildColorProgramMaterializationPlanFromTiming = (
   };
 };
 
-export interface PendingColorMaterialization {
+interface PendingColorMaterialization {
   frameWindow: FrameWindow;
   geometry: ColorGeometrySource;
   outputFrameCount: number;
@@ -375,7 +375,7 @@ export const buildPendingColorMaterialization = (
   };
 };
 
-export const buildPendingColorProgramMaterializationPlan = (
+const buildPendingColorProgramMaterializationPlan = (
   timeline: GeometryTimeline,
   application: PendingColorProgramApplication,
   precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null = null,

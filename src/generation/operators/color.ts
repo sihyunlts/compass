@@ -11,10 +11,10 @@ import {
   buildTargetOriginIds,
   createPendingGeometryApplicationOperator,
   mergePlaybackWindowOverridesIntoTimelineState,
-  resolvePendingColorPlaybackWindowOverrides,
   resolveStageExecutionPlan,
   type PendingGeometryApplicationOperatorInput,
 } from './runtime';
+import { resolvePendingColorPlaybackWindowOverrides } from './runtime/color-materialization';
 
 const applyColorEffect = (
   input: PendingGeometryApplicationOperatorInput,

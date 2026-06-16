@@ -21,7 +21,6 @@ import type {
   GeometryStroke,
   GeometryTimeline,
 } from '../../types';
-import { isFrameWithinWindow } from './frame-window';
 
 const wrapFrameIndex = (
   frameIndex: number,
@@ -35,64 +34,6 @@ const isTargetedStroke = (
   stroke: GeometryStroke,
   targetGroupId: string | null,
 ): boolean => targetGroupId === null || stroke.originGroupId === targetGroupId;
-
-const splitFrameStrokesByTarget = (
-  strokes: ReadonlyArray<GeometryStroke>,
-  targetGroupId: string | null,
-): {
-  targeted: GeometryStroke[];
-  untargeted: GeometryStroke[];
-} => {
-  const targeted: GeometryStroke[] = [];
-  const untargeted: GeometryStroke[] = [];
-
-  for (const stroke of strokes) {
-    if (isTargetedStroke(stroke, targetGroupId)) {
-      targeted.push(stroke);
-    } else {
-      untargeted.push(stroke);
-    }
-  }
-
-  return {
-    targeted,
-    untargeted,
-  };
-};
-
-const takeTargetedStrokesFromFrame = (
-  timeline: GeometryTimeline,
-  frameIndex: number,
-  targetGroupId: string | null,
-): GeometryStroke[] => {
-  const { targeted, untargeted } = splitFrameStrokesByTarget(
-    timeline.frames[frameIndex]?.strokes ?? [],
-    targetGroupId,
-  );
-
-  if (targeted.length > 0) {
-    setFrameStrokes(timeline, frameIndex, untargeted);
-  }
-
-  return targeted;
-};
-
-export const forEachTargetedFrame = (
-  timeline: GeometryTimeline,
-  sourceFrameCount: number,
-  targetGroupId: string | null,
-  frameWindow: FrameWindow,
-  visit: (frameIndex: number, targeted: ReadonlyArray<GeometryStroke>) => void,
-): void => {
-  for (let frameIndex = 0; frameIndex < sourceFrameCount; frameIndex += 1) {
-    const targeted = takeTargetedStrokesFromFrame(timeline, frameIndex, targetGroupId);
-    if (targeted.length === 0 || !isFrameWithinWindow(frameIndex, frameWindow)) {
-      continue;
-    }
-
-    visit(frameIndex, targeted);
-  }
-};
 
 export const buildTargetOriginIds = (
   timeline: GeometryTimeline,

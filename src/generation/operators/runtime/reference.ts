@@ -24,7 +24,7 @@ export const createRackStageExecutionContext = (
   referenceContext,
 });
 
-export const isGeneratorStage = (
+const isGeneratorStage = (
   stage: CompiledRackStage,
 ): stage is RackStageOfKind<GeneratorStageKind> => isGeneratorDeviceKind(stage.deviceKind);
 
@@ -42,7 +42,7 @@ const isReferenceGeneratorStage = (
     : stage.deviceId === sourceId;
 };
 
-export const resolveGeneratorGroupId = (
+const resolveGeneratorGroupId = (
   chain: GeneratorChain,
   generatorId: string,
 ): string | null | undefined => {

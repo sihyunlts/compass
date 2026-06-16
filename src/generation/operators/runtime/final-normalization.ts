@@ -32,7 +32,7 @@ import {
   type TimelineRemapPlan,
 } from './timeline-remap-plan';
 
-export type FinalOriginNormalizationDecision =
+type FinalOriginNormalizationDecision =
   | {
     kind: 'preserve';
     reason: FinalOriginPreserveReason;
@@ -48,7 +48,7 @@ export type FinalOriginNormalizationDecision =
     temporal: SceneTemporalState;
   };
 
-export type FinalOriginPreserveReason =
+type FinalOriginPreserveReason =
   | 'preserved-origin'
   | 'uncleanable-playback-window';
 
@@ -180,14 +180,14 @@ const buildFinalTemporalOverrides = (
   ),
 );
 
-export interface FinalTimelineNormalizationPlan extends TimelineRemapPlan {
+interface FinalTimelineNormalizationPlan extends TimelineRemapPlan {
   originDecisions: ReadonlyMap<string, FinalOriginNormalizationDecision>;
   temporalOverrides: ReadonlyMap<string, SceneTemporalState>;
   pendingTemporalWriteOrderByOriginId: Map<string, number>;
   finalCleanupModeUpdate: FinalCleanupModeUpdate;
 }
 
-export const buildFinalTimelineNormalizationPlan = (
+const buildFinalTimelineNormalizationPlan = (
   state: MutableGenerationState,
 ): FinalTimelineNormalizationPlan => {
   const originDecisions = buildFinalOriginNormalizationDecisions(

@@ -40,7 +40,7 @@ import {
   type TimelineRemapPolicy,
 } from './timeline-remap-plan';
 
-export interface PendingAwareTemporalOriginInput {
+interface PendingAwareTemporalOriginInput {
   originId: string;
   timelineState: OriginTimelineState;
   currentTemporal: SceneTemporalState;
@@ -114,7 +114,7 @@ export const buildTemporalStateUpdatesForTargetOrigins = (
   return temporalUpdates;
 };
 
-export const applyTemporalStateUpdates = (
+const applyTemporalStateUpdates = (
   state: MutableGenerationState,
   temporalUpdates: ReadonlyMap<string, SceneTemporalState>,
   writeOrder: number,
@@ -149,7 +149,7 @@ export const applyTemporalStateUpdates = (
   });
 };
 
-export const applyTemporalStateUpdatesForStage = (
+const applyTemporalStateUpdatesForStage = (
   state: MutableGenerationState,
   temporalUpdates: ReadonlyMap<string, SceneTemporalState>,
   stage: { stageIndex: number },

@@ -40,7 +40,7 @@ export interface PendingGeometryApplicationOperatorInput {
   precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
 }
 
-export const materializePendingRackOperatorInput: RackOperatorInputPreparation = (
+const materializePendingRackOperatorInput: RackOperatorInputPreparation = (
   state: MutableGenerationState,
   context: RackStageExecutionContext,
 ): MutableGenerationState => {
@@ -77,7 +77,7 @@ const buildPendingFrameApplicationInputPlan = (
   };
 };
 
-export const preparePendingFrameApplicationInput = (
+const preparePendingFrameApplicationInput = (
   state: MutableGenerationState,
   context: RackStageExecutionContext,
 ): PendingFrameApplicationOperatorInput => buildPendingFrameApplicationInputPlan(
@@ -85,7 +85,7 @@ export const preparePendingFrameApplicationInput = (
   context,
 );
 
-export const preparePendingGeometryApplicationInput = (
+const preparePendingGeometryApplicationInput = (
   state: MutableGenerationState,
 ): PendingGeometryApplicationOperatorInput => {
   const pendingTemporalExtraction = extractPendingTemporalCheckpoint(state);

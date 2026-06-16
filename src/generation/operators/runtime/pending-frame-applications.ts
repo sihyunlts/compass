@@ -73,7 +73,7 @@ const attachTemporalCheckpoint = (
   precedingTemporalCheckpoint: input.precedingTemporalCheckpoint,
 });
 
-export const appendPendingFrameApplication = (
+const appendPendingFrameApplication = (
   input: PendingFrameApplicationAppendInput,
   application: PendingFrameApplicationDraft,
   options: {
@@ -336,31 +336,32 @@ const materializePendingFrameApplication = (
   timeline: GeometryTimeline,
   application: PendingFrameApplication,
 ): PendingFrameApplicationMaterialization => {
-  if (application.kind === 'color') {
-    return materializePendingColorApplication(timeline, application);
+  switch (application.kind) {
+    case 'color':
+      return materializePendingColorApplication(timeline, application);
+    case 'geometry-rewrite': {
+      const sourceTimeline = application.precedingTemporalCheckpoint
+        ? materializeTemporalCheckpointTimeline(
+            timeline,
+            application.precedingTemporalCheckpoint,
+          )
+        : timeline;
+      return {
+        timeline: materializePendingGeometryRewriteApplication(sourceTimeline, application),
+      };
+    }
+    case 'stroke-rewrite': {
+      const sourceTimeline = application.precedingTemporalCheckpoint
+        ? materializeTemporalCheckpointTimeline(
+            timeline,
+            application.precedingTemporalCheckpoint,
+          )
+        : timeline;
+      return {
+        timeline: materializePendingStrokeRewriteApplication(sourceTimeline, application),
+      };
+    }
   }
-
-  const sourceTimeline = application.precedingTemporalCheckpoint
-    ? materializeTemporalCheckpointTimeline(
-        timeline,
-        application.precedingTemporalCheckpoint,
-      )
-    : timeline;
-
-  if (application.kind === 'geometry-rewrite') {
-    return {
-      timeline: materializePendingGeometryRewriteApplication(sourceTimeline, application),
-    };
-  }
-
-  if (application.kind === 'stroke-rewrite') {
-    return {
-      timeline: materializePendingStrokeRewriteApplication(sourceTimeline, application),
-    };
-  }
-
-  const exhaustiveApplication: never = application;
-  return exhaustiveApplication;
 };
 
 export const materializePendingFrameApplications = (

@@ -20,7 +20,7 @@ const buildOutputFrameIndexes = (
   (_, frameIndex) => resolveSourceFrameIndex(frameIndex * timeline.sampleStepBeats),
 );
 
-export const buildSourceWindowFrameIndexes = (
+const buildSourceWindowFrameIndexes = (
   timeline: GeometryTimeline,
   outputEndBeat: number,
   sourceWindow: TimelineWindow,
