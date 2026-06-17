@@ -45,34 +45,6 @@ interface ColorGeometrySample {
   strokes: ReadonlyArray<GeometryStroke>;
 }
 
-const buildColorGeometrySource = (
-  timeline: GeometryTimeline,
-  targetOriginIds: ReadonlySet<string>,
-  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null,
-): ColorGeometrySource => {
-  const samplesByOriginId = new Map<string, ReadonlyArray<ColorGeometrySample>>();
-  const sourceFrameCount = toFrameCount(timeline.timeDomainEndBeat, timeline.sampleStepBeats);
-
-  for (const originId of targetOriginIds) {
-    const samples = timeline.geometrySamplesByOriginId.get(originId);
-    if (!samples || samples.length === 0) {
-      continue;
-    }
-
-    const temporal = precedingTemporalCheckpoint?.temporalByOriginId.get(originId);
-    samplesByOriginId.set(
-      originId,
-      temporal
-        ? remapColorGeometrySamples(samples, temporal, timeline.sampleStepBeats, sourceFrameCount)
-        : [...samples].sort((left, right) => left.beat - right.beat),
-    );
-  }
-
-  return {
-    samplesByOriginId,
-  };
-};
-
 const resolveSampleIndex = (
   beat: number,
   sampleStepBeats: number,
@@ -125,24 +97,37 @@ const resolveTemporalSourceSampleIndex = (
   return resolveSampleIndex(sourceBeat, sampleStepBeats, sourceFrameCount);
 };
 
-const remapColorGeometrySamples = (
-  samples: ReadonlyArray<GeometrySample>,
-  temporal: SceneTemporalState,
-  sampleStepBeats: number,
-  sourceFrameCount: number,
-): ColorGeometrySample[] => {
-  const sampleByIndex = buildSampleByIndex(samples, sampleStepBeats, sourceFrameCount);
-  const outputFrameCount = toFrameCount(FIXED_TIMELINE_END_BEAT, sampleStepBeats);
-  const remappedSamples: ColorGeometrySample[] = [];
+interface ColorTemporalSampleRemapContext {
+  temporal: SceneTemporalState;
+  sampleStepBeats: number;
+  sourceFrameCount: number;
+}
+
+const remapColorSamples = <TSourceSample extends { beat: number }, TRemappedSample>(
+  samples: ReadonlyArray<TSourceSample>,
+  context: ColorTemporalSampleRemapContext,
+  mapSample: (
+    sample: TSourceSample,
+    outputBeat: number,
+    outputFrameIndex: number,
+  ) => TRemappedSample,
+): TRemappedSample[] => {
+  const sampleByIndex = buildSampleByIndex(
+    samples,
+    context.sampleStepBeats,
+    context.sourceFrameCount,
+  );
+  const outputFrameCount = toFrameCount(FIXED_TIMELINE_END_BEAT, context.sampleStepBeats);
+  const remappedSamples: TRemappedSample[] = [];
 
   for (let outputFrameIndex = 0; outputFrameIndex < outputFrameCount; outputFrameIndex += 1) {
-    const outputBeat = outputFrameIndex * sampleStepBeats;
+    const outputBeat = outputFrameIndex * context.sampleStepBeats;
     const sourceSampleIndex = resolveTemporalSourceSampleIndex(
-      temporal,
+      context.temporal,
       outputFrameIndex,
       outputFrameCount,
-      sampleStepBeats,
-      sourceFrameCount,
+      context.sampleStepBeats,
+      context.sourceFrameCount,
     );
     if (sourceSampleIndex === null) {
       continue;
@@ -153,13 +138,56 @@ const remapColorGeometrySamples = (
       continue;
     }
 
-    remappedSamples.push({
-      beat: outputBeat,
-      strokes: sample.strokes,
-    });
+    remappedSamples.push(mapSample(sample, outputBeat, outputFrameIndex));
   }
 
   return remappedSamples;
+};
+
+const remapColorGeometrySamples = (
+  samples: ReadonlyArray<GeometrySample>,
+  temporal: SceneTemporalState,
+  sampleStepBeats: number,
+  sourceFrameCount: number,
+): ColorGeometrySample[] => remapColorSamples(
+  samples,
+  {
+    temporal,
+    sampleStepBeats,
+    sourceFrameCount,
+  },
+  (sample, outputBeat) => ({
+    beat: outputBeat,
+    strokes: sample.strokes,
+  }),
+);
+
+const buildColorGeometrySource = (
+  timeline: GeometryTimeline,
+  targetOriginIds: ReadonlySet<string>,
+  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null,
+): ColorGeometrySource => {
+  const samplesByOriginId = new Map<string, ReadonlyArray<ColorGeometrySample>>();
+  const sourceFrameCount = toFrameCount(timeline.timeDomainEndBeat, timeline.sampleStepBeats);
+
+  for (const originId of targetOriginIds) {
+    const samples = timeline.geometrySamplesByOriginId.get(originId);
+    if (!samples || samples.length === 0) {
+      continue;
+    }
+
+    const temporal = precedingTemporalCheckpoint?.temporalByOriginId.get(originId);
+    samplesByOriginId.set(
+      originId,
+      temporal
+        ? remapColorGeometrySamples(samples, temporal, timeline.sampleStepBeats, sourceFrameCount)
+        : [...samples].sort((left, right) => left.beat - right.beat),
+    );
+  }
+
+  return {
+    samplesByOriginId,
+  };
 };
 
 const remapColorTimingSamples = (
@@ -167,40 +195,21 @@ const remapColorTimingSamples = (
   temporal: SceneTemporalState,
   sampleStepBeats: number,
   sourceFrameCount: number,
-): ColorTimingSample[] => {
-  const sampleByIndex = buildSampleByIndex(samples, sampleStepBeats, sourceFrameCount);
-  const outputFrameCount = toFrameCount(FIXED_TIMELINE_END_BEAT, sampleStepBeats);
-  const remappedSamples: ColorTimingSample[] = [];
-
-  for (let outputFrameIndex = 0; outputFrameIndex < outputFrameCount; outputFrameIndex += 1) {
-    const outputBeat = outputFrameIndex * sampleStepBeats;
-    const sourceSampleIndex = resolveTemporalSourceSampleIndex(
-      temporal,
-      outputFrameIndex,
-      outputFrameCount,
-      sampleStepBeats,
-      sourceFrameCount,
-    );
-    if (sourceSampleIndex === null) {
-      continue;
-    }
-
-    const sample = sampleByIndex.get(sourceSampleIndex);
-    if (!sample) {
-      continue;
-    }
-
-    remappedSamples.push({
-      beat: outputBeat,
-      strokes: sample.strokes.map((stroke) => ({
-        ...stroke,
-        id: `${stroke.id}@${outputFrameIndex}`,
-      })),
-    });
-  }
-
-  return remappedSamples;
-};
+): ColorTimingSample[] => remapColorSamples(
+  samples,
+  {
+    temporal,
+    sampleStepBeats,
+    sourceFrameCount,
+  },
+  (sample, outputBeat, outputFrameIndex) => ({
+    beat: outputBeat,
+    strokes: sample.strokes.map((stroke) => ({
+      ...stroke,
+      id: `${stroke.id}@${outputFrameIndex}`,
+    })),
+  }),
+);
 
 const buildColorTimingSamplesForOrigins = (
   timeline: GeometryTimeline,
@@ -326,6 +335,31 @@ const resolveColorProgramDestinationFrameIndexes = (
   );
 };
 
+const resolveColorProgramVisibleDestinationFrameIndexes = (
+  slot: ColorProgramSlot,
+  sourceBeat: number,
+  destinationFrameWindow: FrameWindow,
+  colorFrameWindow: FrameWindow,
+  timelineFrameCount: number,
+  sampleStepBeats: number,
+): number[] => resolveColorProgramDestinationFrameIndexes(
+  slot,
+  sourceBeat,
+  destinationFrameWindow,
+  timelineFrameCount,
+  sampleStepBeats,
+).filter((resolvedDestinationFrameIndex) => (
+  isFrameWithinWindow(resolvedDestinationFrameIndex, colorFrameWindow)
+  && (
+    slot.shouldWrap
+    || slot.destinationMode === 'source-frame'
+    || (
+      resolvedDestinationFrameIndex >= destinationFrameWindow.startFrame
+      && resolvedDestinationFrameIndex < destinationFrameWindow.endFrameExclusive
+    )
+  )
+));
+
 interface PendingColorProgramMaterializationPlan {
   slotsByOriginId: Map<string, ColorProgramSlot[]>;
   colorTimelineEndBeat: number;
@@ -441,29 +475,18 @@ export const sampleColorProgramSlotsIntoStage = (
           break;
         }
 
-        const destinationFrameIndexes = resolveColorProgramDestinationFrameIndexes(
-          slot,
-          sourceSample.beat,
-          destinationFrameWindow,
-          outputFrameCount,
-          sampleStepBeats,
-        );
-
         if (sourceSample.strokes.length === 0) {
           continue;
         }
 
-        const resolvedDestinationFrameIndexes = destinationFrameIndexes.filter((resolvedDestinationFrameIndex) => (
-          isFrameWithinWindow(resolvedDestinationFrameIndex, colorFrameWindow)
-          && (
-            slot.shouldWrap
-            || slot.destinationMode === 'source-frame'
-            || (
-              resolvedDestinationFrameIndex >= destinationFrameWindow.startFrame
-              && resolvedDestinationFrameIndex < destinationFrameWindow.endFrameExclusive
-            )
-          )
-        ));
+        const resolvedDestinationFrameIndexes = resolveColorProgramVisibleDestinationFrameIndexes(
+          slot,
+          sourceSample.beat,
+          destinationFrameWindow,
+          colorFrameWindow,
+          outputFrameCount,
+          sampleStepBeats,
+        );
         if (resolvedDestinationFrameIndexes.length === 0) {
           continue;
         }
