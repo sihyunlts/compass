@@ -76,20 +76,72 @@ const resolveTemporalCleanupMode = (
   kind: TemporalEffectKind,
 ): GenerationFinalCleanupMode | undefined => TEMPORAL_EFFECT_POLICIES[kind].cleanupMode;
 
-const resolveTrimSourceWindow = (
+const resolveTemporalEffectSourceWindow = (
+  kind: TemporalEffectKind,
   timelineState: OriginTimelineState,
   sourceWindow: TimelineWindow,
 ): TimelineWindow => (
-  TEMPORAL_EFFECT_POLICIES.trim.sourceWindow === 'current-output-when-pending'
+  TEMPORAL_EFFECT_POLICIES[kind].sourceWindow === 'current-output-when-pending'
     && hasPendingTemporalState(timelineState)
-    ? DEFAULT_TIMELINE_WINDOW
-    : sourceWindow
+      ? DEFAULT_TIMELINE_WINDOW
+      : sourceWindow
 );
 
-const hasApplicableFrame = (
+const resolveTemporalEffectPlacementWindow = (
+  kind: TemporalEffectKind,
+  currentPlacementWindow: TimelineWindow,
+  authoredWindow?: TimelineWindow,
+): TimelineWindow => {
+  switch (TEMPORAL_EFFECT_POLICIES[kind].placementWindow) {
+    case 'current-placement':
+      return currentPlacementWindow;
+    case 'authored-window':
+      return authoredWindow ?? currentPlacementWindow;
+    case 'full-loop':
+      return DEFAULT_TIMELINE_WINDOW;
+  }
+};
+
+const resolveTimelineWindowSpan = (
+  window: TimelineWindow,
+): number => window.end - window.start;
+
+const isUsableTimelineWindow = (
+  window: TimelineWindow,
+): boolean => {
+  const span = resolveTimelineWindowSpan(window);
+  return Number.isFinite(span) && span > 0;
+};
+
+const isBeatWithinTimelineWindow = (
+  beat: number,
+  window: TimelineWindow,
+): boolean => beat >= window.start && beat < window.end;
+
+const resolveActiveUnitWindow = (
+  start: number,
+  end: number,
+): TimelineWindow | null => {
+  const window = { start, end };
+  if (
+    !Number.isFinite(start)
+    || !Number.isFinite(end)
+    || start < 0
+    || end > 1
+    || end <= start
+    || isFixedTimelineWindow(window)
+  ) {
+    return null;
+  }
+
+  return window;
+};
+
+const hasApplicableFrameInWindow = (
   timeline: GeometryTimeline,
   frameWindow: FrameWindow,
-  isApplicableAtFrame: (frameIndex: number, outputBeat: number) => boolean,
+  window: TimelineWindow,
+  isApplicableAtBeat: (outputBeat: number) => boolean = () => true,
 ): boolean => {
   for (let frameIndex = 0; frameIndex < timeline.frames.length; frameIndex += 1) {
     if (!isFrameWithinWindow(frameIndex, frameWindow)) {
@@ -97,7 +149,10 @@ const hasApplicableFrame = (
     }
 
     const outputBeat = frameIndex * timeline.sampleStepBeats;
-    if (isApplicableAtFrame(frameIndex, outputBeat)) {
+    if (
+      isBeatWithinTimelineWindow(outputBeat, window)
+      && isApplicableAtBeat(outputBeat)
+    ) {
       return true;
     }
   }
@@ -157,38 +212,32 @@ const buildReverseTemporalUpdates = (
   targetGroupId,
   requiredFrameWindow,
   ({ currentTemporal, frameWindow, placementWindow, sourceWindow, timelineState }) => {
-    const sourceSpan = sourceWindow.end - sourceWindow.start;
-    const placementSpan = placementWindow.end - placementWindow.start;
+    const reverseSourceWindow = resolveTemporalEffectSourceWindow('reverse', timelineState, sourceWindow);
+    const reversePlacementWindow = resolveTemporalEffectPlacementWindow('reverse', placementWindow);
     if (
-      !Number.isFinite(sourceSpan)
-      || sourceSpan <= 0
-      || !Number.isFinite(placementSpan)
-      || placementSpan <= 0
+      !isUsableTimelineWindow(reverseSourceWindow)
+      || !isUsableTimelineWindow(reversePlacementWindow)
     ) {
       return null;
     }
 
-    if (!hasApplicableFrame(
-      state.timeline,
-      frameWindow,
-      (_frameIndex, outputBeat) => outputBeat >= placementWindow.start && outputBeat < placementWindow.end,
-    )) {
+    if (!hasApplicableFrameInWindow(state.timeline, frameWindow, reversePlacementWindow)) {
       return null;
     }
 
     const reversedSampledTemporal = reverseSampledTimelineTemporalState(
       currentTemporal,
-      placementWindow,
+      reversePlacementWindow,
     );
     if (reversedSampledTemporal) {
       return reversedSampledTemporal;
     }
 
-    const sampleCount = resolveTemporalCompositionSampleCount(state.timeline, placementWindow);
+    const sampleCount = resolveTemporalCompositionSampleCount(state.timeline, reversePlacementWindow);
     return composeTimelineWindowTemporalState(
       timelineState,
       currentTemporal,
-      buildReverseTransform(sourceWindow, placementWindow, sampleCount),
+      buildReverseTransform(reverseSourceWindow, reversePlacementWindow, sampleCount),
       sampleCount,
     );
   },
@@ -204,8 +253,9 @@ const buildTrimTemporalUpdates = (
   state,
   targetGroupId,
   requiredFrameWindow,
-  ({ currentTemporal, frameWindow, sourceWindow, timelineState }) => {
-    const trimSourceWindow = resolveTrimSourceWindow(timelineState, sourceWindow);
+  ({ currentTemporal, frameWindow, placementWindow, sourceWindow, timelineState }) => {
+    const trimSourceWindow = resolveTemporalEffectSourceWindow('trim', timelineState, sourceWindow);
+    const trimPlacementWindow = resolveTemporalEffectPlacementWindow('trim', placementWindow);
 
     return resolveLastModulatedTemporalState(
       state,
@@ -215,18 +265,16 @@ const buildTrimTemporalUpdates = (
       (deviceAtFrame) => {
         const start = deviceAtFrame.params.start;
         const end = deviceAtFrame.params.end;
-        if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 1 || end <= start) {
-          return null;
-        }
-        if (isFixedTimelineWindow({ start, end })) {
+        const trimWindow = resolveActiveUnitWindow(start, end);
+        if (!trimWindow) {
           return null;
         }
 
         return composeTimelineWindowTemporalState(
           timelineState,
           currentTemporal,
-          buildTrimTransform(trimSourceWindow, start, end),
-          resolveTemporalCompositionSampleCount(state.timeline, { start: 0, end: 1 }),
+          buildTrimTransform(trimSourceWindow, trimWindow.start, trimWindow.end),
+          resolveTemporalCompositionSampleCount(state.timeline, trimPlacementWindow),
         );
       },
     );
@@ -243,9 +291,9 @@ const buildStretchTemporalUpdates = (
   state,
   targetGroupId,
   requiredFrameWindow,
-  ({ currentTemporal, frameWindow, sourceWindow, timelineState }) => {
-    const sourceSpan = sourceWindow.end - sourceWindow.start;
-    if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
+  ({ currentTemporal, frameWindow, placementWindow, sourceWindow, timelineState }) => {
+    const stretchSourceWindow = resolveTemporalEffectSourceWindow('stretch', timelineState, sourceWindow);
+    if (!isUsableTimelineWindow(stretchSourceWindow)) {
       return null;
     }
 
@@ -258,21 +306,28 @@ const buildStretchTemporalUpdates = (
         const outputBeat = frameIndex * state.timeline.sampleStepBeats;
         const start = deviceAtFrame.params.start;
         const end = deviceAtFrame.params.end;
-        if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 1 || end <= start) {
+        const authoredWindow = resolveActiveUnitWindow(start, end);
+        if (!authoredWindow) {
           return null;
         }
-        if (isFixedTimelineWindow({ start, end })) {
-          return null;
-        }
-        if (outputBeat < start || outputBeat >= end) {
+        const stretchPlacementWindow = resolveTemporalEffectPlacementWindow(
+          'stretch',
+          placementWindow,
+          authoredWindow,
+        );
+        if (!isBeatWithinTimelineWindow(outputBeat, stretchPlacementWindow)) {
           return null;
         }
 
         return composeTimelineWindowTemporalState(
           timelineState,
           currentTemporal,
-          buildStretchTransform(sourceWindow, start, end),
-          resolveTemporalCompositionSampleCount(state.timeline, { start, end }),
+          buildStretchTransform(
+            stretchSourceWindow,
+            stretchPlacementWindow.start,
+            stretchPlacementWindow.end,
+          ),
+          resolveTemporalCompositionSampleCount(state.timeline, stretchPlacementWindow),
         );
       },
     );
@@ -295,24 +350,22 @@ const buildTimeWarpTemporalUpdates = (
     targetGroupId,
     requiredFrameWindow,
     ({ currentTemporal, frameWindow, placementWindow, sourceWindow, timelineState }) => {
-      const placementSpan = placementWindow.end - placementWindow.start;
-      const sourceSpan = sourceWindow.end - sourceWindow.start;
-      if (!Number.isFinite(placementSpan) || placementSpan <= 0) {
+      const timeWarpSourceWindow = resolveTemporalEffectSourceWindow('timewarp', timelineState, sourceWindow);
+      const timeWarpPlacementWindow = resolveTemporalEffectPlacementWindow('timewarp', placementWindow);
+      if (
+        !isUsableTimelineWindow(timeWarpSourceWindow)
+        || !isUsableTimelineWindow(timeWarpPlacementWindow)
+      ) {
         return null;
       }
-      if (!Number.isFinite(sourceSpan) || sourceSpan <= 0) {
-        return null;
-      }
+      const placementSpan = resolveTimelineWindowSpan(timeWarpPlacementWindow);
 
-      if (!hasApplicableFrame(
+      if (!hasApplicableFrameInWindow(
         state.timeline,
         frameWindow,
-        (_frameIndex, outputBeat) => {
-          if (outputBeat < placementWindow.start || outputBeat >= placementWindow.end) {
-            return false;
-          }
-
-          const normalized = (outputBeat - placementWindow.start) / placementSpan;
+        timeWarpPlacementWindow,
+        (outputBeat) => {
+          const normalized = (outputBeat - timeWarpPlacementWindow.start) / placementSpan;
           const remappedBeat = evaluateTemporalRemap(remap, normalized);
           return remappedBeat !== null && Number.isFinite(remappedBeat);
         },
@@ -323,8 +376,13 @@ const buildTimeWarpTemporalUpdates = (
       return composeTimelineWindowTemporalState(
         timelineState,
         currentTemporal,
-        buildTimeWarpTransform(sourceWindow, placementWindow, remap, state.timeline.sampleStepBeats),
-        resolveTemporalCompositionSampleCount(state.timeline, placementWindow),
+        buildTimeWarpTransform(
+          timeWarpSourceWindow,
+          timeWarpPlacementWindow,
+          remap,
+          state.timeline.sampleStepBeats,
+        ),
+        resolveTemporalCompositionSampleCount(state.timeline, timeWarpPlacementWindow),
       );
     },
   );

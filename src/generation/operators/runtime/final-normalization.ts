@@ -7,9 +7,7 @@ import {
   type OriginTimelineState,
 } from '../../timeline/state';
 import {
-  cloneTimelineWindow,
   clampSceneTemporalStateToFixedLoop,
-  type TimelineWindow,
 } from '../../timeline/temporal-window';
 import type {
   CanonicalOutputAdapter,
@@ -35,22 +33,13 @@ import {
 type FinalOriginNormalizationDecision =
   | {
     kind: 'preserve';
-    reason: FinalOriginPreserveReason;
-    sourceWindow: TimelineWindow | null;
-    remap: OriginFrameRemap | null;
     temporal: SceneTemporalState;
   }
   | {
     kind: 'cleanup';
-    reason: null;
-    sourceWindow: TimelineWindow;
     remap: OriginFrameRemap;
     temporal: SceneTemporalState;
   };
-
-type FinalOriginPreserveReason =
-  | 'preserved-origin'
-  | 'uncleanable-playback-window';
 
 interface FinalOriginNormalizationInput {
   originId: string;
@@ -71,29 +60,15 @@ const resolveFinalCleanupMode = (
     : timelineState.finalCleanupMode
 );
 
-const resolveFinalOriginPreserveReason = (
-  input: FinalOriginNormalizationInput,
-): FinalOriginPreserveReason | null => {
-  if (input.finalCleanupMode === 'preserve') {
-    return 'preserved-origin';
-  }
-
-  return null;
-};
-
 const resolveFinalOriginNormalizationDecision = (
   timeline: GeometryTimeline,
   input: FinalOriginNormalizationInput,
 ): FinalOriginNormalizationDecision => {
   const { timelineState } = input;
   const normalizedTemporal = clampSceneTemporalStateToFixedLoop(timelineState.temporal);
-  const preserveReason = resolveFinalOriginPreserveReason(input);
-  if (preserveReason !== null) {
+  if (input.finalCleanupMode === 'preserve') {
     return {
       kind: 'preserve',
-      reason: preserveReason,
-      sourceWindow: null,
-      remap: null,
       temporal: normalizedTemporal,
     };
   }
@@ -110,17 +85,12 @@ const resolveFinalOriginNormalizationDecision = (
   if (!remap) {
     return {
       kind: 'preserve',
-      reason: 'uncleanable-playback-window',
-      sourceWindow: null,
-      remap: null,
       temporal: normalizedTemporal,
     };
   }
 
   return {
     kind: 'cleanup',
-    reason: null,
-    sourceWindow: cloneTimelineWindow(sourceWindow),
     remap,
     temporal: remap.nextTemporal,
   };
@@ -182,7 +152,6 @@ const buildFinalTemporalOverrides = (
 );
 
 interface FinalTimelineNormalizationPlan extends TimelineRemapPlan {
-  originDecisions: ReadonlyMap<string, FinalOriginNormalizationDecision>;
   temporalOverrides: ReadonlyMap<string, SceneTemporalState>;
   pendingTemporalWriteOrderByOriginId: Map<string, number>;
   finalCleanupModeUpdate: FinalCleanupModeUpdate;
@@ -204,7 +173,6 @@ const buildFinalTimelineNormalizationPlan = (
 
   return {
     ...remapPlan,
-    originDecisions,
     temporalOverrides: buildFinalTemporalOverrides(originDecisions),
     pendingTemporalWriteOrderByOriginId: new Map<string, number>(),
     finalCleanupModeUpdate: {

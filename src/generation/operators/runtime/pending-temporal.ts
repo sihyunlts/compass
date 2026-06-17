@@ -220,22 +220,6 @@ const applyTemporalStateUpdates = (
   });
 };
 
-const applyTemporalStateUpdatesForStage = (
-  state: MutableGenerationState,
-  temporalUpdates: ReadonlyMap<string, SceneTemporalState>,
-  stage: { stageIndex: number },
-  finalCleanupMode?: GenerationFinalCleanupMode,
-): MutableGenerationState => (
-  temporalUpdates.size > 0
-    ? applyTemporalStateUpdates(
-        state,
-        temporalUpdates,
-        stage.stageIndex,
-        finalCleanupMode,
-      )
-    : state
-);
-
 export const createTemporalStateUpdateOperator = <TKind extends RackStageDeviceKind>(
   buildTemporalUpdates: (
     state: MutableGenerationState,
@@ -245,10 +229,10 @@ export const createTemporalStateUpdateOperator = <TKind extends RackStageDeviceK
   finalCleanupMode?: GenerationFinalCleanupMode,
 ): RackOperator => createRackOperator<TKind>(
   (state) => state,
-  (state, stage, context) => applyTemporalStateUpdatesForStage(
+  (state, stage, context) => applyTemporalStateUpdates(
     state,
     buildTemporalUpdates(state, stage, context),
-    stage,
+    stage.stageIndex,
     finalCleanupMode,
   ),
 );
