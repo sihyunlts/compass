@@ -360,6 +360,54 @@ const resolveColorProgramVisibleDestinationFrameIndexes = (
   )
 ));
 
+const cloneColorSlotStrokeWithVelocity = (
+  stroke: GeometryStroke,
+  slot: ColorProgramSlot,
+  application: PendingColorProgramApplication,
+): Omit<GeometryStroke, 'writeId'> => {
+  const colorSlotCount = application.colorConfig.velocities.length;
+  return cloneStrokeWithVelocityAndWriteOrder(
+    stroke,
+    slot.velocity,
+    slot.colorSlotGapFill
+      ? resolveColorSlotWriteOrder(application.writeOrder, slot.slotIndex, colorSlotCount)
+      : application.writeOrder,
+    slot.slotIndex,
+    colorSlotCount,
+    slot.colorSlotGapFill,
+  );
+};
+
+interface ColorSlotFrameWindows {
+  destinationFrameWindow: FrameWindow;
+  visibleFrameWindow: FrameWindow;
+}
+
+interface ColorSlotFrameCandidate {
+  slot: ColorProgramSlot;
+  destinationFrameIndex: number;
+  overlapBeats: number;
+  distanceToFrameCenter: number;
+}
+
+const COLOR_SLOT_OVERLAP_EPSILON = 1e-9;
+
+const resolveColorSlotFrameWindows = (
+  slot: ColorProgramSlot,
+  sampleStepBeats: number,
+  frameWindow: FrameWindow,
+  outputFrameCount: number,
+): ColorSlotFrameWindows => ({
+  destinationFrameWindow: resolveColorSlotDestinationFrameWindow(
+    slot,
+    sampleStepBeats,
+    outputFrameCount,
+  ),
+  visibleFrameWindow: slot.useExtendedFrameWindow
+    ? resolveFrameWindow('all', sampleStepBeats, outputFrameCount)
+    : frameWindow,
+});
+
 interface PendingColorProgramMaterializationPlan {
   slotsByOriginId: Map<string, ColorProgramSlot[]>;
   colorTimelineEndBeat: number;
@@ -442,6 +490,154 @@ const buildPendingColorProgramMaterializationPlan = (
   application,
 );
 
+const resolveFrameSlotOverlapBeats = (
+  slot: ColorProgramSlot,
+  frameIndex: number,
+  sampleStepBeats: number,
+): number => {
+  const frameStartBeat = frameIndex * sampleStepBeats;
+  const frameEndBeat = frameStartBeat + sampleStepBeats;
+  return Math.max(
+    Math.min(frameEndBeat, slot.endBeat) - Math.max(frameStartBeat, slot.startBeat),
+    0,
+  );
+};
+
+const resolveDistanceToFrameCenter = (
+  slot: ColorProgramSlot,
+  frameIndex: number,
+  sampleStepBeats: number,
+): number => {
+  const frameCenterBeat = (frameIndex + 0.5) * sampleStepBeats;
+  const slotCenterBeat = (slot.startBeat + slot.endBeat) / 2;
+  return Math.abs(frameCenterBeat - slotCenterBeat);
+};
+
+const shouldReplaceColorSlotFrameCandidate = (
+  candidate: ColorSlotFrameCandidate,
+  current: ColorSlotFrameCandidate,
+): boolean => {
+  const overlapDelta = candidate.overlapBeats - current.overlapBeats;
+  if (Math.abs(overlapDelta) > COLOR_SLOT_OVERLAP_EPSILON) {
+    return overlapDelta > 0;
+  }
+
+  const distanceDelta = candidate.distanceToFrameCenter - current.distanceToFrameCenter;
+  if (Math.abs(distanceDelta) > COLOR_SLOT_OVERLAP_EPSILON) {
+    return distanceDelta < 0;
+  }
+
+  return candidate.slot.startBeat < current.slot.startBeat;
+};
+
+const addColorSlotFrameCandidate = (
+  candidatesByFrameIndex: Map<number, ColorSlotFrameCandidate>,
+  slot: ColorProgramSlot,
+  destinationFrameIndex: number,
+  sampleStepBeats: number,
+): void => {
+  const candidate: ColorSlotFrameCandidate = {
+    slot,
+    destinationFrameIndex,
+    overlapBeats: resolveFrameSlotOverlapBeats(
+      slot,
+      destinationFrameIndex,
+      sampleStepBeats,
+    ),
+    distanceToFrameCenter: resolveDistanceToFrameCenter(
+      slot,
+      destinationFrameIndex,
+      sampleStepBeats,
+    ),
+  };
+  const current = candidatesByFrameIndex.get(destinationFrameIndex);
+  if (!current || shouldReplaceColorSlotFrameCandidate(candidate, current)) {
+    candidatesByFrameIndex.set(destinationFrameIndex, candidate);
+  }
+};
+
+const writeColorSlotSampleToStage = (
+  timelineStage: ColorMaterializationStage,
+  application: PendingColorProgramApplication,
+  candidate: ColorSlotFrameCandidate,
+  sourceSample: ColorGeometrySample,
+): void => {
+  if (sourceSample.strokes.length === 0) {
+    return;
+  }
+
+  for (const stroke of sourceSample.strokes) {
+    const colorStroke = cloneColorSlotStrokeWithVelocity(
+      stroke,
+      candidate.slot,
+      application,
+    );
+
+    addStrokeToFrames(
+      timelineStage,
+      [candidate.destinationFrameIndex],
+      colorStroke,
+    );
+  }
+};
+
+const sampleColorProgramSourceSampleIntoStage = (
+  timelineStage: ColorMaterializationStage,
+  sampleStepBeats: number,
+  application: PendingColorProgramApplication,
+  slots: ReadonlyArray<ColorProgramSlot>,
+  sourceSample: ColorGeometrySample,
+  frameWindow: FrameWindow,
+  outputFrameCount: number,
+): void => {
+  if (sourceSample.strokes.length === 0) {
+    return;
+  }
+
+  const candidatesByFrameIndex = new Map<number, ColorSlotFrameCandidate>();
+  for (const slot of slots) {
+    if (sourceSample.beat < slot.sourceStartBeat) {
+      break;
+    }
+    if (sourceSample.beat >= slot.sourceEndBeat) {
+      continue;
+    }
+
+    const frameWindows = resolveColorSlotFrameWindows(
+      slot,
+      sampleStepBeats,
+      frameWindow,
+      outputFrameCount,
+    );
+    const resolvedDestinationFrameIndexes = resolveColorProgramVisibleDestinationFrameIndexes(
+      slot,
+      sourceSample.beat,
+      frameWindows.destinationFrameWindow,
+      frameWindows.visibleFrameWindow,
+      outputFrameCount,
+      sampleStepBeats,
+    );
+
+    for (const destinationFrameIndex of resolvedDestinationFrameIndexes) {
+      addColorSlotFrameCandidate(
+        candidatesByFrameIndex,
+        slot,
+        destinationFrameIndex,
+        sampleStepBeats,
+      );
+    }
+  }
+
+  for (const candidate of candidatesByFrameIndex.values()) {
+    writeColorSlotSampleToStage(
+      timelineStage,
+      application,
+      candidate,
+      sourceSample,
+    );
+  }
+};
+
 export const sampleColorProgramSlotsIntoStage = (
   timelineStage: ColorMaterializationStage,
   sampleStepBeats: number,
@@ -457,59 +653,16 @@ export const sampleColorProgramSlotsIntoStage = (
       continue;
     }
 
-    for (const slot of slots) {
-      const destinationFrameWindow = resolveColorSlotDestinationFrameWindow(
-        slot,
+    for (const sourceSample of sourceSamples) {
+      sampleColorProgramSourceSampleIntoStage(
+        timelineStage,
         sampleStepBeats,
+        application,
+        slots,
+        sourceSample,
+        frameWindow,
         outputFrameCount,
       );
-      const colorFrameWindow = slot.useExtendedFrameWindow
-        ? resolveFrameWindow('all', sampleStepBeats, outputFrameCount)
-        : frameWindow;
-
-      for (const sourceSample of sourceSamples) {
-        if (sourceSample.beat < slot.sourceStartBeat) {
-          continue;
-        }
-        if (sourceSample.beat >= slot.sourceEndBeat) {
-          break;
-        }
-
-        if (sourceSample.strokes.length === 0) {
-          continue;
-        }
-
-        const resolvedDestinationFrameIndexes = resolveColorProgramVisibleDestinationFrameIndexes(
-          slot,
-          sourceSample.beat,
-          destinationFrameWindow,
-          colorFrameWindow,
-          outputFrameCount,
-          sampleStepBeats,
-        );
-        if (resolvedDestinationFrameIndexes.length === 0) {
-          continue;
-        }
-
-        for (const stroke of sourceSample.strokes) {
-          addStrokeToFrames(
-            timelineStage,
-            resolvedDestinationFrameIndexes,
-            cloneStrokeWithVelocityAndWriteOrder(
-              stroke,
-              slot.velocity,
-              resolveColorSlotWriteOrder(
-                application.writeOrder,
-                slot.slotIndex,
-                application.colorConfig.velocities.length,
-              ),
-              slot.slotIndex,
-              application.colorConfig.velocities.length,
-              slot.colorSlotGapFill,
-            ),
-          );
-        }
-      }
     }
   }
 };

@@ -11,12 +11,6 @@ export interface ColorDeviceConfig {
   gapPercent: number;
 }
 
-interface ColorProgramTiming {
-  slotStepDuration: number;
-  segmentLength: number;
-  gapDuration: number;
-}
-
 export interface TimedColorSource {
   startBeat: number;
   endBeat: number;
@@ -38,8 +32,8 @@ export interface ColorTimingSample {
   strokes: ReadonlyArray<ColorTimingSampleStroke>;
 }
 
-export interface PlannedColorSlot<T extends TimedColorSource = TimedColorSource> {
-  source: T;
+export interface PlannedColorSlot {
+  source: TimedColorSource;
   velocity: number;
   slotIndex: number;
   offset: number;
@@ -51,8 +45,7 @@ export interface PlannedColorSlot<T extends TimedColorSource = TimedColorSource>
 
 export type ColorSlotDestinationMode = 'source-frame' | 'slot-start';
 
-export interface ColorProgramSlot<T extends TimedColorSource = ColorTimingSegment>
-  extends PlannedColorSlot<T> {
+export interface ColorProgramSlot extends PlannedColorSlot {
   sourceEndBeat: number;
   destinationMode: ColorSlotDestinationMode;
   useExtendedFrameWindow: boolean;
@@ -60,15 +53,25 @@ export interface ColorProgramSlot<T extends TimedColorSource = ColorTimingSegmen
   colorSlotGapFill: boolean;
 }
 
-export interface PlannedColorProgram<T extends TimedColorSource = ColorTimingSegment> {
+export interface PlannedColorProgram {
   endBeat: number;
-  slotsByOriginId: Map<string, ColorProgramSlot<T>[]>;
+  slotsByOriginId: Map<string, ColorProgramSlot[]>;
   playbackWindowByOriginId: Map<string, { start: number; end: number }>;
+}
+
+interface ColorSourceProgression {
+  planningSources: ReadonlyArray<ColorTimingSegment>;
+  referenceDuration: number;
+  destinationMode: ColorSlotDestinationMode;
+  useSlotWindowAsSource: boolean;
+  useExtendedFrameWindow: boolean;
+  shouldWrap: boolean;
 }
 
 const DEFAULT_COLOR_VELOCITY = DEFAULT_COLOR_PARAMS.velocities[0];
 const DEFAULT_COLOR_NOTE_LENGTH_PERCENT = DEFAULT_COLOR_PARAMS.noteLengthPercent;
 const MIN_COLOR_SEGMENT = 1e-4;
+const COLOR_DURATION_EPSILON = 1e-9;
 
 const sortNumbersAscending = (left: number, right: number): number => left - right;
 
@@ -236,33 +239,6 @@ const resolveMedianDuration = (
     : (ordered[middleIndex - 1] + ordered[middleIndex]) / 2;
 };
 
-const resolveColorProgramTiming = (
-  colorConfig: ColorDeviceConfig,
-  referenceDuration: number,
-): ColorProgramTiming | null => {
-  if (
-    !Number.isFinite(referenceDuration)
-    || referenceDuration <= 0
-  ) {
-    return null;
-  }
-
-  const nominalSegmentLength = Math.max(
-    referenceDuration * (colorConfig.noteLengthPercent / 100),
-    MIN_COLOR_SEGMENT,
-  );
-  const nominalGapDuration = Math.max(
-    referenceDuration * (colorConfig.gapPercent / 100),
-    0,
-  );
-
-  return {
-    slotStepDuration: referenceDuration,
-    segmentLength: nominalSegmentLength,
-    gapDuration: nominalGapDuration,
-  };
-};
-
 const resolveNonSteppedMovingReferenceDuration = <T extends TimedColorSource>(
   sourceSegments: ReadonlyArray<T>,
   colorConfig: ColorDeviceConfig,
@@ -290,33 +266,114 @@ const resolveNonSteppedMovingReferenceDuration = <T extends TimedColorSource>(
     : null;
 };
 
-const planColorProgramSlots = <T extends TimedColorSource>(
-  sourceSegments: ReadonlyArray<T>,
+const resolveStaticSourceReferenceDuration = (
+  sourceSegments: ReadonlyArray<ColorTimingSegment>,
   colorConfig: ColorDeviceConfig,
-): PlannedColorSlot<T>[] => {
-  if (sourceSegments.length === 0) {
-    return [];
+): number | null => {
+  if (sourceSegments.length !== 1) {
+    return null;
   }
 
-  const referenceDuration = resolveNonSteppedMovingReferenceDuration(sourceSegments, colorConfig)
+  const sourceDuration = sourceSegments[0].endBeat - sourceSegments[0].startBeat;
+  if (!Number.isFinite(sourceDuration) || sourceDuration <= 0) {
+    return null;
+  }
+
+  const slotCount = colorConfig.velocities.length;
+  if (slotCount === 0) {
+    return null;
+  }
+
+  const gapRatio = Math.max(colorConfig.gapPercent / 100, 0);
+  const referenceDuration = sourceDuration / (slotCount + (gapRatio * Math.max(slotCount - 1, 0)));
+  return Number.isFinite(referenceDuration) && referenceDuration > 0
+    ? referenceDuration
+    : null;
+};
+
+const resolveColorReferenceDuration = (
+  sourceSegments: ReadonlyArray<ColorTimingSegment>,
+  colorConfig: ColorDeviceConfig,
+  useStaticSlotWindow: boolean,
+): number | null => {
+  if (sourceSegments.length === 0) {
+    return null;
+  }
+
+  if (useStaticSlotWindow) {
+    return resolveStaticSourceReferenceDuration(sourceSegments, colorConfig);
+  }
+
+  return resolveNonSteppedMovingReferenceDuration(sourceSegments, colorConfig)
     ?? resolveMedianDuration(
       sourceSegments
         .map((sourceSegment) => sourceSegment.endBeat - sourceSegment.startBeat)
         .map((duration, index) => sourceSegments[index].referenceDuration ?? duration)
         .filter((duration) => Number.isFinite(duration) && duration > 0),
     );
+};
+
+const usesSlotWindowAsSource = (
+  sourceSegments: ReadonlyArray<ColorTimingSegment>,
+  sampleStepBeats: number,
+): boolean => {
+  if (sourceSegments.length !== 1) {
+    return false;
+  }
+
+  const sourceSegment = sourceSegments[0];
+  return sourceSegment.referenceDuration === undefined
+    && sourceSegment.endBeat - sourceSegment.startBeat > sampleStepBeats;
+};
+
+const hasMultipleNonSteppedSegments = (
+  sourceSegments: ReadonlyArray<ColorTimingSegment>,
+): boolean => sourceSegments.length > 1
+  && sourceSegments.every((sourceSegment) => sourceSegment.referenceDuration === undefined);
+
+const hasAuthoredActivationDuration = (
+  sourceSegments: ReadonlyArray<ColorTimingSegment>,
+): boolean => sourceSegments.some(
+  (sourceSegment) => sourceSegment.referenceDuration !== undefined,
+);
+
+const buildColorSourceProgression = (
+  sourceSegments: ReadonlyArray<ColorTimingSegment>,
+  colorConfig: ColorDeviceConfig,
+  sampleStepBeats: number,
+): ColorSourceProgression | null => {
+  const usesStaticSlotWindow = usesSlotWindowAsSource(sourceSegments, sampleStepBeats);
+  const referenceDuration = resolveColorReferenceDuration(
+    sourceSegments,
+    colorConfig,
+    usesStaticSlotWindow,
+  );
   if (referenceDuration === null) {
-    return [];
+    return null;
   }
 
-  const timing = resolveColorProgramTiming(colorConfig, referenceDuration);
-  if (!timing) {
-    return [];
-  }
+  const hasAuthoredDuration = hasAuthoredActivationDuration(sourceSegments);
+  const hasMultipleSegments = hasMultipleNonSteppedSegments(sourceSegments);
+  const useExtendedFrameWindow = hasAuthoredDuration
+    || (hasMultipleSegments && colorConfig.gapPercent > 0);
 
-  const slots: PlannedColorSlot<T>[] = [];
-  for (const source of sourceSegments) {
-    const sourceStepDuration = source.referenceDuration ?? timing.slotStepDuration;
+  return {
+    planningSources: sourceSegments,
+    referenceDuration,
+    destinationMode: usesStaticSlotWindow ? 'source-frame' : 'slot-start',
+    useSlotWindowAsSource: usesStaticSlotWindow,
+    useExtendedFrameWindow,
+    shouldWrap: hasMultipleSegments && colorConfig.gapPercent <= 0,
+  };
+};
+
+const planColorProgramSlots = (
+  progression: ColorSourceProgression,
+  colorConfig: ColorDeviceConfig,
+): ColorProgramSlot[] => {
+  const slots: ColorProgramSlot[] = [];
+  for (const source of progression.planningSources) {
+    const sourceStepDuration = source.referenceDuration ?? progression.referenceDuration;
     const sourceSegmentLength = Math.max(
       sourceStepDuration * (colorConfig.noteLengthPercent / 100),
       MIN_COLOR_SEGMENT,
@@ -337,7 +394,13 @@ const planColorProgramSlots = <T extends TimedColorSource>(
         continue;
       }
 
-      const sourceDuration = source.endBeat - source.startBeat;
+      const sourceStartBeat = progression.useSlotWindowAsSource
+        ? startBeat
+        : source.startBeat;
+      const sourceEndBeat = progression.useSlotWindowAsSource
+        ? sourceStartBeat + sourceSegmentLength
+        : source.endBeat;
+      const sourceDuration = sourceEndBeat - sourceStartBeat;
       if (!Number.isFinite(sourceDuration) || sourceDuration <= 0) {
         continue;
       }
@@ -347,10 +410,17 @@ const planColorProgramSlots = <T extends TimedColorSource>(
         velocity: colorConfig.velocities[slotIndex],
         slotIndex,
         offset,
-        sourceStartBeat: source.startBeat,
+        sourceStartBeat,
+        sourceEndBeat,
         sourceDuration,
         startBeat,
         endBeat,
+        destinationMode: progression.destinationMode,
+        useExtendedFrameWindow: progression.useExtendedFrameWindow,
+        shouldWrap: progression.shouldWrap,
+        colorSlotGapFill: source.referenceDuration !== undefined
+          && colorConfig.gapPercent <= 0
+          && sourceSegmentLength + COLOR_DURATION_EPSILON >= sourceStepDuration,
       });
     }
   }
@@ -358,56 +428,16 @@ const planColorProgramSlots = <T extends TimedColorSource>(
   return slots;
 };
 
-const isStaticColorSource = (
-  sourceSegments: ReadonlyArray<ColorTimingSegment>,
-  sampleStepBeats: number,
-): boolean => {
-  if (sourceSegments.length !== 1) {
-    return false;
-  }
-
-  const sourceSegment = sourceSegments[0];
-  return sourceSegment.referenceDuration === undefined
-    && sourceSegment.endBeat - sourceSegment.startBeat > sampleStepBeats;
-};
-
-const isNonSteppedMovingColorSource = (
-  sourceSegments: ReadonlyArray<ColorTimingSegment>,
-): boolean => sourceSegments.length > 1
-  && sourceSegments.every((sourceSegment) => sourceSegment.referenceDuration === undefined);
-
-const hasActivationColorSlots = (
-  sourceSegments: ReadonlyArray<ColorTimingSegment>,
-): boolean => sourceSegments.some(
-  (sourceSegment) => sourceSegment.referenceDuration !== undefined,
-);
-
-const hasExtendedColorSlots = (
-  sourceSegments: ReadonlyArray<ColorTimingSegment>,
-  colorConfig: { gapPercent: number },
-): boolean => hasActivationColorSlots(sourceSegments)
-  || (colorConfig.gapPercent > 0 && isNonSteppedMovingColorSource(sourceSegments));
-
-const resolveColorSlotSourceEndBeat = <T extends TimedColorSource>(
-  slot: PlannedColorSlot<T>,
-): number => {
-  if (!Number.isFinite(slot.sourceDuration) || slot.sourceDuration <= 0) {
-    return slot.sourceStartBeat;
-  }
-
-  return slot.sourceStartBeat + slot.sourceDuration;
-};
-
-const resolveColorPlaybackEndBeat = <T extends TimedColorSource>(
-  slots: ReadonlyArray<PlannedColorSlot<T>>,
+const resolveColorPlaybackEndBeat = (
+  slots: ReadonlyArray<PlannedColorSlot>,
   fallbackEndBeat: number,
 ): number => slots.reduce(
   (maxEndBeat, slot) => Math.max(maxEndBeat, slot.endBeat),
   fallbackEndBeat,
 );
 
-const resolveColorPlaybackWindow = <T extends TimedColorSource>(
-  slots: ReadonlyArray<PlannedColorSlot<T>>,
+const resolveColorPlaybackWindow = (
+  slots: ReadonlyArray<PlannedColorSlot>,
 ): { start: number; end: number } | null => {
   if (slots.length === 0) {
     return null;
@@ -425,75 +455,6 @@ const resolveColorPlaybackWindow = <T extends TimedColorSource>(
     : null;
 };
 
-const planStaticColorProgramSlots = (
-  sourceSegment: ColorTimingSegment,
-  colorConfig: ColorDeviceConfig,
-): ColorProgramSlot[] => {
-  const slotCount = colorConfig.velocities.length;
-  const sourceDuration = sourceSegment.endBeat - sourceSegment.startBeat;
-  if (slotCount === 0 || !Number.isFinite(sourceDuration) || sourceDuration <= 0) {
-    return [];
-  }
-
-  const gapRatio = Math.max(colorConfig.gapPercent / 100, 0);
-  const baseStepDuration = sourceDuration / (slotCount + (gapRatio * Math.max(slotCount - 1, 0)));
-  if (!Number.isFinite(baseStepDuration) || baseStepDuration <= 0) {
-    return [];
-  }
-
-  const gapDuration = baseStepDuration * gapRatio;
-  const activeDuration = Math.min(
-    Math.max(baseStepDuration * (colorConfig.noteLengthPercent / 100), 0),
-    baseStepDuration,
-  );
-
-  const slots: ColorProgramSlot[] = [];
-  for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
-    const startBeat = sourceSegment.startBeat + slotIndex * (baseStepDuration + gapDuration);
-    const endBeat = startBeat + activeDuration;
-    if (!Number.isFinite(startBeat) || !Number.isFinite(endBeat) || endBeat <= startBeat) {
-      continue;
-    }
-
-    slots.push({
-      source: sourceSegment,
-      velocity: colorConfig.velocities[slotIndex],
-      slotIndex,
-      offset: startBeat - sourceSegment.startBeat,
-      sourceStartBeat: startBeat,
-      sourceEndBeat: endBeat,
-      sourceDuration: endBeat - startBeat,
-      startBeat,
-      endBeat,
-      destinationMode: 'source-frame',
-      useExtendedFrameWindow: false,
-      shouldWrap: false,
-      colorSlotGapFill: false,
-    });
-  }
-
-  return slots;
-};
-
-const planTemporalColorProgramSlots = (
-  sourceSegments: ReadonlyArray<ColorTimingSegment>,
-  colorConfig: ColorDeviceConfig,
-): ColorProgramSlot[] => {
-  const slots = planColorProgramSlots(sourceSegments, colorConfig);
-  const isMovingColorSource = isNonSteppedMovingColorSource(sourceSegments);
-  const useExtendedFrameWindow = hasExtendedColorSlots(sourceSegments, colorConfig);
-  const shouldWrap = colorConfig.gapPercent <= 0 && isMovingColorSource;
-
-  return slots.map((slot) => ({
-    ...slot,
-    sourceEndBeat: resolveColorSlotSourceEndBeat(slot),
-    destinationMode: 'slot-start',
-    useExtendedFrameWindow,
-    shouldWrap,
-    colorSlotGapFill: slot.source.referenceDuration !== undefined && colorConfig.gapPercent <= 0,
-  }));
-};
-
 export const planColorProgram = (
   sourceSegmentsByOriginId: ReadonlyMap<string, ReadonlyArray<ColorTimingSegment>>,
   colorConfig: ColorDeviceConfig,
@@ -505,14 +466,18 @@ export const planColorProgram = (
   let endBeat = fallbackEndBeat;
 
   for (const [originId, sourceSegments] of sourceSegmentsByOriginId.entries()) {
-    const isStaticSource = isStaticColorSource(sourceSegments, sampleStepBeats);
-    const slots = isStaticSource
-      ? planStaticColorProgramSlots(sourceSegments[0], colorConfig)
-      : planTemporalColorProgramSlots(sourceSegments, colorConfig);
+    const progression = buildColorSourceProgression(
+      sourceSegments,
+      colorConfig,
+      sampleStepBeats,
+    );
+    const slots = progression
+      ? planColorProgramSlots(progression, colorConfig)
+      : [];
 
     slotsByOriginId.set(originId, slots);
 
-    if (!isStaticSource && hasExtendedColorSlots(sourceSegments, colorConfig)) {
+    if (progression && !progression.useSlotWindowAsSource && progression.useExtendedFrameWindow) {
       endBeat = resolveColorPlaybackEndBeat(slots, endBeat);
       const playbackWindow = resolveColorPlaybackWindow(slots);
       if (playbackWindow) {

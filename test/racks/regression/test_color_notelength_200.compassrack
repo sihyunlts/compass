@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-06-17T06:33:30.299Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-1",
+        "kind": "waterdrop",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-1",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            33,
+            34
+          ],
+          "noteLengthPercent": 200,
+          "gapPercent": 0
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}
