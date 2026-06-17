@@ -10,7 +10,7 @@ import type {
   TrimEffectNode,
 } from '../../shared/model';
 import type { BeatRange } from '../analysis/types';
-import type { MutableGenerationState } from '../timeline/state';
+import type { MutableGenerationState, OriginTimelineState } from '../timeline/state';
 import {
   buildReverseTransform,
   buildStretchTransform,
@@ -24,7 +24,7 @@ import {
   type TimelineWindow,
 } from '../timeline/temporal-window';
 import { toFrameWindow, type FrameWindow } from '../timeline';
-import type { GeometryTimeline } from '../types';
+import type { GenerationFinalCleanupMode, GeometryTimeline } from '../types';
 import {
   buildTemporalStateUpdatesForTargetOrigins,
   createTemporalStateUpdateOperator,
@@ -32,6 +32,59 @@ import {
   resolveModulatedDeviceAtFrame,
   type ModulationContext,
 } from './runtime';
+
+type TemporalEffectKind = 'reverse' | 'trim' | 'stretch' | 'timewarp';
+
+type TemporalSourceWindowPolicy =
+  | 'playback-window'
+  | 'current-output-when-pending';
+
+type TemporalPlacementWindowPolicy =
+  | 'current-placement'
+  | 'authored-window'
+  | 'full-loop';
+
+interface TemporalEffectPolicy {
+  sourceWindow: TemporalSourceWindowPolicy;
+  placementWindow: TemporalPlacementWindowPolicy;
+  cleanupMode?: GenerationFinalCleanupMode;
+}
+
+const TEMPORAL_EFFECT_POLICIES = {
+  reverse: {
+    sourceWindow: 'playback-window',
+    placementWindow: 'current-placement',
+    cleanupMode: 'align-end',
+  },
+  trim: {
+    sourceWindow: 'current-output-when-pending',
+    placementWindow: 'full-loop',
+    cleanupMode: 'cleanup',
+  },
+  stretch: {
+    sourceWindow: 'playback-window',
+    placementWindow: 'authored-window',
+    cleanupMode: 'preserve',
+  },
+  timewarp: {
+    sourceWindow: 'playback-window',
+    placementWindow: 'current-placement',
+  },
+} satisfies Record<TemporalEffectKind, TemporalEffectPolicy>;
+
+const resolveTemporalCleanupMode = (
+  kind: TemporalEffectKind,
+): GenerationFinalCleanupMode | undefined => TEMPORAL_EFFECT_POLICIES[kind].cleanupMode;
+
+const resolveTrimSourceWindow = (
+  timelineState: OriginTimelineState,
+  sourceWindow: TimelineWindow,
+): TimelineWindow => (
+  TEMPORAL_EFFECT_POLICIES.trim.sourceWindow === 'current-output-when-pending'
+    && hasPendingTemporalState(timelineState)
+    ? DEFAULT_TIMELINE_WINDOW
+    : sourceWindow
+);
 
 const hasApplicableFrame = (
   timeline: GeometryTimeline,
@@ -152,9 +205,7 @@ const buildTrimTemporalUpdates = (
   targetGroupId,
   requiredFrameWindow,
   ({ currentTemporal, frameWindow, sourceWindow, timelineState }) => {
-    const trimSourceWindow = hasPendingTemporalState(timelineState)
-      ? DEFAULT_TIMELINE_WINDOW
-      : sourceWindow;
+    const trimSourceWindow = resolveTrimSourceWindow(timelineState, sourceWindow);
 
     return resolveLastModulatedTemporalState(
       state,
@@ -287,7 +338,7 @@ export const reverseOperator = createTemporalStateUpdateOperator<'reverse'>(
       'all',
     );
   },
-  'align-end',
+  resolveTemporalCleanupMode('reverse'),
 );
 
 export const trimOperator = createTemporalStateUpdateOperator<'trim'>(
@@ -301,7 +352,7 @@ export const trimOperator = createTemporalStateUpdateOperator<'trim'>(
       'all',
     );
   },
-  'cleanup',
+  resolveTemporalCleanupMode('trim'),
 );
 
 export const stretchOperator = createTemporalStateUpdateOperator<'stretch'>(
@@ -315,7 +366,7 @@ export const stretchOperator = createTemporalStateUpdateOperator<'stretch'>(
       'all',
     );
   },
-  'preserve',
+  resolveTemporalCleanupMode('stretch'),
 );
 
 export const timeWarpOperator = createTemporalStateUpdateOperator<'timewarp'>(
@@ -328,4 +379,5 @@ export const timeWarpOperator = createTemporalStateUpdateOperator<'timewarp'>(
       'all',
     );
   },
+  resolveTemporalCleanupMode('timewarp'),
 );
