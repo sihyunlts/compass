@@ -55,13 +55,13 @@ interface PendingAwareTemporalOriginInput {
   sourceWindow: TimelineWindow;
 }
 
-const isIdentityTemporalRemap = (
+const hasIdentityTemporalRemap = (
   temporal: SceneTemporalState,
 ): boolean => temporal.remap.kind === 'affine'
   && Math.abs(temporal.remap.alpha - 1) <= TIMELINE_WINDOW_EPSILON
   && Math.abs(temporal.remap.beta) <= TIMELINE_WINDOW_EPSILON;
 
-const isCleanupEquivalentTemporalState = (
+const matchesObservedWindowCleanup = (
   temporal: SceneTemporalState,
   timelineState: OriginTimelineState,
 ): boolean => {
@@ -76,18 +76,37 @@ const isCleanupEquivalentTemporalState = (
     && Math.abs(temporal.remap.beta - sourceWindow.start) <= TIMELINE_WINDOW_EPSILON;
 };
 
-const normalizeAppliedTemporalState = (
+const shouldDeferTemporalToFinalCleanup = (
+  temporal: SceneTemporalState,
+  timelineState: OriginTimelineState,
+  finalCleanupMode: GenerationFinalCleanupMode,
+): boolean => isFixedTimelineWindow(temporal.visibilityWindow)
+  && finalCleanupMode === 'cleanup'
+  && matchesObservedWindowCleanup(temporal, timelineState);
+
+const shouldStoreMaterializedTemporalState = (
+  temporal: SceneTemporalState,
+  timelineState: OriginTimelineState,
+  finalCleanupMode: GenerationFinalCleanupMode,
+): boolean => isFixedTimelineWindow(temporal.visibilityWindow)
+  && (
+    hasIdentityTemporalRemap(temporal)
+    || shouldDeferTemporalToFinalCleanup(temporal, timelineState, finalCleanupMode)
+  );
+
+const resolveStoredTemporalState = (
   temporal: SceneTemporalState,
   timelineState: OriginTimelineState,
   finalCleanupMode: GenerationFinalCleanupMode,
 ): SceneTemporalState => (
-  (
-    isIdentityTemporalRemap(temporal)
-    || (finalCleanupMode === 'cleanup' && isCleanupEquivalentTemporalState(temporal, timelineState))
-  ) && isFixedTimelineWindow(temporal.visibilityWindow)
+  shouldStoreMaterializedTemporalState(temporal, timelineState, finalCleanupMode)
     ? createMaterializedTemporalState(temporal.visibilityWindow)
     : cloneSceneTemporalState(temporal)
 );
+
+const hasPendingTemporalWrite = (
+  temporal: SceneTemporalState,
+): boolean => temporal.hasAuthoredTimeline || !hasIdentityTemporalRemap(temporal);
 
 const resolvePendingAwareTemporalSourceWindow = (
   state: MutableGenerationState,
@@ -176,7 +195,7 @@ const applyTemporalStateUpdates = (
     }
 
     const nextFinalCleanupMode = finalCleanupMode ?? existing.finalCleanupMode;
-    const nextStoredTemporal = normalizeAppliedTemporalState(
+    const nextStoredTemporal = resolveStoredTemporalState(
       nextTemporal,
       existing,
       nextFinalCleanupMode,
@@ -188,7 +207,7 @@ const applyTemporalStateUpdates = (
       finalCleanupMode: nextFinalCleanupMode,
     });
 
-    if (nextStoredTemporal.hasAuthoredTimeline || !isIdentityTemporalRemap(nextStoredTemporal)) {
+    if (hasPendingTemporalWrite(nextStoredTemporal)) {
       pendingTemporalWriteOrderByOriginId.set(originId, writeOrder);
     } else {
       pendingTemporalWriteOrderByOriginId.delete(originId);
