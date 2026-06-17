@@ -13,8 +13,10 @@ import {
   cloneTimelineWindow,
   createMaterializedTemporalState,
   hasPendingTemporalState,
+  isFixedTimelineWindow,
   resolveTemporalPlacementWindow,
   resolveTemporalSourceWindow,
+  TIMELINE_WINDOW_EPSILON,
   type TimelineWindow,
 } from '../../timeline/temporal-window';
 import type { FrameWindow } from '../../timeline';
@@ -52,6 +54,40 @@ interface PendingAwareTemporalOriginInput {
   placementWindow: TimelineWindow;
   sourceWindow: TimelineWindow;
 }
+
+const isIdentityTemporalRemap = (
+  temporal: SceneTemporalState,
+): boolean => temporal.remap.kind === 'affine'
+  && Math.abs(temporal.remap.alpha - 1) <= TIMELINE_WINDOW_EPSILON
+  && Math.abs(temporal.remap.beta) <= TIMELINE_WINDOW_EPSILON;
+
+const isCleanupEquivalentTemporalState = (
+  temporal: SceneTemporalState,
+  timelineState: OriginTimelineState,
+): boolean => {
+  if (temporal.remap.kind !== 'affine' || !isFixedTimelineWindow(temporal.visibilityWindow)) {
+    return false;
+  }
+
+  const sourceWindow = timelineState.observedWindow;
+  const sourceSpan = sourceWindow.end - sourceWindow.start;
+  return sourceSpan > TIMELINE_WINDOW_EPSILON
+    && Math.abs(temporal.remap.alpha - sourceSpan) <= TIMELINE_WINDOW_EPSILON
+    && Math.abs(temporal.remap.beta - sourceWindow.start) <= TIMELINE_WINDOW_EPSILON;
+};
+
+const normalizeAppliedTemporalState = (
+  temporal: SceneTemporalState,
+  timelineState: OriginTimelineState,
+  finalCleanupMode: GenerationFinalCleanupMode,
+): SceneTemporalState => (
+  (
+    isIdentityTemporalRemap(temporal)
+    || (finalCleanupMode === 'cleanup' && isCleanupEquivalentTemporalState(temporal, timelineState))
+  ) && isFixedTimelineWindow(temporal.visibilityWindow)
+    ? createMaterializedTemporalState(temporal.visibilityWindow)
+    : cloneSceneTemporalState(temporal)
+);
 
 const resolvePendingAwareTemporalSourceWindow = (
   state: MutableGenerationState,
@@ -139,13 +175,24 @@ const applyTemporalStateUpdates = (
       continue;
     }
 
+    const nextFinalCleanupMode = finalCleanupMode ?? existing.finalCleanupMode;
+    const nextStoredTemporal = normalizeAppliedTemporalState(
+      nextTemporal,
+      existing,
+      nextFinalCleanupMode,
+    );
     timelineStateByOriginId.set(originId, {
       observedWindow: cloneTimelineWindow(existing.observedWindow),
       playbackWindow: cloneTimelineWindow(existing.playbackWindow),
-      temporal: cloneSceneTemporalState(nextTemporal),
-      finalCleanupMode: finalCleanupMode ?? existing.finalCleanupMode,
+      temporal: nextStoredTemporal,
+      finalCleanupMode: nextFinalCleanupMode,
     });
-    pendingTemporalWriteOrderByOriginId.set(originId, writeOrder);
+
+    if (nextStoredTemporal.hasAuthoredTimeline || !isIdentityTemporalRemap(nextStoredTemporal)) {
+      pendingTemporalWriteOrderByOriginId.set(originId, writeOrder);
+    } else {
+      pendingTemporalWriteOrderByOriginId.delete(originId);
+    }
   }
 
   return transitionGenerationState(state, {

@@ -17,6 +17,8 @@ import {
   buildTimeWarpTransform,
   buildTrimTransform,
   composeTimelineWindowTemporalState,
+  DEFAULT_TIMELINE_WINDOW,
+  hasPendingTemporalState,
   isFixedTimelineWindow,
   reverseSampledTimelineTemporalState,
   type TimelineWindow,
@@ -150,6 +152,10 @@ const buildTrimTemporalUpdates = (
   targetGroupId,
   requiredFrameWindow,
   ({ currentTemporal, frameWindow, sourceWindow, timelineState }) => {
+    const trimSourceWindow = hasPendingTemporalState(timelineState)
+      ? DEFAULT_TIMELINE_WINDOW
+      : sourceWindow;
+
     return resolveLastModulatedTemporalState(
       state,
       effect,
@@ -168,7 +174,7 @@ const buildTrimTemporalUpdates = (
         return composeTimelineWindowTemporalState(
           timelineState,
           currentTemporal,
-          buildTrimTransform(sourceWindow, start, end),
+          buildTrimTransform(trimSourceWindow, start, end),
           resolveTemporalCompositionSampleCount(state.timeline, { start: 0, end: 1 }),
         );
       },
@@ -202,6 +208,9 @@ const buildStretchTemporalUpdates = (
         const start = deviceAtFrame.params.start;
         const end = deviceAtFrame.params.end;
         if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 1 || end <= start) {
+          return null;
+        }
+        if (isFixedTimelineWindow({ start, end })) {
           return null;
         }
         if (outputBeat < start || outputBeat >= end) {
@@ -292,6 +301,7 @@ export const trimOperator = createTemporalStateUpdateOperator<'trim'>(
       'all',
     );
   },
+  'cleanup',
 );
 
 export const stretchOperator = createTemporalStateUpdateOperator<'stretch'>(
@@ -305,6 +315,7 @@ export const stretchOperator = createTemporalStateUpdateOperator<'stretch'>(
       'all',
     );
   },
+  'preserve',
 );
 
 export const timeWarpOperator = createTemporalStateUpdateOperator<'timewarp'>(

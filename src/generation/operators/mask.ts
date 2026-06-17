@@ -168,7 +168,7 @@ const applyMaskEffect = (
     input,
     targetOriginIds,
     writes,
-    { mode: 'preserve', originIds: baseState.timelineStateByOriginId.keys() },
+    { mode: 'cleanup', originIds: baseState.timelineStateByOriginId.keys() },
   );
 };
 
