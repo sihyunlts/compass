@@ -167,28 +167,42 @@ export const buildTrimTransform = (
 export const buildReverseTransform = (
   sourceWindow: TimelineWindow,
   placementWindow: TimelineWindow,
-  sampleStepBeats: number,
+  sampleCount: number,
 ): TemporalTransform => {
   const sourceSpan = sourceWindow.end - sourceWindow.start;
-  const placementSpan = placementWindow.end - placementWindow.start;
-  const sourceFrameSpan = sourceSpan - sampleStepBeats;
-  const placementFrameSpan = placementSpan - sampleStepBeats;
-  const sourceEndBeat = sourceWindow.end - sampleStepBeats;
-  const alpha = sourceFrameSpan > 0 && placementFrameSpan > 0
-    ? -sourceFrameSpan / placementFrameSpan
-    : -sourceSpan / placementSpan;
+  const safeSampleCount = Math.max(Math.trunc(sampleCount), 1);
+  const sampleSpan = Math.max(safeSampleCount - 1, 1);
 
   return {
-    remapToInput: createAffineTemporalRemap(
-      alpha,
-      (sourceFrameSpan > 0 && placementFrameSpan > 0 ? sourceEndBeat : sourceWindow.end)
-        - alpha * placementWindow.start,
-    ),
-    visibilityWindow: cloneTimelineWindow(placementWindow),
-    inputVisibilityWindow: {
-      start: sourceFrameSpan > 0 ? sourceWindow.start - sampleStepBeats : sourceWindow.start,
-      end: sourceWindow.end,
+    remapToInput: {
+      kind: 'sampled',
+      domainStart: placementWindow.start,
+      domainEnd: placementWindow.end,
+      samples: Array.from({ length: safeSampleCount }, (_, index) => (
+        sourceWindow.start + sourceSpan * ((sampleSpan - index) / sampleSpan)
+      )),
     },
+    visibilityWindow: cloneTimelineWindow(placementWindow),
+  };
+};
+
+export const reverseSampledTimelineTemporalState = (
+  currentTemporal: SceneTemporalState,
+  placementWindow: TimelineWindow,
+): SceneTemporalState | null => {
+  if (currentTemporal.remap.kind !== 'sampled') {
+    return null;
+  }
+
+  return {
+    remap: {
+      kind: 'sampled',
+      domainStart: placementWindow.start,
+      domainEnd: placementWindow.end,
+      samples: [...currentTemporal.remap.samples].reverse(),
+    },
+    visibilityWindow: cloneTimelineWindow(placementWindow),
+    hasAuthoredTimeline: currentTemporal.hasAuthoredTimeline,
   };
 };
 
@@ -204,15 +218,19 @@ export const buildSourceWindowTimeWarpTransform = (
   sourceWindow: TimelineWindow,
   placementWindow: TimelineWindow,
   remap: TemporalRemap,
+  sampleStepBeats: number,
 ): TemporalTransform => {
   const sourceSpan = sourceWindow.end - sourceWindow.start;
+  const sourceFrameSpan = sourceSpan > sampleStepBeats
+    ? sourceSpan - sampleStepBeats
+    : sourceSpan;
   if (remap.kind === 'affine') {
     const placementSpan = placementWindow.end - placementWindow.start;
     return {
       remapToInput: createAffineTemporalRemap(
-        (sourceSpan * remap.alpha) / placementSpan,
-        sourceWindow.start + sourceSpan * remap.beta
-          - ((sourceSpan * remap.alpha * placementWindow.start) / placementSpan),
+        (sourceFrameSpan * remap.alpha) / placementSpan,
+        sourceWindow.start + sourceFrameSpan * remap.beta
+          - ((sourceFrameSpan * remap.alpha * placementWindow.start) / placementSpan),
       ),
       visibilityWindow: cloneTimelineWindow(placementWindow),
     };
@@ -224,7 +242,7 @@ export const buildSourceWindowTimeWarpTransform = (
       domainStart: placementWindow.start,
       domainEnd: placementWindow.end,
       samples: remap.samples.map((sample) => (
-        sample === null ? null : sourceWindow.start + sourceSpan * sample
+        sample === null ? null : sourceWindow.start + sourceFrameSpan * sample
       )),
     },
     visibilityWindow: cloneTimelineWindow(placementWindow),
@@ -235,16 +253,18 @@ export const buildTimeWarpTransform = (
   sourceWindow: TimelineWindow,
   placementWindow: TimelineWindow,
   remap: TemporalRemap,
+  sampleStepBeats: number,
 ): TemporalTransform => (
   isFixedTimelineWindow(sourceWindow)
     ? buildPlacementPreservingTimeWarpTransform(placementWindow, remap)
-    : buildSourceWindowTimeWarpTransform(sourceWindow, placementWindow, remap)
+    : buildSourceWindowTimeWarpTransform(sourceWindow, placementWindow, remap, sampleStepBeats)
 );
 
 export const composeTimelineWindowTemporalState = (
   timelineState: OriginTimelineState,
   currentTemporal: SceneTemporalState,
   transform: TemporalTransform,
+  sampleCount?: number,
 ): SceneTemporalState => composeSceneTemporalState(
   currentTemporal,
   transform,
@@ -252,6 +272,7 @@ export const composeTimelineWindowTemporalState = (
     inputWindow: timelineState.temporal.hasAuthoredTimeline
       ? DEFAULT_TIMELINE_WINDOW
       : timelineState.playbackWindow,
+    sampleCount,
   },
 );
 

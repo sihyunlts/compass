@@ -32,6 +32,9 @@ import {
   resolveColorSlotDestinationFrameIndexes,
   resolveColorSlotWriteOrder,
 } from './timeline-strokes';
+import {
+  resolveWindowSampleBeatForFrame,
+} from './temporal-frame-sampling';
 
 type PendingColorProgramApplication = Omit<PendingColorApplication, 'precedingTemporalCheckpoint'>;
 
@@ -92,14 +95,28 @@ const buildSampleByIndex = <TSample extends { beat: number }>(
 
 const resolveTemporalSourceSampleIndex = (
   temporal: SceneTemporalState,
-  outputBeat: number,
+  outputFrameIndex: number,
+  outputFrameCount: number,
   sampleStepBeats: number,
   sourceFrameCount: number,
 ): number | null => {
-  if (outputBeat < temporal.visibilityWindow.start || outputBeat >= temporal.visibilityWindow.end) {
+  const frameWindow = toFrameWindow(
+    temporal.visibilityWindow,
+    sampleStepBeats,
+    outputFrameCount,
+  );
+  if (
+    outputFrameIndex < frameWindow.startFrame
+    || outputFrameIndex >= frameWindow.endFrameExclusive
+  ) {
     return null;
   }
 
+  const outputBeat = resolveWindowSampleBeatForFrame(
+    outputFrameIndex,
+    frameWindow,
+    temporal.visibilityWindow,
+  );
   const sourceBeat = evaluateTemporalRemap(temporal.remap, outputBeat);
   if (sourceBeat === null || !Number.isFinite(sourceBeat)) {
     return null;
@@ -122,7 +139,8 @@ const remapColorGeometrySamples = (
     const outputBeat = outputFrameIndex * sampleStepBeats;
     const sourceSampleIndex = resolveTemporalSourceSampleIndex(
       temporal,
-      outputBeat,
+      outputFrameIndex,
+      outputFrameCount,
       sampleStepBeats,
       sourceFrameCount,
     );
@@ -158,7 +176,8 @@ const remapColorTimingSamples = (
     const outputBeat = outputFrameIndex * sampleStepBeats;
     const sourceSampleIndex = resolveTemporalSourceSampleIndex(
       temporal,
-      outputBeat,
+      outputFrameIndex,
+      outputFrameCount,
       sampleStepBeats,
       sourceFrameCount,
     );

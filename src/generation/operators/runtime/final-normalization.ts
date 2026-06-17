@@ -68,7 +68,7 @@ const resolveFinalCleanupMode = (
 ): GenerationFinalCleanupMode => (
   timelineState.temporal.hasAuthoredTimeline || timelineState.finalCleanupMode === 'preserve'
     ? 'preserve'
-    : 'cleanup'
+    : timelineState.finalCleanupMode
 );
 
 const resolveFinalOriginPreserveReason = (
@@ -98,13 +98,14 @@ const resolveFinalOriginNormalizationDecision = (
     };
   }
 
-  const sourceWindow = timelineState.playbackWindow;
+  const sourceWindow = timelineState.observedWindow;
   const remap = buildSourceWindowOriginFrameRemap(
     timeline,
     FINAL_TIMELINE_REMAP_POLICY.outputEndBeat,
     sourceWindow,
     createIdentitySceneTemporalState(),
     0,
+    input.finalCleanupMode === 'align-end' ? 'end' : 'start',
   );
   if (!remap) {
     return {

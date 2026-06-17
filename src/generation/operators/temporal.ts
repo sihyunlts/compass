@@ -18,8 +18,10 @@ import {
   buildTrimTransform,
   composeTimelineWindowTemporalState,
   isFixedTimelineWindow,
+  reverseSampledTimelineTemporalState,
+  type TimelineWindow,
 } from '../timeline/temporal-window';
-import type { FrameWindow } from '../timeline';
+import { toFrameWindow, type FrameWindow } from '../timeline';
 import type { GeometryTimeline } from '../types';
 import {
   buildTemporalStateUpdatesForTargetOrigins,
@@ -46,6 +48,19 @@ const hasApplicableFrame = (
   }
 
   return false;
+};
+
+const resolveTemporalCompositionSampleCount = (
+  timeline: GeometryTimeline,
+  window: TimelineWindow,
+): number => {
+  const frameWindow = toFrameWindow(
+    window,
+    timeline.sampleStepBeats,
+    timeline.frames.length,
+  );
+
+  return frameWindow.endFrameExclusive - frameWindow.startFrame;
 };
 
 const resolveLastModulatedTemporalState = <TEffect extends GeneratorEffectNode>(
@@ -106,10 +121,20 @@ const buildReverseTemporalUpdates = (
       return null;
     }
 
+    const reversedSampledTemporal = reverseSampledTimelineTemporalState(
+      currentTemporal,
+      placementWindow,
+    );
+    if (reversedSampledTemporal) {
+      return reversedSampledTemporal;
+    }
+
+    const sampleCount = resolveTemporalCompositionSampleCount(state.timeline, placementWindow);
     return composeTimelineWindowTemporalState(
       timelineState,
       currentTemporal,
-      buildReverseTransform(sourceWindow, placementWindow, state.timeline.sampleStepBeats),
+      buildReverseTransform(sourceWindow, placementWindow, sampleCount),
+      sampleCount,
     );
   },
 );
@@ -144,6 +169,7 @@ const buildTrimTemporalUpdates = (
           timelineState,
           currentTemporal,
           buildTrimTransform(sourceWindow, start, end),
+          resolveTemporalCompositionSampleCount(state.timeline, { start: 0, end: 1 }),
         );
       },
     );
@@ -186,6 +212,7 @@ const buildStretchTemporalUpdates = (
           timelineState,
           currentTemporal,
           buildStretchTransform(sourceWindow, start, end),
+          resolveTemporalCompositionSampleCount(state.timeline, { start, end }),
         );
       },
     );
@@ -236,7 +263,8 @@ const buildTimeWarpTemporalUpdates = (
       return composeTimelineWindowTemporalState(
         timelineState,
         currentTemporal,
-        buildTimeWarpTransform(sourceWindow, placementWindow, remap),
+        buildTimeWarpTransform(sourceWindow, placementWindow, remap, state.timeline.sampleStepBeats),
+        resolveTemporalCompositionSampleCount(state.timeline, placementWindow),
       );
     },
   );
@@ -250,6 +278,7 @@ export const reverseOperator = createTemporalStateUpdateOperator<'reverse'>(
       'all',
     );
   },
+  'align-end',
 );
 
 export const trimOperator = createTemporalStateUpdateOperator<'trim'>(

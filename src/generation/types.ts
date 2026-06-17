@@ -53,7 +53,7 @@ export interface GenerationTimelineWindow {
   end: number;
 }
 
-export type GenerationFinalCleanupMode = 'cleanup' | 'preserve';
+export type GenerationFinalCleanupMode = 'cleanup' | 'preserve' | 'align-end';
 
 export interface GenerationOriginTimelineState {
   /** Observed note-output occupancy from the most recent baked timeline. */

@@ -18,7 +18,11 @@ import {
   type TimelineWindow,
 } from '../../timeline/temporal-window';
 import type { FrameWindow } from '../../timeline';
-import type { CanonicalOutputAdapter, GeometryTimeline } from '../../types';
+import type {
+  CanonicalOutputAdapter,
+  GenerationFinalCleanupMode,
+  GeometryTimeline,
+} from '../../types';
 import type { BeatRange } from '../../analysis/types';
 import { buildTimelineStateAfterTemporalMaterialization } from './timeline-state';
 import { buildTargetOriginIds } from './timeline-strokes';
@@ -118,6 +122,7 @@ const applyTemporalStateUpdates = (
   state: MutableGenerationState,
   temporalUpdates: ReadonlyMap<string, SceneTemporalState>,
   writeOrder: number,
+  finalCleanupMode?: GenerationFinalCleanupMode,
 ): MutableGenerationState => {
   if (temporalUpdates.size === 0) {
     return state;
@@ -138,7 +143,7 @@ const applyTemporalStateUpdates = (
       observedWindow: cloneTimelineWindow(existing.observedWindow),
       playbackWindow: cloneTimelineWindow(existing.playbackWindow),
       temporal: cloneSceneTemporalState(nextTemporal),
-      finalCleanupMode: existing.finalCleanupMode,
+      finalCleanupMode: finalCleanupMode ?? existing.finalCleanupMode,
     });
     pendingTemporalWriteOrderByOriginId.set(originId, writeOrder);
   }
@@ -153,12 +158,14 @@ const applyTemporalStateUpdatesForStage = (
   state: MutableGenerationState,
   temporalUpdates: ReadonlyMap<string, SceneTemporalState>,
   stage: { stageIndex: number },
+  finalCleanupMode?: GenerationFinalCleanupMode,
 ): MutableGenerationState => (
   temporalUpdates.size > 0
     ? applyTemporalStateUpdates(
         state,
         temporalUpdates,
         stage.stageIndex,
+        finalCleanupMode,
       )
     : state
 );
@@ -169,12 +176,14 @@ export const createTemporalStateUpdateOperator = <TKind extends RackStageDeviceK
     stage: RackStageOfKind<TKind>,
     context: RackStageExecutionContext,
   ) => ReadonlyMap<string, SceneTemporalState>,
+  finalCleanupMode?: GenerationFinalCleanupMode,
 ): RackOperator => createRackOperator<TKind>(
   (state) => state,
   (state, stage, context) => applyTemporalStateUpdatesForStage(
     state,
     buildTemporalUpdates(state, stage, context),
     stage,
+    finalCleanupMode,
   ),
 );
 

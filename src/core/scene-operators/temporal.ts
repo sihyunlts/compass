@@ -14,6 +14,7 @@ export interface TemporalTransform {
 
 export interface SceneTemporalCompositionOptions {
   inputWindow?: TemporalVisibilityWindow;
+  sampleCount?: number;
 }
 
 const DEFAULT_TEMPORAL_SAMPLE_COUNT = 129;
@@ -103,9 +104,11 @@ const isAffineTemporalRemap = (
 ): remap is TemporalAffineRemap => remap.kind === 'affine';
 
 const resolveTemporalSampleCount = (
+  preferredSampleCount: number | undefined,
   ...remaps: readonly TemporalRemap[]
 ): number => Math.max(
   DEFAULT_TEMPORAL_SAMPLE_COUNT,
+  Number.isFinite(preferredSampleCount) ? Math.max(Math.trunc(preferredSampleCount), 0) : 0,
   ...remaps.map((remap) => remap.kind === 'sampled' ? remap.samples.length : 0),
 );
 
@@ -238,6 +241,7 @@ const composeSceneTemporalStateBySampling = (
   options: SceneTemporalCompositionOptions,
 ): SceneTemporalState => {
   const sampleCount = resolveTemporalSampleCount(
+    options.sampleCount,
     sceneTemporal.remap,
     transform.remapToInput,
   );
