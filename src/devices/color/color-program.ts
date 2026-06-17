@@ -17,8 +17,11 @@ export interface TimedColorSource {
   referenceDuration?: number;
 }
 
+export type ColorTimingSegmentKind = 'stepped' | 'static' | 'sampled-moving';
+
 export interface ColorTimingSegment extends TimedColorSource {
   originId: string;
+  kind: ColorTimingSegmentKind;
 }
 
 export interface ColorTimingSampleStroke {
@@ -33,7 +36,7 @@ export interface ColorTimingSample {
 }
 
 export interface PlannedColorSlot {
-  source: TimedColorSource;
+  source: ColorTimingSegment;
   velocity: number;
   slotIndex: number;
   offset: number;
@@ -62,11 +65,20 @@ export interface PlannedColorProgram {
 interface ColorSourceProgression {
   planningSources: ReadonlyArray<ColorTimingSegment>;
   referenceDuration: number;
+  slotPlacement: ColorSlotPlacement;
   destinationMode: ColorSlotDestinationMode;
   useSlotWindowAsSource: boolean;
   useExtendedFrameWindow: boolean;
   shouldWrap: boolean;
 }
+
+type ColorSlotPlacement =
+  | { kind: 'natural' }
+  | {
+    kind: 'fit-source-span';
+    sourceStartBeat: number;
+    scale: number;
+  };
 
 const DEFAULT_COLOR_VELOCITY = DEFAULT_COLOR_PARAMS.velocities[0];
 const DEFAULT_COLOR_NOTE_LENGTH_PERCENT = DEFAULT_COLOR_PARAMS.noteLengthPercent;
@@ -149,6 +161,9 @@ export const buildColorTimingSegmentsByOriginId = (
       }
     }
     const hasVaryingNonSteppedSignatures = new Set(signatureBySampleBeat.values()).size > 1;
+    const nonSteppedSegmentKind: ColorTimingSegmentKind = hasVaryingNonSteppedSignatures
+      ? 'sampled-moving'
+      : 'static';
 
     const flushActiveSegment = (): void => {
       if (activeSegmentStartBeat === null || activeSegmentEndBeat === null) {
@@ -157,6 +172,7 @@ export const buildColorTimingSegmentsByOriginId = (
 
       segments.push({
         originId,
+        kind: nonSteppedSegmentKind,
         startBeat: activeSegmentStartBeat,
         endBeat: activeSegmentEndBeat,
       });
@@ -171,6 +187,7 @@ export const buildColorTimingSegmentsByOriginId = (
         activeSignature = null;
         segments.push({
           originId,
+          kind: 'stepped',
           startBeat: sample.beat,
           endBeat: sample.beat + sampleStepBeats,
           referenceDuration: activationStepBeats,
@@ -194,6 +211,7 @@ export const buildColorTimingSegmentsByOriginId = (
         activeSignature = null;
         segments.push({
           originId,
+          kind: 'sampled-moving',
           startBeat: sample.beat,
           endBeat: sample.beat + sampleStepBeats,
         });
@@ -291,20 +309,81 @@ const resolveStaticSourceReferenceDuration = (
     : null;
 };
 
+const resolveColorSourceKind = (
+  sourceSegments: ReadonlyArray<ColorTimingSegment>,
+): ColorTimingSegmentKind | null => {
+  const sourceKinds = new Set(sourceSegments.map((sourceSegment) => sourceSegment.kind));
+  if (sourceKinds.has('stepped')) {
+    return 'stepped';
+  }
+
+  if (sourceKinds.has('sampled-moving')) {
+    return 'sampled-moving';
+  }
+
+  return sourceKinds.has('static') ? 'static' : null;
+};
+
+const resolveSampledMovingSlotPlacement = (
+  sourceSegments: ReadonlyArray<ColorTimingSegment>,
+  colorConfig: ColorDeviceConfig,
+  referenceDuration: number,
+): ColorSlotPlacement => {
+  const firstSource = sourceSegments[0];
+  const lastSource = sourceSegments[sourceSegments.length - 1];
+  if (!firstSource || !lastSource) {
+    return { kind: 'natural' };
+  }
+
+  const sourceStartBeat = firstSource.startBeat;
+  const sourceEndBeat = lastSource.endBeat;
+  const sourceDuration = sourceEndBeat - sourceStartBeat;
+  if (!Number.isFinite(sourceDuration) || sourceDuration <= 0) {
+    return { kind: 'natural' };
+  }
+
+  const sourceSegmentLength = Math.max(
+    referenceDuration * (colorConfig.noteLengthPercent / 100),
+    MIN_COLOR_SEGMENT,
+  );
+  const sourceGapDuration = Math.max(
+    referenceDuration * (colorConfig.gapPercent / 100),
+    0,
+  );
+  const sourceSlotStride = referenceDuration + sourceGapDuration;
+  const lastSlotEndBeat = lastSource.startBeat
+    + (Math.max(colorConfig.velocities.length - 1, 0) * sourceSlotStride)
+    + sourceSegmentLength;
+  const destinationDuration = lastSlotEndBeat - sourceStartBeat;
+  if (!Number.isFinite(destinationDuration) || destinationDuration <= sourceDuration) {
+    return { kind: 'natural' };
+  }
+
+  return {
+    kind: 'fit-source-span',
+    sourceStartBeat,
+    scale: sourceDuration / destinationDuration,
+  };
+};
+
 const resolveColorReferenceDuration = (
   sourceSegments: ReadonlyArray<ColorTimingSegment>,
   colorConfig: ColorDeviceConfig,
-  useStaticSlotWindow: boolean,
+  sourceKind: ColorTimingSegmentKind,
 ): number | null => {
   if (sourceSegments.length === 0) {
     return null;
   }
 
-  if (useStaticSlotWindow) {
+  if (sourceKind === 'static') {
     return resolveStaticSourceReferenceDuration(sourceSegments, colorConfig);
   }
 
-  return resolveNonSteppedMovingReferenceDuration(sourceSegments, colorConfig)
+  const sampledMovingDuration = sourceKind === 'sampled-moving'
+    ? resolveNonSteppedMovingReferenceDuration(sourceSegments, colorConfig)
+    : null;
+
+  return sampledMovingDuration
     ?? resolveMedianDuration(
       sourceSegments
         .map((sourceSegment) => sourceSegment.endBeat - sourceSegment.startBeat)
@@ -313,58 +392,50 @@ const resolveColorReferenceDuration = (
     );
 };
 
-const usesSlotWindowAsSource = (
-  sourceSegments: ReadonlyArray<ColorTimingSegment>,
-  sampleStepBeats: number,
-): boolean => {
-  if (sourceSegments.length !== 1) {
-    return false;
-  }
-
-  const sourceSegment = sourceSegments[0];
-  return sourceSegment.referenceDuration === undefined
-    && sourceSegment.endBeat - sourceSegment.startBeat > sampleStepBeats;
-};
-
-const hasMultipleNonSteppedSegments = (
-  sourceSegments: ReadonlyArray<ColorTimingSegment>,
-): boolean => sourceSegments.length > 1
-  && sourceSegments.every((sourceSegment) => sourceSegment.referenceDuration === undefined);
-
-const hasAuthoredActivationDuration = (
-  sourceSegments: ReadonlyArray<ColorTimingSegment>,
-): boolean => sourceSegments.some(
-  (sourceSegment) => sourceSegment.referenceDuration !== undefined,
-);
-
 const buildColorSourceProgression = (
   sourceSegments: ReadonlyArray<ColorTimingSegment>,
   colorConfig: ColorDeviceConfig,
-  sampleStepBeats: number,
 ): ColorSourceProgression | null => {
-  const usesStaticSlotWindow = usesSlotWindowAsSource(sourceSegments, sampleStepBeats);
+  const sourceKind = resolveColorSourceKind(sourceSegments);
+  if (sourceKind === null) {
+    return null;
+  }
+
   const referenceDuration = resolveColorReferenceDuration(
     sourceSegments,
     colorConfig,
-    usesStaticSlotWindow,
+    sourceKind,
   );
   if (referenceDuration === null) {
     return null;
   }
 
-  const hasAuthoredDuration = hasAuthoredActivationDuration(sourceSegments);
-  const hasMultipleSegments = hasMultipleNonSteppedSegments(sourceSegments);
-  const useExtendedFrameWindow = hasAuthoredDuration
-    || (hasMultipleSegments && colorConfig.gapPercent > 0);
+  const useExtendedFrameWindow = sourceKind === 'stepped'
+    || (sourceKind === 'sampled-moving' && colorConfig.gapPercent > 0);
+  const slotPlacement = sourceKind === 'sampled-moving'
+    ? resolveSampledMovingSlotPlacement(sourceSegments, colorConfig, referenceDuration)
+    : { kind: 'natural' } satisfies ColorSlotPlacement;
 
   return {
     planningSources: sourceSegments,
     referenceDuration,
-    destinationMode: usesStaticSlotWindow ? 'source-frame' : 'slot-start',
-    useSlotWindowAsSource: usesStaticSlotWindow,
+    slotPlacement,
+    destinationMode: sourceKind === 'static' ? 'source-frame' : 'slot-start',
+    useSlotWindowAsSource: sourceKind === 'static',
     useExtendedFrameWindow,
-    shouldWrap: hasMultipleSegments && colorConfig.gapPercent <= 0,
+    shouldWrap: false,
   };
+};
+
+const placeColorSlotBeat = (
+  placement: ColorSlotPlacement,
+  beat: number,
+): number => {
+  if (placement.kind === 'natural') {
+    return beat;
+  }
+
+  return placement.sourceStartBeat + ((beat - placement.sourceStartBeat) * placement.scale);
 };
 
 const planColorProgramSlots = (
@@ -388,8 +459,10 @@ const planColorProgramSlots = (
 
     for (let slotIndex = 0; slotIndex < colorConfig.velocities.length; slotIndex += 1) {
       const offset = slotIndex * sourceSlotStride;
-      const startBeat = source.startBeat + offset;
-      const endBeat = startBeat + sourceSegmentLength;
+      const rawStartBeat = source.startBeat + offset;
+      const rawEndBeat = rawStartBeat + sourceSegmentLength;
+      const startBeat = placeColorSlotBeat(progression.slotPlacement, rawStartBeat);
+      const endBeat = placeColorSlotBeat(progression.slotPlacement, rawEndBeat);
       if (!Number.isFinite(startBeat) || !Number.isFinite(endBeat) || endBeat <= startBeat) {
         continue;
       }
@@ -418,9 +491,14 @@ const planColorProgramSlots = (
         destinationMode: progression.destinationMode,
         useExtendedFrameWindow: progression.useExtendedFrameWindow,
         shouldWrap: progression.shouldWrap,
-        colorSlotGapFill: source.referenceDuration !== undefined
-          && colorConfig.gapPercent <= 0
-          && sourceSegmentLength + COLOR_DURATION_EPSILON >= sourceStepDuration,
+        colorSlotGapFill: colorConfig.gapPercent <= 0
+          && (
+            source.kind === 'sampled-moving'
+            || (
+              source.referenceDuration !== undefined
+              && sourceSegmentLength + COLOR_DURATION_EPSILON >= sourceStepDuration
+            )
+          ),
       });
     }
   }
@@ -458,7 +536,6 @@ const resolveColorPlaybackWindow = (
 export const planColorProgram = (
   sourceSegmentsByOriginId: ReadonlyMap<string, ReadonlyArray<ColorTimingSegment>>,
   colorConfig: ColorDeviceConfig,
-  sampleStepBeats: number,
   fallbackEndBeat: number,
 ): PlannedColorProgram => {
   const slotsByOriginId = new Map<string, ColorProgramSlot[]>();
@@ -469,7 +546,6 @@ export const planColorProgram = (
     const progression = buildColorSourceProgression(
       sourceSegments,
       colorConfig,
-      sampleStepBeats,
     );
     const slots = progression
       ? planColorProgramSlots(progression, colorConfig)

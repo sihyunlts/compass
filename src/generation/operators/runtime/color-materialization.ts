@@ -426,7 +426,6 @@ const buildColorProgramMaterializationPlanFromTiming = (
   const colorProgram = planColorProgram(
     targetSegmentsByOriginId,
     application.colorConfig,
-    sampleStepBeats,
     source.timeDomainEndBeat,
   );
 
