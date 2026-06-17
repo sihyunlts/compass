@@ -198,8 +198,14 @@ export const buildPendingStrokeRewriteFrameWrites = (
   return writes;
 };
 
-type PendingFrameApplicationStage = ReturnType<typeof beginTimelineStage>;
-interface PendingFrameApplicationStageInput {
+type PendingFrameRewriteStage = ReturnType<typeof beginTimelineStage>;
+
+type PendingFrameRewriteApplication = Extract<
+  PendingFrameApplication,
+  { kind: 'geometry-rewrite' | 'stroke-rewrite' }
+>;
+
+interface PendingFrameRewritePlan {
   targetOriginIds: ReadonlySet<string>;
   sourceFrameCount: number;
   endBeat: number;
@@ -210,19 +216,19 @@ const isFrameIndexWithinTimeline = (
   frameIndex: number,
 ): boolean => frameIndex >= 0 && frameIndex < timeline.frames.length;
 
-const materializePendingFrameApplicationStage = (
+const materializeTargetOriginFrameRewrite = (
   timeline: GeometryTimeline,
-  application: PendingFrameApplicationStageInput,
-  applyWrites: (timeline: PendingFrameApplicationStage) => void,
+  plan: PendingFrameRewritePlan,
+  applyWrites: (timeline: PendingFrameRewriteStage) => void,
 ): GeometryTimeline => {
   const nextTimeline = beginTimelineStage(
     timeline,
-    Math.max(timeline.timeDomainEndBeat, application.endBeat),
+    Math.max(timeline.timeDomainEndBeat, plan.endBeat),
   );
   stripOriginFrames(
     nextTimeline,
-    Math.min(application.sourceFrameCount, nextTimeline.frames.length),
-    application.targetOriginIds,
+    Math.min(plan.sourceFrameCount, nextTimeline.frames.length),
+    plan.targetOriginIds,
   );
 
   applyWrites(nextTimeline);
@@ -233,7 +239,7 @@ const materializePendingFrameApplicationStage = (
 const materializePendingStrokeRewriteApplication = (
   timeline: GeometryTimeline,
   application: Extract<PendingFrameApplication, { kind: 'stroke-rewrite' }>,
-): GeometryTimeline => materializePendingFrameApplicationStage(timeline, application, (nextTimeline) => {
+): GeometryTimeline => materializeTargetOriginFrameRewrite(timeline, application, (nextTimeline) => {
   for (const write of application.writes) {
     if (!isFrameIndexWithinTimeline(nextTimeline, write.destinationFrameIndex)) {
       continue;
@@ -259,7 +265,7 @@ const materializePendingGeometryRewriteApplication = (
     timeline.frames.length,
   );
 
-  return materializePendingFrameApplicationStage(
+  return materializeTargetOriginFrameRewrite(
     timeline,
     {
       targetOriginIds: application.targetOriginIds,
@@ -292,7 +298,7 @@ const materializePendingGeometryRewriteApplication = (
   );
 };
 
-interface PendingFrameApplicationMaterialization {
+interface PendingFrameApplicationMaterializationResult {
   timeline: GeometryTimeline;
   playbackWindowByOriginId?: ReadonlyMap<string, TimelineWindow>;
 }
@@ -300,13 +306,13 @@ interface PendingFrameApplicationMaterialization {
 const materializePendingColorApplication = (
   timeline: GeometryTimeline,
   application: Extract<PendingFrameApplication, { kind: 'color' }>,
-): PendingFrameApplicationMaterialization => {
+): PendingFrameApplicationMaterializationResult => {
   const colorMaterialization = buildPendingColorMaterialization(
     timeline,
     application,
     application.precedingTemporalCheckpoint,
   );
-  const nextTimeline = materializePendingFrameApplicationStage(
+  const nextTimeline = materializeTargetOriginFrameRewrite(
     timeline,
     {
       targetOriginIds: application.targetOriginIds,
@@ -332,31 +338,33 @@ const materializePendingColorApplication = (
   };
 };
 
+const resolveFrameRewriteSourceTimeline = (
+  timeline: GeometryTimeline,
+  application: PendingFrameRewriteApplication,
+): GeometryTimeline => (
+  application.precedingTemporalCheckpoint
+    ? materializeTemporalCheckpointTimeline(
+        timeline,
+        application.precedingTemporalCheckpoint,
+      )
+    : timeline
+);
+
 const materializePendingFrameApplication = (
   timeline: GeometryTimeline,
   application: PendingFrameApplication,
-): PendingFrameApplicationMaterialization => {
+): PendingFrameApplicationMaterializationResult => {
   switch (application.kind) {
     case 'color':
       return materializePendingColorApplication(timeline, application);
     case 'geometry-rewrite': {
-      const sourceTimeline = application.precedingTemporalCheckpoint
-        ? materializeTemporalCheckpointTimeline(
-            timeline,
-            application.precedingTemporalCheckpoint,
-          )
-        : timeline;
+      const sourceTimeline = resolveFrameRewriteSourceTimeline(timeline, application);
       return {
         timeline: materializePendingGeometryRewriteApplication(sourceTimeline, application),
       };
     }
     case 'stroke-rewrite': {
-      const sourceTimeline = application.precedingTemporalCheckpoint
-        ? materializeTemporalCheckpointTimeline(
-            timeline,
-            application.precedingTemporalCheckpoint,
-          )
-        : timeline;
+      const sourceTimeline = resolveFrameRewriteSourceTimeline(timeline, application);
       return {
         timeline: materializePendingStrokeRewriteApplication(sourceTimeline, application),
       };
