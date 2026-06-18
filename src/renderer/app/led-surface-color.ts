@@ -1,8 +1,8 @@
 import { clamp } from '../../shared/math';
 
-const LED_SURFACE_GAMMA = 0.52;
-const LED_SURFACE_PAD_FLOOR = 30;
-const LED_SURFACE_PAD_GAIN = 1.07;
+const LED_SURFACE_GAMMA = 0.5;
+const LED_SURFACE_PAD_FLOOR = 45;
+const LED_SURFACE_PAD_GAIN = 1.075;
 
 const parseRgbChannels = (rgb: string): [number, number, number] | null => {
   const values = rgb
