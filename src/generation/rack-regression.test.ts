@@ -4,17 +4,19 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 
-import { buildGeneratedFieldResult } from '../domain/field-result';
-import { toGeneratorPreview } from '../domain/generator-preview';
 import type { GeneratorPreview } from '../shared/contracts/preview/generator-preview';
 import type { ClipNote } from '../shared/model';
-import { parsePresetFileText } from '../shared/presets';
+import {
+  loadRackPreviewFromFixture,
+  RACK_PREVIEW_LOOP_LENGTH_BEATS,
+  RACK_REGRESSION_FIXTURE_DIR,
+} from './rack-preview-debug';
 
 const REPO_ROOT = process.cwd();
-const RACK_FIXTURE_DIR = path.join(REPO_ROOT, 'test', 'racks', 'regression');
+const RACK_FIXTURE_DIR = RACK_REGRESSION_FIXTURE_DIR;
 const BASELINE_DIR = path.join(REPO_ROOT, 'test', 'racks', 'baselines');
 const UPDATE_BASELINES = process.env.UPDATE_RACK_BASELINES === '1';
-const LOOP_LENGTH_BEATS = 1;
+const LOOP_LENGTH_BEATS = RACK_PREVIEW_LOOP_LENGTH_BEATS;
 const FRAME_BUCKET_COUNT = 32;
 const FLOAT_PRECISION = 6;
 
@@ -142,23 +144,6 @@ const buildRackSignature = (
   };
 };
 
-const loadRackPreview = async (
-  rackFileName: string,
-): Promise<GeneratorPreview> => {
-  const rackPath = path.join(RACK_FIXTURE_DIR, rackFileName);
-  const parsed = parsePresetFileText(await readFile(rackPath, 'utf8'), {
-    fileName: rackPath,
-  });
-  assert.equal(parsed.ok, true, `${rackFileName}: preset must parse`);
-  assert.equal(parsed.preset.presetType, 'rack', `${rackFileName}: preset must be a rack`);
-
-  return toGeneratorPreview(buildGeneratedFieldResult({
-    chain: parsed.preset.chain,
-    loopLengthBeats: LOOP_LENGTH_BEATS,
-    launchpadModel: 'mk3',
-  }));
-};
-
 const readBaseline = async (
   baselinePath: string,
 ): Promise<RackSignature> => JSON.parse(await readFile(baselinePath, 'utf8')) as RackSignature;
@@ -187,7 +172,7 @@ test('rack regression fixtures match their compact generation baselines', async 
   }
 
   for (const rackFileName of rackFileNames) {
-    const preview = await loadRackPreview(rackFileName);
+    const preview = await loadRackPreviewFromFixture(rackFileName);
     const signature = buildRackSignature(preview, rackFileName);
     const baselinePath = path.join(BASELINE_DIR, rackFileName.replace(/\.compassrack$/, '.json'));
 
@@ -203,11 +188,11 @@ test('rack regression fixtures match their compact generation baselines', async 
 
 test('color and rotate keep equivalent output regardless of order', async () => {
   const colorThenRotate = buildRackSignature(
-    await loadRackPreview('test_order_color_rotate_color_then_rotate.compassrack'),
+    await loadRackPreviewFromFixture('test_order_color_rotate_color_then_rotate.compassrack'),
     'test_order_color_rotate_color_then_rotate.compassrack',
   );
   const rotateThenColor = buildRackSignature(
-    await loadRackPreview('test_order_color_rotate_rotate_then_color.compassrack'),
+    await loadRackPreviewFromFixture('test_order_color_rotate_rotate_then_color.compassrack'),
     'test_order_color_rotate_rotate_then_color.compassrack',
   );
 
@@ -215,7 +200,7 @@ test('color and rotate keep equivalent output regardless of order', async () => 
 });
 
 test('disabled group output does not leak into generated notes', async () => {
-  const preview = await loadRackPreview('test_disabled_group_bypass.compassrack');
+  const preview = await loadRackPreviewFromFixture('test_disabled_group_bypass.compassrack');
   assert.equal(
     preview.notes.some((note) => note.velocity === 120),
     false,

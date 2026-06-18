@@ -16,6 +16,7 @@
     "publish": "electron-forge publish",
     "web:dev": "vite --config vite.renderer.config.ts --host 127.0.0.1 --port 4173",
     "web:build": "vite build --config vite.renderer.config.ts",
+    "rack:frames": "tsx scripts/render-rack-frames.ts",
     "lint": "eslint --ext .ts,.tsx .",
     "check": "tsx scripts/check.ts"
   },
