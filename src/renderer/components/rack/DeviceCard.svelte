@@ -363,7 +363,7 @@
       :global(.color-slot) {
         width: 1.25rem;
         height: 1.25rem;
-        border: 1px solid var(--neutral-20);
+        border: 1px solid var(--neutral-10);
         border-radius: var(--radius-2);
         padding: 0;
       }
@@ -389,9 +389,13 @@
       }
 
       :global(.color-palette-cell) {
-        border: 1px solid var(--neutral-20);
+        border: 1px solid var(--neutral-10);
         border-radius: var(--radius-2);
         padding: 0;
+      }
+
+      :global(.color-palette-cell:disabled) {
+        visibility: hidden;
       }
 
       :global(.color-palette-cell.is-selected) {
