@@ -77,7 +77,7 @@
 </script>
 
 <div class="device-controls">
-  <div class="column-wrapper mask-selector-column">
+  <div class="column-wrapper">
     <SelectField
       label="Mode"
       value={device.params.mode}
@@ -103,7 +103,7 @@
       {onControlChange}
     />
   </div>
-  <div class="column-wrapper mask-source-column">
+  <div class="column-wrapper">
     {#if device.params.sourceKind === 'tiles'}
       <MaskTilePicker
         deviceId={device.id}
@@ -132,39 +132,3 @@
     {/if}
   </div>
 </div>
-
-<style lang="scss">
-  .mask-selector-column {
-    flex: 0 0 9rem;
-    min-width: 0;
-
-    :global(.control-field) {
-      width: 100%;
-      min-width: 0;
-    }
-
-    :global(.control-field .dropdown-select),
-    :global(.control-field .dropdown-select-trigger) {
-      width: 100%;
-    }
-  }
-
-  .mask-source-column {
-    flex: 0 0 auto;
-    align-items: flex-start;
-    width: fit-content;
-    min-width: 0;
-    min-height: 0;
-    max-height: 100%;
-
-    :global(.control-field:not(.mask-tile-control)) {
-      width: 10rem;
-      min-width: 0;
-    }
-
-    :global(.control-field:not(.mask-tile-control) .dropdown-select),
-    :global(.control-field:not(.mask-tile-control) .dropdown-select-trigger) {
-      width: 100%;
-    }
-  }
-</style>
