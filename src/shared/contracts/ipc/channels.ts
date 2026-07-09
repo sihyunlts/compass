@@ -1,6 +1,8 @@
 export const IPC_CHANNELS = {
   sendGeneratedPreview: 'bridge:send-generated-preview',
   requestAppVersion: 'bridge:request-app-version',
+  checkForUpdates: 'app:check-for-updates',
+  openLatestReleasePage: 'app:open-latest-release-page',
   requestLiveTempo: 'bridge:request-live-tempo',
   liveTempoUpdate: 'live:tempo-update',
   openPreviewWindow: 'preview:open-window',

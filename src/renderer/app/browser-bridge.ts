@@ -11,6 +11,13 @@ import {
   type PresetFile,
   type PresetFileKind,
 } from '../../shared/presets';
+import {
+  GITHUB_API_VERSION,
+  GITHUB_LATEST_RELEASE_URL,
+  GITHUB_RELEASES_API_URL,
+  type GitHubReleaseResponse,
+} from '../../shared/releases/github';
+import { resolveUpdateCheckResponse } from '../../shared/releases/update-check';
 
 const STORAGE_KEY = 'compass:web-bridge:preset-store:v1';
 const VIRTUAL_PRESET_ROOT = 'browser://presets';
@@ -30,6 +37,17 @@ interface BrowserPresetStore {
   folders: Record<PresetFileKind, string[][]>;
   files: BrowserPresetEntry[];
 }
+
+const readDevUpdateCheckOverride = (): string | null => {
+  if (!import.meta.env.DEV) {
+    return null;
+  }
+
+  const version = new URLSearchParams(window.location.search)
+    .get('compassLatestVersion')
+    ?.trim();
+  return version || null;
+};
 
 const createEmptyStore = (): BrowserPresetStore => ({
   folders: {
@@ -243,6 +261,44 @@ export const createBrowserCompassBridge = (): CompassApi => ({
     throw new Error('Desktop app required to send to Ableton.');
   },
   requestAppVersion: async () => __APP_VERSION__,
+  checkForUpdates: async () => {
+    const currentVersion = __APP_VERSION__;
+
+    try {
+      const devLatestVersionOverride = readDevUpdateCheckOverride();
+      if (devLatestVersionOverride) {
+        return resolveUpdateCheckResponse(currentVersion, devLatestVersionOverride);
+      }
+
+      const response = await fetch(GITHUB_RELEASES_API_URL, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': GITHUB_API_VERSION,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`GitHub returned ${response.status}.`);
+      }
+
+      const release = await response.json() as GitHubReleaseResponse;
+      if (release.draft === true || release.prerelease === true) {
+        throw new Error('Latest release is not a stable release.');
+      }
+      if (typeof release.tag_name !== 'string' || !release.tag_name.trim()) {
+        throw new Error('Latest release tag is missing.');
+      }
+
+      return resolveUpdateCheckResponse(currentVersion, release.tag_name);
+    } catch (error) {
+      const message = error instanceof Error && error.message.trim()
+        ? error.message.trim()
+        : 'Update check failed.';
+      return { status: 'unavailable', currentVersion, message };
+    }
+  },
+  openLatestReleasePage: async () => {
+    window.open(GITHUB_LATEST_RELEASE_URL, '_blank', 'noopener,noreferrer');
+  },
   requestLiveTempo: async () => ({
     sentAtIso: new Date().toISOString(),
     target: LIVE_BRIDGE_TARGET,

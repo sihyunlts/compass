@@ -6,6 +6,8 @@
     paletteDescription,
     paletteDescriptionTone = 'neutral',
     appVersionText = '',
+    updateCheckText = '',
+    updateAvailable = false,
     aboutDescription,
     aboutDescriptionTone = 'neutral',
     githubDescription,
@@ -14,11 +16,14 @@
     onPaletteFileChange,
     onOpenAboutSite,
     onOpenGitHub,
+    onOpenLatestReleasePage,
   } = $props<{
     launchpadMk2Enabled: boolean;
     paletteDescription: string;
     paletteDescriptionTone?: 'neutral' | 'error';
     appVersionText?: string;
+    updateCheckText?: string;
+    updateAvailable?: boolean;
     aboutDescription: string;
     aboutDescriptionTone?: 'neutral' | 'error';
     githubDescription: string;
@@ -27,10 +32,26 @@
     onPaletteFileChange: (event: Event) => void | Promise<void>;
     onOpenAboutSite: () => void | Promise<void>;
     onOpenGitHub: () => void | Promise<void>;
+    onOpenLatestReleasePage: () => void | Promise<void>;
   }>();
 </script>
 
 <section class="sidebar-settings-page">
+  {#if updateAvailable && updateCheckText}
+    <section class="sidebar-settings-card" aria-live="polite">
+      <div class="sidebar-settings-row">
+        <div class="sidebar-settings-info">
+          <span class="sidebar-settings-label">Update available</span>
+          <span class="sidebar-settings-description">{updateCheckText}</span>
+        </div>
+        <Button
+          text="Download"
+          onClick={() => onOpenLatestReleasePage()}
+        />
+      </div>
+    </section>
+  {/if}
+
   <section class="sidebar-settings-section">
     <h2 class="sidebar-settings-section-title">Settings</h2>
     <div class="sidebar-settings-card">

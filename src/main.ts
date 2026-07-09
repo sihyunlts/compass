@@ -8,6 +8,7 @@ import { LiveTempoListener } from './main/bridge/live-tempo-listener';
 import { registerIpcHandlers } from './main/ipc/handlers';
 import { GeneratorService } from './main/services/generator-service';
 import { PresetService } from './main/services/preset-service';
+import { UpdateCheckService } from './main/services/update-check-service';
 import { IPC_CHANNELS } from './shared/contracts/ipc/channels';
 
 const WINDOWS_APP_USER_MODEL_ID = 'com.sihyunlights.compass';
@@ -71,8 +72,9 @@ if (process.platform === 'win32') {
 if (!handleSquirrelStartupEvent()) {
   const generatorService = new GeneratorService();
   const presetService = new PresetService();
+  const updateCheckService = new UpdateCheckService();
   const liveTempoListener = new LiveTempoListener();
-  registerIpcHandlers(generatorService, presetService);
+  registerIpcHandlers(generatorService, presetService, updateCheckService);
 
   app.whenReady().then(() => {
     installApplicationMenu();

@@ -28,6 +28,7 @@ import type {
   SendGeneratedPreviewRequest,
   SendGeneratedPreviewResponse,
 } from './generator';
+import type { UpdateCheckResponse } from './releases';
 
 export interface MainWindowDocumentState {
   edited: boolean;
@@ -66,6 +67,8 @@ export interface CompassApi {
     request: SendGeneratedPreviewRequest,
   ) => Promise<SendGeneratedPreviewResponse>;
   requestAppVersion: () => Promise<string>;
+  checkForUpdates: () => Promise<UpdateCheckResponse>;
+  openLatestReleasePage: () => Promise<void>;
   requestLiveTempo: () => Promise<RequestLiveTempoResponse>;
   openPreviewWindow: () => Promise<void>;
   sendPreviewWindowControlRequest: (request: PreviewWindowControlRequest) => void;

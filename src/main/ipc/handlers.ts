@@ -19,6 +19,7 @@ import {
 } from '../app-window';
 import { GeneratorService } from '../services/generator-service';
 import { PresetService } from '../services/preset-service';
+import { UpdateCheckService } from '../services/update-check-service';
 
 let latestPreviewWindowState: PreviewWindowState | null = null;
 
@@ -56,6 +57,7 @@ const parseMainWindowDocumentState = (
 export const registerIpcHandlers = (
   generatorService: GeneratorService,
   presetService: PresetService,
+  updateCheckService: UpdateCheckService,
 ): void => {
   ipcMain.handle(
     IPC_CHANNELS.sendGeneratedPreview,
@@ -66,6 +68,16 @@ export const registerIpcHandlers = (
   ipcMain.handle(
     IPC_CHANNELS.requestAppVersion,
     () => app.getVersion(),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.checkForUpdates,
+    () => updateCheckService.checkForUpdates(),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.openLatestReleasePage,
+    () => updateCheckService.openLatestReleasePage(),
   );
 
   ipcMain.handle(

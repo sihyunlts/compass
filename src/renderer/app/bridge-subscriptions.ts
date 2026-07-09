@@ -1,10 +1,12 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
+import type { UpdateCheckResponse } from '../../shared/contracts/ipc/releases';
 import type { PlaybackSessionController } from './playback-session.svelte';
 
 interface BridgeSubscriptionOptions {
   bridgeClient: CompassApi;
   playbackSession: PlaybackSessionController;
   onVersionResolved?: (version: string) => void;
+  onUpdateCheckResolved?: (result: UpdateCheckResponse) => void;
 }
 
 const runBestEffort = (task: Promise<unknown>): void => {
@@ -29,6 +31,11 @@ export const mountBridgeSubscriptions = (
   runBestEffort(
     options.bridgeClient.requestAppVersion().then((version) => {
       options.onVersionResolved?.(version);
+    }),
+  );
+  runBestEffort(
+    options.bridgeClient.checkForUpdates().then((result) => {
+      options.onUpdateCheckResolved?.(result);
     }),
   );
   runBestEffort(

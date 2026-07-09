@@ -338,6 +338,9 @@
       onVersionResolved: (version) => {
         settingsController.setAppVersion(version);
       },
+      onUpdateCheckResolved: (result) => {
+        settingsController.setUpdateCheckResult(result);
+      },
     });
     const disposeKeyboardShortcuts = mountKeyboardShortcuts({
       editorSession,
@@ -437,6 +440,8 @@
       paletteDescription={settingsState.paletteDescriptionOverride || uiState.paletteNameText || 'Default palette'}
       paletteDescriptionTone={settingsState.paletteDescriptionTone}
       appVersionText={settingsState.appVersionText}
+      updateCheckText={settingsState.updateCheckText}
+      updateAvailable={settingsState.updateAvailable}
       aboutDescription={settingsState.aboutDescriptionOverride || settingsController.getAboutSiteUrl()}
       aboutDescriptionTone={settingsState.aboutDescriptionTone}
       githubDescription="sihyunlts/compass"
@@ -452,6 +457,7 @@
       onPaletteFileChange={(event) => settingsController.handlePaletteFileChange(event)}
       onOpenAboutSite={() => settingsController.openAboutSite()}
       onOpenGitHub={() => settingsController.openGitHub()}
+      onOpenLatestReleasePage={() => settingsController.openLatestReleasePage()}
       onPresetEntryOpen={(entry) => presetController.handlePresetEntryOpen(entry)}
       onPresetFilePointerDown={(entry, sourceEvent, itemEl) =>
         presetController.handlePresetFilePointerDown(entry, sourceEvent, itemEl)}

@@ -1,4 +1,5 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
+import type { UpdateCheckResponse } from '../../shared/contracts/ipc/releases';
 import type { EditorSession } from '../features/editor/session.svelte';
 import type { PlaybackSessionController } from './playback-session.svelte';
 import { createPaletteController, PaletteParseError } from './palette-controller';
@@ -8,6 +9,8 @@ const GITHUB_URL = 'https://github.com/sihyunlts/compass';
 
 interface SettingsControllerState {
   appVersionText: string;
+  updateCheckText: string;
+  updateAvailable: boolean;
   paletteRevision: number;
   paletteDescriptionOverride: string;
   paletteDescriptionTone: 'neutral' | 'error';
@@ -24,6 +27,8 @@ interface SettingsControllerOptions {
 class SettingsController {
   public readonly state: SettingsControllerState = $state({
     appVersionText: '',
+    updateCheckText: '',
+    updateAvailable: false,
     paletteRevision: 0,
     paletteDescriptionOverride: '',
     paletteDescriptionTone: 'neutral',
@@ -121,6 +126,17 @@ class SettingsController {
     this.state.appVersionText = version;
   }
 
+  public setUpdateCheckResult(result: UpdateCheckResponse): void {
+    if (result.status !== 'available') {
+      this.state.updateCheckText = '';
+      this.state.updateAvailable = false;
+      return;
+    }
+
+    this.state.updateCheckText = `Compass v${result.latestVersion}`;
+    this.state.updateAvailable = true;
+  }
+
   public async openAboutSite(): Promise<void> {
     try {
       await this.options.bridgeClient.openExternal(ABOUT_SITE_URL);
@@ -134,6 +150,14 @@ class SettingsController {
       await this.options.bridgeClient.openExternal(GITHUB_URL);
     } catch (error) {
       this.showAboutError('Failed to open GitHub', error);
+    }
+  }
+
+  public async openLatestReleasePage(): Promise<void> {
+    try {
+      await this.options.bridgeClient.openLatestReleasePage();
+    } catch (error) {
+      this.showAboutError('Failed to open release page', error);
     }
   }
 

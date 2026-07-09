@@ -110,6 +110,10 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.sendGeneratedPreview, request),
   requestAppVersion: () =>
     ipcRenderer.invoke(IPC_CHANNELS.requestAppVersion),
+  checkForUpdates: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.checkForUpdates),
+  openLatestReleasePage: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.openLatestReleasePage),
   requestLiveTempo: () =>
     ipcRenderer.invoke(IPC_CHANNELS.requestLiveTempo),
   openPreviewWindow: () =>

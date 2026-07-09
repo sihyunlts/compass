@@ -234,6 +234,8 @@
     paletteDescription = 'Default palette',
     paletteDescriptionTone = 'neutral',
     appVersionText = '',
+    updateCheckText = '',
+    updateAvailable = false,
     aboutDescription = '',
     aboutDescriptionTone = 'neutral',
     githubDescription = '',
@@ -247,6 +249,7 @@
     onPaletteFileChange = () => {},
     onOpenAboutSite = () => {},
     onOpenGitHub = () => {},
+    onOpenLatestReleasePage = () => {},
     onPresetEntryOpen,
     onPresetFilePointerDown,
     onPendingPresetFolderDraftNameChange = () => {},
@@ -268,6 +271,8 @@
     paletteDescription?: string;
     paletteDescriptionTone?: 'neutral' | 'error';
     appVersionText?: string;
+    updateCheckText?: string;
+    updateAvailable?: boolean;
     aboutDescription?: string;
     aboutDescriptionTone?: 'neutral' | 'error';
     githubDescription?: string;
@@ -285,6 +290,7 @@
     onPaletteFileChange?: (event: Event) => void | Promise<void>;
     onOpenAboutSite?: () => void | Promise<void>;
     onOpenGitHub?: () => void | Promise<void>;
+    onOpenLatestReleasePage?: () => void | Promise<void>;
     onPresetEntryOpen: (entry: BrowserTreePresetLeafNode) => void | Promise<void>;
     onPresetFilePointerDown: (
       entry: BrowserTreePresetLeafNode,
@@ -303,6 +309,13 @@
   let pendingPresetFolderInputEl = $state<HTMLInputElement | null>(null);
   let skipPendingPresetFolderBlurId = $state<string | null>(null);
   let focusedPresetDraftKey = $state<string | null>(null);
+
+  const settingsButtonHasUpdateIndicator = $derived(
+    updateAvailable && activePage !== 'settings',
+  );
+  const settingsButtonLabel = $derived(
+    updateAvailable ? 'Settings (Update available)' : 'Settings',
+  );
 
   const activeTreeRoots = $derived.by(() => {
     if (activePage === 'devices') {
@@ -680,9 +693,10 @@
           />
         {/if}
         <Button
-          class="browser-page-switch-button"
+          class={`browser-page-switch-button${settingsButtonHasUpdateIndicator ? ' has-update-indicator' : ''}`}
           variant="icon"
-          label="Settings"
+          label={settingsButtonLabel}
+          title={settingsButtonLabel}
           icon="settings"
           pressed={activePage === 'settings'}
           onClick={() => onPageSelect('settings')}
@@ -697,6 +711,8 @@
           {paletteDescription}
           {paletteDescriptionTone}
           {appVersionText}
+          {updateCheckText}
+          {updateAvailable}
           {aboutDescription}
           {aboutDescriptionTone}
           {githubDescription}
@@ -705,6 +721,7 @@
           onPaletteFileChange={onPaletteFileChange}
           onOpenAboutSite={onOpenAboutSite}
           onOpenGitHub={onOpenGitHub}
+          onOpenLatestReleasePage={onOpenLatestReleasePage}
         />
       {:else if activePage === 'presets' && isPresetLoading}
         <p class="browser-status">Loading presets...</p>
@@ -881,8 +898,20 @@
   }
 
   :global(.button.browser-page-switch-button) {
+    position: relative;
     color: var(--neutral-90);
     background: var(--neutral-20);
+  }
+
+  :global(.button.browser-page-switch-button.has-update-indicator)::after {
+    content: '';
+    position: absolute;
+    right: 0.1875rem;
+    top: 0.1875rem;
+    width: 0.35rem;
+    height: 0.35rem;
+    border-radius: var(--radius-round);
+    background: var(--neutral-90);
   }
 
   :global(.button.browser-page-switch-button.is-active) {
