@@ -59,6 +59,7 @@
     onRackPresetDrop = () => {},
     onScrollMetricsChange = () => {},
     onMiniMapContentRevisionChange = () => {},
+    getFilePath = () => null,
     onPresetFileDrop = async () => {},
     onSaveDevicePreset = () => {},
     onSaveGroupPreset = () => {},
@@ -90,6 +91,7 @@
     onRackPresetDrop?: (source: Extract<BrowserPresetInsertSource, { kind: 'rack-preset' }>) => void;
     onScrollMetricsChange?: (metrics: RackScrollMetrics) => void;
     onMiniMapContentRevisionChange?: (revision: number) => void;
+    getFilePath?: (file: File) => string | null;
     onPresetFileDrop?: (payload: RackPresetFileDrop) => void | Promise<void>;
     onSaveDevicePreset?: (deviceId: string) => void;
     onSaveGroupPreset?: (groupId: string) => void;
@@ -237,6 +239,7 @@
     commitRackPresetDrop: (source) => onRackPresetDrop(source),
     onScrollMetricsChange: (metrics) => onScrollMetricsChange(metrics),
     onMiniMapContentRevisionChange: (revision) => onMiniMapContentRevisionChange(revision),
+    getFilePath: (file) => getFilePath(file),
     onPresetFileDrop: (payload) => onPresetFileDrop(payload),
     saveDevicePreset: (deviceId) => onSaveDevicePreset(deviceId),
     saveGroupPreset: (groupId) => onSaveGroupPreset(groupId),

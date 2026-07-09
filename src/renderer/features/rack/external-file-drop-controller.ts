@@ -5,6 +5,7 @@ interface ExternalFileDropControllerOptions {
   closeContextMenu: () => void;
   clearDropIndicator: () => void;
   syncDropIndicator: (clientX: number, clientY: number) => RackDropZone | null;
+  getFilePath: (file: File) => string | null;
   onPresetFileDrop: (payload: RackPresetFileDrop) => void | Promise<void>;
 }
 
@@ -83,6 +84,7 @@ class ExternalFileDropController {
 
     await this.options.onPresetFileDrop({
       file,
+      filePath: this.options.getFilePath(file),
       fileCount: files.length,
       dropZone,
     });

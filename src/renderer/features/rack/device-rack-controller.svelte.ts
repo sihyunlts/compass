@@ -42,6 +42,7 @@ interface DeviceRackControllerOptions {
   commitRackPresetDrop: (source: Extract<BrowserPresetInsertSource, { kind: 'rack-preset' }>) => void;
   onScrollMetricsChange: (metrics: RackScrollMetrics) => void;
   onMiniMapContentRevisionChange: (revision: number) => void;
+  getFilePath: (file: File) => string | null;
   onPresetFileDrop: (payload: RackPresetFileDrop) => void | Promise<void>;
   saveDevicePreset: (deviceId: string) => void;
   saveGroupPreset: (groupId: string) => void;
@@ -105,6 +106,7 @@ class DeviceRackController {
       clearDropIndicator: () => this.surface.clearDropIndicator(),
       syncDropIndicator: (clientX, clientY) =>
         this.surface.syncExternalFileDropIndicator(clientX, clientY),
+      getFilePath: (file) => this.options.getFilePath(file),
       onPresetFileDrop: (payload) => this.options.onPresetFileDrop(payload),
     });
   }

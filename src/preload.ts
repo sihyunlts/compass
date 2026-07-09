@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 import { IPC_CHANNELS } from './shared/contracts/ipc/channels';
 import type { PresetFileKind } from './shared/presets';
@@ -147,6 +147,7 @@ const api: CompassApi = {
     liveTempoListeners.subscribe(listener),
   openExternal: (url) =>
     ipcRenderer.invoke(IPC_CHANNELS.openExternal, url),
+  getPathForFile: (file) => webUtils.getPathForFile(file),
   savePresetFile: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.savePresetFile, request),
   saveRackFile: (request) =>

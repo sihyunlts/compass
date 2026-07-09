@@ -17,6 +17,7 @@ export interface RackScrollMetrics {
 
 export interface RackPresetFileDrop {
   file: File;
+  filePath: string | null;
   fileCount: number;
   dropZone: RackDropZone | null;
 }

@@ -785,7 +785,7 @@ class PresetController {
       await this.requestRackOpen({
         label: resolveRackDisplayNameFromFileName(payload.file.name),
         preset: parsed.preset,
-        filePath: null,
+        filePath: payload.filePath,
       });
       return;
     }

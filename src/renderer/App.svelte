@@ -563,6 +563,7 @@
           onRackPresetDrop={(source) => presetController.openRackPresetDropDialog(source)}
           onScrollMetricsChange={handleRackScrollMetricsChange}
           onMiniMapContentRevisionChange={handleRackMiniMapContentRevisionChange}
+          getFilePath={(file) => bridgeClient.getPathForFile(file)}
           onPresetFileDrop={(payload) => presetController.handlePresetFileDrop(payload)}
           onSaveDevicePreset={(deviceId) => presetController.handleSaveDevicePreset(deviceId)}
           onSaveGroupPreset={(groupId) => presetController.handleSaveGroupPreset(groupId)}

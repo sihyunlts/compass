@@ -95,6 +95,7 @@ export interface CompassApi {
     listener: (update: LiveTempoUpdate) => void,
   ) => () => void;
   openExternal: (url: string) => Promise<void>;
+  getPathForFile: (file: File) => string | null;
   savePresetFile: (
     request: SavePresetFileRequest,
   ) => Promise<SavePresetFileResponse>;

@@ -267,6 +267,7 @@ export const createBrowserCompassBridge = (): CompassApi => ({
   openExternal: async (url) => {
     window.open(url, '_blank', 'noopener,noreferrer');
   },
+  getPathForFile: () => null,
   savePresetFile: async (request: SavePresetFileRequest) => {
     const presetType = request.payload.presetType;
     const fileName = ensurePresetExtension(
