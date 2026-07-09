@@ -595,18 +595,20 @@
       </svg>
       <div class="curve-editor-segment-controls">
         {#each plottedSegmentControls as control (control.key)}
+          {@const segmentControlLabel = `Curve point between ${control.startNodeId} and ${control.endNodeId}`}
           <button
             type="button"
             class="curve-editor-segment-control"
             data-curve-segment-control-id={control.key}
             style={`left:${control.x}%;top:${control.y}%;`}
             onmousedown={(event) => handleSegmentControlMouseDown(event, control.startNodeId)}
-            aria-label={`Curve point between ${control.startNodeId} and ${control.endNodeId}`}
+            aria-label={segmentControlLabel}
           ></button>
         {/each}
       </div>
       <div class="curve-editor-nodes">
         {#each plottedNodes as node (node.id)}
+          {@const nodeLabel = `Curve node at ${node.t.toFixed(3)}, ${node.v.toFixed(3)}`}
           <button
             type="button"
             class="curve-editor-node"
@@ -614,7 +616,7 @@
             data-curve-node-id={node.id}
             style={`left:${node.x}%;top:${node.y}%;`}
             onmousedown={(event) => handleNodeMouseDown(event, node.id)}
-            aria-label={`Curve node at ${node.t.toFixed(3)}, ${node.v.toFixed(3)}`}
+            aria-label={nodeLabel}
           ></button>
         {/each}
       </div>

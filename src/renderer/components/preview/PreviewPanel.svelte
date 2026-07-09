@@ -30,8 +30,12 @@
   const resolvePlayIcon = (): string => (isPlaying ? 'pause' : 'play_arrow');
   const resolvePlayButtonLabel = (): string =>
     isPlaying ? 'Pause preview' : 'Play preview';
+  const resolvePlayButtonHint = (): string =>
+    isPlaying ? 'Pause' : 'Play';
   const resolveLoopButtonLabel = (): string =>
     loopEnabled ? 'Disable preview loop' : 'Enable preview loop';
+  const resolveLoopButtonHint = (): string =>
+    loopEnabled ? 'Unloop' : 'Loop';
 
   const handlePopout = (): void => {
     void onPopout();
@@ -71,6 +75,7 @@
       class="preview-panel-control-button"
       variant="icon"
       label={resolvePlayButtonLabel()}
+      title={resolvePlayButtonHint()}
       icon={resolvePlayIcon()}
       onClick={onPlayClick}
     />
@@ -79,6 +84,7 @@
       class="preview-panel-control-button"
       variant="icon"
       label={resolveLoopButtonLabel()}
+      title={resolveLoopButtonHint()}
       icon="repeat"
       pressed={loopEnabled}
       onClick={onLoopToggle}
@@ -88,6 +94,7 @@
       class="preview-panel-control-button preview-popout-toggle"
       variant="icon"
       label="Open preview in a separate window"
+      title="Preview popout"
       icon="open_in_new"
       onClick={handlePopout}
     />

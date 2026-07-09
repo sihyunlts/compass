@@ -120,7 +120,6 @@
         </div>
         <Button
           text="Open"
-          title="Open GitHub"
           onClick={() => onOpenGitHub()}
         />
       </div>
@@ -139,7 +138,6 @@
         </div>
         <Button
           text="Open"
-          title="Open website"
           onClick={() => onOpenAboutSite()}
         />
       </div>

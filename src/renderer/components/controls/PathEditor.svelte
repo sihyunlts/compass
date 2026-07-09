@@ -304,12 +304,13 @@
       </svg>
 
       {#each plottedPoints as plottedPoint (plottedPoint.index)}
+        {@const pointLabel = `Path point ${plottedPoint.index + 1}`}
         <button
           type="button"
           class="path-editor-point"
           class:is-selected={plottedPoint.index === selectedPointIndex}
           style={`left:${plottedPoint.x}%;top:${plottedPoint.y}%;`}
-          aria-label={`Path point ${plottedPoint.index + 1}`}
+          aria-label={pointLabel}
           onmousedown={(event) => handlePointMouseDown(event, plottedPoint.index)}
           onclick={handlePointClick}
         ></button>

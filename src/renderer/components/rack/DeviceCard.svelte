@@ -87,6 +87,7 @@
   const DeviceEditor = $derived(deviceDefinition.editor);
   const deviceTabs = $derived.by((): readonly RendererDeviceTabDefinition[] =>
     deviceDefinition.tabs?.(device) ?? []);
+  const enabledToggleLabel = $derived(`${device.enabled ? 'Disable' : 'Enable'} ${title}`);
   const modulationTargetParamKeys = $derived.by(() =>
     new Set(deviceDefinition.modulationTargetParams?.map((param) => param.key) ?? []));
 
@@ -212,6 +213,8 @@
           class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
+          aria-label={enabledToggleLabel}
+          use:hint={enabledToggleLabel}
           onchange={handleEnabledChange}
         />
         <button

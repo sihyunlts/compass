@@ -686,7 +686,6 @@
             class="browser-page-switch-button"
             variant="icon"
             label={mainWindowAlwaysOnTop ? 'Unpin window' : 'Pin window on top'}
-            title={mainWindowAlwaysOnTop ? 'Unpin window' : 'Pin window on top'}
             icon="push_pin"
             pressed={mainWindowAlwaysOnTop}
             onClick={onMainWindowAlwaysOnTopToggle}
@@ -696,7 +695,6 @@
           class={`browser-page-switch-button${settingsButtonHasUpdateIndicator ? ' has-update-indicator' : ''}`}
           variant="icon"
           label={settingsButtonLabel}
-          title={settingsButtonLabel}
           icon="settings"
           pressed={activePage === 'settings'}
           onClick={() => onPageSelect('settings')}
@@ -769,10 +767,11 @@
                 oncontextmenu={(event) => handleTreeItemContextMenu(row.node, event)}
               >
                 {#if row.node.kind === 'folder'}
+                  {@const folderToggleLabel = isFolderExpanded(row.node.id) ? 'Collapse folder' : 'Expand folder'}
                   <button
                     class="browser-tree-leading-slot browser-tree-chevron"
                     type="button"
-                    aria-label={isFolderExpanded(row.node.id) ? 'Collapse folder' : 'Expand folder'}
+                    aria-label={folderToggleLabel}
                     tabindex="-1"
                     onclick={(event) => {
                       event.stopPropagation();

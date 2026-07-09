@@ -1,6 +1,8 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { hint } from '../overlays/hint';
+
   let {
     text,
     label,
@@ -33,6 +35,7 @@
   const rootClass = $derived(`value-button ${className}`.trim());
   const hasClearAction = $derived(typeof onClear === 'function');
   const isDisabled = $derived(disabled === true);
+  const clearHint = $derived(clearTitle ?? clearLabel ?? 'Clear value');
 
   const handleClearPointerDown = (event: PointerEvent): void => {
     event.stopPropagation();
@@ -68,7 +71,7 @@
       type="button"
       class="value-button-clear"
       aria-label={clearLabel ?? 'Clear value'}
-      title={clearTitle ?? clearLabel ?? 'Clear value'}
+      use:hint={clearHint}
       disabled={isDisabled}
       onpointerdown={handleClearPointerDown}
       onclick={handleClearClick}

@@ -23,9 +23,11 @@
   const isPreviewReady = $derived(previewState !== null && previewState.noteCount > 0);
   const playButtonIcon = $derived(isPlaying ? 'pause' : 'play_arrow');
   const playButtonLabel = $derived(isPlaying ? 'Pause preview' : 'Play preview');
+  const playButtonHint = $derived(isPlaying ? 'Pause' : 'Play');
   const loopButtonLabel = $derived(
     isLoopEnabled ? 'Disable preview loop' : 'Enable preview loop',
   );
+  const loopButtonHint = $derived(isLoopEnabled ? 'Unloop' : 'Loop');
   const stageSize = $derived(
     stageWidth > 0 && stageHeight > 0
       ? Math.min(stageWidth, stageHeight)
@@ -103,6 +105,7 @@
         id="preview-popout-play"
         variant="icon"
         label={playButtonLabel}
+        title={playButtonHint}
         icon={playButtonIcon}
         disabled={!isPreviewReady}
         onClick={handlePlayClick}
@@ -111,6 +114,7 @@
         id="preview-popout-loop"
         variant="icon"
         label={loopButtonLabel}
+        title={loopButtonHint}
         icon="repeat"
         pressed={isLoopEnabled}
         onClick={handleLoopToggle}

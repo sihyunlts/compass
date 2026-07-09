@@ -37,6 +37,7 @@
   const buttonClass = $derived(`button button-${variant} ${className}`.trim());
   const ariaLabel = $derived(label ?? text ?? (isIconButton ? icon : undefined));
   const visibleText = $derived(text ?? label ?? '');
+  const hintText = $derived(title ?? (isIconButton ? ariaLabel : undefined));
 </script>
 
 <button
@@ -48,7 +49,7 @@
   aria-label={ariaLabel}
   aria-pressed={pressed}
   {disabled}
-  use:hint={title}
+  use:hint={hintText}
   onclick={onClick}
 >
   {#if isIconButton}

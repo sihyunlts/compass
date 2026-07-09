@@ -476,12 +476,14 @@
                   />
                 {:else if col.kind === 'left-rail'}
                   {@const groupName = resolveGroupDisplayName(groupDisplayNameById, col.groupId)}
+                  {@const groupToggleLabel = `${col.enabled ? 'Disable' : 'Enable'} ${groupName}`}
                   <div class="group-rail-controls">
                     <input
                       class="group-enabled-toggle round-checkbox"
                       type="checkbox"
                       checked={col.enabled}
-                      aria-label={`${groupName} enabled`}
+                      aria-label={groupToggleLabel}
+                      use:hint={groupToggleLabel}
                       onpointerdown={(event) => controller.handleGroupTogglePointerDown(event)}
                       onclick={(event) => controller.handleGroupToggleClick(event)}
                       onchange={(event) => controller.handleGroupEnabledChange(event, col.groupId)}

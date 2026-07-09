@@ -31,7 +31,7 @@
   let isOpen = $state(false);
 
   const displayTitle = $derived(dirty ? `${title}*` : title);
-  const titleText = $derived(dirty ? `${title} - unsaved changes` : title);
+  const titleHint = $derived(dirty ? 'Rename rack (Unsaved changes)' : 'Rename rack');
   const titleLabel = $derived(dirty ? `Rack: ${title}, unsaved changes` : `Rack: ${title}`);
   const rackActions = $derived.by((): RackActionItem[] => [
     { id: 'rack-new-button', label: 'New', run: onNewRack },
@@ -66,7 +66,7 @@
     variant="outline"
     class="workspace-rack-title-button"
     text={displayTitle}
-    title={titleText}
+    title={titleHint}
     label={titleLabel}
     onClick={onRenameRack}
     menuId="rack-file-actions-trigger"
