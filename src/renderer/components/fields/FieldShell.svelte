@@ -3,22 +3,45 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
+  export type FieldShellLayout = 'stacked' | 'inline';
+  export type FieldShellSize = 'default' | 'compact';
+  export type FieldShellLabelVisibility = 'visible' | 'hidden';
+
   let {
     label,
     children,
+    layout = 'stacked',
+    size = 'default',
+    labelVisibility = 'visible',
+    fill = false,
     class: className = '',
     ...rest
   } = $props<{
     label: string;
     children?: Snippet;
+    layout?: FieldShellLayout;
+    size?: FieldShellSize;
+    labelVisibility?: FieldShellLabelVisibility;
+    fill?: boolean;
     class?: string;
   } & Record<string, unknown>>();
 
   const rootClass = $derived(`control-field ${className}`.trim());
 </script>
 
-<div {...rest} class={rootClass}>
-  <span class="field-label">{label}</span>
+<div
+  {...rest}
+  class={rootClass}
+  class:is-inline={layout === 'inline'}
+  class:is-compact={size === 'compact'}
+  class:is-fill={fill}
+>
+  <span
+    class="field-label"
+    class:is-hidden={labelVisibility === 'hidden'}
+  >
+    {label}
+  </span>
   {#if children}
     {@render children()}
   {/if}
@@ -32,16 +55,49 @@
     min-width: 0;
     min-height: 0;
 
+    &.is-inline {
+      flex-direction: row;
+      align-items: center;
+      gap: var(--gap-4);
+    }
+
+    &.is-fill {
+      flex: 1 1 0;
+      width: 100%;
+    }
+
     > :global(input),
     > :global(.dropdown-select),
     > :global(.dropdown-select .dropdown-select-trigger) {
       width: 6.6rem;
       height: 1.75rem;
     }
+
+    &.is-fill > :global(input),
+    &.is-fill > :global(.dropdown-select),
+    &.is-fill > :global(.dropdown-select .dropdown-select-trigger) {
+      width: 100%;
+    }
+
+    &.is-inline.is-fill > :global(input),
+    &.is-inline.is-fill > :global(.dropdown-select),
+    &.is-inline.is-fill > :global(.dropdown-select .dropdown-select-trigger) {
+      flex: 1 1 0;
+    }
+
+    &.is-compact > :global(input) {
+      height: var(--gap-20);
+      padding: 0 var(--gap-6);
+      font-size: var(--text-12);
+    }
   }
 
   .field-label {
     color: var(--neutral-60);
     font-size: var(--text-12);
+
+    &.is-hidden {
+      display: none;
+    }
   }
 </style>

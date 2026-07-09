@@ -64,6 +64,9 @@
   <div class="center-picker-inputs">
     <NumberField
       label="X"
+      layout="inline"
+      size="compact"
+      fill={true}
       step={STEP}
       min={MIN}
       max={MAX}
@@ -75,6 +78,9 @@
     />
     <NumberField
       label="Y"
+      layout="inline"
+      size="compact"
+      fill={true}
       step={STEP}
       min={MIN}
       max={MAX}
@@ -166,20 +172,5 @@
     display: flex;
     gap: var(--gap-8);
     margin-top: var(--gap-2);
-
-    :global(.control-field) {
-      flex: 1 1 0;
-      gap: var(--gap-4);
-      flex-direction: row;
-      align-items: center;
-
-      :global(input) {
-        flex: 1 1 0;
-        width: auto;
-        height: var(--gap-20);
-        padding: 0 var(--gap-6);
-        font-size: var(--text-12);
-      }
-    }
   }
 </style>

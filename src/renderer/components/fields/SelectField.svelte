@@ -12,6 +12,7 @@
     options,
     dataAction,
     dataId,
+    dataParam,
     disabled = false,
     class: className = '',
     onControlChange,
@@ -21,6 +22,7 @@
     options: readonly DropdownOption[];
     dataAction: string;
     dataId: string;
+    dataParam?: string;
     disabled?: boolean;
     class?: string;
     onControlChange: (change: RendererControlChange) => void;
@@ -30,6 +32,7 @@
     onControlChange({
       action: dataAction,
       deviceId: dataId,
+      paramKey: dataParam,
       value: nextValue,
       finalize: true,
     });
@@ -42,6 +45,9 @@
     {options}
     ariaLabel={label}
     {disabled}
+    data-control-action={dataAction}
+    data-device-id={dataId}
+    data-param={dataParam}
     onValueChange={handleValueChange}
   />
 </FieldShell>

@@ -12,6 +12,7 @@
     disabled = false,
     class: className = '',
     onValueChange,
+    ...rest
   } = $props<{
     value: DropdownValue;
     options: readonly DropdownOption[];
@@ -19,7 +20,7 @@
     disabled?: boolean;
     class?: string;
     onValueChange: (value: DropdownValue) => void;
-  }>();
+  } & Record<string, unknown>>();
 
   let rootEl = $state<HTMLDivElement | null>(null);
   let triggerEl = $state<HTMLButtonElement | null>(null);
@@ -56,6 +57,7 @@
 
 <div bind:this={rootEl} class={rootClass}>
   <button
+    {...rest}
     bind:this={triggerEl}
     type="button"
     class="dropdown-select-trigger"

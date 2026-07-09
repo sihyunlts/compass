@@ -12,6 +12,7 @@ import type {
   RendererControlHandler,
 } from '../../../devices/control-types';
 import type { GeneratorDeviceNode } from '../../../shared/model';
+import { readRackControlTarget } from './control-target';
 
 type ChainControlHandler = RendererControlHandler;
 
@@ -173,22 +174,20 @@ export const resetNumericControlToDefault = (
     return null;
   }
 
-  const action = target.dataset.controlAction;
-  const id = target.dataset.deviceId;
-  const paramKey = target.dataset.param;
-  if (!action || !id) {
+  const control = readRackControlTarget(target);
+  if (!control) {
     return null;
   }
 
-  const device = findDeviceById(id);
+  const device = findDeviceById(control.deviceId);
   if (!device) {
     return null;
   }
 
   const baseChange: RendererControlChange = {
-    action,
-    deviceId: id,
-    paramKey,
+    action: control.action,
+    deviceId: control.deviceId,
+    paramKey: control.paramKey ?? undefined,
     value: target.value,
     finalize: true,
   };

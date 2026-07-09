@@ -1,3 +1,8 @@
+import {
+  closestRackNumericInput,
+  isRackNumericInput,
+} from '../control-target';
+
 interface NumericInputDragState {
   pointerId: number | null;
   inputEl: HTMLInputElement | null;
@@ -35,12 +40,6 @@ const createNumericInputDragState = (): NumericInputDragState => ({
   wrapMode: false,
   isPointerLocked: false,
 });
-
-const isRackNumericInput = (target: EventTarget | null): target is HTMLInputElement =>
-  target instanceof HTMLInputElement
-  && target.type === 'number'
-  && !!target.dataset.controlAction
-  && !!target.dataset.deviceId;
 
 export class NumericInputInteraction {
   private readonly onResetInput: (target: EventTarget | null) => boolean;
@@ -102,9 +101,7 @@ export class NumericInputInteraction {
   }
 
   tryStart(event: PointerEvent, target: HTMLElement): boolean {
-    const input = target.closest<HTMLInputElement>(
-      'input[type="number"][data-control-action][data-device-id]',
-    );
+    const input = closestRackNumericInput(target);
     if (!input || input.disabled || input.readOnly) {
       return false;
     }

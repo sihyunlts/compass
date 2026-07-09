@@ -2,6 +2,11 @@
 
 <script lang="ts">
   import type { RendererControlChange } from '../../../devices/control-types';
+  import type {
+    FieldShellLabelVisibility,
+    FieldShellLayout,
+    FieldShellSize,
+  } from '../fields/FieldShell.svelte';
   import FieldShell from '../fields/FieldShell.svelte';
 
   let {
@@ -14,6 +19,10 @@
     min,
     max,
     ariaLabel,
+    layout = 'stacked',
+    size = 'default',
+    labelVisibility = 'visible',
+    fill = false,
     readonly = false,
     disabled = false,
     tabindex,
@@ -29,6 +38,10 @@
     min?: number | string;
     max?: number | string;
     ariaLabel?: string;
+    layout?: FieldShellLayout;
+    size?: FieldShellSize;
+    labelVisibility?: FieldShellLabelVisibility;
+    fill?: boolean;
     readonly?: boolean;
     disabled?: boolean;
     tabindex?: number | string;
@@ -53,7 +66,14 @@
   };
 </script>
 
-<FieldShell {label} class={className}>
+<FieldShell
+  {label}
+  {layout}
+  {size}
+  {labelVisibility}
+  {fill}
+  class={className}
+>
   <input
     type="number"
     {step}

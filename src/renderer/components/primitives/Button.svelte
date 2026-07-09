@@ -43,7 +43,7 @@
   {...rest}
   {id}
   class={buttonClass}
-  class:is-active={isIconButton && pressed === true}
+  class:is-active={pressed === true}
   {type}
   aria-label={ariaLabel}
   aria-pressed={pressed}
@@ -76,6 +76,11 @@
       color: var(--button-disabled-color);
     }
 
+    &.is-active {
+      background: var(--neutral-30);
+      color: var(--neutral-90);
+    }
+
     &-primary {
       --button-disabled-color: color-mix(in oklch, var(--neutral-00) 60%, transparent);
 
@@ -90,11 +95,6 @@
       display: flex;
       align-items: center;
       justify-content: center;
-
-      &.is-active {
-        background: var(--neutral-30);
-        color: var(--neutral-90);
-      }
 
       .material-symbols-rounded {
         font-size: var(--text-18);
