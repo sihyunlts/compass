@@ -1,8 +1,12 @@
 import type { CurveModulatorNode } from '../../shared/model';
 import { sanitizeModulationCurve } from '../../core/modulation/curve';
-import { sanitizeModulationTargets } from '../../core/modulation/routing';
+import {
+  sanitizeModulationTarget,
+  sanitizeModulationTargets,
+} from '../../core/modulation/routing';
 import {
   applyImportedDeviceMeta,
+  isImportRecord,
   resolveImportedDeviceEnabled,
   resolveImportedDeviceId,
   resolveImportedParams,
@@ -20,6 +24,9 @@ const DEFAULT_MODULATOR_PARAMS: CurveModulatorNode['params'] = {
     ],
   },
 };
+
+const LEGACY_MODULATION_TARGET_ID = 'mod-target-legacy';
+const LEGACY_MODULATION_TARGET_SLOT_INDEX = 0;
 
 const createDefaultModulatorNode = (
   id: string,
@@ -39,6 +46,29 @@ const createDefaultModulatorNode = (
   },
 });
 
+const hydrateImportedModulationTargets = (
+  params: Record<string, unknown>,
+): CurveModulatorNode['params']['targets'] => {
+  const targets = sanitizeModulationTargets(params.targets);
+  if (Array.isArray(params.targets) || targets.length > 0) {
+    return targets;
+  }
+
+  // Temporary backward compatibility for the old single-target Modulator format.
+  // TODO: Remove this legacy block after params.target/params.amount racks are no longer supported.
+  if (!isImportRecord(params.target)) {
+    return [];
+  }
+
+  const legacyTarget = sanitizeModulationTarget({
+    ...params.target,
+    id: LEGACY_MODULATION_TARGET_ID,
+    slotIndex: LEGACY_MODULATION_TARGET_SLOT_INDEX,
+    amount: params.amount,
+  });
+  return legacyTarget ? [legacyTarget] : [];
+};
+
 const hydrateImportedModulatorNode = (
   source: Record<string, unknown>,
 ): CurveModulatorNode | null => {
@@ -52,7 +82,7 @@ const hydrateImportedModulatorNode = (
     source,
   );
   const params = resolveImportedParams(source);
-  device.params.targets = sanitizeModulationTargets(params.targets);
+  device.params.targets = hydrateImportedModulationTargets(params);
   device.params.curve = sanitizeModulationCurve(params.curve);
   return device;
 };

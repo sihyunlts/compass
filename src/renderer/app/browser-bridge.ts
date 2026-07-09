@@ -501,6 +501,7 @@ export const createBrowserCompassBridge = (): CompassApi => ({
       status: 'loaded',
       filePath: toVirtualPresetPath(request.presetType, request.relativePath),
       payload: clonePreset(entry.payload as Extract<PresetFile, { presetType: K }>),
+      needsSave: false,
     };
   },
 });

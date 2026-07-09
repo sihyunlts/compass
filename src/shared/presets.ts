@@ -53,6 +53,7 @@ export type ParsedPresetFileResult =
   | {
       ok: true;
       preset: PresetFile;
+      needsSave: boolean;
     }
   | {
       ok: false;
@@ -118,10 +119,33 @@ const parsePresetFileHeader = (
 
 interface ParsedPresetPayload {
   preset: PresetFile;
+  needsSave: boolean;
 }
 
 const hasStoredName = (value: unknown): boolean =>
   isRecord(value) && Object.hasOwn(value, 'name');
+
+// Temporary backward compatibility detector for the old single-target Modulator format.
+// TODO: Remove this legacy detector with the params.target/params.amount hydration fallback.
+const hasLegacyModulatorSingleTarget = (value: unknown): boolean => {
+  if (!isRecord(value) || value.kind !== 'modulator') {
+    return false;
+  }
+
+  const params = isRecord(value.params) ? value.params : null;
+  if (!params || Array.isArray(params.targets)) {
+    return false;
+  }
+
+  const target = isRecord(params.target) ? params.target : null;
+  return typeof target?.deviceId === 'string'
+    && target.deviceId.trim().length > 0
+    && typeof target.paramKey === 'string'
+    && target.paramKey.trim().length > 0;
+};
+
+const hasLegacyModulatorSingleTargetInDevices = (devices: unknown): boolean =>
+  Array.isArray(devices) && devices.some((device) => hasLegacyModulatorSingleTarget(device));
 
 export const toStandaloneDevicePresetDevice = (
   device: GeneratorDeviceNode,
@@ -150,6 +174,7 @@ const parseDevicePresetPayload = (
       savedAtIso: header.savedAtIso,
       device: toStandaloneDevicePresetDevice(device),
     },
+    needsSave: hasLegacyModulatorSingleTarget(rawDevice),
   };
 };
 
@@ -200,6 +225,7 @@ const parseGroupPresetPayload = (
           }
         : {}),
     },
+    needsSave: hasLegacyModulatorSingleTargetInDevices(group.devices),
   };
 };
 
@@ -239,6 +265,7 @@ const parseRackPresetPayload = (
           }
         : {}),
     },
+    needsSave: hasLegacyModulatorSingleTargetInDevices(sourceDevices),
   };
 };
 
@@ -439,5 +466,6 @@ export const parsePresetFileText = (
   return {
     ok: true,
     preset: applyPresetNameFromFileName(preset, options.fileName),
+    needsSave: parsedPreset.needsSave,
   };
 };

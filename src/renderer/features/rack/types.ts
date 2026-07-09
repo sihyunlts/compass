@@ -40,6 +40,7 @@ export type BrowserInsertSource =
       preset: RackPresetFile;
       label: string;
       filePath?: string | null;
+      needsSave?: boolean;
     };
 
 export type BrowserPresetInsertSource = Exclude<BrowserInsertSource, { kind: 'device-kind' }>;

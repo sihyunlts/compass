@@ -187,6 +187,7 @@ export type ReadPresetEntryResponse<K extends PresetFileKind = PresetFileKind> =
       status: 'loaded';
       filePath: string;
       payload: PresetFileByKind<K>;
+      needsSave: boolean;
     }
   | {
       status: 'error';

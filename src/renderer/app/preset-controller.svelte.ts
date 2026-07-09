@@ -61,6 +61,7 @@ type RackOpenTarget = {
   label: string;
   preset: RackPresetFile;
   filePath: string | null;
+  needsSave: boolean;
 };
 
 interface PresetControllerState {
@@ -424,6 +425,7 @@ class PresetController {
           label: source.label,
           preset: source.preset,
           filePath: source.filePath ?? null,
+          needsSave: source.needsSave === true,
         });
       },
       'Rack load failed.',
@@ -786,6 +788,7 @@ class PresetController {
         label: resolveRackDisplayNameFromFileName(payload.file.name),
         preset: parsed.preset,
         filePath: payload.filePath,
+        needsSave: parsed.needsSave,
       });
       return;
     }
@@ -853,6 +856,7 @@ class PresetController {
           preset: response.payload,
           label: entryLabel,
           filePath: response.filePath,
+          needsSave: response.needsSave,
         }
       : null;
   }
@@ -899,6 +903,7 @@ class PresetController {
       label: entry.label,
       preset: response.payload,
       filePath: response.filePath,
+      needsSave: response.needsSave,
     });
   }
 
@@ -928,6 +933,12 @@ class PresetController {
     }
 
     this.setCurrentRackFile(target.filePath, target.label);
+    if (target.needsSave) {
+      this.syncRackDirtyState();
+      this.showMessage('Rack loaded. Save to update the file format.');
+      return;
+    }
+
     this.markCurrentRackClean();
     this.showMessage('Rack loaded.');
   }

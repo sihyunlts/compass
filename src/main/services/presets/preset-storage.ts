@@ -263,6 +263,7 @@ export class PresetStorage {
         status: 'loaded',
         filePath,
         payload: parsed.preset as Extract<PresetFile, { presetType: K }>,
+        needsSave: parsed.needsSave,
       };
     } catch (error) {
       return {
