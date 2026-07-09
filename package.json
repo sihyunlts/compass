@@ -1,7 +1,7 @@
 {
   "name": "compass",
   "productName": "Compass",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Next Generation Lightshow Tool",
   "main": ".vite/build/main.js",
   "private": true,
