@@ -1,4 +1,3 @@
-import { clamp } from '../../shared/math';
 import {
   isCurveModulatorNode,
   type CurveModulatorNode,
@@ -12,24 +11,106 @@ import { normalizeOptionalId } from '../../shared/normalize-id';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import { sanitizeModulationCurve } from './curve';
 
-const MIN_MODULATION_AMOUNT = -128;
-const MAX_MODULATION_AMOUNT = 128;
+export const DEFAULT_MODULATION_TARGET_AMOUNT = 1;
+export const MODULATION_TARGET_SLOT_COUNT = 10;
 
-const sanitizeAmount = (value: unknown): number => {
+const createIndexedTargetId = (index: number): string => `mod-target-${index + 1}`;
+
+const resolveUniqueTargetId = (
+  preferredId: string,
+  fallbackIndex: number,
+  seenIds: ReadonlySet<string>,
+): string => {
+  if (!seenIds.has(preferredId)) {
+    return preferredId;
+  }
+
+  const fallbackId = createIndexedTargetId(fallbackIndex);
+  if (!seenIds.has(fallbackId)) {
+    return fallbackId;
+  }
+
+  for (let suffix = 2; ; suffix += 1) {
+    const candidate = `${fallbackId}-${suffix}`;
+    if (!seenIds.has(candidate)) {
+      return candidate;
+    }
+  }
+};
+
+const sanitizeAmount = (
+  value: unknown,
+  fallback = 0,
+): number => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) {
-    return 0;
+    return fallback;
   }
-  return Number(clamp(numeric, MIN_MODULATION_AMOUNT, MAX_MODULATION_AMOUNT).toFixed(6));
+  return Number(numeric.toFixed(6));
+};
+
+export const createModulationTargetId = (): string =>
+  `mod-target-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
+
+export const sanitizeModulationTargetAmount = (
+  value: unknown,
+): number => sanitizeAmount(value, DEFAULT_MODULATION_TARGET_AMOUNT);
+
+export const isValidModulationTargetSlotIndex = (
+  value: unknown,
+): value is number => (
+  typeof value === 'number'
+  && Number.isInteger(value)
+  && value >= 0
+  && value < MODULATION_TARGET_SLOT_COUNT
+);
+
+const sanitizeModulationTargetSlotIndex = (
+  value: unknown,
+  fallback: number,
+): number => {
+  if (isValidModulationTargetSlotIndex(value)) {
+    return value;
+  }
+
+  if (isValidModulationTargetSlotIndex(fallback)) {
+    return fallback;
+  }
+
+  return 0;
+};
+
+const resolveAvailableSlotIndex = (
+  preferredSlotIndex: number,
+  seenSlotIndices: ReadonlySet<number>,
+): number | null => {
+  for (let slotIndex = preferredSlotIndex; slotIndex < MODULATION_TARGET_SLOT_COUNT; slotIndex += 1) {
+    if (!seenSlotIndices.has(slotIndex)) {
+      return slotIndex;
+    }
+  }
+
+  for (let slotIndex = 0; slotIndex < preferredSlotIndex; slotIndex += 1) {
+    if (!seenSlotIndices.has(slotIndex)) {
+      return slotIndex;
+    }
+  }
+
+  return null;
 };
 
 export const sanitizeModulationTarget = (
   target: unknown,
+  fallbackId = '',
+  fallbackSlotIndex = 0,
 ): ModulationTarget | null => {
   if (!target || typeof target !== 'object') {
     return null;
   }
 
+  const id = typeof (target as { id?: unknown }).id === 'string'
+    ? (target as { id: string }).id.trim()
+    : fallbackId;
   const deviceId = typeof (target as { deviceId?: unknown }).deviceId === 'string'
     ? (target as { deviceId: string }).deviceId.trim()
     : '';
@@ -41,7 +122,55 @@ export const sanitizeModulationTarget = (
     return null;
   }
 
-  return { deviceId, paramKey };
+  return {
+    id: id || fallbackId || createModulationTargetId(),
+    slotIndex: sanitizeModulationTargetSlotIndex(
+      (target as { slotIndex?: unknown }).slotIndex,
+      fallbackSlotIndex,
+    ),
+    deviceId,
+    paramKey,
+    amount: sanitizeModulationTargetAmount((target as { amount?: unknown }).amount),
+  };
+};
+
+export const sanitizeModulationTargets = (
+  targets: unknown,
+): ModulationTarget[] => {
+  if (!Array.isArray(targets)) {
+    return [];
+  }
+
+  const sanitizedTargets: ModulationTarget[] = [];
+  const seenIds = new Set<string>();
+  const seenSlotIndices = new Set<number>();
+  for (let index = 0; index < targets.length; index += 1) {
+    const target = sanitizeModulationTarget(
+      targets[index],
+      createIndexedTargetId(index),
+      index,
+    );
+    if (!target) {
+      continue;
+    }
+
+    const targetId = resolveUniqueTargetId(target.id, index, seenIds);
+    seenIds.add(targetId);
+
+    const slotIndex = resolveAvailableSlotIndex(target.slotIndex, seenSlotIndices);
+    if (slotIndex === null) {
+      continue;
+    }
+    seenSlotIndices.add(slotIndex);
+
+    sanitizedTargets.push({
+      ...target,
+      id: targetId,
+      slotIndex,
+    });
+  }
+
+  return sanitizedTargets.sort((left, right) => left.slotIndex - right.slotIndex);
 };
 
 const sanitizeCurveModulatorNode = (
@@ -53,31 +182,32 @@ const sanitizeCurveModulatorNode = (
   groupId: node.groupId ?? null,
   name: node.name ?? null,
   params: {
-    amount: sanitizeAmount(node.params.amount),
-    target: sanitizeModulationTarget(node.params.target),
+    targets: sanitizeModulationTargets(node.params.targets),
     curve: sanitizeModulationCurve(node.params.curve),
   },
 });
 
-const hasValidTarget = (
+const resolveValidModulationTargetDevice = (
   chain: GeneratorChain,
   target: ModulationTarget | null,
-): boolean => {
+): GeneratorDeviceNode | null => {
   if (!target) {
-    return false;
+    return null;
   }
 
   const targetDeviceIndex = chain.devices.findIndex((device) => device.id === target.deviceId);
   if (targetDeviceIndex === -1) {
-    return false;
+    return null;
   }
 
   const targetDevice = chain.devices[targetDeviceIndex];
   if (!targetDevice || !isModulationTargetDeviceKind(targetDevice.kind)) {
-    return false;
+    return null;
   }
 
-  return isModulationTargetParamKey(targetDevice.kind, target.paramKey);
+  return isModulationTargetParamKey(targetDevice.kind, target.paramKey)
+    ? targetDevice
+    : null;
 };
 
 export const reconcileGeneratorChainModulators = (
@@ -97,10 +227,6 @@ export const reconcileGeneratorChainModulators = (
       device.enabled = sanitized.enabled;
       changed = true;
     }
-    if (sanitized.params.amount !== device.params.amount) {
-      device.params.amount = sanitized.params.amount;
-      changed = true;
-    }
 
     const originalCurve = device.params.curve;
     const nextCurve: ModulationCurve = sanitized.params.curve;
@@ -113,24 +239,19 @@ export const reconcileGeneratorChainModulators = (
       changed = true;
     }
 
-    const target = sanitized.params.target;
-    const targetKey = target ? `${target.deviceId}:${target.paramKey}` : '';
-    const isTargetValid = hasValidTarget(chain, target);
-    const isTargetDuplicated = targetKey ? seenTargetKeys.has(targetKey) : false;
-    const nextTarget = isTargetValid && !isTargetDuplicated ? target : null;
-
-    const prevTarget = device.params.target;
-    const isSameTarget = (
-      (prevTarget?.deviceId ?? '') === (nextTarget?.deviceId ?? '')
-      && (prevTarget?.paramKey ?? '') === (nextTarget?.paramKey ?? '')
-    );
-    if (!isSameTarget) {
-      device.params.target = nextTarget;
-      changed = true;
+    const nextTargets: ModulationTarget[] = [];
+    for (const target of sanitized.params.targets) {
+      const targetKey = `${target.deviceId}:${target.paramKey}`;
+      if (!resolveValidModulationTargetDevice(chain, target) || seenTargetKeys.has(targetKey)) {
+        continue;
+      }
+      seenTargetKeys.add(targetKey);
+      nextTargets.push(target);
     }
 
-    if (nextTarget) {
-      seenTargetKeys.add(`${nextTarget.deviceId}:${nextTarget.paramKey}`);
+    if (JSON.stringify(device.params.targets) !== JSON.stringify(nextTargets)) {
+      device.params.targets = nextTargets;
+      changed = true;
     }
   }
 
@@ -139,6 +260,7 @@ export const reconcileGeneratorChainModulators = (
 
 interface ValidatedModulationRoute {
   modulator: CurveModulatorNode;
+  target: ModulationTarget;
   targetDevice: GeneratorDeviceNode;
   targetParamKey: string;
 }
@@ -155,36 +277,26 @@ export const collectValidatedModulationRoutes = (
       continue;
     }
 
-    const target = sanitizeModulationTarget(device.params.target);
-    if (!target) {
-      continue;
-    }
+    const sanitized = sanitizeCurveModulatorNode(device);
+    for (const target of sanitized.params.targets) {
+      const targetKey = `${target.deviceId}:${target.paramKey}`;
+      if (seenTargetKeys.has(targetKey)) {
+        continue;
+      }
 
-    const targetKey = `${target.deviceId}:${target.paramKey}`;
-    if (seenTargetKeys.has(targetKey)) {
-      continue;
-    }
+      const targetDevice = resolveValidModulationTargetDevice(chain, target);
+      if (!targetDevice) {
+        continue;
+      }
 
-    const targetDeviceIndex = chain.devices.findIndex((item) => item.id === target.deviceId);
-    if (targetDeviceIndex === -1) {
-      continue;
+      seenTargetKeys.add(targetKey);
+      routes.push({
+        modulator: sanitized,
+        target,
+        targetDevice,
+        targetParamKey: target.paramKey,
+      });
     }
-
-    const targetDevice = chain.devices[targetDeviceIndex];
-    if (!targetDevice || !isModulationTargetDeviceKind(targetDevice.kind)) {
-      continue;
-    }
-
-    if (!isModulationTargetParamKey(targetDevice.kind, target.paramKey)) {
-      continue;
-    }
-
-    seenTargetKeys.add(targetKey);
-    routes.push({
-      modulator: sanitizeCurveModulatorNode(device),
-      targetDevice,
-      targetParamKey: target.paramKey,
-    });
   }
 
   return routes;

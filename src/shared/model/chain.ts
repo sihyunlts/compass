@@ -198,8 +198,11 @@ export interface ModulationCurve {
 }
 
 export interface ModulationTarget {
+  id: string;
+  slotIndex: number;
   deviceId: string;
   paramKey: string;
+  amount: number;
 }
 
 export interface CurveModulatorNode extends GroupedDeviceNode {
@@ -207,9 +210,8 @@ export interface CurveModulatorNode extends GroupedDeviceNode {
   kind: 'modulator';
   enabled: boolean;
   params: {
-    amount: number;
     curve: ModulationCurve;
-    target: ModulationTarget | null;
+    targets: ModulationTarget[];
   };
 }
 

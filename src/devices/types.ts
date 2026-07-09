@@ -18,7 +18,9 @@ export interface RendererDeviceEditorPropsBase {
   currentBeatBeats?: number;
   currentProgress01?: number;
   modulationReadoutById?: Record<string, string>;
+  activeDeviceTab?: string;
   resolvePaletteRgb: (velocity: number) => string;
+  onDeviceTabChange?: (tabId: string) => void;
   onControlChange: (change: RendererControlChange) => void;
 }
 
@@ -51,8 +53,16 @@ export interface RendererDeviceSchema<K extends RendererDeviceKind = RendererDev
   hydrateImportedNode: ImportedRendererDeviceHydrator<K>;
 }
 
+export interface RendererDeviceTabDefinition {
+  id: string;
+  label: string;
+  disabled?: boolean;
+}
+
 export interface RendererDeviceDefinition<K extends RendererDeviceKind = RendererDeviceKind>
   extends RendererDeviceSchema<K> {
   editor: Component<RendererDeviceEditorProps<K>>;
   controls?: RendererKindControlDefinition;
+  defaultTabId?: string;
+  tabs?: (device: RendererDeviceNodeOfKind<K>) => readonly RendererDeviceTabDefinition[];
 }

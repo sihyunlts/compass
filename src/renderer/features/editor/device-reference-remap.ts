@@ -43,20 +43,21 @@ export const remapInternalDeviceReferences = (
   unresolvedReferencePolicy: UnresolvedReferencePolicy = 'preserve',
 ): void => {
   if (device.kind === 'modulator') {
-    const target = device.params.target;
-    if (!target) {
+    if (device.params.targets.length === 0) {
       return;
     }
 
-    const remappedId = idMap.get(target.deviceId) ?? null;
-    if (remappedId) {
-      target.deviceId = remappedId;
-      return;
-    }
+    device.params.targets = device.params.targets.flatMap((target) => {
+      const remappedId = idMap.get(target.deviceId) ?? null;
+      if (remappedId) {
+        return [{
+          ...target,
+          deviceId: remappedId,
+        }];
+      }
 
-    if (unresolvedReferencePolicy === 'clear') {
-      device.params.target = null;
-    }
+      return unresolvedReferencePolicy === 'clear' ? [] : [target];
+    });
 
     return;
   }

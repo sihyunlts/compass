@@ -65,11 +65,6 @@
         "groupId": null,
         "name": null,
         "params": {
-          "amount": 10,
-          "target": {
-            "deviceId": "effect-19",
-            "paramKey": "offsetY"
-          },
           "curve": {
             "domain": "loop01",
             "divisions": 16,
@@ -90,7 +85,16 @@
                 "v": 1
               }
             ]
-          }
+          },
+          "targets": [
+            {
+              "id": "mod-target-1",
+              "slotIndex": 0,
+              "deviceId": "effect-19",
+              "paramKey": "offsetY",
+              "amount": 10
+            }
+          ]
         }
       },
       {
@@ -100,11 +104,6 @@
         "groupId": null,
         "name": null,
         "params": {
-          "amount": 1,
-          "target": {
-            "deviceId": "effect-23",
-            "paramKey": "scaleX"
-          },
           "curve": {
             "domain": "loop01",
             "divisions": 16,
@@ -125,7 +124,16 @@
                 "v": 1
               }
             ]
-          }
+          },
+          "targets": [
+            {
+              "id": "mod-target-2",
+              "slotIndex": 0,
+              "deviceId": "effect-23",
+              "paramKey": "scaleX",
+              "amount": 1
+            }
+          ]
         }
       },
       {
@@ -135,11 +143,6 @@
         "groupId": null,
         "name": null,
         "params": {
-          "amount": 90,
-          "target": {
-            "deviceId": "effect-21",
-            "paramKey": "angleDeg"
-          },
           "curve": {
             "domain": "loop01",
             "divisions": 16,
@@ -160,7 +163,16 @@
                 "v": 1
               }
             ]
-          }
+          },
+          "targets": [
+            {
+              "id": "mod-target-3",
+              "slotIndex": 0,
+              "deviceId": "effect-21",
+              "paramKey": "angleDeg",
+              "amount": 90
+            }
+          ]
         }
       }
     ],

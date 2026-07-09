@@ -41,11 +41,6 @@
         "groupId": null,
         "name": null,
         "params": {
-          "amount": 4.5,
-          "target": {
-            "deviceId": "effect-13",
-            "paramKey": "offsetX"
-          },
           "curve": {
             "domain": "loop01",
             "divisions": 16,
@@ -61,7 +56,16 @@
                 "v": 1
               }
             ]
-          }
+          },
+          "targets": [
+            {
+              "id": "mod-target-1",
+              "slotIndex": 0,
+              "deviceId": "effect-13",
+              "paramKey": "offsetX",
+              "amount": 4.5
+            }
+          ]
         }
       }
     ],

@@ -33,6 +33,7 @@ import type {
   RendererDeviceKind,
   RendererDeviceNodeOfKind,
   RendererDeviceSchema,
+  RendererDeviceTabDefinition,
   RendererModulationParamDefinition,
 } from './types';
 import { waterdropDeviceControls } from './waterdrop/controls';
@@ -43,7 +44,9 @@ export type RendererDeviceEditorModulePath = `./${string}/ui.svelte`;
 export type RendererDeviceManifestEntry = {
   [K in RendererDeviceKind]: RendererDeviceSchema<K> & {
     controls?: RendererKindControlDefinition;
+    defaultTabId?: string;
     editor: RendererDeviceEditorModulePath;
+    tabs?: (device: RendererDeviceNodeOfKind<K>) => readonly RendererDeviceTabDefinition[];
   };
 }[RendererDeviceKind];
 
@@ -71,7 +74,12 @@ export const RENDERER_DEVICE_MANIFEST = [
   {
     ...modulatorDeviceSchema,
     controls: modulatorDeviceControls,
+    defaultTabId: 'curve',
     editor: './modulator/ui.svelte',
+    tabs: () => [
+      { id: 'curve', label: 'Curve' },
+      { id: 'map', label: 'Map' },
+    ],
   },
   {
     ...mirrorDeviceSchema,

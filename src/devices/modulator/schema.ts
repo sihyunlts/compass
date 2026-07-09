@@ -1,18 +1,16 @@
 import type { CurveModulatorNode } from '../../shared/model';
 import { sanitizeModulationCurve } from '../../core/modulation/curve';
-import { sanitizeModulationTarget } from '../../core/modulation/routing';
+import { sanitizeModulationTargets } from '../../core/modulation/routing';
 import {
   applyImportedDeviceMeta,
   resolveImportedDeviceEnabled,
   resolveImportedDeviceId,
   resolveImportedParams,
-  toFiniteNumber,
 } from '../import-hydration';
 import type { RendererDeviceSchema } from '../types';
 
 const DEFAULT_MODULATOR_PARAMS: CurveModulatorNode['params'] = {
-  amount: 1,
-  target: null,
+  targets: [],
   curve: {
     domain: 'loop01',
     divisions: 16,
@@ -23,8 +21,6 @@ const DEFAULT_MODULATOR_PARAMS: CurveModulatorNode['params'] = {
   },
 };
 
-const MODULATOR_NUMERIC_PARAM_KEYS = ['amount'] as const;
-
 const createDefaultModulatorNode = (
   id: string,
   enabled: boolean,
@@ -34,8 +30,7 @@ const createDefaultModulatorNode = (
   enabled: enabled !== false,
   groupId: null,
   params: {
-    amount: DEFAULT_MODULATOR_PARAMS.amount,
-    target: DEFAULT_MODULATOR_PARAMS.target,
+    targets: [],
     curve: {
       domain: DEFAULT_MODULATOR_PARAMS.curve.domain,
       divisions: DEFAULT_MODULATOR_PARAMS.curve.divisions,
@@ -57,8 +52,7 @@ const hydrateImportedModulatorNode = (
     source,
   );
   const params = resolveImportedParams(source);
-  device.params.amount = toFiniteNumber(params.amount, device.params.amount);
-  device.params.target = sanitizeModulationTarget(params.target);
+  device.params.targets = sanitizeModulationTargets(params.targets);
   device.params.curve = sanitizeModulationCurve(params.curve);
   return device;
 };
@@ -67,7 +61,6 @@ export const modulatorDeviceSchema = {
   kind: 'modulator',
   label: 'Modulator',
   group: 'effect',
-  numericParamKeys: MODULATOR_NUMERIC_PARAM_KEYS,
   createDefaultNode: createDefaultModulatorNode,
   hydrateImportedNode: hydrateImportedModulatorNode,
 } satisfies RendererDeviceSchema<'modulator'>;

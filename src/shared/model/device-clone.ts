@@ -135,13 +135,13 @@ export function cloneDeviceNode(
       groupId: device.groupId ?? null,
       name: device.name ?? null,
       params: {
-        amount: device.params.amount,
-        target: device.params.target
-          ? {
-            deviceId: device.params.target.deviceId,
-            paramKey: device.params.target.paramKey,
-          }
-          : null,
+        targets: device.params.targets.map((target) => ({
+          id: target.id,
+          slotIndex: target.slotIndex,
+          deviceId: target.deviceId,
+          paramKey: target.paramKey,
+          amount: target.amount,
+        })),
         curve: cloneModulationCurve(device.params.curve),
       },
     };

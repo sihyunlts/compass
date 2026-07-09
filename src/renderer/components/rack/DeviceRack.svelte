@@ -4,7 +4,11 @@
    * Integrates rack selection, drop indicators, and group rendering state.
    */
   import { onMount } from 'svelte';
-  import type { GeneratorDeviceNode, GeneratorChain } from '../../../shared/model';
+  import {
+    isCurveModulatorNode,
+    type GeneratorDeviceNode,
+    type GeneratorChain,
+  } from '../../../shared/model';
   import type { ContextMenuTarget } from '../../features/context-menu/types';
   import type {
     BrowserNonRackPresetInsertSource,
@@ -100,6 +104,8 @@
   let dropIndicatorEl = $state<HTMLElement | null>(null);
   let browserDragBadgeEl = $state<HTMLElement | null>(null);
   let renamePopover = $state<ReturnType<typeof RackRenamePopover> | null>(null);
+  let mappingCaptureModulatorId = $state<string | null>(null);
+  let mappingCaptureSlotIndex = $state<number | null>(null);
 
   const resolveGroupEnabled = (groupId: string): boolean =>
     chainState.groupStateById[groupId]?.enabled !== false;
@@ -118,6 +124,85 @@
     buildGroupDisplayNameById(devices, chainState.groupStateById));
   const rackContentItems = $derived.by(() =>
     buildRackContentItems(devices, resolveGroupEnabled));
+
+  const isModulatorDeviceId = (deviceId: string): boolean => {
+    const device = devices.find((item) => item.id === deviceId) ?? null;
+    return device !== null && isCurveModulatorNode(device);
+  };
+
+  const setMappingCapture = (modulatorId: string | null, slotIndex: number | null): void => {
+    mappingCaptureModulatorId = modulatorId;
+    mappingCaptureSlotIndex = slotIndex;
+  };
+
+  const handleDeviceTabChange = (deviceId: string, tabId: string): void => {
+    if (!isModulatorDeviceId(deviceId)) {
+      return;
+    }
+
+    if (tabId === 'map') {
+      setMappingCapture(deviceId, null);
+      return;
+    }
+
+    if (mappingCaptureModulatorId === deviceId) {
+      setMappingCapture(null, null);
+    }
+  };
+
+  const handleModulationTargetSlotSelect = (deviceId: string, slotIndex: number): void => {
+    if (!isModulatorDeviceId(deviceId)) {
+      return;
+    }
+
+    if (mappingCaptureModulatorId === deviceId && mappingCaptureSlotIndex === slotIndex) {
+      setMappingCapture(deviceId, null);
+      return;
+    }
+
+    setMappingCapture(deviceId, slotIndex);
+  };
+
+  const handleModulationTargetPick = (
+    targetDeviceId: string,
+    paramKey: string,
+  ): void => {
+    const modulatorId = mappingCaptureModulatorId;
+    const slotIndex = mappingCaptureSlotIndex;
+    if (!modulatorId || slotIndex === null) {
+      return;
+    }
+
+    controller.surface.handleControlChange({
+      action: 'assign-modulation-target-slot',
+      deviceId: modulatorId,
+      value: {
+        slotIndex,
+        deviceId: targetDeviceId,
+        paramKey,
+      },
+      finalize: true,
+    });
+    setMappingCapture(modulatorId, null);
+  };
+
+  const clearMappingCaptureSlot = (): void => {
+    if (mappingCaptureSlotIndex !== null) {
+      setMappingCapture(mappingCaptureModulatorId, null);
+    }
+  };
+
+  const handleChainPointerDown = (event: PointerEvent): void => {
+    clearMappingCaptureSlot();
+    controller.surface.handleChainPointerDown(event);
+  };
+
+  $effect(() => {
+    window.addEventListener('pointerdown', clearMappingCaptureSlot);
+    return () => {
+      window.removeEventListener('pointerdown', clearMappingCaptureSlot);
+    };
+  });
   const isRackEmpty = $derived(rackContentItems.length === 0);
 
   const miniMapLayoutSignature = $derived.by(() => {
@@ -240,7 +325,7 @@
     class="chain-devices"
     onfocusin={(event) => controller.surface.handleChainFocusIn(event)}
     onkeydown={(event) => controller.handleChainKeyDown(event)}
-    onpointerdown={(event) => controller.surface.handleChainPointerDown(event)}
+    onpointerdown={handleChainPointerDown}
     oncontextmenu={(event) => controller.surface.handleChainContextMenu(event)}
     onclick={(event) => controller.surface.handleChainClick(event)}
     ondblclick={(event) => controller.surface.handleChainDoubleClick(event)}
@@ -286,9 +371,20 @@
             onRenameBlur={() => controller.rename.handleInputBlur()}
             onRenameKeyDown={(event) => controller.rename.handleInputKeyDown(event)}
             onSavePreset={(deviceId) => controller.handleDeviceSavePreset(deviceId)}
+            {mappingCaptureModulatorId}
+            {mappingCaptureSlotIndex}
+            onDeviceTabChange={handleDeviceTabChange}
+            onModulationTargetSlotSelect={handleModulationTargetSlotSelect}
+            onModulationTargetPick={handleModulationTargetPick}
             onControlChange={(change) => controller.surface.handleControlChange(change)}
-            onHeaderPointerDown={(event) => controller.handleDeviceHeaderPointerDown(event, item.device.id)}
-            onHeaderClick={(event) => controller.handleDeviceHeaderClick(event, item.device.id)}
+            onHeaderPointerDown={(event) => {
+              clearMappingCaptureSlot();
+              controller.handleDeviceHeaderPointerDown(event, item.device.id);
+            }}
+            onHeaderClick={(event) => {
+              clearMappingCaptureSlot();
+              controller.handleDeviceHeaderClick(event, item.device.id);
+            }}
             onHeaderContextMenu={(event) => controller.handleDeviceHeaderContextMenu(event, item.device.id)}
             onHeaderDoubleClick={(event) => controller.handleDeviceHeaderDoubleClick(event, item.device.id)}
           />
@@ -358,9 +454,20 @@
                     onRenameBlur={() => controller.rename.handleInputBlur()}
                     onRenameKeyDown={(event) => controller.rename.handleInputKeyDown(event)}
                     onSavePreset={(deviceId) => controller.handleDeviceSavePreset(deviceId)}
+                    {mappingCaptureModulatorId}
+                    {mappingCaptureSlotIndex}
+                    onDeviceTabChange={handleDeviceTabChange}
+                    onModulationTargetSlotSelect={handleModulationTargetSlotSelect}
+                    onModulationTargetPick={handleModulationTargetPick}
                     onControlChange={(change) => controller.surface.handleControlChange(change)}
-                    onHeaderPointerDown={(event) => controller.handleDeviceHeaderPointerDown(event, col.device.id)}
-                    onHeaderClick={(event) => controller.handleDeviceHeaderClick(event, col.device.id)}
+                    onHeaderPointerDown={(event) => {
+                      clearMappingCaptureSlot();
+                      controller.handleDeviceHeaderPointerDown(event, col.device.id);
+                    }}
+                    onHeaderClick={(event) => {
+                      clearMappingCaptureSlot();
+                      controller.handleDeviceHeaderClick(event, col.device.id);
+                    }}
                     onHeaderContextMenu={(event) => controller.handleDeviceHeaderContextMenu(event, col.device.id)}
                     onHeaderDoubleClick={(event) => controller.handleDeviceHeaderDoubleClick(event, col.device.id)}
                   />

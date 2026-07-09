@@ -4,21 +4,39 @@ import {
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 import { sanitizeCurveDivisions, sanitizeCurveNodes } from '../../core/modulation/curve';
-import { sanitizeModulationTarget } from '../../core/modulation/routing';
+import {
+  DEFAULT_MODULATION_TARGET_AMOUNT,
+  createModulationTargetId,
+  isValidModulationTargetSlotIndex,
+  sanitizeModulationTarget,
+  sanitizeModulationTargetAmount,
+} from '../../core/modulation/routing';
+import type { CurveModulatorNode, ModulationTarget } from '../../shared/model';
+
+const readTargetId = (change: { paramKey?: string }): string | null => {
+  const targetId = change.paramKey?.trim() ?? '';
+  return targetId || null;
+};
+
+const findTargetById = (
+  device: CurveModulatorNode,
+  targetId: string,
+): ModulationTarget | null =>
+  device.params.targets.find((target) => target.id === targetId) ?? null;
 
 export const modulatorDeviceControls = {
   descriptors: {
-    'set-modulation-target-device': {
-      resolveMergeKey: createMergeKeyResolver('set-modulation-target-device'),
+    'assign-modulation-target-slot': {
+      resolveMergeKey: () => null,
     },
-    'set-modulation-target-param': {
-      resolveMergeKey: createMergeKeyResolver('set-modulation-target-param'),
+    'clear-modulation-target-slot': {
+      resolveMergeKey: () => null,
     },
-    'set-modulation-amount': {
-      resolveMergeKey: createMergeKeyResolver('set-modulation-amount'),
-      resolveDefaultValue: (defaultDevice) =>
-        defaultDevice.kind === 'modulator'
-          ? defaultDevice.params.amount
+    'set-modulation-target-amount': {
+      resolveMergeKey: createMergeKeyResolver('set-modulation-target-amount', readTargetId),
+      resolveDefaultValue: (defaultDevice, change) =>
+        defaultDevice.kind === 'modulator' && readTargetId(change)
+          ? DEFAULT_MODULATION_TARGET_AMOUNT
           : null,
     },
     'set-modulation-divisions': {
@@ -29,72 +47,96 @@ export const modulatorDeviceControls = {
     },
   },
   createHandlers: (context) => ({
-    'set-modulation-target-device': (device, change) => {
+    'assign-modulation-target-slot': (device, change) => {
       if (device.kind !== 'modulator') {
         return false;
       }
 
-      if (typeof change.value !== 'string') {
+      if (!change.value || typeof change.value !== 'object') {
         return false;
       }
 
-      const deviceId = change.value.trim();
-      if (!deviceId) {
-        device.params.target = null;
-        return true;
+      const slotIndex = (change.value as { slotIndex?: unknown }).slotIndex;
+      if (!isValidModulationTargetSlotIndex(slotIndex)) {
+        return false;
       }
 
-      const targetDevice = context.findDeviceById(deviceId);
+      const requestedDeviceId = typeof (change.value as { deviceId?: unknown }).deviceId === 'string'
+        ? (change.value as { deviceId: string }).deviceId.trim()
+        : '';
+      const requestedParamKey = typeof (change.value as { paramKey?: unknown }).paramKey === 'string'
+        ? (change.value as { paramKey: string }).paramKey.trim()
+        : '';
+      if (!requestedDeviceId || !requestedParamKey) {
+        return false;
+      }
+
+      const targetDevice = context.findDeviceById(requestedDeviceId);
       if (!targetDevice) {
-        device.params.target = null;
-        return true;
+        return false;
       }
 
       const paramOptions = context.getModulationTargetParamDefinitions(targetDevice.kind);
-      if (paramOptions.length === 0) {
-        device.params.target = null;
-        return true;
+      if (!paramOptions.some((option) => option.key === requestedParamKey)) {
+        return false;
       }
 
-      const currentParamKey = device.params.target?.paramKey ?? '';
-      const nextParamKey = paramOptions.some((item) => item.key === currentParamKey)
-        ? currentParamKey
-        : paramOptions[0].key;
+      const existingTarget = device.params.targets.find((target) =>
+        target.deviceId === requestedDeviceId
+        && target.paramKey === requestedParamKey) ?? null;
+      if (existingTarget) {
+        return false;
+      }
 
-      device.params.target = sanitizeModulationTarget({
-        deviceId,
-        paramKey: nextParamKey,
+      const previousTarget = device.params.targets.find((target) => target.slotIndex === slotIndex) ?? null;
+      const target = sanitizeModulationTarget({
+        id: previousTarget?.id ?? createModulationTargetId(),
+        slotIndex,
+        deviceId: requestedDeviceId,
+        paramKey: requestedParamKey,
+        amount: previousTarget?.amount ?? DEFAULT_MODULATION_TARGET_AMOUNT,
       });
+      if (!target) {
+        return false;
+      }
+
+      device.params.targets = [
+        ...device.params.targets.filter((item) =>
+          item.slotIndex !== slotIndex
+          && !(item.deviceId === requestedDeviceId && item.paramKey === requestedParamKey)),
+        target,
+      ].sort((left, right) => left.slotIndex - right.slotIndex);
       return true;
     },
-    'set-modulation-target-param': (device, change) => {
+    'clear-modulation-target-slot': (device, change) => {
       if (device.kind !== 'modulator') {
         return false;
       }
 
-      if (typeof change.value !== 'string') {
+      const slotIndex = change.value;
+      if (!isValidModulationTargetSlotIndex(slotIndex)) {
         return false;
       }
 
-      const paramKey = change.value.trim();
-      if (!paramKey) {
-        device.params.target = null;
-        return true;
-      }
-
-      const currentDeviceId = device.params.target?.deviceId ?? '';
-      if (!currentDeviceId) {
+      const nextTargets = device.params.targets.filter((target) => target.slotIndex !== slotIndex);
+      if (nextTargets.length === device.params.targets.length) {
         return false;
       }
-
-      device.params.target = sanitizeModulationTarget({
-        deviceId: currentDeviceId,
-        paramKey,
-      });
+      device.params.targets = nextTargets;
       return true;
     },
-    'set-modulation-amount': (device, change) => {
+    'set-modulation-target-amount': (device, change) => {
       if (device.kind !== 'modulator') {
+        return false;
+      }
+
+      const targetId = readTargetId(change);
+      if (!targetId) {
+        return false;
+      }
+
+      const target = findTargetById(device, targetId);
+      if (!target) {
         return false;
       }
 
@@ -103,7 +145,7 @@ export const modulatorDeviceControls = {
         return false;
       }
 
-      device.params.amount = value;
+      target.amount = sanitizeModulationTargetAmount(value);
       return true;
     },
     'set-modulation-divisions': (device, change) => {

@@ -5,8 +5,11 @@
   import { tick } from 'svelte';
   import type { GeneratorDeviceNode } from '../../../shared/model';
   import type { RendererControlChange } from '../../../devices/control-types';
+  import type { RendererDeviceTabDefinition } from '../../../devices/types';
   import { getDeviceBrowserCategory } from '../../features/editor/device-browser-categories';
   import { getRendererDeviceDefinition } from '../../../devices';
+  import { closestRackControlTarget } from '../../features/rack/control-target';
+  import DeviceTabs from './DeviceTabs.svelte';
   import { hint } from '../overlays/hint';
 
   let {
@@ -30,6 +33,11 @@
     onRenameBlur,
     onRenameKeyDown,
     onSavePreset,
+    mappingCaptureModulatorId = null,
+    mappingCaptureSlotIndex = null,
+    onDeviceTabChange,
+    onModulationTargetSlotSelect,
+    onModulationTargetPick,
     onControlChange,
     onHeaderPointerDown,
     onHeaderClick,
@@ -56,6 +64,11 @@
     onRenameBlur?: (event: FocusEvent) => void;
     onRenameKeyDown?: (event: KeyboardEvent) => void;
     onSavePreset?: (deviceId: string) => void;
+    mappingCaptureModulatorId?: string | null;
+    mappingCaptureSlotIndex?: number | null;
+    onDeviceTabChange?: (deviceId: string, tabId: string) => void;
+    onModulationTargetSlotSelect?: (deviceId: string, slotIndex: number) => void;
+    onModulationTargetPick?: (targetDeviceId: string, paramKey: string) => void;
     onControlChange: (change: RendererControlChange) => void;
     onHeaderPointerDown?: (event: PointerEvent) => void;
     onHeaderClick?: (event: MouseEvent) => void;
@@ -64,12 +77,18 @@
   }>();
 
   let renameInputEl = $state<HTMLInputElement | null>(null);
+  let editorScopeEl = $state<HTMLDivElement | null>(null);
+  let activeDeviceTab = $state('');
   const isDeviceDisabled = $derived(!device.enabled || isDisabledByGroup);
   const isInlineRenaming = $derived(isRenaming && !isCollapsed);
   const deviceDefinition = $derived(getRendererDeviceDefinition(device.kind));
   const deviceCategory = $derived(getDeviceBrowserCategory(device.kind));
   const deviceCardStyle = $derived(`--device-category-accent:var(${deviceCategory.accentColorVar});`);
   const DeviceEditor = $derived(deviceDefinition.editor);
+  const deviceTabs = $derived.by((): readonly RendererDeviceTabDefinition[] =>
+    deviceDefinition.tabs?.(device) ?? []);
+  const modulationTargetParamKeys = $derived.by(() =>
+    new Set(deviceDefinition.modulationTargetParams?.map((param) => param.key) ?? []));
 
   $effect(() => {
     if (!isInlineRenaming) {
@@ -80,6 +99,23 @@
       renameInputEl?.focus();
       renameInputEl?.select();
     });
+  });
+
+  $effect(() => {
+    if (deviceTabs.length === 0) {
+      activeDeviceTab = '';
+      return;
+    }
+
+    if (deviceTabs.some((tab) => tab.id === activeDeviceTab && tab.disabled !== true)) {
+      return;
+    }
+
+    const defaultTabId = deviceDefinition.defaultTabId;
+    const defaultTab = deviceTabs.find((tab) => tab.id === defaultTabId && tab.disabled !== true)
+      ?? deviceTabs.find((tab) => tab.disabled !== true)
+      ?? deviceTabs[0];
+    activeDeviceTab = defaultTab?.id ?? '';
   });
 
   const handleSavePresetPointerDown = (event: PointerEvent): void => {
@@ -109,6 +145,43 @@
       finalize: true,
     });
   };
+
+  const handleEditorMappingCapture = (event: Event): void => {
+    if (
+      !mappingCaptureModulatorId
+      || mappingCaptureSlotIndex === null
+      || mappingCaptureModulatorId === device.id
+    ) {
+      return;
+    }
+
+    const control = closestRackControlTarget(event.target, {
+      requireParam: true,
+      deviceId: device.id,
+      paramKeys: modulationTargetParamKeys,
+    });
+    if (!control?.paramKey) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    onModulationTargetPick?.(device.id, control.paramKey);
+  };
+
+  $effect(() => {
+    const element = editorScopeEl;
+    if (!element) {
+      return;
+    }
+
+    element.addEventListener('pointerdown', handleEditorMappingCapture, { capture: true });
+    element.addEventListener('click', handleEditorMappingCapture, { capture: true });
+    return () => {
+      element.removeEventListener('pointerdown', handleEditorMappingCapture, { capture: true });
+      element.removeEventListener('click', handleEditorMappingCapture, { capture: true });
+    };
+  });
 </script>
 
 <div
@@ -172,9 +245,21 @@
         <span class="device-title">{title}</span>
       {/if}
     </div>
+    {#if !isCollapsed && deviceTabs.length > 0}
+      <DeviceTabs
+        tabs={deviceTabs}
+        activeTab={activeDeviceTab}
+        ariaLabel={`${title} views`}
+        class="device-head-tabs"
+        onChange={(tabId) => {
+          activeDeviceTab = tabId;
+          onDeviceTabChange?.(device.id, tabId);
+        }}
+      />
+    {/if}
   </header>
 
-  <div class="device-editor-scope" data-rack-keyboard-scope="local">
+  <div bind:this={editorScopeEl} class="device-editor-scope" data-rack-keyboard-scope="local">
     <DeviceEditor
       {device}
       {devices}
@@ -184,7 +269,18 @@
       {currentBeatBeats}
       {currentProgress01}
       {modulationReadoutById}
+      {activeDeviceTab}
+      activeModulationTargetSlotIndex={mappingCaptureModulatorId === device.id
+        ? mappingCaptureSlotIndex
+        : undefined}
       {resolvePaletteRgb}
+      onDeviceTabChange={(tabId) => {
+        activeDeviceTab = tabId;
+        onDeviceTabChange?.(device.id, tabId);
+      }}
+      onModulationTargetSlotSelect={(slotIndex) => {
+        onModulationTargetSlotSelect?.(device.id, slotIndex);
+      }}
       {onControlChange}
     />
   </div>
@@ -219,7 +315,7 @@
       border-bottom: 1px solid var(--neutral-20);
       border-radius: var(--device-head-radius) var(--device-head-radius) 0 0;
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: var(--gap-10);
       cursor: grab;
       -webkit-user-drag: none;
@@ -253,6 +349,11 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      :global(.device-head-tabs) {
+        margin-left: auto;
+        flex: 0 0 auto;
       }
     }
 

@@ -49,12 +49,17 @@ class ModulationReadoutCache {
       loopLengthBeats,
       { wrap: isLoopEnabled },
     );
+    const readoutSegmentsByModulatorId = new Map<string, string[]>();
     for (const readout of readouts) {
-      readoutById[readout.modulatorId] = [
-        `${readout.targetParamKey}`,
-        `Current ${readout.modulatedValue.toFixed(3)}`,
-        `Base ${readout.baseValue.toFixed(3)}`,
-      ].join(' | ');
+      const segments = readoutSegmentsByModulatorId.get(readout.modulatorId) ?? [];
+      segments.push(`${readout.targetParamKey} ${readout.modulatedValue.toFixed(3)}`);
+      readoutSegmentsByModulatorId.set(readout.modulatorId, segments);
+    }
+
+    for (const [modulatorId, segments] of readoutSegmentsByModulatorId.entries()) {
+      readoutById[modulatorId] = segments.length === 1
+        ? `Current ${segments[0]}`
+        : `${segments.length} targets | ${segments.join(' | ')}`;
     }
 
     return readoutById;

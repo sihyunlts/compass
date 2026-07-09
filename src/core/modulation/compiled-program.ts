@@ -101,7 +101,7 @@ export const compileModulationProgram = (
       modulatorId: route.modulator.id,
       targetDeviceId: route.targetDevice.id,
       targetParamKey: route.targetParamKey,
-      amount: route.modulator.params.amount,
+      amount: route.target.amount,
       baseValue,
       curve: toCompiledCurve(route.modulator.params.curve),
       isTimelineReversed: reversedTimelineByDeviceId.get(route.targetDevice.id) === true,
