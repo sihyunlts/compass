@@ -156,6 +156,7 @@
     }
 
     &-trigger {
+      flex: 0 0 1.75rem;
       width: 1.75rem;
       padding: 0;
       border-left: 1px solid color-mix(in oklch, currentColor 16%, transparent);

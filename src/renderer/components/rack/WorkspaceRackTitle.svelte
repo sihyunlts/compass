@@ -107,7 +107,6 @@
     align-items: center;
     flex: 0 1 auto;
     min-width: 0;
-    max-width: 10rem;
     color: var(--neutral-90);
     font-weight: 500;
 
