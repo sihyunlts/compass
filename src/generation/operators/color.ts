@@ -39,7 +39,7 @@ const applyColorEffect = (
     },
   );
   const kernel = compileColorAgeKernel(buildColorConfig(effect));
-  if (!kernel || targetOriginIds.size === 0) {
+  if (targetOriginIds.size === 0) {
     return sourceState;
   }
 

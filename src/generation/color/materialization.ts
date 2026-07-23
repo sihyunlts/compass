@@ -65,10 +65,7 @@ const colorizeEventStroke = (
 
 const median = (
   values: ReadonlyArray<number>,
-): number | null => {
-  if (values.length === 0) {
-    return null;
-  }
+): number => {
   const sorted = [...values].sort((left, right) => left - right);
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0
@@ -92,30 +89,23 @@ const resolveReferenceFrameCountByRunIndex = (
 
   const referenceFrameCountByRunIndex = new Map<number, number>();
   for (const [runIndex, runEvents] of eventsByRunIndex.entries()) {
-    const motionCadence = median(
-      runEvents
-        .map((event) => event.motionUnitFrameCount)
-        .filter((frameCount) => frameCount > 0),
-    );
-    if (motionCadence !== null) {
+    const motionCadences = runEvents
+      .map((event) => event.motionUnitFrameCount)
+      .filter((frameCount) => frameCount > 0);
+    if (motionCadences.length > 0) {
       // The one-LED motion clock excludes stationary dwell, while dense samples
       // retain every upstream pose used to draw the trail.
-      referenceFrameCountByRunIndex.set(runIndex, Math.max(motionCadence, 1));
+      referenceFrameCountByRunIndex.set(runIndex, median(motionCadences));
       continue;
     }
 
     const event = runEvents[0];
-    const activeFrameCount = Math.max(
-      event.runEndFrameExclusive - event.runStartFrame,
-      1,
-    );
+    const activeFrameCount = event.runEndFrameExclusive - event.runStartFrame;
     const kernelUnitCount = (kernel.slots.length * kernel.noteLengthRatio)
-      + (Math.max(kernel.slots.length - 1, 0) * kernel.gapRatio);
+      + ((kernel.slots.length - 1) * kernel.gapRatio);
     referenceFrameCountByRunIndex.set(
       runIndex,
-      kernelUnitCount > 0
-        ? activeFrameCount / kernelUnitCount
-        : activeFrameCount,
+      activeFrameCount / kernelUnitCount,
     );
   }
 
@@ -124,7 +114,7 @@ const resolveReferenceFrameCountByRunIndex = (
 
 const toFirstSampleFrame = (
   frame: number,
-): number => Math.max(Math.ceil(frame - COLOR_AGE_EPSILON), 0);
+): number => Math.ceil(frame - COLOR_AGE_EPSILON);
 
 const buildEventWrites = (
   events: ReadonlyArray<GeometryStateEvent>,
@@ -137,7 +127,7 @@ const buildEventWrites = (
   );
   for (let eventIndex = 0; eventIndex < events.length; eventIndex += 1) {
     const event = events[eventIndex];
-    const referenceFrameCount = referenceFrameCountByRunIndex.get(event.runIndex) ?? 1;
+    const referenceFrameCount = referenceFrameCountByRunIndex.get(event.runIndex)!;
     const requestedNoteDurationFrames = Math.max(
       referenceFrameCount * kernel.noteLengthRatio,
       1,
@@ -148,7 +138,7 @@ const buildEventWrites = (
     const stateEndFrame = nextEvent?.runIndex === event.runIndex
       ? nextEvent.frameIndex
       : event.runEndFrameExclusive;
-    const stateFrameCount = Math.max(stateEndFrame - event.frameIndex, 1);
+    const stateFrameCount = stateEndFrame - event.frameIndex;
     // A geometry snapshot already supplies one visible stroke. The first slot,
     // and every band separated by an explicit Gap, therefore uses only the
     // centerline sweep above 100%. Gap 0 keeps dense history bands so diagonal
@@ -191,11 +181,7 @@ const buildEventWrites = (
       });
     }
     const finalWrite = eventWrites[eventWrites.length - 1];
-    if (
-      finalWrite
-      && finalWrite.startFrame < stateEndFrame
-      && finalWrite.endFrameExclusive < stateEndFrame
-    ) {
+    if (finalWrite.endFrameExclusive < stateEndFrame) {
       finalWrite.endFrameExclusive = stateEndFrame;
     }
     writes.push(...eventWrites);
@@ -231,11 +217,6 @@ export const materializeColorTimeline = (
   });
 
   for (const originId of input.targetOriginIds) {
-    const frameWindow = input.sourceFrameWindow;
-    if (frameWindow.endFrameExclusive <= frameWindow.startFrame) {
-      continue;
-    }
-
     const events = eventsByOriginId.get(originId) ?? [];
     const originWrites = buildEventWrites(events, input.kernel);
     for (const write of originWrites) {
@@ -266,9 +247,9 @@ export const materializeColorTimeline = (
     frameIndex < input.sourceFrameWindow.endFrameExclusive;
     frameIndex += 1
   ) {
-    const retainedStrokes = timelineStage.frames[frameIndex]?.strokes.filter(
+    const retainedStrokes = timelineStage.frames[frameIndex].strokes.filter(
       (stroke) => !input.targetOriginIds.has(stroke.polyline.originId),
-    ) ?? [];
+    );
     setFrameStrokes(timelineStage, frameIndex, retainedStrokes);
   }
 

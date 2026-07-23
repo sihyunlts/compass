@@ -5,16 +5,9 @@ import type {
 
 export const compileColorAgeKernel = (
   config: ColorDeviceConfig,
-): CompiledColorAgeKernel | null => {
-  if (config.velocities.length === 0) {
-    return null;
-  }
-
+): CompiledColorAgeKernel => {
   const noteLengthRatio = config.noteLengthPercent / 100;
-  const gapRatio = Math.max(config.gapPercent / 100, 0);
-  if (!Number.isFinite(noteLengthRatio) || noteLengthRatio <= 0 || !Number.isFinite(gapRatio)) {
-    return null;
-  }
+  const gapRatio = config.gapPercent / 100;
 
   return {
     noteLengthRatio,
