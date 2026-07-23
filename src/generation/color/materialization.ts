@@ -35,6 +35,8 @@ interface ColorAgeWrite {
   event: GeometryStateEvent;
   startFrame: number;
   endFrameExclusive: number;
+  playbackEndFrameExclusive: number;
+  colorAgeBandIndex: number;
   velocity: number;
 }
 
@@ -50,11 +52,15 @@ const cloneMask = (
 const colorizeEventStroke = (
   stroke: GeometryStroke,
   velocity: number,
+  colorAgeBandIndex: number | undefined,
+  colorAgeBandCount: number | undefined,
   writeOrder: number,
 ): Omit<GeometryStroke, 'writeId'> => ({
   polyline: {
     ...stroke.polyline,
     velocity,
+    colorAgeBandIndex,
+    colorAgeBandCount,
     points: stroke.polyline.points,
     clipStack: stroke.polyline.clipStack,
   },
@@ -177,6 +183,11 @@ const buildEventWrites = (
         event,
         startFrame,
         endFrameExclusive,
+        playbackEndFrameExclusive: Math.max(
+          toFirstSampleFrame(rawStartFrame + requestedNoteDurationFrames),
+          startFrame + 1,
+        ),
+        colorAgeBandIndex: slot.slotIndex,
         velocity: slot.velocity,
       });
     }
@@ -209,6 +220,7 @@ export const materializeColorTimeline = (
 ): ColorTimelineMaterializationResult => {
   const writes: ColorAgeWrite[] = [];
   const playbackWindowByOriginId = new Map<string, { start: number; end: number }>();
+  const usesNearestColorBoundary = input.kernel.noteLengthRatio < 1;
   let outputEndFrameExclusive = input.sourceTimeline.frames.length;
   const eventsByOriginId = extractGeometryEventTracks({
     timeline: input.sourceTimeline,
@@ -221,12 +233,15 @@ export const materializeColorTimeline = (
     const originWrites = buildEventWrites(events, input.kernel);
     for (const write of originWrites) {
       writes.push(write);
-      outputEndFrameExclusive = Math.max(outputEndFrameExclusive, write.endFrameExclusive);
+      outputEndFrameExclusive = Math.max(
+        outputEndFrameExclusive,
+        write.playbackEndFrameExclusive,
+      );
       mergePlaybackWindow(
         playbackWindowByOriginId,
         originId,
         write.startFrame * input.sourceTimeline.sampleStepBeats,
-        write.endFrameExclusive * input.sourceTimeline.sampleStepBeats,
+        write.playbackEndFrameExclusive * input.sourceTimeline.sampleStepBeats,
       );
     }
   }
@@ -259,7 +274,13 @@ export const materializeColorTimeline = (
         timelineStage,
         write.startFrame,
         write.endFrameExclusive,
-        colorizeEventStroke(stroke, write.velocity, input.writeOrder),
+        colorizeEventStroke(
+          stroke,
+          write.velocity,
+          usesNearestColorBoundary ? write.colorAgeBandIndex : undefined,
+          usesNearestColorBoundary ? input.kernel.slots.length : undefined,
+          input.writeOrder,
+        ),
       );
     }
   }

@@ -12,6 +12,7 @@ import { createSpatialBounds } from './analysis/bounds';
 import type { CanonicalExecutionRequest } from './analysis/types';
 import {
   collectOccupiedCoordinates,
+  shouldReplaceStrokeAtCoordinate,
   type OccupiedCoordinateCandidateBounds,
 } from './timeline/analysis';
 import {
@@ -225,8 +226,12 @@ const resolveExactCoordinateWinner = (
 
     if (
       !winner
-      || stroke.writeOrder > winner.writeOrder
-      || (stroke.writeOrder === winner.writeOrder && stroke.writeId > winner.writeId)
+      || shouldReplaceStrokeAtCoordinate(
+        stroke,
+        winner,
+        coordinateGroup.x,
+        coordinateGroup.y,
+      )
     ) {
       winner = stroke;
     }

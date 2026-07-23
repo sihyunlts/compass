@@ -14,11 +14,15 @@ interface OccupiedCoordinate {
   velocity: number;
   writeOrder: number;
   writeId: number;
+  distanceSquared: number;
+  colorAgeBandIndex?: number;
+  colorAgeBandCount?: number;
 }
 
 interface StrokeOccupiedCoordinateCandidate {
   x: number;
   y: number;
+  distanceSquared: number;
 }
 
 export interface OccupiedCoordinateCandidateBounds {
@@ -39,6 +43,7 @@ type OccupiedCoordinateCandidateCache = Map<string, StrokeOccupiedCoordinateCand
 
 const occupiedCoordinateCandidatesByStroke = new WeakMap<GeometryStroke, OccupiedCoordinateCandidateCache>();
 const occupiedCoordinateCandidatesByPoints = new WeakMap<GeometryStroke['polyline']['points'], OccupiedCoordinateCandidateCache>();
+const TRAILING_COLOR_AGE_BAND_DISTANCE_BIAS_SQUARED = 0.04;
 
 const toCandidateCacheKey = (
   bounds: OccupiedCoordinateCandidateBounds | null,
@@ -109,8 +114,84 @@ const toCandidateBounds = (
 const shouldReplaceWinner = (
   candidate: OccupiedCoordinate,
   current: OccupiedCoordinate,
-): boolean => candidate.writeOrder > current.writeOrder
-  || (candidate.writeOrder === current.writeOrder && candidate.writeId > current.writeId);
+): boolean => {
+  if (isRelatedColorAgeBand(candidate, current)) {
+    if (Math.abs(candidate.writeOrder - current.writeOrder) > 1e-9) {
+      return candidate.writeOrder > current.writeOrder;
+    }
+
+    const distanceDelta = resolveColorAgeBandBoundaryDistance(candidate)
+      - resolveColorAgeBandBoundaryDistance(current);
+    if (Math.abs(distanceDelta) > 1e-9) {
+      return distanceDelta < 0;
+    }
+  }
+
+  return candidate.writeOrder > current.writeOrder
+    || (candidate.writeOrder === current.writeOrder && candidate.writeId > current.writeId);
+};
+
+const isRelatedColorAgeBand = (
+  first: OccupiedCoordinate,
+  second: OccupiedCoordinate,
+): boolean => (
+  first.originId === second.originId
+  && first.originGroupId === second.originGroupId
+  && typeof first.colorAgeBandIndex === 'number'
+  && typeof second.colorAgeBandIndex === 'number'
+  && typeof first.colorAgeBandCount === 'number'
+  && typeof second.colorAgeBandCount === 'number'
+  && first.colorAgeBandCount === second.colorAgeBandCount
+);
+
+const resolveColorAgeBandBoundaryDistance = (
+  coordinate: OccupiedCoordinate,
+): number => {
+  // The final band has only a preceding neighbor, so keep near-boundary raster
+  // overlap with that neighbor instead of letting the final band swallow it.
+  const trailingBandBias = coordinate.colorAgeBandIndex === coordinate.colorAgeBandCount - 1
+    ? TRAILING_COLOR_AGE_BAND_DISTANCE_BIAS_SQUARED
+    : 0;
+  return coordinate.distanceSquared + trailingBandBias;
+};
+
+const toOccupiedCoordinate = (
+  stroke: GeometryStroke,
+  x: number,
+  y: number,
+  distanceSquared: number,
+): OccupiedCoordinate => ({
+  originId: stroke.polyline.originId,
+  originGroupId: stroke.originGroupId,
+  x,
+  y,
+  velocity: stroke.polyline.velocity,
+  writeOrder: stroke.writeOrder,
+  writeId: stroke.writeId,
+  distanceSquared,
+  colorAgeBandIndex: stroke.polyline.colorAgeBandIndex,
+  colorAgeBandCount: stroke.polyline.colorAgeBandCount,
+});
+
+export const shouldReplaceStrokeAtCoordinate = (
+  candidate: GeometryStroke,
+  current: GeometryStroke,
+  x: number,
+  y: number,
+): boolean => shouldReplaceWinner(
+  toOccupiedCoordinate(
+    candidate,
+    x,
+    y,
+    distanceToPolylineSquared({ x, y }, candidate.polyline),
+  ),
+  toOccupiedCoordinate(
+    current,
+    x,
+    y,
+    distanceToPolylineSquared({ x, y }, current.polyline),
+  ),
+);
 
 const collectCenterlineCandidateCoordinates = (
   stroke: GeometryStroke,
@@ -178,10 +259,12 @@ const collectCenterlineCandidateCoordinates = (
 };
 
 const toOccupiedCoordinateCandidates = (
+  stroke: GeometryStroke,
   coordinates: ReadonlyArray<{ x: number; y: number }>,
 ): StrokeOccupiedCoordinateCandidate[] => coordinates.map((coordinate) => ({
   x: coordinate.x,
   y: coordinate.y,
+  distanceSquared: distanceToPolylineSquared(coordinate, stroke.polyline),
 }));
 
 const collectStrokeOccupiedCoordinates = (
@@ -209,6 +292,7 @@ const collectStrokeOccupiedCoordinates = (
   let coordinates: StrokeOccupiedCoordinateCandidate[];
   if (stroke.polyline.rasterMode === 'centerline') {
     coordinates = toOccupiedCoordinateCandidates(
+      stroke,
       collectCenterlineCandidateCoordinates(stroke, outputBounds),
     );
   } else {
@@ -224,7 +308,7 @@ const collectStrokeOccupiedCoordinates = (
             continue;
           }
 
-          coordinates.push({ x, y });
+          coordinates.push({ x, y, distanceSquared });
         }
       }
     }
@@ -249,7 +333,11 @@ export const collectOccupiedCoordinates = (
   const byCoordinate = new Map<string, OccupiedCoordinate>();
 
   for (const stroke of strokes) {
-    for (const { x, y } of collectStrokeOccupiedCoordinates(stroke, outputBounds)) {
+    for (const {
+      x,
+      y,
+      distanceSquared,
+    } of collectStrokeOccupiedCoordinates(stroke, outputBounds)) {
       const coordinateKey = toRoundedCoordinateKey(x, y);
       if (!coordinateKey) {
         continue;
@@ -259,15 +347,12 @@ export const collectOccupiedCoordinates = (
         continue;
       }
 
-      const candidate: OccupiedCoordinate = {
-        originId: stroke.polyline.originId,
-        originGroupId: stroke.originGroupId,
-        x: Math.round(x),
-        y: Math.round(y),
-        velocity: stroke.polyline.velocity,
-        writeOrder: stroke.writeOrder,
-        writeId: stroke.writeId,
-      };
+      const candidate = toOccupiedCoordinate(
+        stroke,
+        Math.round(x),
+        Math.round(y),
+        distanceSquared,
+      );
 
       if (!winnerOnly) {
         byCoordinate.set(`${stroke.writeId}:${coordinateKey}`, candidate);

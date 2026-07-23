@@ -76,6 +76,8 @@ export interface Polyline {
   closed: boolean;
   originId: string;
   velocity: number;
+  colorAgeBandIndex?: number;
+  colorAgeBandCount?: number;
   rasterMode?: 'centerline';
   clipStack: SceneClip[];
 }

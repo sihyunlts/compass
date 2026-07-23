@@ -1,6 +1,4 @@
 import type { Vec2 } from '../../core/core-types';
-import { applyAffine } from '../../core/geometry';
-import { THICKNESS } from '../../core/pipeline/constants';
 import type { FrameWindow } from '../timeline';
 import type { GeometryStroke, GeometryTimeline } from '../types';
 
@@ -28,13 +26,6 @@ export interface ExtractGeometryEventTracksInput {
   probeStepLed?: number;
 }
 
-interface SampledPolylinePoint extends Vec2 {
-  tangentX: number;
-  tangentY: number;
-  isDegenerate: boolean;
-  capDirection: -1 | 0 | 1;
-}
-
 interface MutableGeometryStateEvent extends GeometryStateEvent {
   runEndFrameExclusive: number;
 }
@@ -59,36 +50,23 @@ const spatialHashBySnapshot = new WeakMap<
   Map<number, Map<string, Vec2[]>>
 >();
 
-const isInsideMasks = (
-  stroke: GeometryStroke,
-  point: Vec2,
-): boolean => stroke.masks.every((mask) => {
-  const localPoint = applyAffine(mask.inverseTransform, point);
-  return mask.contains(localPoint.x, localPoint.y);
-});
-
 const interpolateSegment = (
   start: Vec2,
   end: Vec2,
-  length: number,
   t: number,
-): SampledPolylinePoint => {
+): Vec2 => {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   return {
     x: start.x + (dx * t),
     y: start.y + (dy * t),
-    tangentX: dx / length,
-    tangentY: dy / length,
-    isDegenerate: false,
-    capDirection: 0,
   };
 };
 
 const samplePolylineByArcLength = (
   stroke: GeometryStroke,
   probeStepLed: number,
-): SampledPolylinePoint[] => {
+): Vec2[] => {
   const points = stroke.polyline.points;
   if (points.length === 0) {
     return [];
@@ -97,10 +75,6 @@ const samplePolylineByArcLength = (
     return [{
       x: points[0].x,
       y: points[0].y,
-      tangentX: 1,
-      tangentY: 0,
-      isDegenerate: true,
-      capDirection: 0,
     }];
   }
 
@@ -127,14 +101,10 @@ const samplePolylineByArcLength = (
     return [{
       x: points[0].x,
       y: points[0].y,
-      tangentX: 1,
-      tangentY: 0,
-      isDegenerate: true,
-      capDirection: 0,
     }];
   }
 
-  const samples: SampledPolylinePoint[] = [];
+  const samples: Vec2[] = [];
   const safeStep = Math.max(probeStepLed, GEOMETRY_DISTANCE_EPSILON);
   const sampleCount = Math.max(Math.ceil(totalLength / safeStep), 1);
   let segmentIndex = 0;
@@ -159,14 +129,8 @@ const samplePolylineByArcLength = (
     const sample = interpolateSegment(
       segment.start,
       segment.end,
-      segment.length,
       localDistance / segment.length,
     );
-    if (!stroke.polyline.closed && sampleIndex === 0) {
-      sample.capDirection = -1;
-    } else if (!stroke.polyline.closed && sampleIndex === sampleCount) {
-      sample.capDirection = 1;
-    }
     samples.push(sample);
   }
 
@@ -176,41 +140,7 @@ const samplePolylineByArcLength = (
 const buildStrokeProbes = (
   stroke: GeometryStroke,
   probeStepLed: number,
-): Vec2[] => {
-  const centerline = samplePolylineByArcLength(stroke, probeStepLed);
-  if (stroke.masks.length === 0) {
-    return centerline.map(({ x, y }) => ({ x, y }));
-  }
-
-  const probes: Vec2[] = [];
-  for (const sample of centerline) {
-    const normalX = -sample.tangentY;
-    const normalY = sample.tangentX;
-    const offsets = sample.isDegenerate
-      ? [{ x: 0, y: 0 }]
-      : [-THICKNESS, 0, THICKNESS].map((offset) => ({
-          x: normalX * offset,
-          y: normalY * offset,
-        }));
-    if (sample.capDirection !== 0) {
-      offsets.push({
-        x: sample.tangentX * THICKNESS * sample.capDirection,
-        y: sample.tangentY * THICKNESS * sample.capDirection,
-      });
-    }
-    for (const offset of offsets) {
-      const point = {
-        x: sample.x + offset.x,
-        y: sample.y + offset.y,
-      };
-      if (isInsideMasks(stroke, point)) {
-        probes.push(point);
-      }
-    }
-  }
-
-  return probes;
-};
+): Vec2[] => samplePolylineByArcLength(stroke, probeStepLed);
 
 const buildTopologyKey = (
   strokes: ReadonlyArray<GeometryStroke>,
@@ -225,7 +155,8 @@ export const buildGeometryMotionSnapshot = (
   strokes: ReadonlyArray<GeometryStroke>,
   probeStepLed = DEFAULT_PROBE_STEP_LED,
 ): GeometryMotionSnapshot => {
-  // World-space probes keep capture timing invariant under fixed rigid transforms.
+  // Visibility clipping changes what is drawn, not how far the source moved.
+  // Measure source centerlines so Mask and Symmetry keep the same one-LED clock.
   const probes = strokes.flatMap((stroke) => buildStrokeProbes(stroke, probeStepLed));
   return {
     probes,
