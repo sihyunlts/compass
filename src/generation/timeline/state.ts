@@ -6,7 +6,6 @@ import type {
   GeometryStroke,
   GeometryTimeline,
 } from '../types';
-import type { ColorDeviceConfig } from '../../devices/color/color-program';
 import { createEmptyTimeline } from './index';
 
 export type OriginTimelineState = GenerationOriginTimelineState;
@@ -14,16 +13,6 @@ export type OriginTimelineState = GenerationOriginTimelineState;
 export interface PendingTemporalMaterializationCheckpoint {
   temporalByOriginId: ReadonlyMap<string, SceneTemporalState>;
   writeOrderByOriginId: ReadonlyMap<string, number>;
-}
-
-export interface PendingColorApplication {
-  kind: 'color';
-  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
-  targetOriginIds: ReadonlySet<string>;
-  targetGroupId: string | null;
-  requiredFrameWindow: BeatRange | 'all';
-  colorConfig: ColorDeviceConfig;
-  writeOrder: number;
 }
 
 export interface PendingStrokeRewriteFrameWrite {
@@ -57,7 +46,6 @@ export interface PendingGeometryRewriteApplication {
 }
 
 export type PendingFrameApplication =
-  | PendingColorApplication
   | PendingStrokeRewriteApplication
   | PendingGeometryRewriteApplication;
 
@@ -148,36 +136,15 @@ export const clonePendingFrameApplications = (
     };
   }
 
-  if (application.kind === 'stroke-rewrite') {
-    return {
-      kind: 'stroke-rewrite',
-      precedingTemporalCheckpoint,
-      targetOriginIds: new Set(application.targetOriginIds),
-      sourceFrameCount: application.sourceFrameCount,
-      endBeat: application.endBeat,
-      writes: application.writes.map((write) => ({
-        destinationFrameIndex: write.destinationFrameIndex,
-        strokes: write.strokes.map(clonePendingStroke),
-      })),
-    };
-  }
-
   return {
-    kind: 'color',
+    kind: 'stroke-rewrite',
     precedingTemporalCheckpoint,
     targetOriginIds: new Set(application.targetOriginIds),
-    targetGroupId: application.targetGroupId,
-    requiredFrameWindow: application.requiredFrameWindow === 'all'
-      ? 'all'
-      : {
-          start: application.requiredFrameWindow.start,
-          end: application.requiredFrameWindow.end,
-        },
-    colorConfig: {
-      velocities: [...application.colorConfig.velocities],
-      noteLengthPercent: application.colorConfig.noteLengthPercent,
-      gapPercent: application.colorConfig.gapPercent,
-    },
-    writeOrder: application.writeOrder,
+    sourceFrameCount: application.sourceFrameCount,
+    endBeat: application.endBeat,
+    writes: application.writes.map((write) => ({
+      destinationFrameIndex: write.destinationFrameIndex,
+      strokes: write.strokes.map(clonePendingStroke),
+    })),
   };
 });

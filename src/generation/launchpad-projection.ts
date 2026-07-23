@@ -10,7 +10,10 @@ import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 import type { LaunchpadButton } from '../shared/model';
 import { createSpatialBounds } from './analysis/bounds';
 import type { CanonicalExecutionRequest } from './analysis/types';
-import { collectOccupiedCoordinates } from './timeline/analysis';
+import {
+  collectOccupiedCoordinates,
+  type OccupiedCoordinateCandidateBounds,
+} from './timeline/analysis';
 import {
   type CanonicalOutputAdapter,
   type CanonicalSpatialMask,
@@ -235,8 +238,24 @@ const resolveWinnerByCoordinate = (
   }
 
   const winnerByCoordinate = new Map<string, WinnerStroke>();
+  let outputBounds: OccupiedCoordinateCandidateBounds | null = null;
+  for (const coordinateGroup of coordinateGroupByKey.values()) {
+    if (outputBounds) {
+      outputBounds.minX = Math.min(outputBounds.minX, coordinateGroup.x);
+      outputBounds.maxX = Math.max(outputBounds.maxX, coordinateGroup.x);
+      outputBounds.minY = Math.min(outputBounds.minY, coordinateGroup.y);
+      outputBounds.maxY = Math.max(outputBounds.maxY, coordinateGroup.y);
+    } else {
+      outputBounds = {
+        minX: coordinateGroup.x,
+        maxX: coordinateGroup.x,
+        minY: coordinateGroup.y,
+        maxY: coordinateGroup.y,
+      };
+    }
+  }
 
-  const occupied = collectOccupiedCoordinates(visibleStrokes, true, { fillColorSlotGaps: true });
+  const occupied = collectOccupiedCoordinates(visibleStrokes, true, outputBounds);
   for (const coordinate of occupied.values()) {
     const coordinateKey = toRoundedCoordinateKey(coordinate.x, coordinate.y);
     if (coordinateKey === null || !coordinateGroupByKey.has(coordinateKey)) {

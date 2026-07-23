@@ -1,6 +1,5 @@
 import {
   clonePendingFrameApplications,
-  type PendingColorApplication,
   type PendingFrameApplication,
   type PendingGeometryRewriteApplication,
   type MutableGenerationState,
@@ -13,10 +12,6 @@ import {
   completeTimelineStage,
   type FrameWindow,
 } from '../../timeline';
-import {
-  mergeTimelineWindows,
-  type TimelineWindow,
-} from '../../timeline/temporal-window';
 import type { CanonicalOutputAdapter } from '../../types';
 import {
   buildSourceStrokesByOriginAndFrame,
@@ -33,30 +28,8 @@ import {
   type FinalCleanupModeUpdate,
   type GenerationStateTransitionOverrides,
 } from './state-transition';
-import {
-  buildPendingColorMaterialization,
-  sampleColorProgramSlotsIntoStage,
-} from './color-materialization';
-
-const mergePlaybackWindowOverrides = (
-  playbackWindowOverrideMaps: ReadonlyArray<ReadonlyMap<string, TimelineWindow>>,
-): Map<string, TimelineWindow> => {
-  const overrides = new Map<string, TimelineWindow>();
-
-  for (const playbackWindowOverrideMap of playbackWindowOverrideMaps) {
-    for (const [originId, playbackWindow] of playbackWindowOverrideMap.entries()) {
-      overrides.set(
-        originId,
-        mergeTimelineWindows(overrides.get(originId), playbackWindow),
-      );
-    }
-  }
-
-  return overrides;
-};
 
 type PendingFrameApplicationDraft =
-  | Omit<PendingColorApplication, 'precedingTemporalCheckpoint'>
   | Omit<PendingGeometryRewriteApplication, 'precedingTemporalCheckpoint'>
   | Omit<PendingStrokeRewriteApplication, 'precedingTemporalCheckpoint'>;
 
@@ -141,22 +114,6 @@ export const appendPendingGeometryRewriteApplication = (
   );
 };
 
-export const appendPendingColorApplication = (
-  input: PendingFrameApplicationAppendInput,
-  application: Omit<PendingColorApplication, 'kind' | 'precedingTemporalCheckpoint'>,
-  options: {
-    timelineStateByOriginId?: MutableGenerationState['timelineStateByOriginId'];
-    finalCleanupModeUpdate: FinalCleanupModeUpdate;
-  },
-): MutableGenerationState => appendPendingFrameApplication(
-  input,
-  {
-    kind: 'color',
-    ...application,
-  },
-  options,
-);
-
 export const buildPendingStrokeRewriteFrameWrites = (
   timeline: GeometryTimeline,
   targetOriginIds: ReadonlySet<string>,
@@ -199,11 +156,6 @@ export const buildPendingStrokeRewriteFrameWrites = (
 };
 
 type PendingFrameRewriteStage = ReturnType<typeof beginTimelineStage>;
-
-type PendingFrameRewriteApplication = Extract<
-  PendingFrameApplication,
-  { kind: 'geometry-rewrite' | 'stroke-rewrite' }
->;
 
 interface PendingFrameRewritePlan {
   targetOriginIds: ReadonlySet<string>;
@@ -298,49 +250,9 @@ const materializePendingGeometryRewriteApplication = (
   );
 };
 
-interface PendingFrameApplicationMaterializationResult {
-  timeline: GeometryTimeline;
-  playbackWindowByOriginId?: ReadonlyMap<string, TimelineWindow>;
-}
-
-const materializePendingColorApplication = (
-  timeline: GeometryTimeline,
-  application: Extract<PendingFrameApplication, { kind: 'color' }>,
-): PendingFrameApplicationMaterializationResult => {
-  const colorMaterialization = buildPendingColorMaterialization(
-    timeline,
-    application,
-    application.precedingTemporalCheckpoint,
-  );
-  const nextTimeline = materializeTargetOriginFrameRewrite(
-    timeline,
-    {
-      targetOriginIds: application.targetOriginIds,
-      sourceFrameCount: timeline.frames.length,
-      endBeat: colorMaterialization.plan.colorTimelineEndBeat,
-    },
-    (timelineStage) => {
-      sampleColorProgramSlotsIntoStage(
-        timelineStage,
-        timeline.sampleStepBeats,
-        application,
-        colorMaterialization.plan,
-        colorMaterialization.geometry,
-        colorMaterialization.frameWindow,
-        colorMaterialization.outputFrameCount,
-      );
-    },
-  );
-
-  return {
-    timeline: nextTimeline,
-    playbackWindowByOriginId: colorMaterialization.plan.playbackWindowByOriginId,
-  };
-};
-
 const resolveFrameRewriteSourceTimeline = (
   timeline: GeometryTimeline,
-  application: PendingFrameRewriteApplication,
+  application: Pick<PendingFrameApplication, 'precedingTemporalCheckpoint'>,
 ): GeometryTimeline => (
   application.precedingTemporalCheckpoint
     ? materializeTemporalCheckpointTimeline(
@@ -353,21 +265,15 @@ const resolveFrameRewriteSourceTimeline = (
 const materializePendingFrameApplication = (
   timeline: GeometryTimeline,
   application: PendingFrameApplication,
-): PendingFrameApplicationMaterializationResult => {
+): GeometryTimeline => {
   switch (application.kind) {
-    case 'color':
-      return materializePendingColorApplication(timeline, application);
     case 'geometry-rewrite': {
       const sourceTimeline = resolveFrameRewriteSourceTimeline(timeline, application);
-      return {
-        timeline: materializePendingGeometryRewriteApplication(sourceTimeline, application),
-      };
+      return materializePendingGeometryRewriteApplication(sourceTimeline, application);
     }
     case 'stroke-rewrite': {
       const sourceTimeline = resolveFrameRewriteSourceTimeline(timeline, application);
-      return {
-        timeline: materializePendingStrokeRewriteApplication(sourceTimeline, application),
-      };
+      return materializePendingStrokeRewriteApplication(sourceTimeline, application);
     }
   }
 };
@@ -383,13 +289,8 @@ export const materializePendingFrameApplications = (
   }
 
   let timeline = state.timeline;
-  const playbackWindowOverrideMaps: ReadonlyMap<string, TimelineWindow>[] = [];
   for (const application of state.pendingFrameApplications) {
-    const materialization = materializePendingFrameApplication(timeline, application);
-    timeline = materialization.timeline;
-    if (materialization.playbackWindowByOriginId) {
-      playbackWindowOverrideMaps.push(materialization.playbackWindowByOriginId);
-    }
+    timeline = materializePendingFrameApplication(timeline, application);
   }
 
   return transitionGenerationState(state, {
@@ -400,8 +301,6 @@ export const materializePendingFrameApplications = (
       outputAdapter,
       mutedGroupIds,
       mutedGeneratorIds,
-      undefined,
-      mergePlaybackWindowOverrides(playbackWindowOverrideMaps),
     ),
     pendingFrameApplications: [],
   });

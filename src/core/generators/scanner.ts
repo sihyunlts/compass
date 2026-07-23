@@ -81,7 +81,6 @@ export const buildScannerPolyline = (
     closed: false,
     originId,
     velocity,
-    activationStepBeats: 1 / travelRange,
     rasterMode: 'centerline',
     clipStack: [],
   };

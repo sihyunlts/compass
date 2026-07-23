@@ -24,6 +24,7 @@ interface CompiledModulationRoute {
 
 export interface CompiledModulationProgram {
   routes: ReadonlyArray<CompiledModulationRoute>;
+  routesByTargetDeviceId: ReadonlyMap<string, ReadonlyArray<CompiledModulationRoute>>;
 }
 
 interface ModulationRuntimeReadout {
@@ -90,6 +91,7 @@ export const compileModulationProgram = (
   const routes = collectValidatedModulationRoutes(chain);
   const reversedTimelineByDeviceId = resolveReversedTimelineByDeviceId(chain);
   const compiled: CompiledModulationRoute[] = [];
+  const routesByTargetDeviceId = new Map<string, CompiledModulationRoute[]>();
 
   for (const route of routes) {
     const baseValue = readNumericDeviceParam(route.targetDevice, route.targetParamKey);
@@ -97,7 +99,7 @@ export const compileModulationProgram = (
       continue;
     }
 
-    compiled.push({
+    const compiledRoute: CompiledModulationRoute = {
       modulatorId: route.modulator.id,
       targetDeviceId: route.targetDevice.id,
       targetParamKey: route.targetParamKey,
@@ -105,11 +107,20 @@ export const compileModulationProgram = (
       baseValue,
       curve: toCompiledCurve(route.modulator.params.curve),
       isTimelineReversed: reversedTimelineByDeviceId.get(route.targetDevice.id) === true,
-    });
+    };
+    compiled.push(compiledRoute);
+
+    const targetRoutes = routesByTargetDeviceId.get(compiledRoute.targetDeviceId);
+    if (targetRoutes) {
+      targetRoutes.push(compiledRoute);
+    } else {
+      routesByTargetDeviceId.set(compiledRoute.targetDeviceId, [compiledRoute]);
+    }
   }
 
   return {
     routes: compiled,
+    routesByTargetDeviceId,
   };
 };
 

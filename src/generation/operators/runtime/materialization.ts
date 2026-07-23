@@ -6,6 +6,7 @@ import {
 import type {
   GeometryTimeline,
 } from '../../types';
+import type { TimelineWindow } from '../../timeline/temporal-window';
 import {
   buildTimelineStateByOriginId,
 } from './timeline-state';
@@ -102,6 +103,7 @@ export const replaceTimelineAndRefreshRackState = (
   timelineStateSeedByOriginId: ReadonlyMap<string, OriginTimelineState>,
   context: RackStageExecutionContext,
   unprotectedOriginIds: Iterable<string> = [],
+  playbackWindowOverrides: ReadonlyMap<string, TimelineWindow> = new Map(),
 ): MutableGenerationState => transitionGenerationState(state, {
   timeline,
   timelineStateByOriginId: applyFinalCleanupModeUpdate(
@@ -111,6 +113,8 @@ export const replaceTimelineAndRefreshRackState = (
       context.outputAdapter,
       context.mutedGroupIds,
       context.mutedGeneratorIds,
+      undefined,
+      playbackWindowOverrides,
     ),
     { mode: 'cleanup', originIds: unprotectedOriginIds },
   ),

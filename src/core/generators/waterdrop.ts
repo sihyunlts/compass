@@ -2,7 +2,6 @@ import type { Polyline, Vec2 } from '../core-types';
 import type { WaterdropParams } from '../../shared/model';
 
 const RING_TRAVEL_SPAN = 18;
-const RING_ACTIVATION_STEP_BEATS = 1 / RING_TRAVEL_SPAN;
 
 const toSuperellipsePoint = (
   center: Vec2,
@@ -59,7 +58,6 @@ export const buildWaterdropPolyline = (
     closed: true,
     originId,
     velocity,
-    activationStepBeats: RING_ACTIVATION_STEP_BEATS,
     clipStack: [],
   };
 };

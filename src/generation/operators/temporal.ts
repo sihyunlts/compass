@@ -178,11 +178,21 @@ const resolveLastModulatedTemporalState = <TEffect extends GeneratorEffectNode>(
   effect: TEffect,
   modulationContext: ModulationContext,
   frameWindow: FrameWindow,
+  evaluationWindow: TimelineWindow,
   resolveTemporalStateAtFrame: (deviceAtFrame: TEffect, frameIndex: number) => SceneTemporalState | null,
 ): SceneTemporalState | null => {
   let nextTemporal: SceneTemporalState | null = null;
+  const evaluationFrameWindow = toFrameWindow(
+    evaluationWindow,
+    state.timeline.sampleStepBeats,
+    state.timeline.frames.length,
+  );
 
-  for (let frameIndex = 0; frameIndex < state.timeline.frames.length; frameIndex += 1) {
+  for (
+    let frameIndex = evaluationFrameWindow.startFrame;
+    frameIndex < evaluationFrameWindow.endFrameExclusive;
+    frameIndex += 1
+  ) {
     if (!isFrameWithinWindow(frameIndex, frameWindow)) {
       continue;
     }
@@ -192,7 +202,7 @@ const resolveLastModulatedTemporalState = <TEffect extends GeneratorEffectNode>(
       effect,
       frameIndex,
       state.timeline.sampleStepBeats,
-      state.timeline.timeDomainEndBeat,
+      evaluationWindow,
     ) as TEffect;
     const temporalState = resolveTemporalStateAtFrame(deviceAtFrame, frameIndex);
     if (temporalState) {
@@ -262,6 +272,7 @@ const buildTrimTemporalUpdates = (
       effect,
       modulationContext,
       frameWindow,
+      trimPlacementWindow,
       (deviceAtFrame) => {
         const start = deviceAtFrame.params.start;
         const end = deviceAtFrame.params.end;
@@ -302,6 +313,7 @@ const buildStretchTemporalUpdates = (
       effect,
       modulationContext,
       frameWindow,
+      placementWindow,
       (deviceAtFrame, frameIndex) => {
         const outputBeat = frameIndex * state.timeline.sampleStepBeats;
         const start = deviceAtFrame.params.start;

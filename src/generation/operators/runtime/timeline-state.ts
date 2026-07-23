@@ -139,27 +139,6 @@ export const buildTimelineStateAfterTemporalMaterialization = (
   );
 };
 
-export const mergePlaybackWindowOverridesIntoTimelineState = (
-  timelineStateByOriginId: ReadonlyMap<string, OriginTimelineState>,
-  playbackWindowOverrides: ReadonlyMap<string, TimelineWindow>,
-): Map<string, OriginTimelineState> => {
-  const nextTimelineStateByOriginId = cloneTimelineStateByOriginId(timelineStateByOriginId);
-
-  for (const [originId, playbackWindow] of playbackWindowOverrides.entries()) {
-    const current = nextTimelineStateByOriginId.get(originId);
-    if (!current) {
-      continue;
-    }
-
-    nextTimelineStateByOriginId.set(originId, {
-      ...current,
-      playbackWindow: mergeTimelineWindows(current.playbackWindow, playbackWindow),
-    });
-  }
-
-  return nextTimelineStateByOriginId;
-};
-
 export const seedGeneratedOriginTimelineState = (
   timelineStateByOriginId: ReadonlyMap<string, OriginTimelineState>,
   originId: string,

@@ -21,20 +21,46 @@ export const createModulationContext = (
 export const isDeviceModulated = (
   context: ModulationContext,
   deviceId: string,
-): boolean => context.program.routes.some((route) => route.targetDeviceId === deviceId);
+): boolean => context.program.routesByTargetDeviceId.has(deviceId);
+
+export interface ModulationEvaluationWindow {
+  start: number;
+  end: number;
+}
+
+const resolveEvaluationWindow = (
+  context: ModulationContext,
+  window: ModulationEvaluationWindow | undefined,
+): ModulationEvaluationWindow => {
+  if (
+    window
+    && Number.isFinite(window.start)
+    && Number.isFinite(window.end)
+    && window.end > window.start
+  ) {
+    return window;
+  }
+
+  return {
+    start: 0,
+    end: context.loopLengthBeats,
+  };
+};
 
 export const resolveModulatedDeviceAtFrame = <T extends GeneratorDeviceNode>(
   context: ModulationContext,
   device: T,
   frameIndex: number,
   sampleStepBeats: number,
-  evaluationLoopLengthBeats = context.loopLengthBeats,
+  evaluationWindow?: ModulationEvaluationWindow,
 ): T => {
-  if (context.program.routes.length === 0) {
+  if (!context.program.routesByTargetDeviceId.has(device.id)) {
     return device;
   }
 
-  const cacheKey = `${device.id}:${frameIndex}:${evaluationLoopLengthBeats}`;
+  const resolvedWindow = resolveEvaluationWindow(context, evaluationWindow);
+  const evaluationLoopLengthBeats = resolvedWindow.end - resolvedWindow.start;
+  const cacheKey = `${device.id}:${frameIndex}:${resolvedWindow.start}:${resolvedWindow.end}`;
   const cached = context.deviceByFrameKey.get(cacheKey);
   if (cached) {
     return cached as T;
@@ -48,7 +74,7 @@ export const resolveModulatedDeviceAtFrame = <T extends GeneratorDeviceNode>(
       groupStateById: {},
     },
     new Map<string, GeneratorDeviceNode>([[snapshot.id, snapshot]]),
-    frameIndex * sampleStepBeats,
+    (frameIndex * sampleStepBeats) - resolvedWindow.start,
     evaluationLoopLengthBeats,
     { wrap: true },
   );

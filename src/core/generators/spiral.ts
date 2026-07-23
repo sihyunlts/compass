@@ -3,7 +3,6 @@ import type { SpiralParams } from '../../shared/model';
 
 const SPIRAL_TRAVEL_SPAN = 18;
 const SPIRAL_STRIDE = 4.5;
-const SPIRAL_ACTIVATION_STEP_BEATS = 1 / SPIRAL_TRAVEL_SPAN;
 
 export const buildSpiralPolyline = (
   originId: string,
@@ -58,7 +57,6 @@ export const buildSpiralPolyline = (
     closed: false,
     originId,
     velocity,
-    activationStepBeats: SPIRAL_ACTIVATION_STEP_BEATS,
     clipStack: [],
   };
 };
