@@ -41,9 +41,11 @@ interface MutableGeometryStateEvent extends GeometryStateEvent {
 
 interface OriginCaptureState {
   events: MutableGeometryStateEvent[];
-  lastSample: GeometryMotionSnapshot | null;
-  motionUnitAnchor: GeometryMotionSnapshot | null;
-  movingFrameCountSinceUnit: number;
+  activeRun: {
+    lastSample: GeometryMotionSnapshot;
+    motionUnitAnchor: GeometryMotionSnapshot;
+    movingFrameCountSinceUnit: number;
+  } | null;
   runIndex: number;
   runStartFrame: number;
 }
@@ -68,15 +70,11 @@ const isInsideMasks = (
 const interpolateSegment = (
   start: Vec2,
   end: Vec2,
+  length: number,
   t: number,
-): SampledPolylinePoint | null => {
+): SampledPolylinePoint => {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
-  const length = Math.hypot(dx, dy);
-  if (!Number.isFinite(length) || length <= GEOMETRY_DISTANCE_EPSILON) {
-    return null;
-  }
-
   return {
     x: start.x + (dx * t),
     y: start.y + (dy * t),
@@ -125,7 +123,7 @@ const samplePolylineByArcLength = (
     segments.push({ start, end, startDistance: totalLength, length });
     totalLength += length;
   }
-  if (segments.length === 0 || totalLength <= GEOMETRY_DISTANCE_EPSILON) {
+  if (segments.length === 0) {
     return [{
       x: points[0].x,
       y: points[0].y,
@@ -161,16 +159,15 @@ const samplePolylineByArcLength = (
     const sample = interpolateSegment(
       segment.start,
       segment.end,
+      segment.length,
       localDistance / segment.length,
     );
-    if (sample) {
-      if (!stroke.polyline.closed && sampleIndex === 0) {
-        sample.capDirection = -1;
-      } else if (!stroke.polyline.closed && sampleIndex === sampleCount) {
-        sample.capDirection = 1;
-      }
-      samples.push(sample);
+    if (!stroke.polyline.closed && sampleIndex === 0) {
+      sample.capDirection = -1;
+    } else if (!stroke.polyline.closed && sampleIndex === sampleCount) {
+      sample.capDirection = 1;
     }
+    samples.push(sample);
   }
 
   return samples;
@@ -363,9 +360,7 @@ const closeActiveRun = (
     }
     event.runEndFrameExclusive = endFrameExclusive;
   }
-  state.lastSample = null;
-  state.motionUnitAnchor = null;
-  state.movingFrameCountSinceUnit = 0;
+  state.activeRun = null;
 };
 
 export const extractGeometryEventTracks = (
@@ -388,9 +383,7 @@ export const extractGeometryEventTracks = (
   for (const originId of input.targetOriginIds) {
     stateByOriginId.set(originId, {
       events: [],
-      lastSample: null,
-      motionUnitAnchor: null,
-      movingFrameCountSinceUnit: 0,
+      activeRun: null,
       runIndex: -1,
       runStartFrame: frameWindow.startFrame,
     });
@@ -402,7 +395,7 @@ export const extractGeometryEventTracks = (
     frameIndex += 1
   ) {
     const strokesByOriginId = new Map<string, GeometryStroke[]>();
-    for (const stroke of input.timeline.frames[frameIndex]?.strokes ?? []) {
+    for (const stroke of input.timeline.frames[frameIndex].strokes) {
       const originId = stroke.polyline.originId;
       if (!input.targetOriginIds.has(originId)) {
         continue;
@@ -419,13 +412,14 @@ export const extractGeometryEventTracks = (
       const strokes = strokesByOriginId.get(originId) ?? [];
       const candidate = buildGeometryMotionSnapshot(strokes, probeStepLed);
       if (candidate.isEmpty) {
-        if (state.lastSample) {
+        if (state.activeRun) {
           closeActiveRun(state, frameIndex);
         }
         continue;
       }
 
-      if (!state.lastSample) {
+      const activeRun = state.activeRun;
+      if (!activeRun) {
         state.runIndex += 1;
         state.runStartFrame = frameIndex;
         state.events.push({
@@ -436,47 +430,49 @@ export const extractGeometryEventTracks = (
           motionUnitFrameCount: 0,
           strokes: [...strokes],
         });
-        state.lastSample = candidate;
-        state.motionUnitAnchor = candidate;
+        state.activeRun = {
+          lastSample: candidate,
+          motionUnitAnchor: candidate,
+          movingFrameCountSinceUnit: 0,
+        };
         continue;
       }
 
       if (!hasGeometryChangedByAtLeast(
-        state.lastSample,
+        activeRun.lastSample,
         candidate,
         SAMPLE_MOTION_DISTANCE_LED,
       )) {
         continue;
       }
 
-      state.movingFrameCountSinceUnit += 1;
-      const reachedMotionUnit = state.motionUnitAnchor === null
-        || hasGeometryChangedByAtLeast(
-          state.motionUnitAnchor,
-          candidate,
-          motionUnitDistanceLed,
-        );
+      activeRun.movingFrameCountSinceUnit += 1;
+      const reachedMotionUnit = hasGeometryChangedByAtLeast(
+        activeRun.motionUnitAnchor,
+        candidate,
+        motionUnitDistanceLed,
+      );
       state.events.push({
         frameIndex,
         runIndex: state.runIndex,
         runStartFrame: state.runStartFrame,
         runEndFrameExclusive: frameWindow.endFrameExclusive,
         motionUnitFrameCount: reachedMotionUnit
-          ? Math.max(state.movingFrameCountSinceUnit, 1)
+          ? activeRun.movingFrameCountSinceUnit
           : 0,
         strokes: [...strokes],
       });
-      state.lastSample = candidate;
+      activeRun.lastSample = candidate;
       if (reachedMotionUnit) {
-        state.motionUnitAnchor = candidate;
-        state.movingFrameCountSinceUnit = 0;
+        activeRun.motionUnitAnchor = candidate;
+        activeRun.movingFrameCountSinceUnit = 0;
       }
     }
   }
 
   const tracks = new Map<string, GeometryStateEvent[]>();
   for (const [originId, state] of stateByOriginId.entries()) {
-    if (state.lastSample) {
+    if (state.activeRun) {
       closeActiveRun(state, frameWindow.endFrameExclusive);
     }
     if (state.events.length > 0) {

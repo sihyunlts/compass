@@ -26,7 +26,6 @@ import {
   applyFinalCleanupModeUpdate,
   transitionGenerationState,
   type FinalCleanupModeUpdate,
-  type GenerationStateTransitionOverrides,
 } from './state-transition';
 
 type PendingFrameApplicationDraft =
@@ -49,10 +48,7 @@ const attachTemporalCheckpoint = (
 const appendPendingFrameApplication = (
   input: PendingFrameApplicationAppendInput,
   application: PendingFrameApplicationDraft,
-  options: {
-    timelineStateByOriginId?: MutableGenerationState['timelineStateByOriginId'];
-    finalCleanupModeUpdate?: FinalCleanupModeUpdate;
-  } = {},
+  finalCleanupModeUpdate: FinalCleanupModeUpdate,
 ): MutableGenerationState => {
   const state = input.baseState;
   const pendingFrameApplications = clonePendingFrameApplications(state.pendingFrameApplications);
@@ -60,20 +56,13 @@ const appendPendingFrameApplication = (
     pendingFrameApplications.push(attachTemporalCheckpoint(input, application));
   }
 
-  const timelineStateByOriginId = options.finalCleanupModeUpdate
-    ? applyFinalCleanupModeUpdate(
-        options.timelineStateByOriginId ?? state.timelineStateByOriginId,
-        options.finalCleanupModeUpdate,
-      )
-    : options.timelineStateByOriginId;
-  const overrides: GenerationStateTransitionOverrides = {
+  return transitionGenerationState(state, {
     pendingFrameApplications,
-  };
-  if (timelineStateByOriginId) {
-    overrides.timelineStateByOriginId = timelineStateByOriginId;
-  }
-
-  return transitionGenerationState(state, overrides);
+    timelineStateByOriginId: applyFinalCleanupModeUpdate(
+      state.timelineStateByOriginId,
+      finalCleanupModeUpdate,
+    ),
+  });
 };
 
 export const appendPendingStrokeRewriteApplication = (
@@ -91,7 +80,7 @@ export const appendPendingStrokeRewriteApplication = (
       endBeat: input.sourceState.timeline.timeDomainEndBeat,
       writes,
     },
-    { finalCleanupModeUpdate },
+    finalCleanupModeUpdate,
   );
 };
 
@@ -110,7 +99,7 @@ export const appendPendingGeometryRewriteApplication = (
       requiredFrameWindow,
       rewriteFrameStrokes,
     },
-    { finalCleanupModeUpdate },
+    finalCleanupModeUpdate,
   );
 };
 

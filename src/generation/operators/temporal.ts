@@ -187,16 +187,22 @@ const resolveLastModulatedTemporalState = <TEffect extends GeneratorEffectNode>(
     state.timeline.sampleStepBeats,
     state.timeline.frames.length,
   );
+  const applicableFrameWindow: FrameWindow = {
+    startFrame: Math.max(
+      frameWindow.startFrame,
+      evaluationFrameWindow.startFrame,
+    ),
+    endFrameExclusive: Math.min(
+      frameWindow.endFrameExclusive,
+      evaluationFrameWindow.endFrameExclusive,
+    ),
+  };
 
   for (
-    let frameIndex = evaluationFrameWindow.startFrame;
-    frameIndex < evaluationFrameWindow.endFrameExclusive;
+    let frameIndex = applicableFrameWindow.startFrame;
+    frameIndex < applicableFrameWindow.endFrameExclusive;
     frameIndex += 1
   ) {
-    if (!isFrameWithinWindow(frameIndex, frameWindow)) {
-      continue;
-    }
-
     const deviceAtFrame = resolveModulatedDeviceAtFrame(
       modulationContext,
       effect,

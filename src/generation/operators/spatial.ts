@@ -68,19 +68,20 @@ const applyPendingSpatialTransform = (
 ): MutableGenerationState => {
   const { baseState } = input;
   const targetOriginIds = buildTargetOriginIds(baseState.timeline, targetGroupId);
-  const evaluationWindowByOriginId = new Map<string, ModulationEvaluationWindow>();
-  for (const originId of targetOriginIds) {
-    const timelineState = baseState.timelineStateByOriginId.get(originId);
-    const window = input.precedingTemporalCheckpoint?.temporalByOriginId.has(originId)
-      ? timelineState?.temporal.visibilityWindow
-      : timelineState?.playbackWindow;
-    evaluationWindowByOriginId.set(
-      originId,
-      window && Number.isFinite(window.start) && Number.isFinite(window.end) && window.end > window.start
-        ? window
-        : fallbackEvaluationWindow,
-    );
-  }
+  const evaluationWindowByTargetOriginId = new Map(
+    Array.from(targetOriginIds, (originId) => {
+      const timelineState = baseState.timelineStateByOriginId.get(originId);
+      const window = input.precedingTemporalCheckpoint?.temporalByOriginId.has(originId)
+        ? timelineState?.temporal.visibilityWindow
+        : timelineState?.playbackWindow;
+      return [
+        originId,
+        window && Number.isFinite(window.start) && Number.isFinite(window.end) && window.end > window.start
+          ? window
+          : fallbackEvaluationWindow,
+      ] as const;
+    }),
+  );
 
   return appendPendingGeometryRewriteApplication(
     input,
@@ -92,8 +93,7 @@ const applyPendingSpatialTransform = (
           ? resolveDeviceAtFrame(
               frameIndex,
               timeline.sampleStepBeats,
-              evaluationWindowByOriginId.get(stroke.polyline.originId)
-                ?? fallbackEvaluationWindow,
+              evaluationWindowByTargetOriginId.get(stroke.polyline.originId)!,
             )
           : effect;
         return transformStroke(

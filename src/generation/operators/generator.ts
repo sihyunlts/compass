@@ -34,10 +34,7 @@ const applyGeneratorDevice = (
   const frameWindow = resolveFrameWindow(
     executionPlan.requiredFrameWindow,
     nextTimeline.sampleStepBeats,
-    Math.min(
-      nextTimeline.frames.length,
-      toFrameCount(generatorEndBeat, nextTimeline.sampleStepBeats),
-    ),
+    toFrameCount(generatorEndBeat, nextTimeline.sampleStepBeats),
   );
 
   for (let frameIndex = frameWindow.startFrame; frameIndex < frameWindow.endFrameExclusive; frameIndex += 1) {

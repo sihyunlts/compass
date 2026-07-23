@@ -28,6 +28,13 @@ export interface OccupiedCoordinateCandidateBounds {
   maxY: number;
 }
 
+const UNBOUNDED_COORDINATE_CANDIDATES: OccupiedCoordinateCandidateBounds = {
+  minX: Number.NEGATIVE_INFINITY,
+  maxX: Number.POSITIVE_INFINITY,
+  minY: Number.NEGATIVE_INFINITY,
+  maxY: Number.POSITIVE_INFINITY,
+};
+
 type OccupiedCoordinateCandidateCache = Map<string, StrokeOccupiedCoordinateCandidate[]>;
 
 const occupiedCoordinateCandidatesByStroke = new WeakMap<GeometryStroke, OccupiedCoordinateCandidateCache>();
@@ -77,21 +84,22 @@ const toCandidateBounds = (
     return null;
   }
 
+  const candidateBounds = outputBounds ?? UNBOUNDED_COORDINATE_CANDIDATES;
   const startX = Math.max(
     Math.floor(minX - THICKNESS),
-    outputBounds ? Math.ceil(outputBounds.minX) : Number.NEGATIVE_INFINITY,
+    Math.ceil(candidateBounds.minX),
   );
   const endX = Math.min(
     Math.ceil(maxX + THICKNESS),
-    outputBounds ? Math.floor(outputBounds.maxX) : Number.POSITIVE_INFINITY,
+    Math.floor(candidateBounds.maxX),
   );
   const startY = Math.max(
     Math.floor(minY - THICKNESS),
-    outputBounds ? Math.ceil(outputBounds.minY) : Number.NEGATIVE_INFINITY,
+    Math.ceil(candidateBounds.minY),
   );
   const endY = Math.min(
     Math.ceil(maxY + THICKNESS),
-    outputBounds ? Math.floor(outputBounds.maxY) : Number.POSITIVE_INFINITY,
+    Math.floor(candidateBounds.maxY),
   );
   return startX <= endX && startY <= endY
     ? { startX, endX, startY, endY }

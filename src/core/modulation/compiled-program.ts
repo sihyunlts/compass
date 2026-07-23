@@ -160,32 +160,22 @@ export const evaluateModulationProgramReadouts = (
   return readouts;
 };
 
-export const applyModulationProgramToChain = (
-  program: CompiledModulationProgram,
-  targetChainWithoutModulators: GeneratorChain,
-  deviceById: Map<string, GeneratorDeviceNode>,
+export const applyModulationRoutesToDevice = (
+  routes: ReadonlyArray<CompiledModulationRoute>,
+  targetDevice: GeneratorDeviceNode,
   beat01: number,
   loopLengthBeats: number,
   options?: {
     wrap?: boolean;
   },
 ): void => {
-  if (targetChainWithoutModulators.devices.length === 0) {
-    return;
-  }
-
   const baseTimelineT = toLoopProgress01(
     beat01,
     loopLengthBeats,
     options?.wrap !== false,
   );
 
-  for (const route of program.routes) {
-    const targetDevice = deviceById.get(route.targetDeviceId);
-    if (!targetDevice) {
-      continue;
-    }
-
+  for (const route of routes) {
     const timelineT = route.isTimelineReversed
       ? reverseLoopProgress01(baseTimelineT)
       : baseTimelineT;

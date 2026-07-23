@@ -1,5 +1,5 @@
 import {
-  applyModulationProgramToChain,
+  applyModulationRoutesToDevice,
   compileModulationProgram,
 } from '../../../core/modulation/compiled-program';
 import {
@@ -54,7 +54,8 @@ export const resolveModulatedDeviceAtFrame = <T extends GeneratorDeviceNode>(
   sampleStepBeats: number,
   evaluationWindow?: ModulationEvaluationWindow,
 ): T => {
-  if (!context.program.routesByTargetDeviceId.has(device.id)) {
+  const routes = context.program.routesByTargetDeviceId.get(device.id);
+  if (!routes) {
     return device;
   }
 
@@ -67,13 +68,9 @@ export const resolveModulatedDeviceAtFrame = <T extends GeneratorDeviceNode>(
   }
 
   const snapshot = cloneDeviceNode(device) as T;
-  applyModulationProgramToChain(
-    context.program,
-    {
-      devices: [snapshot],
-      groupStateById: {},
-    },
-    new Map<string, GeneratorDeviceNode>([[snapshot.id, snapshot]]),
+  applyModulationRoutesToDevice(
+    routes,
+    snapshot,
     (frameIndex * sampleStepBeats) - resolvedWindow.start,
     evaluationLoopLengthBeats,
     { wrap: true },
