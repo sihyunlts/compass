@@ -4,31 +4,16 @@ import {
   composeAffine,
   invertAffine,
 } from '../../../core/geometry';
-import type { TimedColorSource } from '../../../devices/color/color-program';
-import {
-  collectOccupiedCoordinates,
-} from '../../timeline/analysis';
 import {
   addStrokeToFrame,
-  deleteGeometrySamplesForOrigins,
   deleteOrigins,
-  deleteTimingSamplesForOrigins,
   setFrameStrokes,
-  type FrameWindow,
 } from '../../timeline';
 import type {
   GeometryMask,
   GeometryStroke,
   GeometryTimeline,
 } from '../../types';
-
-const wrapFrameIndex = (
-  frameIndex: number,
-  frameCount: number,
-): number => {
-  const safeFrameCount = Math.max(frameCount, 1);
-  return ((frameIndex % safeFrameCount) + safeFrameCount) % safeFrameCount;
-};
 
 const isTargetedStroke = (
   stroke: GeometryStroke,
@@ -117,39 +102,6 @@ const resolveStageWriteOrder = (
   stroke: GeometryStroke,
 ): number => writeOrder + resolveIntraWriteOrder(stroke.writeOrder);
 
-export const resolveColorSlotWriteOrder = (
-  writeOrder: number,
-  slotIndex: number,
-  slotCount: number,
-): number => writeOrder + ((Math.max(slotCount, 1) - slotIndex) / (Math.max(slotCount, 1) + 1));
-
-export const resolveColorSlotDestinationFrameIndexes = <T extends TimedColorSource>(
-  source: T,
-  startFrameIndex: number,
-  destinationFrameWindow: FrameWindow,
-  timelineFrameCount: number,
-  shouldWrap: boolean,
-): number[] => {
-  if (shouldWrap) {
-    return [wrapFrameIndex(startFrameIndex, timelineFrameCount)];
-  }
-
-  if (source.referenceDuration === undefined) {
-    return [startFrameIndex];
-  }
-
-  const frameIndexes: number[] = [];
-  for (
-    let frameIndex = Math.max(destinationFrameWindow.startFrame, startFrameIndex);
-    frameIndex < destinationFrameWindow.endFrameExclusive;
-    frameIndex += 1
-  ) {
-    frameIndexes.push(frameIndex);
-  }
-
-  return frameIndexes;
-};
-
 const transformMask = (
   mask: GeometryMask,
   transform: AffineTransform | null,
@@ -186,44 +138,6 @@ export const cloneStrokeWithWriteOrder = (
   masks: stroke.masks.map(cloneMask),
 });
 
-export const cloneStrokeWithVelocityAndWriteOrder = (
-  stroke: GeometryStroke,
-  velocity: number,
-  writeOrder: number,
-  colorSlotIndex: number,
-  colorSlotCount: number,
-  colorSlotGapFill: boolean,
-): Omit<GeometryStroke, 'writeId'> => ({
-  polyline: {
-    ...stroke.polyline,
-    velocity,
-    colorSlotIndex,
-    colorSlotCount,
-    colorSlotGapFill,
-    points: stroke.polyline.points,
-    clipStack: stroke.polyline.clipStack,
-  },
-  originGroupId: stroke.originGroupId,
-  writeOrder,
-  masks: stroke.masks.map(cloneMask),
-});
-
-const resolveStrokeActivationSignature = (
-  stroke: Omit<GeometryStroke, 'writeId'>,
-): string | undefined => {
-  const coordinates = collectOccupiedCoordinates([
-    {
-      ...stroke,
-      writeId: 0,
-    },
-  ], true);
-  const signature = Array.from(coordinates.values())
-    .map((coordinate) => `${coordinate.x},${coordinate.y}`)
-    .sort()
-    .join('|');
-  return signature || undefined;
-};
-
 export const transformStroke = (
   stroke: GeometryStroke,
   transform: AffineTransform | null,
@@ -239,19 +153,11 @@ export const transformStroke = (
           inverseTransform: { ...clip.inverseTransform },
         })),
       };
-  const transformedStroke = {
+  return {
     polyline,
     originGroupId: stroke.originGroupId,
     writeOrder: resolveStageWriteOrder(writeOrder, stroke),
     masks: stroke.masks.map((mask) => transformMask(mask, transform)),
-  };
-
-  return {
-    ...transformedStroke,
-    polyline: {
-      ...polyline,
-      activationSignature: resolveStrokeActivationSignature(transformedStroke),
-    },
   };
 };
 
@@ -330,8 +236,6 @@ export const stripOriginFrames = (
   targetOriginIds: ReadonlySet<string>,
 ): void => {
   deleteOrigins(timeline, targetOriginIds);
-  deleteGeometrySamplesForOrigins(timeline, targetOriginIds);
-  deleteTimingSamplesForOrigins(timeline, targetOriginIds);
 
   for (let frameIndex = 0; frameIndex < sourceFrameCount; frameIndex += 1) {
     takeOriginStrokesFromFrame(timeline, frameIndex, targetOriginIds);

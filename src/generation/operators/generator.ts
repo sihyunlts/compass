@@ -18,6 +18,7 @@ import {
   beginTimelineStage,
   completeTimelineStage,
   ensureTimelineFrameCount,
+  toFrameCount,
 } from '../timeline';
 
 const applyGeneratorDevice = (
@@ -27,12 +28,13 @@ const applyGeneratorDevice = (
 ): MutableGenerationState => {
   const device = stage.device;
   const nextTimeline = beginTimelineStage(state.timeline);
-  ensureTimelineFrameCount(nextTimeline, 1);
+  const generatorEndBeat = context.modulationContext.loopLengthBeats;
+  ensureTimelineFrameCount(nextTimeline, generatorEndBeat);
   const executionPlan = resolveStageExecutionPlan(context, stage);
   const frameWindow = resolveFrameWindow(
     executionPlan.requiredFrameWindow,
     nextTimeline.sampleStepBeats,
-    nextTimeline.frames.length,
+    toFrameCount(generatorEndBeat, nextTimeline.sampleStepBeats),
   );
 
   for (let frameIndex = frameWindow.startFrame; frameIndex < frameWindow.endFrameExclusive; frameIndex += 1) {
@@ -44,7 +46,6 @@ const applyGeneratorDevice = (
         device,
         frameIndex,
         nextTimeline.sampleStepBeats,
-        nextTimeline.timeDomainEndBeat,
       ),
       stage.stageIndex,
       executionPlan.generatorOutputBounds,

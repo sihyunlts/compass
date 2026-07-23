@@ -10,7 +10,11 @@ import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 import type { LaunchpadButton } from '../shared/model';
 import { createSpatialBounds } from './analysis/bounds';
 import type { CanonicalExecutionRequest } from './analysis/types';
-import { collectOccupiedCoordinates } from './timeline/analysis';
+import {
+  collectOccupiedCoordinates,
+  shouldReplaceStrokeAtCoordinate,
+  type OccupiedCoordinateCandidateBounds,
+} from './timeline/analysis';
 import {
   type CanonicalOutputAdapter,
   type CanonicalSpatialMask,
@@ -76,6 +80,28 @@ const buildCoordinateGroupByKey = (
   }
 
   return coordinateGroupByKey;
+};
+
+const resolveCoordinateGroupBounds = (
+  coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
+): OccupiedCoordinateCandidateBounds | null => {
+  let bounds: OccupiedCoordinateCandidateBounds | null = null;
+  for (const coordinateGroup of coordinateGroupByKey.values()) {
+    if (bounds) {
+      bounds.minX = Math.min(bounds.minX, coordinateGroup.x);
+      bounds.maxX = Math.max(bounds.maxX, coordinateGroup.x);
+      bounds.minY = Math.min(bounds.minY, coordinateGroup.y);
+      bounds.maxY = Math.max(bounds.maxY, coordinateGroup.y);
+    } else {
+      bounds = {
+        minX: coordinateGroup.x,
+        maxX: coordinateGroup.x,
+        minY: coordinateGroup.y,
+        maxY: coordinateGroup.y,
+      };
+    }
+  }
+  return bounds;
 };
 
 const buildFractionalCoordinateGroups = (
@@ -200,8 +226,12 @@ const resolveExactCoordinateWinner = (
 
     if (
       !winner
-      || stroke.writeOrder > winner.writeOrder
-      || (stroke.writeOrder === winner.writeOrder && stroke.writeId > winner.writeId)
+      || shouldReplaceStrokeAtCoordinate(
+        stroke,
+        winner,
+        coordinateGroup.x,
+        coordinateGroup.y,
+      )
     ) {
       winner = stroke;
     }
@@ -218,6 +248,7 @@ const resolveExactCoordinateWinner = (
 const resolveWinnerByCoordinate = (
   strokes: ReadonlyArray<GeometryStroke>,
   coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
+  outputBounds: OccupiedCoordinateCandidateBounds | null,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): Map<string, WinnerStroke> => {
@@ -235,8 +266,7 @@ const resolveWinnerByCoordinate = (
   }
 
   const winnerByCoordinate = new Map<string, WinnerStroke>();
-
-  const occupied = collectOccupiedCoordinates(visibleStrokes, true, { fillColorSlotGaps: true });
+  const occupied = collectOccupiedCoordinates(visibleStrokes, true, outputBounds);
   for (const coordinate of occupied.values()) {
     const coordinateKey = toRoundedCoordinateKey(coordinate.x, coordinate.y);
     if (coordinateKey === null || !coordinateGroupByKey.has(coordinateKey)) {
@@ -316,6 +346,7 @@ const buildVisibleWindowByOriginId = (
 export const resolveActiveByPitchFromFrameStrokes = (
   strokes: ReadonlyArray<GeometryStroke>,
   coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
+  outputBounds: OccupiedCoordinateCandidateBounds | null,
   mutedGroupIds: ReadonlySet<string> = new Set<string>(),
   mutedGeneratorIds: ReadonlySet<string> = new Set<string>(),
   fractionalCoordinateGroups: ReadonlyArray<CoordinateGroup> = [],
@@ -324,6 +355,7 @@ export const resolveActiveByPitchFromFrameStrokes = (
   const winnerByCoordinate = resolveWinnerByCoordinate(
     strokes,
     coordinateGroupByKey,
+    outputBounds,
     mutedGroupIds,
     mutedGeneratorIds,
   );
@@ -379,6 +411,7 @@ export const projectTimelineToActivePitchesBySampleIndex = (
   mutedGeneratorIds: ReadonlySet<string>,
 ): ReadonlyArray<ReadonlyMap<number, SampledActivePitch>> => {
   const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
+  const outputBounds = resolveCoordinateGroupBounds(coordinateGroupByKey);
   const fractionalCoordinateGroups = buildFractionalCoordinateGroups(runtimeMap.buttonIndex);
 
   return timeline.frames.map((frame) => {
@@ -389,6 +422,7 @@ export const projectTimelineToActivePitchesBySampleIndex = (
     return resolveActiveByPitchFromFrameStrokes(
       frame.strokes,
       coordinateGroupByKey,
+      outputBounds,
       mutedGroupIds,
       mutedGeneratorIds,
       fractionalCoordinateGroups,

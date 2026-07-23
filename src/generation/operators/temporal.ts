@@ -178,21 +178,37 @@ const resolveLastModulatedTemporalState = <TEffect extends GeneratorEffectNode>(
   effect: TEffect,
   modulationContext: ModulationContext,
   frameWindow: FrameWindow,
+  evaluationWindow: TimelineWindow,
   resolveTemporalStateAtFrame: (deviceAtFrame: TEffect, frameIndex: number) => SceneTemporalState | null,
 ): SceneTemporalState | null => {
   let nextTemporal: SceneTemporalState | null = null;
+  const evaluationFrameWindow = toFrameWindow(
+    evaluationWindow,
+    state.timeline.sampleStepBeats,
+    state.timeline.frames.length,
+  );
+  const applicableFrameWindow: FrameWindow = {
+    startFrame: Math.max(
+      frameWindow.startFrame,
+      evaluationFrameWindow.startFrame,
+    ),
+    endFrameExclusive: Math.min(
+      frameWindow.endFrameExclusive,
+      evaluationFrameWindow.endFrameExclusive,
+    ),
+  };
 
-  for (let frameIndex = 0; frameIndex < state.timeline.frames.length; frameIndex += 1) {
-    if (!isFrameWithinWindow(frameIndex, frameWindow)) {
-      continue;
-    }
-
+  for (
+    let frameIndex = applicableFrameWindow.startFrame;
+    frameIndex < applicableFrameWindow.endFrameExclusive;
+    frameIndex += 1
+  ) {
     const deviceAtFrame = resolveModulatedDeviceAtFrame(
       modulationContext,
       effect,
       frameIndex,
       state.timeline.sampleStepBeats,
-      state.timeline.timeDomainEndBeat,
+      evaluationWindow,
     ) as TEffect;
     const temporalState = resolveTemporalStateAtFrame(deviceAtFrame, frameIndex);
     if (temporalState) {
@@ -262,6 +278,7 @@ const buildTrimTemporalUpdates = (
       effect,
       modulationContext,
       frameWindow,
+      trimPlacementWindow,
       (deviceAtFrame) => {
         const start = deviceAtFrame.params.start;
         const end = deviceAtFrame.params.end;
@@ -302,6 +319,7 @@ const buildStretchTemporalUpdates = (
       effect,
       modulationContext,
       frameWindow,
+      placementWindow,
       (deviceAtFrame, frameIndex) => {
         const outputBeat = frameIndex * state.timeline.sampleStepBeats;
         const start = deviceAtFrame.params.start;

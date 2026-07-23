@@ -24,6 +24,7 @@ interface CompiledModulationRoute {
 
 export interface CompiledModulationProgram {
   routes: ReadonlyArray<CompiledModulationRoute>;
+  routesByTargetDeviceId: ReadonlyMap<string, ReadonlyArray<CompiledModulationRoute>>;
 }
 
 interface ModulationRuntimeReadout {
@@ -90,6 +91,7 @@ export const compileModulationProgram = (
   const routes = collectValidatedModulationRoutes(chain);
   const reversedTimelineByDeviceId = resolveReversedTimelineByDeviceId(chain);
   const compiled: CompiledModulationRoute[] = [];
+  const routesByTargetDeviceId = new Map<string, CompiledModulationRoute[]>();
 
   for (const route of routes) {
     const baseValue = readNumericDeviceParam(route.targetDevice, route.targetParamKey);
@@ -97,7 +99,7 @@ export const compileModulationProgram = (
       continue;
     }
 
-    compiled.push({
+    const compiledRoute: CompiledModulationRoute = {
       modulatorId: route.modulator.id,
       targetDeviceId: route.targetDevice.id,
       targetParamKey: route.targetParamKey,
@@ -105,11 +107,20 @@ export const compileModulationProgram = (
       baseValue,
       curve: toCompiledCurve(route.modulator.params.curve),
       isTimelineReversed: reversedTimelineByDeviceId.get(route.targetDevice.id) === true,
-    });
+    };
+    compiled.push(compiledRoute);
+
+    const targetRoutes = routesByTargetDeviceId.get(compiledRoute.targetDeviceId);
+    if (targetRoutes) {
+      targetRoutes.push(compiledRoute);
+    } else {
+      routesByTargetDeviceId.set(compiledRoute.targetDeviceId, [compiledRoute]);
+    }
   }
 
   return {
     routes: compiled,
+    routesByTargetDeviceId,
   };
 };
 
@@ -149,32 +160,22 @@ export const evaluateModulationProgramReadouts = (
   return readouts;
 };
 
-export const applyModulationProgramToChain = (
-  program: CompiledModulationProgram,
-  targetChainWithoutModulators: GeneratorChain,
-  deviceById: Map<string, GeneratorDeviceNode>,
+export const applyModulationRoutesToDevice = (
+  routes: ReadonlyArray<CompiledModulationRoute>,
+  targetDevice: GeneratorDeviceNode,
   beat01: number,
   loopLengthBeats: number,
   options?: {
     wrap?: boolean;
   },
 ): void => {
-  if (targetChainWithoutModulators.devices.length === 0) {
-    return;
-  }
-
   const baseTimelineT = toLoopProgress01(
     beat01,
     loopLengthBeats,
     options?.wrap !== false,
   );
 
-  for (const route of program.routes) {
-    const targetDevice = deviceById.get(route.targetDeviceId);
-    if (!targetDevice) {
-      continue;
-    }
-
+  for (const route of routes) {
     const timelineT = route.isTimelineReversed
       ? reverseLoopProgress01(baseTimelineT)
       : baseTimelineT;

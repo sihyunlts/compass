@@ -3,32 +3,34 @@ import {
 } from '../../devices/color/color-program';
 import type { ColorEffectNode } from '../../shared/model';
 import type { BeatRange } from '../analysis/types';
+import { compileColorAgeKernel } from '../color/age-kernel';
+import { materializeColorTimeline } from '../color/materialization';
 import {
   type MutableGenerationState,
 } from '../timeline/state';
 import {
-  appendPendingColorApplication,
   buildTargetOriginIds,
-  createPendingGeometryApplicationOperator,
-  mergePlaybackWindowOverridesIntoTimelineState,
+  createPendingFrameApplicationOperator,
+  replaceTimelineAndRefreshRackState,
+  resolveFrameWindow,
   resolveStageExecutionPlan,
-  type PendingGeometryApplicationOperatorInput,
+  type PendingFrameApplicationOperatorInput,
+  type RackStageExecutionContext,
 } from './runtime';
-import { resolvePendingColorPlaybackWindowOverrides } from './runtime/color-materialization';
 
 const applyColorEffect = (
-  input: PendingGeometryApplicationOperatorInput,
+  input: PendingFrameApplicationOperatorInput,
   effect: ColorEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
   requiredFrameWindow: BeatRange | 'all',
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
+  context: RackStageExecutionContext,
 ): MutableGenerationState => {
-  const state = input.baseState;
-  const colorConfig = buildColorConfig(effect);
+  const sourceState = input.sourceState;
   const targetOriginIds = buildTargetOriginIds(
-    state.timeline,
+    sourceState.timeline,
     targetGroupId,
     {
       excludeMutedSources: targetGroupId === null,
@@ -36,34 +38,34 @@ const applyColorEffect = (
       mutedGeneratorIds,
     },
   );
-  const colorApplication = {
-    kind: 'color' as const,
-    targetOriginIds,
-    targetGroupId,
-    requiredFrameWindow,
-    colorConfig,
-    writeOrder,
-  };
-  const playbackWindowByOriginId = resolvePendingColorPlaybackWindowOverrides(
-    state.timeline,
-    colorApplication,
-    input.precedingTemporalCheckpoint,
-  );
+  const kernel = compileColorAgeKernel(buildColorConfig(effect));
+  if (targetOriginIds.size === 0) {
+    return sourceState;
+  }
 
-  return appendPendingColorApplication(
-    input,
-    colorApplication,
-    {
-      timelineStateByOriginId: mergePlaybackWindowOverridesIntoTimelineState(
-        state.timelineStateByOriginId,
-        playbackWindowByOriginId,
-      ),
-      finalCleanupModeUpdate: { mode: 'cleanup', originIds: targetOriginIds },
-    },
+  const materialization = materializeColorTimeline({
+    sourceTimeline: sourceState.timeline,
+    targetOriginIds,
+    sourceFrameWindow: resolveFrameWindow(
+      requiredFrameWindow,
+      sourceState.timeline.sampleStepBeats,
+      sourceState.timeline.frames.length,
+    ),
+    kernel,
+    writeOrder,
+  });
+
+  return replaceTimelineAndRefreshRackState(
+    sourceState,
+    materialization.timeline,
+    sourceState.timelineStateByOriginId,
+    context,
+    targetOriginIds,
+    materialization.playbackWindowByOriginId,
   );
 };
 
-export const colorOperator = createPendingGeometryApplicationOperator<'color'>(
+export const colorOperator = createPendingFrameApplicationOperator<'color'>(
   (input, stage, context) => {
     const device = stage.device;
     const executionPlan = resolveStageExecutionPlan(context, stage);
@@ -76,6 +78,7 @@ export const colorOperator = createPendingGeometryApplicationOperator<'color'>(
       executionPlan.requiredFrameWindow,
       context.mutedGroupIds,
       context.mutedGeneratorIds,
+      context,
     );
   },
 );

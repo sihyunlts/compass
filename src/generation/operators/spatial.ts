@@ -6,6 +6,7 @@ import {
   resolveModulatedDeviceAtFrame,
   resolveStageExecutionPlan,
   transformStroke,
+  type ModulationEvaluationWindow,
   type PendingGeometryApplicationOperatorInput,
   type SpatialTransformStageKind,
 } from './runtime';
@@ -60,27 +61,47 @@ const applyPendingSpatialTransform = (
   resolveDeviceAtFrame: (
     frameIndex: number,
     sampleStepBeats: number,
-    timeDomainEndBeat: number,
+    evaluationWindow: ModulationEvaluationWindow,
   ) => GeneratorEffectNode,
   requiredFrameWindow: BeatRange | 'all',
+  fallbackEvaluationWindow: ModulationEvaluationWindow,
 ): MutableGenerationState => {
   const { baseState } = input;
   const targetOriginIds = buildTargetOriginIds(baseState.timeline, targetGroupId);
+  const evaluationWindowByTargetOriginId = new Map(
+    Array.from(targetOriginIds, (originId) => {
+      const timelineState = baseState.timelineStateByOriginId.get(originId);
+      const window = input.precedingTemporalCheckpoint?.temporalByOriginId.has(originId)
+        ? timelineState?.temporal.visibilityWindow
+        : timelineState?.playbackWindow;
+      return [
+        originId,
+        window && Number.isFinite(window.start) && Number.isFinite(window.end) && window.end > window.start
+          ? window
+          : fallbackEvaluationWindow,
+      ] as const;
+    }),
+  );
 
   return appendPendingGeometryRewriteApplication(
     input,
     targetOriginIds,
     requiredFrameWindow,
     ({ timeline, frameIndex, strokes }) => {
-      const deviceAtFrame = isModulated
-        ? resolveDeviceAtFrame(
-            frameIndex,
-            timeline.sampleStepBeats,
-            timeline.timeDomainEndBeat,
-          )
-        : effect;
-      const transform = resolveEffectTransform(deviceAtFrame);
-      return strokes.map((stroke) => transformStroke(stroke, transform, writeOrder));
+      return strokes.map((stroke) => {
+        const deviceAtFrame = isModulated
+          ? resolveDeviceAtFrame(
+              frameIndex,
+              timeline.sampleStepBeats,
+              evaluationWindowByTargetOriginId.get(stroke.polyline.originId)!,
+            )
+          : effect;
+        return transformStroke(
+          stroke,
+          resolveEffectTransform(deviceAtFrame),
+          writeOrder,
+        );
+      });
     },
     { mode: 'cleanup', originIds: targetOriginIds },
   );
@@ -98,14 +119,18 @@ export const spatialTransformOperator = createPendingGeometryApplicationOperator
       stage.groupId,
       stage.stageIndex,
       isModulated,
-      (frameIndex, sampleStepBeats, timeDomainEndBeat) => resolveModulatedDeviceAtFrame(
+      (frameIndex, sampleStepBeats, evaluationWindow) => resolveModulatedDeviceAtFrame(
         context.modulationContext,
         device,
         frameIndex,
         sampleStepBeats,
-        timeDomainEndBeat,
+        evaluationWindow,
       ) as GeneratorEffectNode,
       executionPlan.requiredFrameWindow,
+      {
+        start: 0,
+        end: context.modulationContext.loopLengthBeats,
+      },
     );
   },
 );

@@ -15,9 +15,9 @@ export {
   createModulationContext,
   isDeviceModulated,
   resolveModulatedDeviceAtFrame,
+  type ModulationEvaluationWindow,
 } from './runtime/modulation';
 export {
-  appendPendingColorApplication,
   appendPendingGeometryRewriteApplication,
   appendPendingStrokeRewriteApplication,
   buildPendingStrokeRewriteFrameWrites,
@@ -33,7 +33,6 @@ export {
   shouldApplyReferenceStage,
 } from './runtime/reference';
 export {
-  mergePlaybackWindowOverridesIntoTimelineState,
   seedGeneratedOriginTimelineState,
 } from './runtime/timeline-state';
 export {
