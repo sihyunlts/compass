@@ -1,6 +1,7 @@
 import type { GeneratorChain } from '../../shared/model';
 import type { OperatorExecutionPlan } from '../analysis/types';
 import type { CompiledRackPlan, CompiledRackStage, RackStageDeviceKind } from '../plan/types';
+import { resolveCompiledRackSampleStepBeats } from '../plan/sampling';
 import { createEmptyGenerationState, type MutableGenerationState } from '../timeline/state';
 import { createEmptyTimeline } from '../timeline';
 import type { CanonicalOutputAdapter, GeometryTimeline } from '../types';
@@ -91,7 +92,7 @@ const resolveMaskSourceReferenceTimeline = (
       mutedGeneratorIds: referenceMutedGeneratorIds,
     };
     const stageExecutionContext = createRackStageExecutionContext(referenceContext);
-    let currentState = createEmptyGenerationState();
+    let currentState = createEmptyGenerationState(context.sampleStepBeats);
 
     for (const stage of context.compiledPlan.stages) {
       if (!shouldApplyReferenceStage(stage, context, sourceKind, sourceId)) {
@@ -123,9 +124,11 @@ export const executeCompiledRackPlan = (
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): MutableGenerationState => {
+  const sampleStepBeats = resolveCompiledRackSampleStepBeats(compiledPlan);
   const modulationContext = createModulationContext(modulationChain, loopLengthBeats);
   const referenceContext: MaskSourceReferenceContext = {
     compiledPlan,
+    sampleStepBeats,
     outputAdapter,
     modulationContext,
     executionPlanByDeviceId,
@@ -140,7 +143,7 @@ export const executeCompiledRackPlan = (
     ),
   };
   const stageExecutionContext = createRackStageExecutionContext(referenceContext);
-  let currentState = createEmptyGenerationState();
+  let currentState = createEmptyGenerationState(sampleStepBeats);
 
   for (const stage of compiledPlan.stages) {
     currentState = applyCompiledRackStage(

@@ -26,6 +26,7 @@ export interface ModulationContext {
 
 export interface MaskSourceReferenceContext {
   compiledPlan: CompiledRackPlan;
+  sampleStepBeats: number;
   outputAdapter: CanonicalOutputAdapter;
   modulationContext: ModulationContext;
   executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>;

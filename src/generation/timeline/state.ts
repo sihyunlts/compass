@@ -6,7 +6,7 @@ import type {
   GeometryStroke,
   GeometryTimeline,
 } from '../types';
-import { createEmptyTimeline } from './index';
+import { createEmptyTimeline, DEFAULT_SAMPLE_STEP_BEATS } from './index';
 
 export type OriginTimelineState = GenerationOriginTimelineState;
 
@@ -56,8 +56,10 @@ export interface MutableGenerationState {
   pendingFrameApplications: PendingFrameApplication[];
 }
 
-export const createEmptyGenerationState = (): MutableGenerationState => ({
-  timeline: createEmptyTimeline(),
+export const createEmptyGenerationState = (
+  sampleStepBeats = DEFAULT_SAMPLE_STEP_BEATS,
+): MutableGenerationState => ({
+  timeline: createEmptyTimeline(sampleStepBeats),
   timelineStateByOriginId: new Map<string, OriginTimelineState>(),
   pendingTemporalWriteOrderByOriginId: new Map<string, number>(),
   pendingFrameApplications: [],

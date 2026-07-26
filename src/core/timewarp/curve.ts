@@ -170,6 +170,31 @@ export const createSampledRemapFromTimeWarpCurve = (
   };
 };
 
+export const resolveTimeWarpCurveMaxRate = (
+  curve: TimeWarpCurve,
+): number => {
+  const remap = createSampledRemapFromTimeWarpCurve(curve);
+  const sampleSpan = remap.samples.length - 1;
+  const domainSpan = remap.domainEnd - remap.domainStart;
+  if (sampleSpan <= 0 || !Number.isFinite(domainSpan) || domainSpan <= 0) {
+    return 1;
+  }
+
+  const sampleStep = domainSpan / sampleSpan;
+  let maxRate = 0;
+  for (let index = 1; index < remap.samples.length; index += 1) {
+    const previous = remap.samples[index - 1];
+    const current = remap.samples[index];
+    if (previous === null || current === null) {
+      continue;
+    }
+
+    maxRate = Math.max(maxRate, Math.abs(current - previous) / sampleStep);
+  }
+
+  return Number.isFinite(maxRate) ? Math.max(maxRate, 1) : 1;
+};
+
 export const isIdentityTimeWarpCurve = (
   curve: TimeWarpCurve,
 ): boolean => {
