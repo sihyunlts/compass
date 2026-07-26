@@ -9,6 +9,8 @@ import { modulatorDeviceControls } from './modulator/controls';
 import { modulatorDeviceSchema } from './modulator/schema';
 import { pathDeviceControls } from './path/controls';
 import { pathDeviceSchema } from './path/schema';
+import { rainDeviceControls } from './rain/controls';
+import { rainDeviceSchema } from './rain/schema';
 import { reverseDeviceSchema } from './reverse/schema';
 import { rotateDeviceControls } from './rotate/controls';
 import { rotateDeviceSchema } from './rotate/schema';
@@ -60,6 +62,11 @@ export const RENDERER_DEVICE_MANIFEST = [
     ...scannerDeviceSchema,
     controls: scannerDeviceControls,
     editor: './scanner/ui.svelte',
+  },
+  {
+    ...rainDeviceSchema,
+    controls: rainDeviceControls,
+    editor: './rain/ui.svelte',
   },
   {
     ...spiralDeviceSchema,

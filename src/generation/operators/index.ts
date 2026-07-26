@@ -25,6 +25,7 @@ import { reverseOperator, stretchOperator, timeWarpOperator, trimOperator } from
 const RACK_OPERATORS: Record<RackStageDeviceKind, RackOperator> = {
   waterdrop: generatorOperator,
   scanner: generatorOperator,
+  rain: generatorOperator,
   spiral: generatorOperator,
   path: generatorOperator,
   mirror: spatialTransformOperator,

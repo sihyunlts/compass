@@ -54,6 +54,17 @@ export function cloneDeviceNode(
     };
   }
 
+  if (device.kind === 'rain') {
+    return {
+      id: device.id,
+      kind: 'rain',
+      enabled: device.enabled,
+      groupId: device.groupId ?? null,
+      name: device.name ?? null,
+      params: { ...device.params },
+    };
+  }
+
   if (device.kind === 'spiral') {
     return {
       id: device.id,

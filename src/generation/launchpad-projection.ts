@@ -180,10 +180,23 @@ const isStrokeActiveAtCoordinate = (
   stroke: GeometryStroke,
   x: number,
   y: number,
-): boolean => (
-  isPointInsideMasks(stroke, x, y)
-  && distanceToPolylineSquared({ x, y }, stroke.polyline) <= THICKNESS * THICKNESS
-);
+): boolean => {
+  if (!isPointInsideMasks(stroke, x, y)) {
+    return false;
+  }
+
+  const points = stroke.polyline.points;
+  if (stroke.polyline.rasterMode === 'centerline' && points.length === 1) {
+    const point = points[0];
+    return Number.isFinite(point.x)
+      && Number.isFinite(point.y)
+      && Math.round(point.x) === x
+      && Math.round(point.y) === y;
+  }
+
+  return distanceToPolylineSquared({ x, y }, stroke.polyline)
+    <= THICKNESS * THICKNESS;
+};
 
 const doesStrokeHitNoteOutput = (
   stroke: GeometryStroke,

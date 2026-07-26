@@ -53,12 +53,17 @@ const applyGeneratorDevice = (
   }
 
   const completedTimeline = completeTimelineStage(nextTimeline);
+  const preservesFullPlaybackWindow = device.kind === 'rain';
   return replaceTimelineAndRefreshRackState(
     state,
     completedTimeline,
-    seedGeneratedOriginTimelineState(state.timelineStateByOriginId, stage.deviceId),
+    seedGeneratedOriginTimelineState(
+      state.timelineStateByOriginId,
+      stage.deviceId,
+      preservesFullPlaybackWindow ? 'preserve' : 'cleanup',
+    ),
     context,
-    [stage.deviceId],
+    preservesFullPlaybackWindow ? [] : [stage.deviceId],
   );
 };
 

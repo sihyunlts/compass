@@ -1,4 +1,5 @@
 import type { GeneratorDeviceNode } from '../shared/model';
+import { normalizeRainDensity, normalizeRainSpeed } from './rain/schema';
 import { normalizePositiveScaleFactor } from './scale/schema';
 
 type DeviceKind = GeneratorDeviceNode['kind'];
@@ -43,6 +44,26 @@ const NUMERIC_PARAM_ACCESSORS: Record<
       read: (device) => (device as DeviceNodeOfKind<'scanner'>).params.angleDeg,
       write: (device, value) => {
         (device as DeviceNodeOfKind<'scanner'>).params.angleDeg = value;
+      },
+    },
+  },
+  rain: {
+    angleDeg: {
+      read: (device) => (device as DeviceNodeOfKind<'rain'>).params.angleDeg,
+      write: (device, value) => {
+        (device as DeviceNodeOfKind<'rain'>).params.angleDeg = value;
+      },
+    },
+    density: {
+      read: (device) => (device as DeviceNodeOfKind<'rain'>).params.density,
+      write: (device, value) => {
+        (device as DeviceNodeOfKind<'rain'>).params.density = normalizeRainDensity(value);
+      },
+    },
+    speed: {
+      read: (device) => (device as DeviceNodeOfKind<'rain'>).params.speed,
+      write: (device, value) => {
+        (device as DeviceNodeOfKind<'rain'>).params.speed = normalizeRainSpeed(value);
       },
     },
   },

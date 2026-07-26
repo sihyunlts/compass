@@ -7,6 +7,7 @@ import type {
 const GENERATOR_DEVICE_KINDS = new Set<GeneratorDeviceNode['kind']>([
   'waterdrop',
   'scanner',
+  'rain',
   'spiral',
   'path',
 ]);

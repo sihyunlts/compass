@@ -142,13 +142,14 @@ export const buildTimelineStateAfterTemporalMaterialization = (
 export const seedGeneratedOriginTimelineState = (
   timelineStateByOriginId: ReadonlyMap<string, OriginTimelineState>,
   originId: string,
+  finalCleanupMode: GenerationFinalCleanupMode = 'cleanup',
 ): Map<string, OriginTimelineState> => {
   const nextTimelineStateByOriginId = cloneTimelineStateByOriginId(timelineStateByOriginId);
   nextTimelineStateByOriginId.set(originId, {
     observedWindow: EMPTY_TIMELINE_WINDOW,
     playbackWindow: EMPTY_TIMELINE_WINDOW,
     temporal: createIdentitySceneTemporalState(),
-    finalCleanupMode: 'cleanup',
+    finalCleanupMode,
   });
 
   return nextTimelineStateByOriginId;

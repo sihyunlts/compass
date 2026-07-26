@@ -1,4 +1,5 @@
 import {
+  COMPOSITION_BOUNDS,
   COMPOSITION_CENTER,
   toAxisMirrorTransformAt,
   toMirrorTransformAt,
@@ -123,6 +124,19 @@ const buildGeneratorAnalysis = (
   if (device.kind === 'scanner') {
     return createOperatorAnalysis({
       outputBounds: 'all',
+      inputRoi: 'none',
+      framesNeeded: 'current',
+    });
+  }
+
+  if (device.kind === 'rain') {
+    return createOperatorAnalysis({
+      outputBounds: createSpatialBounds(
+        COMPOSITION_BOUNDS.minX,
+        COMPOSITION_BOUNDS.maxX,
+        COMPOSITION_BOUNDS.minY,
+        COMPOSITION_BOUNDS.maxY,
+      ),
       inputRoi: 'none',
       framesNeeded: 'current',
     });

@@ -1,5 +1,8 @@
 import { GENERATED_VELOCITY, POLYLINE_STEP } from '../core/pipeline/constants';
+import type { Polyline } from '../core/core-types';
+import { COMPOSITION_BOUNDS } from '../core/geometry';
 import { buildPathPolyline } from '../core/generators/path';
+import { buildRainPolylines } from '../core/generators/rain';
 import { buildScannerPolyline } from '../core/generators/scanner';
 import { buildSpiralPolyline } from '../core/generators/spiral';
 import { buildWaterdropPolyline } from '../core/generators/waterdrop';
@@ -12,42 +15,17 @@ import {
   addStrokeToFrame,
 } from './timeline';
 
-const buildGeneratorPolyline = (
-  device: Exclude<GeneratorNode, Extract<GeneratorNode, { kind: 'scanner' }>>,
-  beat01: number,
-) => {
-  if (device.kind === 'waterdrop') {
-    return buildWaterdropPolyline(
-      device.id,
-      device.params,
-      beat01,
-      POLYLINE_STEP,
-      GENERATED_VELOCITY,
-    );
-  }
+const NORMALIZED_GENERATOR_END_BEAT = 1;
 
-  if (device.kind === 'spiral') {
-    return buildSpiralPolyline(
-      device.id,
-      device.params,
-      beat01,
-      POLYLINE_STEP,
-      GENERATED_VELOCITY,
-    );
-  }
-
-  return buildPathPolyline(
-    device.id,
-    device.params,
-    GENERATED_VELOCITY,
-  );
-};
+const toPolylineArray = (
+  polyline: Polyline | null,
+): Polyline[] => polyline ? [polyline] : [];
 
 const buildScannerGeneratorPolyline = (
   device: Extract<GeneratorNode, { kind: 'scanner' }>,
   beat01: number,
   evaluationBounds: SpatialRequirement,
-) => {
+): Polyline | null => {
   const bounds = toBounds(evaluationBounds);
   if (!bounds) {
     return null;
@@ -63,6 +41,62 @@ const buildScannerGeneratorPolyline = (
   );
 };
 
+const buildGeneratorPolylines = (
+  device: GeneratorNode,
+  beat01: number,
+  sampleStepBeats: number,
+  evaluationBounds: SpatialRequirement,
+): Polyline[] => {
+  if (device.kind === 'waterdrop') {
+    return toPolylineArray(
+      buildWaterdropPolyline(
+        device.id,
+        device.params,
+        beat01,
+        POLYLINE_STEP,
+        GENERATED_VELOCITY,
+      ),
+    );
+  }
+
+  if (device.kind === 'scanner') {
+    return toPolylineArray(
+      buildScannerGeneratorPolyline(device, beat01, evaluationBounds),
+    );
+  }
+
+  if (device.kind === 'rain') {
+    return buildRainPolylines(
+      device.id,
+      device.params,
+      beat01,
+      sampleStepBeats,
+      GENERATED_VELOCITY,
+      COMPOSITION_BOUNDS,
+    );
+  }
+
+  if (device.kind === 'spiral') {
+    return toPolylineArray(
+      buildSpiralPolyline(
+        device.id,
+        device.params,
+        beat01,
+        POLYLINE_STEP,
+        GENERATED_VELOCITY,
+      ),
+    );
+  }
+
+  return toPolylineArray(
+    buildPathPolyline(
+      device.id,
+      device.params,
+      GENERATED_VELOCITY,
+    ),
+  );
+};
+
 export const rasterizeGeneratorFrame = (
   timeline: GeometryTimeline,
   frameIndex: number,
@@ -71,16 +105,24 @@ export const rasterizeGeneratorFrame = (
   evaluationBounds: SpatialRequirement,
 ): void => {
   const beat = frameIndex * timeline.sampleStepBeats;
-  const polyline = device.kind === 'scanner'
-    ? buildScannerGeneratorPolyline(device, Math.min(Math.max(beat, 0), 1), evaluationBounds)
-    : buildGeneratorPolyline(device, Math.min(Math.max(beat, 0), 1));
-  if (!polyline || polyline.points.length === 0) {
-    return;
-  }
+  const polylines = buildGeneratorPolylines(
+    device,
+    device.kind === 'rain'
+      ? Math.max(beat, 0)
+      : Math.min(Math.max(beat, 0), NORMALIZED_GENERATOR_END_BEAT),
+    timeline.sampleStepBeats,
+    evaluationBounds,
+  );
 
-  addStrokeToFrame(timeline, frameIndex, {
-    polyline,
-    originGroupId: normalizeOptionalId(device.groupId),
-    writeOrder,
-  });
+  for (const polyline of polylines) {
+    if (polyline.points.length === 0) {
+      continue;
+    }
+
+    addStrokeToFrame(timeline, frameIndex, {
+      polyline,
+      originGroupId: normalizeOptionalId(device.groupId),
+      writeOrder,
+    });
+  }
 };

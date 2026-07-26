@@ -17,7 +17,7 @@ export const DEVICE_BROWSER_CATEGORY_DEFINITIONS = [
     label: 'Generators',
     directoryName: 'Generators',
     accentColorVar: '--yellow-50',
-    deviceKinds: ['waterdrop', 'scanner', 'spiral', 'path'],
+    deviceKinds: ['waterdrop', 'scanner', 'rain', 'spiral', 'path'],
   },
   {
     categoryId: 'transform',
@@ -81,6 +81,7 @@ for (const [index, definition] of DEVICE_BROWSER_CATEGORY_DEFINITIONS.entries())
 const DEVICE_BROWSER_ICON_BY_KIND: Record<RendererDeviceKind, string> = {
   waterdrop: 'water_drop',
   scanner: 'scan',
+  rain: 'rainy',
   spiral: 'cyclone',
   path: 'line_end_diamond',
   mirror: 'flip',

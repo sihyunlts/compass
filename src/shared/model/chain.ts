@@ -27,6 +27,20 @@ export interface ScannerGeneratorNode extends GroupedDeviceNode {
   params: ScannerParams;
 }
 
+export interface RainParams {
+  seed: number;
+  angleDeg: number;
+  density: number;
+  speed: number;
+}
+
+export interface RainGeneratorNode extends GroupedDeviceNode {
+  id: string;
+  kind: 'rain';
+  enabled: boolean;
+  params: RainParams;
+}
+
 export interface SpiralParams {
   centerX: number;
   centerY: number;
@@ -60,6 +74,7 @@ export interface PathGeneratorNode extends GroupedDeviceNode {
 export type GeneratorNode =
   | WaterdropGeneratorNode
   | ScannerGeneratorNode
+  | RainGeneratorNode
   | SpiralGeneratorNode
   | PathGeneratorNode;
 
