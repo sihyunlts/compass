@@ -42,14 +42,17 @@
 
     &-left {
       display: flex;
+      flex: 1 1 0;
       align-items: center;
       gap: var(--gap-8);
       min-width: 0;
+      overflow: hidden;
     }
   }
 
   &-actions {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: var(--gap-8);
     min-width: 0;
