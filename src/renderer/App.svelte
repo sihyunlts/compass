@@ -496,6 +496,8 @@
             onNewRack={() => presetController.handleNewRack()}
             onSaveRack={() => presetController.handleSaveRack()}
             onSaveRackAs={() => presetController.handleSaveRackAs()}
+            onRevertRack={() => presetController.handleRevertRack()}
+            canRevertRack={presetState.canRevertRack && presetState.isRackDirty}
             onRenameRack={openRackRenameDialog}
           />
 

@@ -77,6 +77,7 @@ interface PresetControllerState {
   currentRackFilePath: string | null;
   currentRackDisplayName: string;
   isRackDirty: boolean;
+  canRevertRack: boolean;
 }
 
 interface PresetControllerOptions {
@@ -154,6 +155,7 @@ class PresetController {
     currentRackFilePath: null,
     currentRackDisplayName: DEFAULT_RACK_FILE_DISPLAY_NAME,
     isRackDirty: false,
+    canRevertRack: false,
   });
 
   private presetListRequestToken = 0;
@@ -167,6 +169,8 @@ class PresetController {
   private cleanCollapsedDeviceIdsKey = '';
 
   private cleanRackDisplayName = DEFAULT_RACK_FILE_DISPLAY_NAME;
+
+  private cleanRackPreset: RackPresetFile | null = null;
 
   private lastMainWindowDocumentEdited: boolean | null = null;
 
@@ -217,6 +221,23 @@ class PresetController {
     }, 'New rack failed.');
   }
 
+  public handleRevertRack(): void {
+    this.syncRackDirtyState();
+    if (!this.state.isRackDirty || !this.cleanRackPreset) {
+      return;
+    }
+
+    const result = this.options.editorSession.commands.applyRackPreset(this.cleanRackPreset);
+    if (!result.ok) {
+      this.showMessage(result.message);
+      return;
+    }
+
+    this.state.currentRackDisplayName = this.cleanRackDisplayName;
+    this.markCurrentRackClean({ captureRevertTarget: true });
+    this.showMessage('Rack reverted to saved state.');
+  }
+
   public async renameCurrentRack(rawName: string): Promise<boolean> {
     const nextName = resolveRackDisplayNameFromFileName(rawName);
     if (nextName === this.state.currentRackDisplayName) {
@@ -247,12 +268,29 @@ class PresetController {
     return true;
   }
 
-  private markCurrentRackClean(): void {
+  private markCurrentRackClean(
+    options: { captureRevertTarget?: boolean } = {},
+  ): void {
     const editorState = this.options.editorSession.state;
     this.cleanRackRevision = editorState.chainRevision;
     this.cleanCollapsedDeviceIdsKey = toCollapsedDeviceIdsKey(editorState.collapsedDeviceIds);
-    this.cleanRackDisplayName = this.state.currentRackDisplayName;
+    if (options.captureRevertTarget) {
+      this.captureCurrentRackRevertTarget();
+    } else {
+      this.cleanRackDisplayName = this.state.currentRackDisplayName;
+    }
     this.state.isRackDirty = false;
+  }
+
+  private captureCurrentRackRevertTarget(): void {
+    this.cleanRackDisplayName = this.state.currentRackDisplayName;
+    this.cleanRackPreset = this.buildCurrentRackFile();
+    this.state.canRevertRack = true;
+  }
+
+  private clearRevertTarget(): void {
+    this.cleanRackPreset = null;
+    this.state.canRevertRack = false;
   }
 
   private setCurrentRackFile(filePath: string | null, displayName: string): void {
@@ -312,7 +350,7 @@ class PresetController {
     });
     if (response.status === 'saved') {
       this.setCurrentRackFile(response.filePath, resolveRackDisplayNameFromPath(response.filePath));
-      this.markCurrentRackClean();
+      this.markCurrentRackClean({ captureRevertTarget: true });
       if (options.showSuccessMessage) {
         this.showMessage('Rack saved.');
       }
@@ -330,7 +368,7 @@ class PresetController {
     const response = await this.options.bridgeClient.savePresetFile(this.buildRackSaveAsRequest());
     if (response.status === 'saved') {
       this.setCurrentRackFile(response.filePath, resolveRackDisplayNameFromPath(response.filePath));
-      this.markCurrentRackClean();
+      this.markCurrentRackClean({ captureRevertTarget: true });
       if (options.showSuccessMessage) {
         this.showMessage('Rack saved.');
       }
@@ -934,12 +972,13 @@ class PresetController {
 
     this.setCurrentRackFile(target.filePath, target.label);
     if (target.needsSave) {
+      this.captureCurrentRackRevertTarget();
       this.syncRackDirtyState();
       this.showMessage('Rack loaded. Save to update the file format.');
       return;
     }
 
-    this.markCurrentRackClean();
+    this.markCurrentRackClean({ captureRevertTarget: true });
     this.showMessage('Rack loaded.');
   }
 
@@ -972,6 +1011,7 @@ class PresetController {
     }
 
     this.setCurrentRackFile(null, DEFAULT_RACK_FILE_DISPLAY_NAME);
+    this.clearRevertTarget();
     this.markCurrentRackClean();
     this.showMessage('New rack created.');
   }

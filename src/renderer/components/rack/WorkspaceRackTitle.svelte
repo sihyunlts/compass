@@ -6,6 +6,8 @@
     id: string;
     label: string;
     run: () => void;
+    disabled?: boolean;
+    separatorBefore?: boolean;
   };
 
   let {
@@ -15,6 +17,8 @@
     onNewRack,
     onSaveRack,
     onSaveRackAs,
+    onRevertRack,
+    canRevertRack = false,
     onRenameRack,
   } = $props<{
     title: string;
@@ -23,6 +27,8 @@
     onNewRack: () => void;
     onSaveRack: () => void;
     onSaveRackAs: () => void;
+    onRevertRack: () => void;
+    canRevertRack?: boolean;
     onRenameRack: () => void;
   }>();
 
@@ -37,6 +43,13 @@
     { id: 'rack-new-button', label: 'New', run: onNewRack },
     { id: 'rack-save-button', label: 'Save', run: onSaveRack },
     { id: 'rack-save-as-button', label: 'Save As', run: onSaveRackAs },
+    {
+      id: 'rack-revert-button',
+      label: 'Revert to Saved',
+      run: onRevertRack,
+      disabled: !canRevertRack,
+      separatorBefore: true,
+    },
   ]);
 
   const closeMenu = (restoreFocus: boolean): void => {
@@ -86,12 +99,15 @@
   >
     <div class="rack-file-actions-list floating-menu-list" role="menu" aria-label="Rack actions">
       {#each rackActions as action (action.id)}
+        {#if action.separatorBefore}
+          <hr class="floating-menu-separator" />
+        {/if}
         <button
           id={action.id}
           class="floating-menu-item"
           type="button"
           role="menuitem"
-          disabled={disabled}
+          disabled={disabled || action.disabled}
           onclick={() => runAction(action)}
         >
           {action.label}
