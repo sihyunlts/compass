@@ -10,7 +10,7 @@ import {
 import type { RendererDeviceSchema } from '../types';
 
 export const RAIN_SEED_MIN = 0;
-export const RAIN_SEED_MAX = 0xffff_ffff;
+export const RAIN_SEED_MAX = 9999;
 export const RAIN_DENSITY_MIN = 0;
 export const RAIN_DENSITY_MAX = 32;
 export const RAIN_SPEED_MIN = 0.3;
