@@ -6,12 +6,12 @@
   import type { Snippet } from 'svelte';
   import {
     attachFloatingLayerDismissHandlers,
-    animateFloatingLayerExit,
     FLOATING_LAYER_ENTER_SPRING_OPTIONS,
     isEventTargetWithinFloatingLayer,
     resolveAnchoredFloatingLayerPosition,
     resolveFloatingLayerEnterOffsetY,
   } from '../overlays/floating-layer';
+  import { FloatingLayerPresence } from '../overlays/floating-layer-presence.svelte';
 
   let {
     open = false,
@@ -31,13 +31,11 @@
   let x = $state(0);
   let y = $state(0);
   let maxHeightPx = $state(384);
-  let shouldRender = $state(false);
   let isPositioned = $state(false);
-  let isExiting = $state(false);
   let positionToken = 0;
-  let cancelExitAnimation: (() => void) | null = null;
 
   const rootClass = $derived(`floating-dropdown floating-menu-surface ${className}`.trim());
+  const presence = new FloatingLayerPresence();
   const enterY = new Spring(0, FLOATING_LAYER_ENTER_SPRING_OPTIONS);
 
   const updatePosition = async (): Promise<void> => {
@@ -66,6 +64,7 @@
         { instant: true },
       );
       isPositioned = true;
+      presence.enter([{ element: dropdownEl }]);
       enterY.target = 0;
       return;
     }
@@ -75,31 +74,24 @@
 
   $effect(() => {
     if (open && anchorEl) {
-      cancelExitAnimation?.();
-      cancelExitAnimation = null;
-      isExiting = false;
-      shouldRender = true;
+      presence.show();
       void updatePosition();
       return;
     }
 
-    if (!shouldRender || isExiting) {
+    if (!presence.rendered || presence.exiting) {
       return;
     }
 
     if (!dropdownEl || !isPositioned) {
-      shouldRender = false;
+      presence.hideImmediately();
       isPositioned = false;
       void enterY.set(0, { instant: true });
       return;
     }
 
-    isExiting = true;
-    cancelExitAnimation = animateFloatingLayerExit(dropdownEl, () => {
-      cancelExitAnimation = null;
-      shouldRender = false;
+    presence.hide([{ element: dropdownEl }], () => {
       isPositioned = false;
-      isExiting = false;
       void enterY.set(0, { instant: true });
     });
   });
@@ -118,13 +110,13 @@
     });
 
     return () => {
-      cancelExitAnimation?.();
+      presence.destroy();
       detachDismissHandlers();
     };
   });
 </script>
 
-{#if shouldRender}
+{#if presence.rendered}
   <div
     bind:this={dropdownEl}
     class={rootClass}
@@ -146,26 +138,12 @@
     max-height: min(24rem, var(--floating-dropdown-max-height, calc(100vh - 1rem)));
     overflow-y: auto;
     visibility: hidden;
-    opacity: 0;
     translate: 0 var(--floating-dropdown-enter-y, 0);
     pointer-events: none;
 
     &.is-positioned {
       visibility: visible;
       pointer-events: auto;
-      animation: floating-layer-fade-in
-        var(--floating-layer-enter-duration)
-        var(--floating-layer-enter-easing)
-        both;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .floating-dropdown.is-positioned {
-      animation: none;
-      opacity: 1;
-      filter: none;
-      translate: none;
     }
   }
 </style>

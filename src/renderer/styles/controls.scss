@@ -139,6 +139,10 @@ input {
     translate: none !important;
   }
 
+  .modal-dialog {
+    transform: scale(1) !important;
+  }
+
   .switch-thumb {
     transform: translateX(0) !important;
   }
@@ -163,12 +167,6 @@ html.reduce-animation {
   }
 }
 
-.floating-menu-surface,
-.app-hint {
-  --floating-layer-enter-duration: 150ms;
-  --floating-layer-enter-easing: cubic-bezier(0, 0.5, 0.5, 1);
-}
-
 .floating-menu-surface {
   position: fixed;
   inset: 0 auto auto 0;
@@ -184,18 +182,6 @@ html.reduce-animation {
   border: 1px solid var(--neutral-40);
   border-radius: var(--radius-8);
   background: var(--neutral-10);
-}
-
-@keyframes floating-layer-fade-in {
-  from {
-    opacity: 0;
-    filter: blur(4px);
-  }
-
-  to {
-    opacity: 1;
-    filter: blur(0);
-  }
 }
 
 @keyframes floating-hint-enter {
@@ -265,10 +251,13 @@ html.reduce-animation {
   line-height: 1.25;
   pointer-events: none;
   white-space: normal;
-  animation: floating-hint-enter
-    var(--floating-layer-enter-duration)
-    var(--floating-layer-enter-easing)
-    both;
+
+  &:not([data-floating-layer-motion='managed']) {
+    animation: floating-hint-enter
+      150ms
+      cubic-bezier(0, 0.5, 0.5, 1)
+      both;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

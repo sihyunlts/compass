@@ -1,4 +1,5 @@
 import { clamp } from '../../../shared/math';
+import { SPRING_PRECISION } from '../../motion';
 
 export type FloatingLayerSize = {
   width: number;
@@ -30,13 +31,33 @@ type FloatingLayerDismissHandlers = {
   onDismissRequest?: () => void;
 };
 
+export type FloatingLayerEnterTarget = {
+  element: HTMLElement;
+  blurPx?: number | null;
+  translateY?: number;
+  durationMs?: number;
+  easing?: string;
+};
+
+export type FloatingLayerExitTarget = {
+  element: HTMLElement;
+  targetScale?: number | null;
+  blurPx?: number | null;
+  durationMs?: number;
+  easing?: string;
+};
+
 export const DEFAULT_FLOATING_LAYER_MARGIN_PX = 8;
 export const FLOATING_LAYER_ENTER_DISTANCE_PX = 6;
 export const FLOATING_LAYER_ENTER_SPRING_OPTIONS = {
   stiffness: 0.2,
   damping: 0.8,
+  precision: SPRING_PRECISION,
 } as const;
-const FLOATING_LAYER_EXIT_DURATION_MS = 140;
+export const FLOATING_LAYER_ENTER_DURATION_MS = 150;
+export const FLOATING_LAYER_ENTER_EASING = 'cubic-bezier(0, 0.5, 0.5, 1)';
+export const FLOATING_LAYER_EXIT_DURATION_MS = 200;
+export const FLOATING_LAYER_EXIT_EASING = 'cubic-bezier(0.4, 0, 1, 1)';
 
 export const resolveFloatingLayerEnterOffsetY = (
   verticalPlacement: FloatingLayerVerticalPlacement,
@@ -48,25 +69,99 @@ const shouldReduceFloatingLayerMotion = (): boolean =>
   document.documentElement.classList.contains('reduce-animation')
   || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+export const animateFloatingLayerEnter = (
+  targets: readonly FloatingLayerEnterTarget[],
+  onFinish: () => void = () => {},
+): (() => void) => {
+  if (targets.length === 0 || shouldReduceFloatingLayerMotion()) {
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        onFinish();
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }
+
+  let remainingAnimations = targets.length;
+  let finished = false;
+  const animations = targets.map((target) => {
+    const fromKeyframe: Keyframe = { opacity: '0' };
+    const toKeyframe: Keyframe = { opacity: '1' };
+    if (target.blurPx !== null) {
+      fromKeyframe.filter = `blur(${target.blurPx ?? 4}px)`;
+      toKeyframe.filter = 'blur(0)';
+    }
+    if (target.translateY !== undefined) {
+      fromKeyframe.translate = `0 ${target.translateY}px`;
+      toKeyframe.translate = 'none';
+    }
+
+    const animation = target.element.animate(
+      [fromKeyframe, toKeyframe],
+      {
+        duration: target.durationMs ?? FLOATING_LAYER_ENTER_DURATION_MS,
+        easing: target.easing ?? FLOATING_LAYER_ENTER_EASING,
+        fill: 'both',
+      },
+    );
+    animation.onfinish = () => {
+      animation.onfinish = null;
+      remainingAnimations -= 1;
+      if (remainingAnimations > 0 || finished) {
+        return;
+      }
+
+      finished = true;
+      for (const runningAnimation of animations) {
+        runningAnimation.onfinish = null;
+        runningAnimation.cancel();
+      }
+      onFinish();
+    };
+    return animation;
+  });
+
+  return () => {
+    if (finished) {
+      return;
+    }
+    finished = true;
+    for (const animation of animations) {
+      animation.onfinish = null;
+      animation.cancel();
+    }
+  };
+};
+
 export const animateFloatingLayerExit = (
-  layerEl: HTMLElement,
+  targets: readonly FloatingLayerExitTarget[],
   onFinish: () => void,
 ): (() => void) => {
-  const wasInert = layerEl.inert;
-  const previousPointerEvents = layerEl.style.pointerEvents;
+  const interactionSnapshots = targets.map(({ element }) => ({
+    element,
+    inert: element.inert,
+    pointerEvents: element.style.pointerEvents,
+  }));
   const restoreInteraction = (): void => {
-    layerEl.inert = wasInert;
-    if (previousPointerEvents) {
-      layerEl.style.pointerEvents = previousPointerEvents;
-    } else {
-      layerEl.style.removeProperty('pointer-events');
+    for (const snapshot of interactionSnapshots) {
+      snapshot.element.inert = snapshot.inert;
+      if (snapshot.pointerEvents) {
+        snapshot.element.style.pointerEvents = snapshot.pointerEvents;
+      } else {
+        snapshot.element.style.removeProperty('pointer-events');
+      }
     }
   };
 
-  layerEl.inert = true;
-  layerEl.style.pointerEvents = 'none';
+  for (const { element } of targets) {
+    element.inert = true;
+    element.style.pointerEvents = 'none';
+  }
 
-  if (shouldReduceFloatingLayerMotion()) {
+  if (targets.length === 0 || shouldReduceFloatingLayerMotion()) {
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
@@ -80,42 +175,62 @@ export const animateFloatingLayerExit = (
     };
   }
 
-  const computedStyle = window.getComputedStyle(layerEl);
-  const positionedTransform = computedStyle.transform === 'none'
-    ? ''
-    : computedStyle.transform;
-  const animation = layerEl.animate(
-    [
+  let remainingAnimations = targets.length;
+  let finished = false;
+  const animations = targets.map((target) => {
+    const computedStyle = window.getComputedStyle(target.element);
+    const positionedTransform = computedStyle.transform === 'none'
+      ? ''
+      : computedStyle.transform;
+    const fromKeyframe: Keyframe = { opacity: computedStyle.opacity };
+    const toKeyframe: Keyframe = { opacity: '0' };
+    if (target.blurPx !== null) {
+      fromKeyframe.filter = computedStyle.filter;
+      toKeyframe.filter = `blur(${target.blurPx ?? 4}px)`;
+    }
+    if (target.targetScale !== null) {
+      const exitScale = target.targetScale ?? 1.04;
+      fromKeyframe.transform = positionedTransform || 'scale(1)';
+      toKeyframe.transform = positionedTransform
+        ? `${positionedTransform} scale(${exitScale})`
+        : `scale(${exitScale})`;
+    }
+    const animation = target.element.animate(
+      [fromKeyframe, toKeyframe],
       {
-        opacity: computedStyle.opacity,
-        filter: computedStyle.filter,
-        transform: positionedTransform || 'scale(1)',
+        duration: target.durationMs ?? FLOATING_LAYER_EXIT_DURATION_MS,
+        easing: target.easing ?? FLOATING_LAYER_EXIT_EASING,
+        fill: 'forwards',
       },
-      {
-        opacity: '0',
-        filter: 'blur(4px)',
-        transform: positionedTransform
-          ? `${positionedTransform} scale(1.04)`
-          : 'scale(1.04)',
-      },
-    ],
-    {
-      duration: FLOATING_LAYER_EXIT_DURATION_MS,
-      easing: 'cubic-bezier(0.4, 0, 1, 1)',
-      fill: 'forwards',
-    },
-  );
+    );
+    animation.onfinish = () => {
+      animation.onfinish = null;
+      remainingAnimations -= 1;
+      if (remainingAnimations > 0 || finished) {
+        return;
+      }
 
-  animation.onfinish = () => {
-    animation.onfinish = null;
-    animation.cancel();
-    restoreInteraction();
-    onFinish();
-  };
+      finished = true;
+      onFinish();
+      queueMicrotask(() => {
+        for (const completedAnimation of animations) {
+          completedAnimation.cancel();
+        }
+        restoreInteraction();
+      });
+    };
+    return animation;
+  });
 
   return () => {
-    animation.onfinish = null;
-    animation.cancel();
+    if (finished) {
+      return;
+    }
+    finished = true;
+    for (const animation of animations) {
+      animation.onfinish = null;
+      animation.cancel();
+    }
     restoreInteraction();
   };
 };

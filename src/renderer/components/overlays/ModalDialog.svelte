@@ -9,10 +9,47 @@
 
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { tick } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
+  import { Spring } from 'svelte/motion';
+  import { SPRING_PRECISION } from '../../motion';
   import Button from '../primitives/Button.svelte';
+  import {
+    FLOATING_LAYER_ENTER_DURATION_MS,
+    FLOATING_LAYER_ENTER_EASING,
+    FLOATING_LAYER_EXIT_EASING,
+  } from './floating-layer';
+  import { FloatingLayerPresence } from './floating-layer-presence.svelte';
 
   const FOCUSABLE_SELECTOR = 'input:not([disabled]), button:not([disabled])';
+  const MODAL_DIALOG_ENTER_SCALE = 1.06;
+  const MODAL_DIALOG_EXIT_SCALE = 1.10;
+  const MODAL_DIALOG_ENTER_SPRING_OPTIONS = {
+    stiffness: 0.2,
+    damping: 1,
+    precision: SPRING_PRECISION,
+  } as const;
+  const MODAL_DIALOG_EXIT_ANIMATION_OPTIONS = {
+    targetScale: MODAL_DIALOG_EXIT_SCALE,
+    blurPx: 8,
+    durationMs: 250,
+    easing: FLOATING_LAYER_EXIT_EASING,
+  } as const;
+  const MODAL_DIALOG_BACKDROP_ENTER_ANIMATION_OPTIONS = {
+    blurPx: null,
+    durationMs: FLOATING_LAYER_ENTER_DURATION_MS,
+    easing: 'ease',
+  } as const;
+  const MODAL_DIALOG_BACKDROP_EXIT_ANIMATION_OPTIONS = {
+    targetScale: null,
+    blurPx: null,
+    durationMs: MODAL_DIALOG_EXIT_ANIMATION_OPTIONS.durationMs,
+    easing: 'ease',
+  } as const;
+  const MODAL_DIALOG_ENTER_ANIMATION_OPTIONS = {
+    blurPx: 8,
+    durationMs: FLOATING_LAYER_ENTER_DURATION_MS,
+    easing: FLOATING_LAYER_ENTER_EASING,
+  } as const;
 
   let {
     open = false,
@@ -40,10 +77,13 @@
     children?: Snippet;
   }>();
 
+  let backdropEl = $state<HTMLDivElement | null>(null);
   let dialogEl = $state<HTMLDivElement | null>(null);
   let previouslyFocusedEl: HTMLElement | null = null;
   let wasOpen = false;
   let focusToken = 0;
+  const presence = new FloatingLayerPresence();
+  const dialogScale = new Spring(1, MODAL_DIALOG_ENTER_SPRING_OPTIONS);
   const titleId = allocateModalDialogId('modal-dialog-title');
   const descriptionId = allocateModalDialogId('modal-dialog-description');
 
@@ -79,6 +119,35 @@
 
     previouslyFocusedEl.focus();
     previouslyFocusedEl = null;
+  };
+
+  const finishClose = (): void => {
+    void dialogScale.set(1, { instant: true });
+  };
+
+  const startExit = (): void => {
+    if (!presence.rendered || presence.exiting) {
+      return;
+    }
+    if (!backdropEl || !dialogEl) {
+      presence.hideImmediately();
+      finishClose();
+      return;
+    }
+
+    presence.hide(
+      [
+        {
+          element: backdropEl,
+          ...MODAL_DIALOG_BACKDROP_EXIT_ANIMATION_OPTIONS,
+        },
+        {
+          element: dialogEl,
+          ...MODAL_DIALOG_EXIT_ANIMATION_OPTIONS,
+        },
+      ],
+      finishClose,
+    );
   };
 
   const handleCancel = (): void => {
@@ -156,17 +225,48 @@
 
   $effect(() => {
     if (open && !wasOpen) {
+      const shouldAnimateEnter = presence.show();
       previouslyFocusedEl = document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
+      dialogScale.stiffness = MODAL_DIALOG_ENTER_SPRING_OPTIONS.stiffness;
+      dialogScale.damping = MODAL_DIALOG_ENTER_SPRING_OPTIONS.damping;
+      dialogScale.precision = MODAL_DIALOG_ENTER_SPRING_OPTIONS.precision;
+      if (shouldAnimateEnter) {
+        void dialogScale.set(MODAL_DIALOG_ENTER_SCALE, { instant: true });
+        void tick().then(() => {
+          if (!open || !backdropEl || !dialogEl) {
+            return;
+          }
+
+          presence.enter([
+            {
+              element: backdropEl,
+              ...MODAL_DIALOG_BACKDROP_ENTER_ANIMATION_OPTIONS,
+            },
+            {
+              element: dialogEl,
+              ...MODAL_DIALOG_ENTER_ANIMATION_OPTIONS,
+            },
+          ]);
+          dialogScale.target = 1;
+        });
+      } else {
+        dialogScale.target = 1;
+      }
       void focusInitialAction();
     }
 
     if (!open && wasOpen) {
       restorePreviousFocus();
+      startExit();
     }
 
     wasOpen = open;
+  });
+
+  onDestroy(() => {
+    presence.destroy();
   });
 
   $effect(() => {
@@ -184,10 +284,12 @@
   });
 </script>
 
-{#if open}
+{#if presence.rendered}
   <div
+    bind:this={backdropEl}
     class="modal-dialog-backdrop"
     role="presentation"
+    aria-hidden={!open}
     data-preserve-rack-selection="true"
     onpointerdown={handleBackdropPointerDown}
   >
@@ -195,11 +297,13 @@
       bind:this={dialogEl}
       class="modal-dialog"
       role="dialog"
+      aria-hidden={!open}
       aria-modal="true"
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
       tabindex="-1"
       data-preserve-rack-selection="true"
+      style:transform={`scale(${dialogScale.current})`}
       onkeydown={handleKeyDown}
     >
       <h2 id={titleId} class="modal-dialog-title">{title}</h2>

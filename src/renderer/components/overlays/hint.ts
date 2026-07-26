@@ -1,4 +1,5 @@
 import {
+  animateFloatingLayerEnter,
   animateFloatingLayerExit,
   resolveFloatingLayerEnterOffsetY,
 } from './floating-layer';
@@ -83,6 +84,7 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
   let hintText = normalizeHint(value);
   let hintEl: HTMLDivElement | null = null;
   let exitingHintEl: HTMLDivElement | null = null;
+  let cancelEnterAnimation: (() => void) | null = null;
   let cancelExitAnimation: (() => void) | null = null;
   let showTimer: number | null = null;
   let previousDescribedBy: string | null = null;
@@ -98,9 +100,9 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
     showTimer = null;
   };
 
-  const positionHint = (): void => {
+  const positionHint = (): number | null => {
     if (!hintEl) {
-      return;
+      return null;
     }
 
     const anchorRect = node.getBoundingClientRect();
@@ -127,17 +129,16 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
       );
 
     hintEl.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`;
-    hintEl.style.setProperty(
-      '--floating-layer-enter-y',
-      `${resolveFloatingLayerEnterOffsetY(opensAbove ? 'above' : 'below')}px`,
-    );
+    return resolveFloatingLayerEnterOffsetY(opensAbove ? 'above' : 'below');
   };
 
   const closeHint = (): void => {
     clearShowTimer();
     const wasOpen = hintEl !== null;
     const closingHintEl = hintEl;
+    const cancelEnteringHint = cancelEnterAnimation;
     hintEl = null;
+    cancelEnterAnimation = null;
 
     if (wasOpen) {
       if (previousDescribedBy === null) {
@@ -152,14 +153,18 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
       cancelExitAnimation?.();
       exitingHintEl?.remove();
       exitingHintEl = closingHintEl;
-      cancelExitAnimation = animateFloatingLayerExit(closingHintEl, () => {
-        closingHintEl.remove();
-        if (exitingHintEl === closingHintEl) {
-          exitingHintEl = null;
-          cancelExitAnimation = null;
-        }
-      });
+      cancelExitAnimation = animateFloatingLayerExit(
+        [{ element: closingHintEl }],
+        () => {
+          closingHintEl.remove();
+          if (exitingHintEl === closingHintEl) {
+            exitingHintEl = null;
+            cancelExitAnimation = null;
+          }
+        },
+      );
     }
+    cancelEnteringHint?.();
 
     window.removeEventListener('scroll', closeHint, true);
     window.removeEventListener('resize', closeHint);
@@ -173,6 +178,7 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
       return;
     }
 
+    const shouldAnimateEnter = hintEl === null;
     if (!hintEl) {
       cancelExitAnimation?.();
       cancelExitAnimation = null;
@@ -187,6 +193,7 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
       hintEl = document.createElement('div');
       hintEl.id = hintId;
       hintEl.className = 'app-hint';
+      hintEl.dataset.floatingLayerMotion = 'managed';
       hintEl.role = 'tooltip';
       document.body.append(hintEl);
 
@@ -197,7 +204,18 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
     }
 
     hintEl.textContent = hintText;
-    positionHint();
+    const enterY = positionHint();
+    const enteringHintEl = hintEl;
+    if (shouldAnimateEnter && enterY !== null) {
+      cancelEnterAnimation = animateFloatingLayerEnter(
+        [{ element: enteringHintEl, translateY: enterY }],
+        () => {
+          if (hintEl === enteringHintEl) {
+            cancelEnterAnimation = null;
+          }
+        },
+      );
+    }
   };
 
   function handleDocumentKeyDown(event: KeyboardEvent): void {
@@ -257,9 +275,11 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
       node.removeEventListener('blur', closeHint);
       unregisterWindowFocusHandlers();
       closeHint();
+      cancelEnterAnimation?.();
       cancelExitAnimation?.();
       exitingHintEl?.remove();
       exitingHintEl = null;
+      cancelEnterAnimation = null;
       cancelExitAnimation = null;
     },
   };

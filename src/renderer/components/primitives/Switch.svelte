@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import { Spring } from 'svelte/motion';
+  import { SPRING_PRECISION } from '../../motion';
 
   let {
     id,
@@ -25,6 +26,7 @@
     {
       stiffness: 0.2,
       damping: 1,
+      precision: SPRING_PRECISION,
     },
   );
 </script>
