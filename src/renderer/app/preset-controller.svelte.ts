@@ -66,7 +66,6 @@ type RackOpenTarget = {
 
 interface PresetControllerState {
   presetTree: BrowserTreePresetFolderNode[];
-  isPresetLoading: boolean;
   presetErrorText: string | null;
   pendingPresetFolderDraft: PendingPresetFolderDraft | null;
   presetFolderSelectionTarget: PresetFolderSelectionTarget | null;
@@ -144,7 +143,6 @@ const toCollapsedDeviceIdsKey = (ids: readonly string[]): string =>
 class PresetController {
   public readonly state: PresetControllerState = $state({
     presetTree: [],
-    isPresetLoading: false,
     presetErrorText: null,
     pendingPresetFolderDraft: null,
     presetFolderSelectionTarget: null,
@@ -384,7 +382,6 @@ class PresetController {
 
   public async loadTree(): Promise<void> {
     const requestToken = ++this.presetListRequestToken;
-    this.state.isPresetLoading = true;
     this.state.presetErrorText = null;
 
     try {
@@ -409,10 +406,6 @@ class PresetController {
       this.state.presetErrorText = error instanceof Error && error.message.trim()
         ? error.message.trim()
         : 'Failed to load presets.';
-    } finally {
-      if (requestToken === this.presetListRequestToken) {
-        this.state.isPresetLoading = false;
-      }
     }
   }
 

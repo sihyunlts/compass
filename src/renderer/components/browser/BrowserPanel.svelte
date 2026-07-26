@@ -223,7 +223,6 @@
     activePage = 'devices',
     deviceTree = [] as BrowserTreeDeviceFolderNode[],
     presetTree = [] as BrowserTreePresetFolderNode[],
-    isPresetLoading = false,
     presetErrorText = null,
     pendingPresetFolderDraft = null,
     presetFolderSelectionTarget = null,
@@ -262,7 +261,6 @@
     activePage?: BrowserPanelPage;
     deviceTree: BrowserTreeDeviceFolderNode[];
     presetTree: BrowserTreePresetFolderNode[];
-    isPresetLoading?: boolean;
     presetErrorText?: string | null;
     pendingPresetFolderDraft?: PendingPresetFolderDraft | null;
     presetFolderSelectionTarget?: PresetFolderSelectionTarget | null;
@@ -727,8 +725,6 @@
           onOpenGitHub={onOpenGitHub}
           onOpenLatestReleasePage={onOpenLatestReleasePage}
         />
-      {:else if activePage === 'presets' && isPresetLoading}
-        <p class="browser-status">Loading presets...</p>
       {:else if activePage === 'presets' && presetErrorText}
         <p class="browser-status browser-status-error">{presetErrorText}</p>
       {:else}

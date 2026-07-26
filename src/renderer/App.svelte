@@ -13,7 +13,9 @@
     sanitizeSidebarWidth,
     saveMainWindowAlwaysOnTop,
   } from './features/editor/persistence-storage';
-  import BrowserPanel from './components/browser/BrowserPanel.svelte';
+  import BrowserPanel, {
+    type BrowserPanelPage,
+  } from './components/browser/BrowserPanel.svelte';
   import type { ContextMenuTarget } from './features/context-menu/types';
   import TextField from './components/fields/TextField.svelte';
   import Button from './components/primitives/Button.svelte';
@@ -62,6 +64,8 @@
   let rackViewApi: RackViewApi | null = $state(null);
   let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
   let mainWindowAlwaysOnTop = $state(loadMainWindowAlwaysOnTop());
+  let pendingSidebarPage: BrowserPanelPage | null = null;
+  let sidebarPageSelectionToken = 0;
 
   const closeContextMenu = (): void => {
     contextMenuComponent?.close();
@@ -200,13 +204,32 @@
     headerIndicator.syncFromSource();
   });
 
-  $effect(() => {
-    if (uiState.sidebarPage !== 'presets') {
+  const handleSidebarPageSelect = async (
+    nextPage: BrowserPanelPage,
+  ): Promise<void> => {
+    if (nextPage === pendingSidebarPage) {
+      return;
+    }
+    if (nextPage === uiState.sidebarPage) {
+      if (pendingSidebarPage !== null) {
+        sidebarPageSelectionToken += 1;
+        pendingSidebarPage = null;
+      }
       return;
     }
 
-    void presetController.loadTree();
-  });
+    const selectionToken = ++sidebarPageSelectionToken;
+    pendingSidebarPage = nextPage;
+    if (nextPage === 'presets') {
+      await presetController.loadTree();
+      if (selectionToken !== sidebarPageSelectionToken) {
+        return;
+      }
+    }
+
+    pendingSidebarPage = null;
+    uiState.sidebarPage = nextPage;
+  };
 
   const handleUndoClick = (): void => {
     closeContextMenu();
@@ -437,7 +460,6 @@
       activePage={uiState.sidebarPage}
       deviceTree={DEVICE_BROWSER_TREE}
       presetTree={presetState.presetTree}
-      isPresetLoading={presetState.isPresetLoading}
       presetErrorText={presetState.presetErrorText}
       pendingPresetFolderDraft={presetState.pendingPresetFolderDraft}
       presetFolderSelectionTarget={presetState.presetFolderSelectionTarget}
@@ -451,7 +473,7 @@
       aboutDescriptionTone={settingsState.aboutDescriptionTone}
       githubDescription="sihyunlts/compass"
       onPageSelect={(nextPage) => {
-        uiState.sidebarPage = nextPage;
+        void handleSidebarPageSelect(nextPage);
       }}
       onMainWindowAlwaysOnTopToggle={() => void handleMainWindowAlwaysOnTopToggle()}
       onReduceAnimationToggle={(enabled) =>
