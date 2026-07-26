@@ -19,6 +19,11 @@ const UPDATE_BASELINES = process.env.UPDATE_RACK_BASELINES === '1';
 const LOOP_LENGTH_BEATS = RACK_PREVIEW_LOOP_LENGTH_BEATS;
 const FRAME_BUCKET_COUNT = 32;
 const FLOAT_PRECISION = 6;
+const PLAYBACK_LENGTH_INVARIANT_RACKS = [
+  'test_colorgap_timewarp.compassrack',
+  'test_modulator_all.compassrack',
+] as const;
+const PLAYBACK_LENGTHS_BEATS = [0.25, 1, 8] as const;
 
 interface RackSignature {
   noteCount: number;
@@ -32,6 +37,13 @@ interface RackSignature {
   firstActiveFrame: number | null;
   lastActiveFrame: number | null;
   frameBuckets: string[][];
+}
+
+interface NormalizedPlaybackPattern {
+  sourceTimelineEndBeat: number;
+  sampleStepBeats: number;
+  notes: ClipNote[];
+  ledFramesBySampleIndex: GeneratorPreview['ledFramesBySampleIndex'];
 }
 
 const roundNumber = (
@@ -144,6 +156,20 @@ const buildRackSignature = (
   };
 };
 
+const normalizePlaybackPattern = (
+  preview: GeneratorPreview,
+  loopLengthBeats: number,
+): NormalizedPlaybackPattern => ({
+  sourceTimelineEndBeat: roundNumber(preview.sourceTimelineEndBeat / loopLengthBeats),
+  sampleStepBeats: roundNumber(preview.sampleStepBeats / loopLengthBeats),
+  notes: preview.notes.map((note) => ({
+    ...note,
+    startBeat: roundNumber(note.startBeat / loopLengthBeats),
+    durationBeats: roundNumber(note.durationBeats / loopLengthBeats),
+  })),
+  ledFramesBySampleIndex: preview.ledFramesBySampleIndex,
+});
+
 const readBaseline = async (
   baselinePath: string,
 ): Promise<RackSignature> => JSON.parse(await readFile(baselinePath, 'utf8')) as RackSignature;
@@ -183,6 +209,26 @@ test('rack regression fixtures match their compact generation baselines', async 
 
     assert.equal(existsSync(baselinePath), true, `${rackFileName}: missing baseline`);
     assert.deepEqual(signature, await readBaseline(baselinePath), `${rackFileName}: baseline changed`);
+  }
+});
+
+test('rack patterns scale to short and long playback lengths without truncation', async () => {
+  for (const rackFileName of PLAYBACK_LENGTH_INVARIANT_RACKS) {
+    const patterns = await Promise.all(
+      PLAYBACK_LENGTHS_BEATS.map(async (loopLengthBeats) => normalizePlaybackPattern(
+        await loadRackPreviewFromFixture(rackFileName, { loopLengthBeats }),
+        loopLengthBeats,
+      )),
+    );
+    const canonicalPattern = patterns[PLAYBACK_LENGTHS_BEATS.indexOf(1)];
+
+    for (let index = 0; index < patterns.length; index += 1) {
+      assert.deepEqual(
+        patterns[index],
+        canonicalPattern,
+        `${rackFileName}: ${PLAYBACK_LENGTHS_BEATS[index]}-beat output must scale the complete pattern`,
+      );
+    }
   }
 });
 
