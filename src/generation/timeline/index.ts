@@ -44,21 +44,6 @@ const cloneMask = (mask: GeometryMask): GeometryMask => ({
   inverseTransform: { ...mask.inverseTransform },
 });
 
-const cloneStroke = (stroke: GeometryStroke): GeometryStroke => ({
-  polyline: {
-    ...stroke.polyline,
-    points: stroke.polyline.points.map((point) => ({ ...point })),
-    clipStack: stroke.polyline.clipStack.map((clip) => ({
-      ...clip,
-      inverseTransform: { ...clip.inverseTransform },
-    })),
-  },
-  originGroupId: stroke.originGroupId,
-  writeOrder: stroke.writeOrder,
-  writeId: stroke.writeId,
-  masks: stroke.masks.map(cloneMask),
-});
-
 const isTimelineStageBuffer = (
   timeline: GeometryTimeline | TimelineStageBuffer,
 ): timeline is TimelineStageBuffer => 'sourceFrames' in timeline;
@@ -200,7 +185,7 @@ export const addStrokeToFrame = (
   stroke: Omit<GeometryStroke, 'writeId' | 'masks'> & { masks?: GeometryMask[] },
 ): void => {
   const writableFrame = getWritableFrame(timeline, frameIndex);
-  const nextStroke = {
+  const nextStroke: GeometryStroke = {
     ...stroke,
     writeId: timeline.nextWriteId,
     masks: stroke.masks?.map(cloneMask) ?? [],
@@ -244,9 +229,10 @@ export const addExistingStrokeToFrame = (
   stroke: GeometryStroke,
 ): void => {
   const writableFrame = getWritableFrame(timeline, frameIndex);
-  const nextStroke = cloneStroke(stroke);
-  writableFrame.strokes.push(nextStroke);
-  registerStrokeOrigin(timeline, nextStroke);
+  // Temporal placement preserves every stroke field. Geometry strokes and
+  // masks are immutable snapshots, so the frame only needs another reference.
+  writableFrame.strokes.push(stroke);
+  registerStrokeOrigin(timeline, stroke);
   timeline.nextWriteId = Math.max(timeline.nextWriteId, stroke.writeId + 1);
 };
 

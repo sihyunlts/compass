@@ -13,7 +13,7 @@ export interface GeometryStateEvent {
 }
 
 export interface GeometryMotionSnapshot {
-  probes: ReadonlyArray<Vec2>;
+  probes: Float64Array;
   topologyKey: string;
   isEmpty: boolean;
 }
@@ -45,37 +45,33 @@ const DEFAULT_MOTION_UNIT_DISTANCE_LED = 1;
 const DEFAULT_PROBE_STEP_LED = 0.25;
 const GEOMETRY_DISTANCE_EPSILON = 1e-6;
 const SAMPLE_MOTION_DISTANCE_LED = 1e-4;
+type SpatialCellKey = number | string;
+interface SpatialHash {
+  probes: Float64Array;
+  minCellX: number;
+  maxCellX: number;
+  minCellY: number;
+  maxCellY: number;
+  cellWidth: number;
+  usesPackedKeys: boolean;
+  probeOffsetsByCell: Map<SpatialCellKey, number[]>;
+}
+
 const spatialHashBySnapshot = new WeakMap<
   GeometryMotionSnapshot,
-  Map<number, Map<string, Vec2[]>>
+  Map<number, SpatialHash>
 >();
-
-const interpolateSegment = (
-  start: Vec2,
-  end: Vec2,
-  t: number,
-): Vec2 => {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  return {
-    x: start.x + (dx * t),
-    y: start.y + (dy * t),
-  };
-};
 
 const samplePolylineByArcLength = (
   stroke: GeometryStroke,
   probeStepLed: number,
-): Vec2[] => {
+): Float64Array => {
   const points = stroke.polyline.points;
   if (points.length === 0) {
-    return [];
+    return new Float64Array();
   }
   if (points.length === 1) {
-    return [{
-      x: points[0].x,
-      y: points[0].y,
-    }];
+    return new Float64Array([points[0].x, points[0].y]);
   }
 
   const segments: Array<{
@@ -98,15 +94,13 @@ const samplePolylineByArcLength = (
     totalLength += length;
   }
   if (segments.length === 0) {
-    return [{
-      x: points[0].x,
-      y: points[0].y,
-    }];
+    return new Float64Array([points[0].x, points[0].y]);
   }
 
-  const samples: Vec2[] = [];
   const safeStep = Math.max(probeStepLed, GEOMETRY_DISTANCE_EPSILON);
   const sampleCount = Math.max(Math.ceil(totalLength / safeStep), 1);
+  const probeCount = stroke.polyline.closed ? sampleCount : sampleCount + 1;
+  const probes = new Float64Array(probeCount * 2);
   let segmentIndex = 0;
   for (let sampleIndex = 0; sampleIndex <= sampleCount; sampleIndex += 1) {
     if (stroke.polyline.closed && sampleIndex === sampleCount) {
@@ -126,21 +120,14 @@ const samplePolylineByArcLength = (
       Math.max(distance - segment.startDistance, 0),
       segment.length,
     );
-    const sample = interpolateSegment(
-      segment.start,
-      segment.end,
-      localDistance / segment.length,
-    );
-    samples.push(sample);
+    const t = localDistance / segment.length;
+    const probeOffset = sampleIndex * 2;
+    probes[probeOffset] = segment.start.x + ((segment.end.x - segment.start.x) * t);
+    probes[probeOffset + 1] = segment.start.y + ((segment.end.y - segment.start.y) * t);
   }
 
-  return samples;
+  return probes;
 };
-
-const buildStrokeProbes = (
-  stroke: GeometryStroke,
-  probeStepLed: number,
-): Vec2[] => samplePolylineByArcLength(stroke, probeStepLed);
 
 const buildTopologyKey = (
   strokes: ReadonlyArray<GeometryStroke>,
@@ -157,7 +144,17 @@ export const buildGeometryMotionSnapshot = (
 ): GeometryMotionSnapshot => {
   // Visibility clipping changes what is drawn, not how far the source moved.
   // Measure source centerlines so Mask and Symmetry keep the same one-LED clock.
-  const probes = strokes.flatMap((stroke) => buildStrokeProbes(stroke, probeStepLed));
+  const probeChunks = strokes.map((stroke) => samplePolylineByArcLength(stroke, probeStepLed));
+  let probes = probeChunks[0] ?? new Float64Array();
+  if (probeChunks.length > 1) {
+    const probeValueCount = probeChunks.reduce((count, chunk) => count + chunk.length, 0);
+    probes = new Float64Array(probeValueCount);
+    let probeOffset = 0;
+    for (const chunk of probeChunks) {
+      probes.set(chunk, probeOffset);
+      probeOffset += chunk.length;
+    }
+  }
   return {
     probes,
     topologyKey: buildTopologyKey(strokes),
@@ -165,23 +162,77 @@ export const buildGeometryMotionSnapshot = (
   };
 };
 
-const toSpatialCellKey = (
-  point: Vec2,
-  cellSize: number,
-): string => `${Math.floor(point.x / cellSize)},${Math.floor(point.y / cellSize)}`;
+const resolveSpatialCellKey = (
+  hash: Pick<
+    SpatialHash,
+    'minCellX' | 'maxCellX' | 'minCellY' | 'maxCellY' | 'cellWidth' | 'usesPackedKeys'
+  >,
+  cellX: number,
+  cellY: number,
+): SpatialCellKey | null => {
+  if (
+    cellX < hash.minCellX
+    || cellX > hash.maxCellX
+    || cellY < hash.minCellY
+    || cellY > hash.maxCellY
+  ) {
+    return null;
+  }
+
+  return hash.usesPackedKeys
+    ? ((cellY - hash.minCellY) * hash.cellWidth) + (cellX - hash.minCellX)
+    : `${cellX},${cellY}`;
+};
 
 const buildSpatialHash = (
-  probes: ReadonlyArray<Vec2>,
+  probes: Float64Array,
   cellSize: number,
-): Map<string, Vec2[]> => {
-  const hash = new Map<string, Vec2[]>();
-  for (const probe of probes) {
-    const key = toSpatialCellKey(probe, cellSize);
-    const cell = hash.get(key);
+): SpatialHash => {
+  let minCellX = Number.POSITIVE_INFINITY;
+  let maxCellX = Number.NEGATIVE_INFINITY;
+  let minCellY = Number.POSITIVE_INFINITY;
+  let maxCellY = Number.NEGATIVE_INFINITY;
+  for (let probeOffset = 0; probeOffset < probes.length; probeOffset += 2) {
+    const cellX = Math.floor(probes[probeOffset] / cellSize);
+    const cellY = Math.floor(probes[probeOffset + 1] / cellSize);
+    minCellX = Math.min(minCellX, cellX);
+    maxCellX = Math.max(maxCellX, cellX);
+    minCellY = Math.min(minCellY, cellY);
+    maxCellY = Math.max(maxCellY, cellY);
+  }
+
+  const cellWidth = maxCellX - minCellX + 1;
+  const cellHeight = maxCellY - minCellY + 1;
+  const usesPackedKeys = Number.isSafeInteger(minCellX)
+    && Number.isSafeInteger(maxCellX)
+    && Number.isSafeInteger(minCellY)
+    && Number.isSafeInteger(maxCellY)
+    && Number.isSafeInteger(cellWidth)
+    && Number.isSafeInteger(cellHeight)
+    && Number.isSafeInteger(cellWidth * cellHeight);
+  const hash: SpatialHash = {
+    probes,
+    minCellX,
+    maxCellX,
+    minCellY,
+    maxCellY,
+    cellWidth,
+    usesPackedKeys,
+    probeOffsetsByCell: new Map(),
+  };
+  for (let probeOffset = 0; probeOffset < probes.length; probeOffset += 2) {
+    const cellX = Math.floor(probes[probeOffset] / cellSize);
+    const cellY = Math.floor(probes[probeOffset + 1] / cellSize);
+    const key = resolveSpatialCellKey(hash, cellX, cellY);
+    if (key === null) {
+      continue;
+    }
+
+    const cell = hash.probeOffsetsByCell.get(key);
     if (cell) {
-      cell.push(probe);
+      cell.push(probeOffset);
     } else {
-      hash.set(key, [probe]);
+      hash.probeOffsetsByCell.set(key, [probeOffset]);
     }
   }
   return hash;
@@ -190,7 +241,7 @@ const buildSpatialHash = (
 const resolveSpatialHash = (
   snapshot: GeometryMotionSnapshot,
   cellSize: number,
-): Map<string, Vec2[]> => {
+): SpatialHash => {
   let hashByCellSize = spatialHashBySnapshot.get(snapshot);
   if (!hashByCellSize) {
     hashByCellSize = new Map();
@@ -208,27 +259,38 @@ const resolveSpatialHash = (
 };
 
 const hasProbeOutsideDistance = (
-  probes: ReadonlyArray<Vec2>,
-  candidates: ReadonlyMap<string, ReadonlyArray<Vec2>>,
+  probes: Float64Array,
+  candidates: SpatialHash,
   distanceLed: number,
 ): boolean => {
   const threshold = Math.max(distanceLed - GEOMETRY_DISTANCE_EPSILON, 0);
   const thresholdSquared = threshold * threshold;
 
-  for (const probe of probes) {
-    const cellX = Math.floor(probe.x / distanceLed);
-    const cellY = Math.floor(probe.y / distanceLed);
+  for (let probeOffset = 0; probeOffset < probes.length; probeOffset += 2) {
+    const probeX = probes[probeOffset];
+    const probeY = probes[probeOffset + 1];
+    const cellX = Math.floor(probeX / distanceLed);
+    const cellY = Math.floor(probeY / distanceLed);
     let hasNearbyCandidate = false;
     for (let offsetY = -1; offsetY <= 1 && !hasNearbyCandidate; offsetY += 1) {
       for (let offsetX = -1; offsetX <= 1 && !hasNearbyCandidate; offsetX += 1) {
-        const cell = candidates.get(`${cellX + offsetX},${cellY + offsetY}`);
+        const key = resolveSpatialCellKey(
+          candidates,
+          cellX + offsetX,
+          cellY + offsetY,
+        );
+        if (key === null) {
+          continue;
+        }
+
+        const cell = candidates.probeOffsetsByCell.get(key);
         if (!cell) {
           continue;
         }
 
-        for (const candidate of cell) {
-          const dx = candidate.x - probe.x;
-          const dy = candidate.y - probe.y;
+        for (const candidateOffset of cell) {
+          const dx = candidates.probes[candidateOffset] - probeX;
+          const dy = candidates.probes[candidateOffset + 1] - probeY;
           if ((dx * dx) + (dy * dy) < thresholdSquared) {
             hasNearbyCandidate = true;
             break;
@@ -280,6 +342,13 @@ const clampFrameWindow = (
   ),
 });
 
+const resolvePositiveFinite = (
+  value: number | undefined,
+  fallback: number,
+): number => typeof value === 'number' && Number.isFinite(value) && value > 0
+  ? value
+  : fallback;
+
 const closeActiveRun = (
   state: OriginCaptureState,
   endFrameExclusive: number,
@@ -302,14 +371,14 @@ export const extractGeometryEventTracks = (
     return new Map();
   }
 
-  const motionUnitDistanceLed = Number.isFinite(input.motionUnitDistanceLed)
-    && (input.motionUnitDistanceLed ?? 0) > 0
-    ? input.motionUnitDistanceLed as number
-    : DEFAULT_MOTION_UNIT_DISTANCE_LED;
-  const probeStepLed = Number.isFinite(input.probeStepLed)
-    && (input.probeStepLed ?? 0) > 0
-    ? input.probeStepLed as number
-    : DEFAULT_PROBE_STEP_LED;
+  const motionUnitDistanceLed = resolvePositiveFinite(
+    input.motionUnitDistanceLed,
+    DEFAULT_MOTION_UNIT_DISTANCE_LED,
+  );
+  const probeStepLed = resolvePositiveFinite(
+    input.probeStepLed,
+    DEFAULT_PROBE_STEP_LED,
+  );
   const stateByOriginId = new Map<string, OriginCaptureState>();
   for (const originId of input.targetOriginIds) {
     stateByOriginId.set(originId, {

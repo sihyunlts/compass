@@ -7,10 +7,9 @@ import {
 import { buildRuntimeMapData } from './runtime-map';
 import { buildCanonicalFieldResult } from '../generation/engine';
 import {
+  createLaunchpadProjectionContext,
   projectActivePitchesToNotes,
-  projectTimelineToActivePitchesBySampleIndex,
   createLaunchpadExecutionRequest,
-  createLaunchpadOutputAdapter,
 } from '../generation/launchpad-projection';
 import type {
   CanonicalAnalysisResult,
@@ -90,17 +89,16 @@ const buildGeneratedFieldResultWithRuntimeMap = ({
     return createEmptyFieldResult();
   }
 
-  const outputAdapter = createLaunchpadOutputAdapter(runtimeMap);
+  const projectionContext = createLaunchpadProjectionContext(runtimeMap);
   const executionRequest = createLaunchpadExecutionRequest();
   const generated = buildCanonicalFieldResult(
     chain,
     loopLengthBeats,
-    outputAdapter,
+    projectionContext.outputAdapter,
     executionRequest,
   );
-  const activeByPitchFrames = projectTimelineToActivePitchesBySampleIndex(
+  const activeByPitchFrames = projectionContext.projectTimelineToActivePitchesBySampleIndex(
     generated.timeline,
-    runtimeMap,
     generated.mutedGroupIds,
     generated.mutedGeneratorIds,
   );

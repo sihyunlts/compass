@@ -5,7 +5,6 @@ import {
   invertAffine,
 } from '../../../core/geometry';
 import {
-  addStrokeToFrame,
   deleteOrigins,
   setFrameStrokes,
 } from '../../timeline';
@@ -145,14 +144,10 @@ export const transformStroke = (
 ): Omit<GeometryStroke, 'writeId'> => {
   const polyline = transform
     ? applyTransformToPolyline(stroke.polyline, transform)
-    : {
-        ...stroke.polyline,
-        points: stroke.polyline.points.map((point) => ({ ...point })),
-        clipStack: stroke.polyline.clipStack.map((clip) => ({
-          ...clip,
-          inverseTransform: { ...clip.inverseTransform },
-        })),
-      };
+    // Temporal remaps and identity spatial rewrites change placement metadata,
+    // not geometry. Canonical strokes are immutable snapshots, so preserving
+    // the polyline identity lets downstream projection reuse its occupancy.
+    : stroke.polyline;
   return {
     polyline,
     originGroupId: stroke.originGroupId,
@@ -251,13 +246,4 @@ export const toSourceFrameIndex = (
     Math.max(Math.floor(beat / timeline.sampleStepBeats), 0),
     frameCount - 1,
   );
-};
-
-export const addRemappedStrokeToFrame = (
-  timeline: GeometryTimeline,
-  frameIndex: number,
-  stroke: GeometryStroke,
-  writeOrder: number,
-): void => {
-  addStrokeToFrame(timeline, frameIndex, transformStroke(stroke, null, writeOrder));
 };

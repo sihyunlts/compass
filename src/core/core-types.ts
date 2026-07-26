@@ -67,17 +67,17 @@ export interface IntersectionClipShape {
 export type ClipShape = TileUnionClipShape | HalfPlaneClipShape | IntersectionClipShape;
 
 export interface SceneClip {
-  shape: ClipShape;
-  inverseTransform: AffineTransform;
+  readonly shape: ClipShape;
+  readonly inverseTransform: Readonly<AffineTransform>;
 }
 
 export interface Polyline {
-  points: Vec2[];
-  closed: boolean;
-  originId: string;
-  velocity: number;
-  colorAgeBandIndex?: number;
-  colorAgeBandCount?: number;
-  rasterMode?: 'centerline';
-  clipStack: SceneClip[];
+  readonly points: ReadonlyArray<Readonly<Vec2>>;
+  readonly closed: boolean;
+  readonly originId: string;
+  readonly velocity: number;
+  readonly colorAgeBandIndex?: number;
+  readonly colorAgeBandCount?: number;
+  readonly rasterMode?: 'centerline';
+  readonly clipStack: ReadonlyArray<SceneClip>;
 }

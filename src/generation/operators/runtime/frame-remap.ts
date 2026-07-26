@@ -4,14 +4,49 @@ import {
   beginTimelineStage,
   completeTimelineStage,
 } from '../../timeline';
-import type { GeometryTimeline } from '../../types';
+import type { GeometryStroke, GeometryTimeline } from '../../types';
 import { isFrameWithinWindow, resolveFrameWindow } from './frame-window';
 import {
-  addRemappedStrokeToFrame,
   buildSourceStrokesByOriginAndFrame,
   stripOriginFrames,
+  transformStroke,
 } from './timeline-strokes';
 import type { OriginFrameRemap } from './types';
+
+const buildRemappedStrokeBySource = (
+  sourceStrokesByOriginAndFrame: ReadonlyMap<string, ReadonlyMap<number, GeometryStroke[]>>,
+  remaps: ReadonlyMap<string, OriginFrameRemap>,
+  firstWriteId: number,
+): WeakMap<GeometryStroke, GeometryStroke> => {
+  const remappedStrokeBySource = new WeakMap<GeometryStroke, GeometryStroke>();
+  let nextWriteId = firstWriteId;
+
+  for (const [originId, remap] of remaps.entries()) {
+    const sourceStrokesByFrame = sourceStrokesByOriginAndFrame.get(originId);
+    if (!sourceStrokesByFrame) {
+      continue;
+    }
+
+    const uniqueSourceStrokes = new Set<GeometryStroke>();
+    for (const frameStrokes of sourceStrokesByFrame.values()) {
+      for (const stroke of frameStrokes) {
+        uniqueSourceStrokes.add(stroke);
+      }
+    }
+    const sourceStrokes = Array.from(uniqueSourceStrokes)
+      .sort((left, right) => left.writeId - right.writeId);
+
+    for (const sourceStroke of sourceStrokes) {
+      remappedStrokeBySource.set(sourceStroke, {
+        ...transformStroke(sourceStroke, null, remap.writeOrder),
+        writeId: nextWriteId,
+      });
+      nextWriteId += 1;
+    }
+  }
+
+  return remappedStrokeBySource;
+};
 
 export const remapTimeline = (
   timeline: GeometryTimeline,
@@ -38,6 +73,13 @@ export const remapTimeline = (
     timeline,
     targetOriginIds,
   );
+  const remappedStrokeBySource = preserveWriteMetadata
+    ? null
+    : buildRemappedStrokeBySource(
+        sourceStrokesByOriginAndFrame,
+        remaps,
+        nextTimeline.nextWriteId,
+      );
   for (const [originId, remap] of remaps.entries()) {
     const sourceStrokesByFrame = sourceStrokesByOriginAndFrame.get(originId);
     if (!sourceStrokesByFrame) {
@@ -69,7 +111,14 @@ export const remapTimeline = (
           continue;
         }
 
-        addRemappedStrokeToFrame(nextTimeline, frameIndex, stroke, remap.writeOrder);
+        // Source write ids define stable order within each origin. Assigning one
+        // remap-stage id per immutable source stroke preserves that order while
+        // sharing the temporal placement across output frames.
+        const remappedStroke = remappedStrokeBySource?.get(stroke);
+        if (!remappedStroke) {
+          throw new Error('Temporal remap stroke cache is incomplete.');
+        }
+        addExistingStrokeToFrame(nextTimeline, frameIndex, remappedStroke);
       }
     }
   }

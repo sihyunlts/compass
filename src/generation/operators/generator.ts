@@ -20,6 +20,7 @@ import {
   ensureTimelineFrameCount,
   toFrameCount,
 } from '../timeline';
+import { FIXED_TIMELINE_END_BEAT } from '../timeline/temporal-window';
 
 const applyGeneratorDevice = (
   state: MutableGenerationState,
@@ -28,13 +29,19 @@ const applyGeneratorDevice = (
 ): MutableGenerationState => {
   const device = stage.device;
   const nextTimeline = beginTimelineStage(state.timeline);
-  const generatorEndBeat = context.modulationContext.loopLengthBeats;
-  ensureTimelineFrameCount(nextTimeline, generatorEndBeat);
+  // Generators author one canonical pattern. The field result scales that
+  // complete pattern to the requested clip length after rack evaluation.
+  const generatorPatternEndBeat = FIXED_TIMELINE_END_BEAT;
+  const generatorEvaluationWindow = {
+    start: 0,
+    end: generatorPatternEndBeat,
+  };
+  ensureTimelineFrameCount(nextTimeline, generatorPatternEndBeat);
   const executionPlan = resolveStageExecutionPlan(context, stage);
   const frameWindow = resolveFrameWindow(
     executionPlan.requiredFrameWindow,
     nextTimeline.sampleStepBeats,
-    toFrameCount(generatorEndBeat, nextTimeline.sampleStepBeats),
+    toFrameCount(generatorPatternEndBeat, nextTimeline.sampleStepBeats),
   );
 
   for (let frameIndex = frameWindow.startFrame; frameIndex < frameWindow.endFrameExclusive; frameIndex += 1) {
@@ -46,6 +53,7 @@ const applyGeneratorDevice = (
         device,
         frameIndex,
         nextTimeline.sampleStepBeats,
+        generatorEvaluationWindow,
       ),
       stage.stageIndex,
       executionPlan.generatorOutputBounds,

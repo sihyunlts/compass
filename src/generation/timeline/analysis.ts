@@ -6,7 +6,7 @@ import type {
   GeometryStroke,
 } from '../types';
 
-interface OccupiedCoordinate {
+export interface OccupiedCoordinate {
   originId: string;
   originGroupId: string | null;
   x: number;
@@ -19,7 +19,7 @@ interface OccupiedCoordinate {
   colorAgeBandCount?: number;
 }
 
-interface StrokeOccupiedCoordinateCandidate {
+export interface StrokeOccupiedCoordinateCandidate {
   x: number;
   y: number;
   distanceSquared: number;
@@ -111,7 +111,7 @@ const toCandidateBounds = (
     : null;
 };
 
-const shouldReplaceWinner = (
+export const shouldReplaceOccupiedCoordinate = (
   candidate: OccupiedCoordinate,
   current: OccupiedCoordinate,
 ): boolean => {
@@ -155,7 +155,7 @@ const resolveColorAgeBandBoundaryDistance = (
   return coordinate.distanceSquared + trailingBandBias;
 };
 
-const toOccupiedCoordinate = (
+export const createOccupiedCoordinate = (
   stroke: GeometryStroke,
   x: number,
   y: number,
@@ -172,26 +172,6 @@ const toOccupiedCoordinate = (
   colorAgeBandIndex: stroke.polyline.colorAgeBandIndex,
   colorAgeBandCount: stroke.polyline.colorAgeBandCount,
 });
-
-export const shouldReplaceStrokeAtCoordinate = (
-  candidate: GeometryStroke,
-  current: GeometryStroke,
-  x: number,
-  y: number,
-): boolean => shouldReplaceWinner(
-  toOccupiedCoordinate(
-    candidate,
-    x,
-    y,
-    distanceToPolylineSquared({ x, y }, candidate.polyline),
-  ),
-  toOccupiedCoordinate(
-    current,
-    x,
-    y,
-    distanceToPolylineSquared({ x, y }, current.polyline),
-  ),
-);
 
 const collectCenterlineCandidateCoordinates = (
   stroke: GeometryStroke,
@@ -267,7 +247,7 @@ const toOccupiedCoordinateCandidates = (
   distanceSquared: distanceToPolylineSquared(coordinate, stroke.polyline),
 }));
 
-const collectStrokeOccupiedCoordinates = (
+const resolveStrokeOccupiedCoordinateCandidates = (
   stroke: GeometryStroke,
   outputBounds: OccupiedCoordinateCandidateBounds | null,
 ): StrokeOccupiedCoordinateCandidate[] => {
@@ -325,6 +305,14 @@ const collectStrokeOccupiedCoordinates = (
   return coordinates;
 };
 
+export const collectStrokeOccupiedCoordinateCandidates = (
+  stroke: GeometryStroke,
+  outputBounds: OccupiedCoordinateCandidateBounds | null = null,
+): StrokeOccupiedCoordinateCandidate[] => resolveStrokeOccupiedCoordinateCandidates(
+  stroke,
+  outputBounds,
+).filter(({ x, y }) => isPointInsideMasks(stroke.masks, x, y));
+
 export const collectOccupiedCoordinates = (
   strokes: ReadonlyArray<GeometryStroke>,
   winnerOnly: boolean,
@@ -337,17 +325,13 @@ export const collectOccupiedCoordinates = (
       x,
       y,
       distanceSquared,
-    } of collectStrokeOccupiedCoordinates(stroke, outputBounds)) {
+    } of collectStrokeOccupiedCoordinateCandidates(stroke, outputBounds)) {
       const coordinateKey = toRoundedCoordinateKey(x, y);
       if (!coordinateKey) {
         continue;
       }
 
-      if (!isPointInsideMasks(stroke.masks, x, y)) {
-        continue;
-      }
-
-      const candidate = toOccupiedCoordinate(
+      const candidate = createOccupiedCoordinate(
         stroke,
         Math.round(x),
         Math.round(y),
@@ -360,7 +344,7 @@ export const collectOccupiedCoordinates = (
       }
 
       const existing = byCoordinate.get(coordinateKey);
-      if (!existing || shouldReplaceWinner(candidate, existing)) {
+      if (!existing || shouldReplaceOccupiedCoordinate(candidate, existing)) {
         byCoordinate.set(coordinateKey, candidate);
       }
     }

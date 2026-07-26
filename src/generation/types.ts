@@ -6,16 +6,16 @@ import type {
 import type { CompiledRackPlan } from './plan/types';
 
 export interface GeometryMask {
-  contains(x: number, y: number): boolean;
-  inverseTransform: AffineTransform;
+  readonly contains: (x: number, y: number) => boolean;
+  readonly inverseTransform: Readonly<AffineTransform>;
 }
 
 export interface GeometryStroke {
-  polyline: Polyline;
-  originGroupId: string | null;
-  writeOrder: number;
-  writeId: number;
-  masks: GeometryMask[];
+  readonly polyline: Polyline;
+  readonly originGroupId: string | null;
+  readonly writeOrder: number;
+  readonly writeId: number;
+  readonly masks: ReadonlyArray<GeometryMask>;
 }
 
 export interface GeometryFrame {

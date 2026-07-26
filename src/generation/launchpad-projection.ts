@@ -11,8 +11,10 @@ import type { LaunchpadButton } from '../shared/model';
 import { createSpatialBounds } from './analysis/bounds';
 import type { CanonicalExecutionRequest } from './analysis/types';
 import {
-  collectOccupiedCoordinates,
-  shouldReplaceStrokeAtCoordinate,
+  collectStrokeOccupiedCoordinateCandidates,
+  createOccupiedCoordinate,
+  shouldReplaceOccupiedCoordinate,
+  type OccupiedCoordinate,
   type OccupiedCoordinateCandidateBounds,
 } from './timeline/analysis';
 import {
@@ -30,9 +32,33 @@ interface CoordinateGroup {
   buttons: ReadonlyArray<LaunchpadButton>;
 }
 
-interface WinnerStroke {
-  velocity: number;
-  originId: string;
+interface CoordinateGroupHit {
+  coordinateGroup: CoordinateGroup;
+  distanceSquared: number;
+}
+
+/**
+ * Stores output-space facts that depend only on geometry and masks. Visibility
+ * and final coordinate hits stay separate because centerline visibility uses a
+ * different footprint rule from final integer rasterization.
+ */
+interface StrokeOutputProjection {
+  noteOutputHit?: boolean;
+  integerCoordinateHits?: ReadonlyArray<CoordinateGroupHit>;
+  fractionalCoordinateHits?: ReadonlyArray<CoordinateGroupHit>;
+}
+
+type ResolveStrokeOutputProjection = (
+  stroke: GeometryStroke,
+) => StrokeOutputProjection;
+
+export interface LaunchpadProjectionContext {
+  outputAdapter: CanonicalOutputAdapter;
+  projectTimelineToActivePitchesBySampleIndex(
+    timeline: GeometryTimeline,
+    mutedGroupIds: ReadonlySet<string>,
+    mutedGeneratorIds: ReadonlySet<string>,
+  ): ReadonlyArray<ReadonlyMap<number, SampledActivePitch>>;
 }
 
 const TILE_MIN = 0;
@@ -211,94 +237,154 @@ const doesStrokeHitNoteOutput = (
   return false;
 };
 
+const buildProjectionGeometryKey = (
+  stroke: GeometryStroke,
+  resolveMaskFunctionId: (contains: GeometryStroke['masks'][number]['contains']) => number,
+): string => [
+  stroke.polyline.closed ? 'closed' : 'open',
+  stroke.polyline.rasterMode ?? 'stroke',
+  ...stroke.masks.map((mask) => {
+    const transform = mask.inverseTransform;
+    return [
+      resolveMaskFunctionId(mask.contains),
+      transform.a,
+      transform.b,
+      transform.c,
+      transform.d,
+      transform.tx,
+      transform.ty,
+    ].join(',');
+  }),
+].join(':');
+
+const createStrokeOutputProjectionResolver = (): ResolveStrokeOutputProjection => {
+  // Canonical generation treats strokes, points, and masks as immutable
+  // snapshots. Keeping this cache inside one projection context makes that
+  // lifetime explicit and prevents results from leaking across generations.
+  const projectionByStroke = new WeakMap<GeometryStroke, StrokeOutputProjection>();
+  const projectionByPoints = new WeakMap<
+    GeometryStroke['polyline']['points'],
+    Map<string, StrokeOutputProjection>
+  >();
+  const maskFunctionIdByContains = new WeakMap<
+    GeometryStroke['masks'][number]['contains'],
+    number
+  >();
+  let nextMaskFunctionId = 1;
+
+  const resolveMaskFunctionId = (
+    contains: GeometryStroke['masks'][number]['contains'],
+  ): number => {
+    const cached = maskFunctionIdByContains.get(contains);
+    if (cached) {
+      return cached;
+    }
+
+    const id = nextMaskFunctionId;
+    nextMaskFunctionId += 1;
+    maskFunctionIdByContains.set(contains, id);
+    return id;
+  };
+
+  return (stroke) => {
+    const strokeCached = projectionByStroke.get(stroke);
+    if (strokeCached) {
+      return strokeCached;
+    }
+
+    const geometryKey = buildProjectionGeometryKey(stroke, resolveMaskFunctionId);
+    const pointsCached = projectionByPoints.get(stroke.polyline.points)?.get(geometryKey);
+    if (pointsCached) {
+      projectionByStroke.set(stroke, pointsCached);
+      return pointsCached;
+    }
+
+    const projection: StrokeOutputProjection = {};
+    const projectionsForPoints = projectionByPoints.get(stroke.polyline.points) ?? new Map();
+    projectionsForPoints.set(geometryKey, projection);
+    projectionByPoints.set(stroke.polyline.points, projectionsForPoints);
+    projectionByStroke.set(stroke, projection);
+    return projection;
+  };
+};
+
 const resolveStrokeHitsNoteOutput = (
   stroke: GeometryStroke,
   noteOutputCoordinateGroups: ReadonlyArray<CoordinateGroup>,
-  noteOutputHitByStroke: WeakMap<GeometryStroke, boolean>,
+  resolveStrokeOutputProjection: ResolveStrokeOutputProjection,
 ): boolean => {
-  const cached = noteOutputHitByStroke.get(stroke);
-  if (cached !== undefined) {
-    return cached;
+  const projection = resolveStrokeOutputProjection(stroke);
+  if (projection.noteOutputHit !== undefined) {
+    return projection.noteOutputHit;
   }
 
   const result = doesStrokeHitNoteOutput(stroke, noteOutputCoordinateGroups);
-  noteOutputHitByStroke.set(stroke, result);
+  projection.noteOutputHit = result;
   return result;
 };
 
-const resolveExactCoordinateWinner = (
-  coordinateGroup: CoordinateGroup,
-  visibleStrokes: ReadonlyArray<GeometryStroke>,
-): WinnerStroke | null => {
-  let winner: GeometryStroke | null = null;
-
-  for (const stroke of visibleStrokes) {
-    if (!isStrokeActiveAtCoordinate(stroke, coordinateGroup.x, coordinateGroup.y)) {
-      continue;
-    }
-
-    if (
-      !winner
-      || shouldReplaceStrokeAtCoordinate(
-        stroke,
-        winner,
-        coordinateGroup.x,
-        coordinateGroup.y,
-      )
-    ) {
-      winner = stroke;
-    }
-  }
-
-  return winner
-    ? {
-      velocity: winner.polyline.velocity,
-      originId: winner.polyline.originId,
-    }
-    : null;
-};
-
-const resolveWinnerByCoordinate = (
-  strokes: ReadonlyArray<GeometryStroke>,
+const resolveIntegerCoordinateHits = (
+  stroke: GeometryStroke,
   coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
   outputBounds: OccupiedCoordinateCandidateBounds | null,
-  mutedGroupIds: ReadonlySet<string>,
-  mutedGeneratorIds: ReadonlySet<string>,
-): Map<string, WinnerStroke> => {
-  if (strokes.length === 0 || coordinateGroupByKey.size === 0) {
-    return new Map<string, WinnerStroke>();
+  resolveStrokeOutputProjection: ResolveStrokeOutputProjection,
+): ReadonlyArray<CoordinateGroupHit> => {
+  const projection = resolveStrokeOutputProjection(stroke);
+  if (projection.integerCoordinateHits) {
+    return projection.integerCoordinateHits;
   }
 
-  const visibleStrokes = strokes.filter((stroke) => isVisibleStroke(
-    stroke,
-    mutedGroupIds,
-    mutedGeneratorIds,
-  ));
-  if (visibleStrokes.length === 0) {
-    return new Map<string, WinnerStroke>();
-  }
-
-  const winnerByCoordinate = new Map<string, WinnerStroke>();
-  const occupied = collectOccupiedCoordinates(visibleStrokes, true, outputBounds);
-  for (const coordinate of occupied.values()) {
+  const coordinateHits: CoordinateGroupHit[] = [];
+  const occupied = collectStrokeOccupiedCoordinateCandidates(stroke, outputBounds);
+  for (const coordinate of occupied) {
     const coordinateKey = toRoundedCoordinateKey(coordinate.x, coordinate.y);
-    if (coordinateKey === null || !coordinateGroupByKey.has(coordinateKey)) {
+    if (coordinateKey === null) {
       continue;
     }
 
-    winnerByCoordinate.set(coordinateKey, {
-      velocity: coordinate.velocity,
-      originId: coordinate.originId,
-    });
+    const coordinateGroup = coordinateGroupByKey.get(coordinateKey);
+    if (coordinateGroup && hasNoteOutput(coordinateGroup)) {
+      coordinateHits.push({
+        coordinateGroup,
+        distanceSquared: coordinate.distanceSquared,
+      });
+    }
   }
 
-  return winnerByCoordinate;
+  projection.integerCoordinateHits = coordinateHits;
+  return coordinateHits;
+};
+
+const resolveFractionalCoordinateHits = (
+  stroke: GeometryStroke,
+  fractionalCoordinateGroups: ReadonlyArray<CoordinateGroup>,
+  resolveStrokeOutputProjection: ResolveStrokeOutputProjection,
+): ReadonlyArray<CoordinateGroupHit> => {
+  const projection = resolveStrokeOutputProjection(stroke);
+  if (projection.fractionalCoordinateHits) {
+    return projection.fractionalCoordinateHits;
+  }
+
+  const coordinateHits = fractionalCoordinateGroups.flatMap((coordinateGroup) => (
+    hasNoteOutput(coordinateGroup)
+    && isStrokeActiveAtCoordinate(stroke, coordinateGroup.x, coordinateGroup.y)
+      ? [{
+          coordinateGroup,
+          distanceSquared: distanceToPolylineSquared(
+            { x: coordinateGroup.x, y: coordinateGroup.y },
+            stroke.polyline,
+          ),
+        }]
+      : []
+  ));
+  projection.fractionalCoordinateHits = coordinateHits;
+  return coordinateHits;
 };
 
 const buildVisibleWindowByOriginId = (
   timeline: GeometryTimeline,
   noteOutputCoordinateGroups: ReadonlyArray<CoordinateGroup>,
-  noteOutputHitByStroke: WeakMap<GeometryStroke, boolean>,
+  resolveStrokeOutputProjection: ResolveStrokeOutputProjection,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): ReadonlyMap<string, GenerationTimelineWindow> => {
@@ -342,7 +428,7 @@ const buildVisibleWindowByOriginId = (
         || !resolveStrokeHitsNoteOutput(
           stroke,
           noteOutputCoordinateGroups,
-          noteOutputHitByStroke,
+          resolveStrokeOutputProjection,
         )
       ) {
         continue;
@@ -356,29 +442,72 @@ const buildVisibleWindowByOriginId = (
   return windowByOriginId;
 };
 
-export const resolveActiveByPitchFromFrameStrokes = (
+const resolveActiveByPitchFromFrameStrokes = (
   strokes: ReadonlyArray<GeometryStroke>,
   coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
   outputBounds: OccupiedCoordinateCandidateBounds | null,
-  mutedGroupIds: ReadonlySet<string> = new Set<string>(),
-  mutedGeneratorIds: ReadonlySet<string> = new Set<string>(),
-  fractionalCoordinateGroups: ReadonlyArray<CoordinateGroup> = [],
+  fractionalCoordinateGroups: ReadonlyArray<CoordinateGroup>,
+  resolveStrokeOutputProjection: ResolveStrokeOutputProjection,
+  mutedGroupIds: ReadonlySet<string>,
+  mutedGeneratorIds: ReadonlySet<string>,
 ): Map<number, SampledActivePitch> => {
   const activeByPitch = new Map<number, SampledActivePitch>();
-  const winnerByCoordinate = resolveWinnerByCoordinate(
-    strokes,
-    coordinateGroupByKey,
-    outputBounds,
-    mutedGroupIds,
-    mutedGeneratorIds,
-  );
+  const integerWinnerByCoordinateKey = new Map<string, OccupiedCoordinate>();
+  const fractionalWinnerByCoordinateGroup = new Map<CoordinateGroup, OccupiedCoordinate>();
 
-  for (const [coordinateKey, winner] of winnerByCoordinate.entries()) {
+  for (const stroke of strokes) {
+    if (!isVisibleStroke(stroke, mutedGroupIds, mutedGeneratorIds)) {
+      continue;
+    }
+
+    for (const hit of resolveIntegerCoordinateHits(
+      stroke,
+      coordinateGroupByKey,
+      outputBounds,
+      resolveStrokeOutputProjection,
+    )) {
+      const { coordinateGroup } = hit;
+      const coordinateKey = toRoundedCoordinateKey(coordinateGroup.x, coordinateGroup.y);
+      if (coordinateKey === null) {
+        continue;
+      }
+
+      const current = integerWinnerByCoordinateKey.get(coordinateKey);
+      const candidate = createOccupiedCoordinate(
+        stroke,
+        coordinateGroup.x,
+        coordinateGroup.y,
+        hit.distanceSquared,
+      );
+      if (!current || shouldReplaceOccupiedCoordinate(candidate, current)) {
+        integerWinnerByCoordinateKey.set(coordinateKey, candidate);
+      }
+    }
+
+    for (const hit of resolveFractionalCoordinateHits(
+      stroke,
+      fractionalCoordinateGroups,
+      resolveStrokeOutputProjection,
+    )) {
+      const { coordinateGroup } = hit;
+      const current = fractionalWinnerByCoordinateGroup.get(coordinateGroup);
+      const candidate = createOccupiedCoordinate(
+        stroke,
+        coordinateGroup.x,
+        coordinateGroup.y,
+        hit.distanceSquared,
+      );
+      if (!current || shouldReplaceOccupiedCoordinate(candidate, current)) {
+        fractionalWinnerByCoordinateGroup.set(coordinateGroup, candidate);
+      }
+    }
+  }
+
+  for (const [coordinateKey, winner] of integerWinnerByCoordinateKey.entries()) {
     const coordinateGroup = coordinateGroupByKey.get(coordinateKey);
     if (!coordinateGroup) {
       continue;
     }
-
     for (const button of coordinateGroup.buttons) {
       if (button.output.kind !== 'note') {
         continue;
@@ -392,11 +521,8 @@ export const resolveActiveByPitchFromFrameStrokes = (
     }
   }
 
-  const visibleStrokes = fractionalCoordinateGroups.length === 0
-    ? []
-    : strokes.filter((stroke) => isVisibleStroke(stroke, mutedGroupIds, mutedGeneratorIds));
   for (const coordinateGroup of fractionalCoordinateGroups) {
-    const winner = resolveExactCoordinateWinner(coordinateGroup, visibleStrokes);
+    const winner = fractionalWinnerByCoordinateGroup.get(coordinateGroup);
     if (!winner) {
       continue;
     }
@@ -417,30 +543,59 @@ export const resolveActiveByPitchFromFrameStrokes = (
   return activeByPitch;
 };
 
-export const projectTimelineToActivePitchesBySampleIndex = (
-  timeline: GeometryTimeline,
+export const createLaunchpadProjectionContext = (
   runtimeMap: RuntimeMapData,
-  mutedGroupIds: ReadonlySet<string>,
-  mutedGeneratorIds: ReadonlySet<string>,
-): ReadonlyArray<ReadonlyMap<number, SampledActivePitch>> => {
+): LaunchpadProjectionContext => {
   const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
   const outputBounds = resolveCoordinateGroupBounds(coordinateGroupByKey);
   const fractionalCoordinateGroups = buildFractionalCoordinateGroups(runtimeMap.buttonIndex);
+  const noteOutputCoordinateGroups = buildNoteOutputCoordinateGroups(
+    coordinateGroupByKey,
+    fractionalCoordinateGroups,
+  );
+  const coordinateKeyByTileId = buildViewportCoordinateKeyByTileId(runtimeMap.buttonIndex);
+  const resolveStrokeOutputProjection = createStrokeOutputProjectionResolver();
 
-  return timeline.frames.map((frame) => {
-    if (frame.strokes.length === 0) {
-      return EMPTY_ACTIVE_BY_PITCH;
-    }
+  const outputAdapter: CanonicalOutputAdapter = {
+    createMaskFromViewportTiles: (tileIds) => createMaskFromCoordinateKeys(
+      new Set(
+        Array.from(tileIds)
+          .map((tileId) => coordinateKeyByTileId.get(tileId))
+          .filter((coordinateKey): coordinateKey is string => coordinateKey !== undefined),
+      ),
+    ),
+    buildVisibleWindowByOriginId: (timeline, mutedGroupIds, mutedGeneratorIds) =>
+      buildVisibleWindowByOriginId(
+        timeline,
+        noteOutputCoordinateGroups,
+        resolveStrokeOutputProjection,
+        mutedGroupIds,
+        mutedGeneratorIds,
+      ),
+  };
 
-    return resolveActiveByPitchFromFrameStrokes(
-      frame.strokes,
-      coordinateGroupByKey,
-      outputBounds,
+  return {
+    outputAdapter,
+    projectTimelineToActivePitchesBySampleIndex: (
+      timeline,
       mutedGroupIds,
       mutedGeneratorIds,
-      fractionalCoordinateGroups,
-    );
-  });
+    ) => timeline.frames.map((frame) => {
+      if (frame.strokes.length === 0) {
+        return EMPTY_ACTIVE_BY_PITCH;
+      }
+
+      return resolveActiveByPitchFromFrameStrokes(
+        frame.strokes,
+        coordinateGroupByKey,
+        outputBounds,
+        fractionalCoordinateGroups,
+        resolveStrokeOutputProjection,
+        mutedGroupIds,
+        mutedGeneratorIds,
+      );
+    }),
+  };
 };
 
 export const projectActivePitchesToNotes = (
@@ -477,34 +632,3 @@ export const createLaunchpadExecutionRequest = (): CanonicalExecutionRequest => 
     end: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   },
 });
-
-export const createLaunchpadOutputAdapter = (
-  runtimeMap: RuntimeMapData,
-): CanonicalOutputAdapter => {
-  const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
-  const fractionalCoordinateGroups = buildFractionalCoordinateGroups(runtimeMap.buttonIndex);
-  const noteOutputCoordinateGroups = buildNoteOutputCoordinateGroups(
-    coordinateGroupByKey,
-    fractionalCoordinateGroups,
-  );
-  const noteOutputHitByStroke = new WeakMap<GeometryStroke, boolean>();
-  const coordinateKeyByTileId = buildViewportCoordinateKeyByTileId(runtimeMap.buttonIndex);
-
-  return {
-    createMaskFromViewportTiles: (tileIds) => createMaskFromCoordinateKeys(
-      new Set(
-        Array.from(tileIds)
-          .map((tileId) => coordinateKeyByTileId.get(tileId))
-          .filter((coordinateKey): coordinateKey is string => coordinateKey !== undefined),
-      ),
-    ),
-    buildVisibleWindowByOriginId: (timeline, mutedGroupIds, mutedGeneratorIds) =>
-      buildVisibleWindowByOriginId(
-        timeline,
-        noteOutputCoordinateGroups,
-        noteOutputHitByStroke,
-        mutedGroupIds,
-        mutedGeneratorIds,
-      ),
-  };
-};
