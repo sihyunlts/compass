@@ -11,7 +11,7 @@ outlets = 3;
 var DEFAULT_INCOMING_OSC_PATH = "/compass/clip-notes";
 var TEMPO_OSC_PATH = "/compass/live-tempo";
 var STATUS_OSC_PATH = "/compass/bridge-status";
-var BRIDGE_VERSION = "v1.0.2";
+var BRIDGE_VERSION = "v1.0.3";
 
 var TEMPO_POLL_INTERVAL_MS = 250;
 var CREATE_MIDI_CLIP_SUPPORT_UNKNOWN = -1;
