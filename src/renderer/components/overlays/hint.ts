@@ -16,6 +16,53 @@ const HINT_DELAY_MS = 360;
 const VIEWPORT_PADDING_PX = 8;
 const HINT_GAP_PX = 6;
 const FLOATING_LAYER_VIEWPORT_TOP_PROPERTY = '--floating-layer-viewport-top';
+const windowBlurCallbacks = new Set<() => void>();
+let suppressWindowRestoreFocusHint = false;
+let windowFocusRestoreFrame: number | null = null;
+
+const handleWindowBlur = (): void => {
+  suppressWindowRestoreFocusHint = true;
+  if (windowFocusRestoreFrame !== null) {
+    window.cancelAnimationFrame(windowFocusRestoreFrame);
+    windowFocusRestoreFrame = null;
+  }
+  for (const closeHint of windowBlurCallbacks) {
+    closeHint();
+  }
+};
+
+const handleWindowFocus = (): void => {
+  if (windowFocusRestoreFrame !== null) {
+    window.cancelAnimationFrame(windowFocusRestoreFrame);
+  }
+  windowFocusRestoreFrame = window.requestAnimationFrame(() => {
+    windowFocusRestoreFrame = null;
+    suppressWindowRestoreFocusHint = false;
+  });
+};
+
+const registerWindowFocusHandlers = (closeHint: () => void): (() => void) => {
+  if (windowBlurCallbacks.size === 0) {
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
+  }
+  windowBlurCallbacks.add(closeHint);
+
+  return () => {
+    windowBlurCallbacks.delete(closeHint);
+    if (windowBlurCallbacks.size > 0) {
+      return;
+    }
+
+    window.removeEventListener('blur', handleWindowBlur);
+    window.removeEventListener('focus', handleWindowFocus);
+    if (windowFocusRestoreFrame !== null) {
+      window.cancelAnimationFrame(windowFocusRestoreFrame);
+      windowFocusRestoreFrame = null;
+    }
+    suppressWindowRestoreFocusHint = false;
+  };
+};
 
 const normalizeHint = (value: HintValue): string =>
   typeof value === 'string' ? value.trim() : '';
@@ -177,7 +224,7 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
     }, 0);
   };
   const handleFocus = (): void => {
-    if (!didFocusFromPointer) {
+    if (!didFocusFromPointer && !suppressWindowRestoreFocusHint) {
       scheduleHint(0);
     }
   };
@@ -187,6 +234,7 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
   node.addEventListener('pointerleave', closeHint);
   node.addEventListener('focus', handleFocus);
   node.addEventListener('blur', closeHint);
+  const unregisterWindowFocusHandlers = registerWindowFocusHandlers(closeHint);
 
   return {
     update(nextValue: HintValue): void {
@@ -207,6 +255,7 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
       node.removeEventListener('pointerleave', closeHint);
       node.removeEventListener('focus', handleFocus);
       node.removeEventListener('blur', closeHint);
+      unregisterWindowFocusHandlers();
       closeHint();
       cancelExitAnimation?.();
       exitingHintEl?.remove();
