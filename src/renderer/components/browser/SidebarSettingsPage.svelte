@@ -1,5 +1,6 @@
 <script lang="ts">
   import Button from '../primitives/Button.svelte';
+  import Switch from '../primitives/Switch.svelte';
 
   let {
     launchpadMk2Enabled,
@@ -60,14 +61,11 @@
           <span class="sidebar-settings-label">Pro MK2 Mode</span>
           <span class="sidebar-settings-description">Enable mapping for Launchpad Pro MK2</span>
         </div>
-        <input
+        <Switch
           id="launchpad-model-mk2"
-          type="checkbox"
           checked={launchpadMk2Enabled}
-          onchange={(event) => {
-            const target = event.currentTarget as HTMLInputElement;
-            onLaunchpadModelToggle(target.checked);
-          }}
+          label="Pro MK2 Mode"
+          onCheckedChange={onLaunchpadModelToggle}
         />
       </div>
 
@@ -211,7 +209,7 @@
     gap: var(--gap-8);
   }
 
-  .sidebar-settings-row > input[type='checkbox'],
+  .sidebar-settings-row > :global(.switch),
   .sidebar-settings-row > :global(.button) {
     align-self: center;
   }
