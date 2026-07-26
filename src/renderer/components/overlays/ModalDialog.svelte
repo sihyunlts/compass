@@ -50,6 +50,13 @@
     durationMs: FLOATING_LAYER_ENTER_DURATION_MS,
     easing: FLOATING_LAYER_ENTER_EASING,
   } as const;
+  type ModalDialogText = {
+    title: string;
+    description: string | null;
+    confirmLabel: string;
+    secondaryLabel: string | null;
+    cancelLabel: string;
+  };
 
   let {
     open = false,
@@ -77,6 +84,13 @@
     children?: Snippet;
   }>();
 
+  let displayedText = $state<ModalDialogText>({
+    title: '',
+    description: null,
+    confirmLabel: 'OK',
+    secondaryLabel: null,
+    cancelLabel: 'Cancel',
+  });
   let backdropEl = $state<HTMLDivElement | null>(null);
   let dialogEl = $state<HTMLDivElement | null>(null);
   let previouslyFocusedEl: HTMLElement | null = null;
@@ -86,6 +100,20 @@
   const dialogScale = new Spring(1, MODAL_DIALOG_ENTER_SPRING_OPTIONS);
   const titleId = allocateModalDialogId('modal-dialog-title');
   const descriptionId = allocateModalDialogId('modal-dialog-description');
+
+  $effect(() => {
+    if (!open) {
+      return;
+    }
+
+    displayedText = {
+      title,
+      description,
+      confirmLabel,
+      secondaryLabel,
+      cancelLabel,
+    };
+  });
 
   const resolveFocusableElements = (): HTMLElement[] => {
     if (!dialogEl) {
@@ -300,16 +328,16 @@
       aria-hidden={!open}
       aria-modal="true"
       aria-labelledby={titleId}
-      aria-describedby={description ? descriptionId : undefined}
+      aria-describedby={displayedText.description ? descriptionId : undefined}
       tabindex="-1"
       data-preserve-rack-selection="true"
       style:transform={`scale(${dialogScale.current})`}
       onkeydown={handleKeyDown}
     >
-      <h2 id={titleId} class="modal-dialog-title">{title}</h2>
+      <h2 id={titleId} class="modal-dialog-title">{displayedText.title}</h2>
 
-      {#if description}
-        <p id={descriptionId} class="modal-dialog-description">{description}</p>
+      {#if displayedText.description}
+        <p id={descriptionId} class="modal-dialog-description">{displayedText.description}</p>
       {/if}
 
       {#if children}
@@ -322,21 +350,21 @@
         <Button
           class="modal-dialog-action-button"
           disabled={busy}
-          text={cancelLabel}
+          text={displayedText.cancelLabel}
           onClick={handleCancel}
         />
-        {#if secondaryLabel}
+        {#if displayedText.secondaryLabel}
           <Button
             class="modal-dialog-action-button"
             disabled={busy}
-            text={secondaryLabel}
+            text={displayedText.secondaryLabel}
             onClick={handleSecondary}
           />
         {/if}
         <Button
           class="modal-dialog-action-button"
           disabled={busy}
-          text={confirmLabel}
+          text={displayedText.confirmLabel}
           onClick={handleConfirm}
         />
       </footer>

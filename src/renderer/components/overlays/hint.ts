@@ -242,7 +242,11 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
     }, 0);
   };
   const handleFocus = (): void => {
-    if (!didFocusFromPointer && !suppressWindowRestoreFocusHint) {
+    if (
+      !didFocusFromPointer
+      && !suppressWindowRestoreFocusHint
+      && node.matches(':focus-visible')
+    ) {
       scheduleHint(0);
     }
   };
