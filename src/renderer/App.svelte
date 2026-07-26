@@ -543,7 +543,8 @@
                 value: option.label,
                 label: option.label,
               }))}
-              ariaLabel="Preview length"
+              ariaLabel="Lightshow Length"
+              showHint
               onValueChange={handlePreviewLengthChange}
             />
           </div>

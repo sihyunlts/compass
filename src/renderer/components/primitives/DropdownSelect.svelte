@@ -1,6 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { hint } from '../overlays/hint';
   import FloatingDropdown from './FloatingDropdown.svelte';
   import DropdownOptionList from './DropdownOptionList.svelte';
   import type { DropdownOption, DropdownValue } from './dropdown-types';
@@ -9,6 +10,7 @@
     value,
     options,
     ariaLabel,
+    showHint = false,
     disabled = false,
     class: className = '',
     onValueChange,
@@ -17,6 +19,7 @@
     value: DropdownValue;
     options: readonly DropdownOption[];
     ariaLabel: string;
+    showHint?: boolean;
     disabled?: boolean;
     class?: string;
     onValueChange: (value: DropdownValue) => void;
@@ -65,6 +68,7 @@
     aria-haspopup="listbox"
     aria-expanded={isOpen}
     disabled={isDisabled}
+    use:hint={showHint ? ariaLabel : undefined}
     onclick={() => isOpen = !isOpen}
     onkeydown={handleTriggerKeyDown}
   >
