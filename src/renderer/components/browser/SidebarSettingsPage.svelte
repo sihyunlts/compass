@@ -4,6 +4,7 @@
 
   let {
     launchpadMk2Enabled,
+    reduceAnimation,
     paletteDescription,
     paletteDescriptionTone = 'neutral',
     appVersionText = '',
@@ -13,6 +14,7 @@
     aboutDescriptionTone = 'neutral',
     githubDescription,
     onLaunchpadModelToggle,
+    onReduceAnimationToggle,
     onPaletteReset,
     onPaletteFileChange,
     onOpenAboutSite,
@@ -20,6 +22,7 @@
     onOpenLatestReleasePage,
   } = $props<{
     launchpadMk2Enabled: boolean;
+    reduceAnimation: boolean;
     paletteDescription: string;
     paletteDescriptionTone?: 'neutral' | 'error';
     appVersionText?: string;
@@ -29,6 +32,7 @@
     aboutDescriptionTone?: 'neutral' | 'error';
     githubDescription: string;
     onLaunchpadModelToggle: (enabled: boolean) => void;
+    onReduceAnimationToggle: (enabled: boolean) => void;
     onPaletteReset: () => void;
     onPaletteFileChange: (event: Event) => void | Promise<void>;
     onOpenAboutSite: () => void | Promise<void>;
@@ -54,7 +58,7 @@
   {/if}
 
   <section class="sidebar-settings-section">
-    <h2 class="sidebar-settings-section-title">Settings</h2>
+    <h2 class="sidebar-settings-section-title">Lightshow</h2>
     <div class="sidebar-settings-card">
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
@@ -97,6 +101,24 @@
             />
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sidebar-settings-section">
+    <h2 class="sidebar-settings-section-title">Interface</h2>
+    <div class="sidebar-settings-card">
+      <div class="sidebar-settings-row">
+        <div class="sidebar-settings-info">
+          <span class="sidebar-settings-label">Reduce Animation</span>
+          <span class="sidebar-settings-description">Minimize interface motion and transitions</span>
+        </div>
+        <Switch
+          id="reduce-animation"
+          checked={reduceAnimation}
+          label="Reduce Animation"
+          onCheckedChange={onReduceAnimationToggle}
+        />
       </div>
     </div>
   </section>

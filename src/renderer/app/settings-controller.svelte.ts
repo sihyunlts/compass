@@ -1,6 +1,10 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { UpdateCheckResponse } from '../../shared/contracts/ipc/releases';
 import type { EditorSession } from '../features/editor/session.svelte';
+import {
+  loadReduceAnimation,
+  saveReduceAnimation,
+} from '../features/editor/persistence-storage';
 import type { PlaybackSessionController } from './playback-session.svelte';
 import { createPaletteController, PaletteParseError } from './palette-controller';
 
@@ -11,6 +15,7 @@ interface SettingsControllerState {
   appVersionText: string;
   updateCheckText: string;
   updateAvailable: boolean;
+  reduceAnimation: boolean;
   paletteRevision: number;
   paletteDescriptionOverride: string;
   paletteDescriptionTone: 'neutral' | 'error';
@@ -29,6 +34,7 @@ class SettingsController {
     appVersionText: '',
     updateCheckText: '',
     updateAvailable: false,
+    reduceAnimation: loadReduceAnimation(),
     paletteRevision: 0,
     paletteDescriptionOverride: '',
     paletteDescriptionTone: 'neutral',
@@ -120,6 +126,11 @@ class SettingsController {
     if (this.options.editorSession.commands.setLaunchpadModelEnabled(nextEnabled)) {
       this.playbackSession?.renderPreviewFrame();
     }
+  }
+
+  public handleReduceAnimationToggle(enabled: boolean): void {
+    this.state.reduceAnimation = enabled;
+    saveReduceAnimation(enabled);
   }
 
   public setAppVersion(version: string): void {

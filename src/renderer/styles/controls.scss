@@ -122,6 +122,53 @@ input {
   }
 }
 
+@mixin reduced-animation-mode {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .floating-dropdown,
+  .app-hint {
+    translate: none !important;
+  }
+
+  .switch-thumb {
+    transform: translateX(0) !important;
+  }
+
+  .switch.is-checked .switch-thumb {
+    transform: translateX(12px) !important;
+  }
+
+  .preview-scrub-loader .loader-bar {
+    animation: none !important;
+    transform: translateX(97%) !important;
+  }
+}
+
+html.reduce-animation {
+  @include reduced-animation-mode;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    @include reduced-animation-mode;
+  }
+}
+
+.floating-menu-surface,
+.app-hint {
+  --floating-layer-enter-duration: 150ms;
+  --floating-layer-enter-easing: cubic-bezier(0, 0.5, 0.5, 1);
+}
+
 .floating-menu-surface {
   position: fixed;
   inset: 0 auto auto 0;
@@ -129,6 +176,7 @@ input {
   display: inline-flex;
   flex-direction: column;
   align-items: stretch;
+  gap: var(--gap-2);
   width: fit-content;
   min-width: 6rem;
   max-width: calc(100vw - var(--gap-16));
@@ -138,15 +186,42 @@ input {
   background: var(--neutral-10);
 }
 
+@keyframes floating-layer-fade-in {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes floating-hint-enter {
+  from {
+    opacity: 0;
+    filter: blur(4px);
+    translate: 0 var(--floating-layer-enter-y, -6px);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+    translate: none;
+  }
+}
+
 .floating-menu-list {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0;
+  gap: var(--gap-2);
   outline: none;
 }
 
 .floating-menu-item {
+  position: relative;
   border: 0;
   border-radius: var(--radius-4);
   background: transparent;
@@ -154,8 +229,14 @@ input {
   text-align: start;
   font-size: var(--text-13);
   white-space: nowrap;
-  padding: var(--gap-6) var(--gap-8);
+  padding: var(--gap-4) var(--gap-8);
   cursor: pointer;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -1px 0;
+  }
 
   &:hover,
   &:focus-visible {
@@ -184,4 +265,17 @@ input {
   line-height: 1.25;
   pointer-events: none;
   white-space: normal;
+  animation: floating-hint-enter
+    var(--floating-layer-enter-duration)
+    var(--floating-layer-enter-easing)
+    both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-hint {
+    animation: none;
+    opacity: 1;
+    filter: none;
+    translate: none;
+  }
 }

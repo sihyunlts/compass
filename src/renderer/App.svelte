@@ -411,6 +411,10 @@
     if (!appEl) return;
 
     appEl.classList.toggle('is-sidebar-resizing', uiState.isSidebarResizing);
+    document.documentElement.classList.toggle(
+      'reduce-animation',
+      settingsState.reduceAnimation,
+    );
     appEl.style.setProperty('--sidebar-width', `${uiState.sidebarWidthPx}px`);
     appEl.style.setProperty(
       '--browser-panel-width',
@@ -429,6 +433,7 @@
       reserveTitlebarSpace={reserveBrowserTitlebarSpace}
       canToggleWindowLayer={!isWebFallback}
       {mainWindowAlwaysOnTop}
+      reduceAnimation={settingsState.reduceAnimation}
       activePage={uiState.sidebarPage}
       deviceTree={DEVICE_BROWSER_TREE}
       presetTree={presetState.presetTree}
@@ -449,6 +454,8 @@
         uiState.sidebarPage = nextPage;
       }}
       onMainWindowAlwaysOnTopToggle={() => void handleMainWindowAlwaysOnTopToggle()}
+      onReduceAnimationToggle={(enabled) =>
+        settingsController.handleReduceAnimationToggle(enabled)}
       onDeviceAdd={editorSession.commands.addBrowserDevice}
       onBrowserPointerDown={editorSession.commands.handleBrowserPointerDown}
       onOpenContextMenu={(x, y, target) => contextMenuComponent?.open(x, y, target)}

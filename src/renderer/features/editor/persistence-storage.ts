@@ -141,3 +141,16 @@ export const saveMainWindowAlwaysOnTop = (enabled: boolean): void => {
     },
   });
 };
+
+/** Loads the reduced animation flag with `false` fallback for missing or invalid values. */
+export const loadReduceAnimation = (): boolean =>
+  toBoolean(readPersistedRendererState().ui?.reduceAnimation, false);
+
+/** Persists the reduced animation flag as a strict boolean. */
+export const saveReduceAnimation = (enabled: boolean): void => {
+  writePersistedRendererState({
+    ui: {
+      reduceAnimation: enabled === true,
+    },
+  });
+};

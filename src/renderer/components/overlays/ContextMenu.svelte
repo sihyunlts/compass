@@ -3,6 +3,7 @@
   import type { ContextMenuTarget } from '../../features/context-menu/types';
   import {
     attachFloatingLayerDismissHandlers,
+    animateFloatingLayerExit,
     isEventTargetWithinFloatingLayer,
     resolveViewportFloatingLayerPosition,
   } from './floating-layer';
@@ -36,12 +37,15 @@
   }>();
 
   let isOpen = $state(false);
+  let isRendered = $state(false);
   let isPositioned = $state(false);
+  let isExiting = $state(false);
   let x = $state(0);
   let y = $state(0);
   let target = $state<ContextMenuTarget | null>(null);
   let menuEl = $state<HTMLElement | null>(null);
   let openToken = 0;
+  let cancelExitAnimation: (() => void) | null = null;
 
   const isPresetBrowserTarget = $derived.by(() =>
     target?.kind === 'preset-entry' || target?.kind === 'presets-root');
@@ -90,7 +94,11 @@
     }
 
     target = structuredClone(nextTarget);
+    cancelExitAnimation?.();
+    cancelExitAnimation = null;
+    isExiting = false;
     isPositioned = false;
+    isRendered = true;
     isOpen = true;
     const token = ++openToken;
     await tick();
@@ -112,8 +120,25 @@
   export function close() {
     openToken += 1;
     isOpen = false;
-    isPositioned = false;
-    target = null;
+    if (!isRendered || isExiting) {
+      return;
+    }
+
+    const finishClose = (): void => {
+      cancelExitAnimation = null;
+      isRendered = false;
+      isPositioned = false;
+      isExiting = false;
+      target = null;
+    };
+
+    if (!menuEl || !isPositioned) {
+      finishClose();
+      return;
+    }
+
+    isExiting = true;
+    cancelExitAnimation = animateFloatingLayerExit(menuEl, finishClose);
   }
 
   function handleDeleteClick() {
@@ -189,14 +214,20 @@
     close();
   }
 
-  onMount(() =>
-    attachFloatingLayerDismissHandlers({
+  onMount(() => {
+    const detachDismissHandlers = attachFloatingLayerDismissHandlers({
       isActive: () => isOpen,
       containsEventTarget: (eventTarget) => isEventTargetWithinFloatingLayer(eventTarget, menuEl),
       onPointerDownOutside: close,
       onResize: close,
       onDismissRequest: close,
-    }));
+    });
+
+    return () => {
+      cancelExitAnimation?.();
+      detachDismissHandlers();
+    };
+  });
 </script>
 
 {#snippet menuItem(id: string, label: string, handler: () => void)}
@@ -215,11 +246,11 @@
   bind:this={menuEl}
   id="context-menu"
   class="context-menu floating-menu-surface"
-  class:is-open={isOpen && isPositioned}
+  class:is-open={isRendered && isPositioned}
   role="menu"
-  aria-hidden={!isOpen}
-  hidden={!isOpen}
-  style:transform={isOpen ? `translate3d(${x}px, ${y}px, 0)` : undefined}
+  aria-hidden={!isOpen || !isPositioned}
+  hidden={!isRendered}
+  style:transform={isRendered ? `translate3d(${x}px, ${y}px, 0)` : undefined}
 >
   {#if target}
     {#if isPresetBrowserTarget}
@@ -261,10 +292,12 @@
 <style lang="scss">
   .context-menu {
     transform: translate3d(-9999px, -9999px, 0);
-    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
 
     &.is-open {
-      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
     }
   }
 </style>

@@ -230,6 +230,7 @@
     reserveTitlebarSpace = true,
     canToggleWindowLayer = false,
     mainWindowAlwaysOnTop = false,
+    reduceAnimation = false,
     launchpadMk2Enabled = false,
     paletteDescription = 'Default palette',
     paletteDescriptionTone = 'neutral',
@@ -241,6 +242,7 @@
     githubDescription = '',
     onPageSelect = () => {},
     onMainWindowAlwaysOnTopToggle = () => {},
+    onReduceAnimationToggle = () => {},
     onDeviceAdd,
     onBrowserPointerDown,
     onOpenContextMenu = () => {},
@@ -267,6 +269,7 @@
     reserveTitlebarSpace?: boolean;
     canToggleWindowLayer?: boolean;
     mainWindowAlwaysOnTop?: boolean;
+    reduceAnimation?: boolean;
     launchpadMk2Enabled?: boolean;
     paletteDescription?: string;
     paletteDescriptionTone?: 'neutral' | 'error';
@@ -278,6 +281,7 @@
     githubDescription?: string;
     onPageSelect?: (page: BrowserPanelPage) => void;
     onMainWindowAlwaysOnTopToggle?: () => void;
+    onReduceAnimationToggle?: (enabled: boolean) => void;
     onDeviceAdd: (kind: RendererDeviceKind) => void;
     onBrowserPointerDown: (payload: BrowserPointerDownPayload) => void;
     onOpenContextMenu?: (
@@ -706,6 +710,7 @@
       {#if activePage === 'settings'}
         <SidebarSettingsPage
           {launchpadMk2Enabled}
+          {reduceAnimation}
           {paletteDescription}
           {paletteDescriptionTone}
           {appVersionText}
@@ -715,6 +720,7 @@
           {aboutDescriptionTone}
           {githubDescription}
           onLaunchpadModelToggle={onLaunchpadModelToggle}
+          onReduceAnimationToggle={onReduceAnimationToggle}
           onPaletteReset={onPaletteReset}
           onPaletteFileChange={onPaletteFileChange}
           onOpenAboutSite={onOpenAboutSite}
@@ -849,6 +855,10 @@
     padding: var(--gap-10);
     background: var(--neutral-10);
     border-right: 1px solid var(--neutral-20);
+
+    &.has-titlebar-spacer {
+      --floating-layer-viewport-top: 48px;
+    }
 
     &::before {
       content: '';
