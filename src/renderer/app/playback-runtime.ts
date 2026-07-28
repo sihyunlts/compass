@@ -93,8 +93,8 @@ class PlaybackScheduler {
         this.currentBeat %= endBeat;
       } else {
         this.currentBeat = endBeat;
-        this.options.onFrame(this.currentBeat);
         this.stop(false);
+        this.options.onFrame(this.currentBeat);
         return;
       }
     }

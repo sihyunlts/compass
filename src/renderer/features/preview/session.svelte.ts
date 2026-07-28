@@ -39,6 +39,9 @@ interface PreviewFrameInput {
   isPlaying: boolean;
   isLoopEnabled: boolean;
   resolveLedRgb: (velocity: number) => string;
+  resolveActiveCells?: (
+    activeCells: PreviewWindowState['activeCells'],
+  ) => PreviewWindowState['activeCells'];
 }
 
 interface PreviewSessionState {
@@ -110,8 +113,9 @@ export class PreviewSession {
       beat,
     );
 
+    const rackActiveCells = toActiveCells(activeVelocityByPitch, input.resolveLedRgb);
     const previewWindowState: PreviewWindowState = {
-      activeCells: toActiveCells(activeVelocityByPitch, input.resolveLedRgb),
+      activeCells: input.resolveActiveCells?.(rackActiveCells) ?? rackActiveCells,
       previewRevision,
       chain: sourceChain,
       launchpadModel: input.launchpadModel,

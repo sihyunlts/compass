@@ -39,7 +39,10 @@
     }
 
     return Math.round(clamp(
-      (previewState.currentBeat / previewState.sourceTimelineEndBeat) * PREVIEW_SCRUB_MAX,
+      (
+        previewState.displayProgress01
+        ?? previewState.currentBeat / previewState.sourceTimelineEndBeat
+      ) * PREVIEW_SCRUB_MAX,
       0,
       PREVIEW_SCRUB_MAX,
     ));

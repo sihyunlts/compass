@@ -12,6 +12,7 @@ export interface PreviewWindowState {
   chain: GeneratorChain;
   currentBeat: number;
   sourceTimelineEndBeat: number;
+  displayProgress01?: number;
   loopLengthBeats: number;
   noteCount: number;
   uniquePitchCount: number;

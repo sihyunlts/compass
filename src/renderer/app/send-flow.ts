@@ -31,6 +31,7 @@ class SendFlowController {
     uiState.sendButtonLabel = 'Sending...';
     uiState.sendButtonDisabled = true;
     headerIndicator.show('Sending...', { autoClear: false });
+    playbackSession.prepareForSend();
 
     try {
       const bridge = editorSession.readBridgeSettings();

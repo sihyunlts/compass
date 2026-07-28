@@ -50,6 +50,11 @@
     selectPreviewBpmText,
   } from './features/editor/selectors';
   import { createPreviewSession } from './features/preview/session.svelte';
+  import {
+    loadBadAppleAnimation,
+    resolveBadApplePreviewFrame,
+    type BadAppleAnimation,
+  } from './features/preview/bad-apple';
   import type { RackViewApi } from './features/rack/api';
 
   const AUTO_PREVIEW_DEBOUNCE_MS = 120;
@@ -85,6 +90,7 @@
     onSyncAfterRender: () => syncRackAfterRender(),
   });
   const previewSession = createPreviewSession();
+  let badAppleAnimation: BadAppleAnimation | null = $state(null);
   const uiState = editorSession.state;
   const previewState = previewSession.state;
   const historyControls = $derived.by(() => selectHistoryControls(uiState));
@@ -114,6 +120,7 @@
     bridgeClient,
     editorSession,
   });
+  const presetState = presetController.state;
   const settingsState = settingsController.state;
   const resolvePaletteRgb = (velocity: number): string =>
     settingsController.resolvePaletteRgb(velocity, '0 0 0');
@@ -123,9 +130,20 @@
     previewSession,
     headerIndicator,
     resolveLedRgb: (velocity) => settingsController.resolvePaletteRgb(velocity, DEFAULT_LED_RGB),
+    resolvePreviewVisual: ({ elapsedMs, launchpadModel }) => {
+      if (
+        presetState.currentRackDisplayName.trim().toLowerCase() !== 'bad apple'
+        || !badAppleAnimation
+      ) {
+        return null;
+      }
+      return resolveBadApplePreviewFrame(badAppleAnimation, elapsedMs, launchpadModel);
+    },
+    onPreviewVisualStart: () => {
+      headerIndicator.show('BAD APPLE!!', { priority: 'high' });
+    },
   });
   settingsController.attachPlaybackSession(playbackSession);
-  const presetState = presetController.state;
   let isRackRenameDialogOpen = $state(false);
   let isRackRenamePending = $state(false);
   let rackRenameDraft = $state('');
@@ -146,6 +164,9 @@
   const isKaguyaRack = $derived(
     presetState.currentRackDisplayName.trim().toLowerCase() === 'kaguya',
   );
+  const isBadAppleRack = $derived(
+    presetState.currentRackDisplayName.trim().toLowerCase() === 'bad apple',
+  );
   const currentPreviewProgress01 = $derived.by(() => {
     const sourceTimelineEndBeat = previewState.sourceTimelineEndBeat;
     if (!Number.isFinite(sourceTimelineEndBeat) || sourceTimelineEndBeat <= 0) {
@@ -161,6 +182,22 @@
     void presetState.currentRackFilePath;
     void presetState.isRackDirty;
     presetController.syncMainWindowDocumentState();
+  });
+
+  $effect(() => {
+    const enabled = isBadAppleRack;
+    untrack(() => {
+      playbackSession.setPreviewVisualEnabled(enabled);
+    });
+    const shouldLoadAnimation = enabled && untrack(() => !badAppleAnimation);
+    if (shouldLoadAnimation) {
+      void loadBadAppleAnimation().then((animation) => {
+        badAppleAnimation = animation;
+      }).catch(() => {
+        // The rack preview remains available if the optional easter egg asset fails.
+        playbackSession.setPreviewVisualEnabled(false);
+      });
+    }
   });
 
   $effect(() => {
@@ -369,6 +406,12 @@
   };
 
   onMount(() => {
+    void loadBadAppleAnimation().then((animation) => {
+      badAppleAnimation = animation;
+    }).catch(() => {
+      // The normal rack preview is the fallback when the optional asset is unavailable.
+      playbackSession.setPreviewVisualEnabled(false);
+    });
     editorSession.initialize();
     playbackSession.initialize();
     if (uiState.headerIndicatorText.trim()) {

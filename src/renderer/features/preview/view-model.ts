@@ -9,7 +9,7 @@ import { resolveLedSurfaceRgb } from '../../app/led-surface-color';
 const PREVIEW_COLS = 10;
 const PREVIEW_ROWS = 10;
 
-interface PreviewSurfaceCellModel {
+export interface PreviewSurfaceCellModel {
   key: string;
   pitches: number[];
   isEdgeButton: boolean;
@@ -75,7 +75,7 @@ const isEdgeButtonCell = (
 const toNoteNumber = (button: LaunchpadButton): number | null =>
   button.output.kind === 'note' ? button.output.number : null;
 
-const resolvePreviewCellModels = (
+export const resolvePreviewCellModels = (
   model?: LaunchpadModel,
 ): ReadonlyArray<PreviewSurfaceCellModel> => {
   const resolvedModel = resolveLaunchpadModel(model);
