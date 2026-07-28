@@ -18,34 +18,16 @@ const VIEWPORT_PADDING_PX = 8;
 const HINT_GAP_PX = 6;
 const FLOATING_LAYER_VIEWPORT_TOP_PROPERTY = '--floating-layer-viewport-top';
 const windowBlurCallbacks = new Set<() => void>();
-let suppressWindowRestoreFocusHint = false;
-let windowFocusRestoreFrame: number | null = null;
 
 const handleWindowBlur = (): void => {
-  suppressWindowRestoreFocusHint = true;
-  if (windowFocusRestoreFrame !== null) {
-    window.cancelAnimationFrame(windowFocusRestoreFrame);
-    windowFocusRestoreFrame = null;
-  }
   for (const closeHint of windowBlurCallbacks) {
     closeHint();
   }
 };
 
-const handleWindowFocus = (): void => {
-  if (windowFocusRestoreFrame !== null) {
-    window.cancelAnimationFrame(windowFocusRestoreFrame);
-  }
-  windowFocusRestoreFrame = window.requestAnimationFrame(() => {
-    windowFocusRestoreFrame = null;
-    suppressWindowRestoreFocusHint = false;
-  });
-};
-
-const registerWindowFocusHandlers = (closeHint: () => void): (() => void) => {
+const registerWindowBlurHandler = (closeHint: () => void): (() => void) => {
   if (windowBlurCallbacks.size === 0) {
     window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('focus', handleWindowFocus);
   }
   windowBlurCallbacks.add(closeHint);
 
@@ -56,12 +38,6 @@ const registerWindowFocusHandlers = (closeHint: () => void): (() => void) => {
     }
 
     window.removeEventListener('blur', handleWindowBlur);
-    window.removeEventListener('focus', handleWindowFocus);
-    if (windowFocusRestoreFrame !== null) {
-      window.cancelAnimationFrame(windowFocusRestoreFrame);
-      windowFocusRestoreFrame = null;
-    }
-    suppressWindowRestoreFocusHint = false;
   };
 };
 
@@ -88,7 +64,6 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
   let cancelExitAnimation: (() => void) | null = null;
   let showTimer: number | null = null;
   let previousDescribedBy: string | null = null;
-  let didFocusFromPointer = false;
   const hintId = `app-hint-${++hintIdCounter}`;
 
   const clearShowTimer = (): void => {
@@ -233,30 +208,30 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
     showTimer = window.setTimeout(openHint, delayMs);
   };
 
-  const handlePointerEnter = (): void => scheduleHint(HINT_DELAY_MS);
+  const handlePointerMove = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch' || hintEl || showTimer !== null) {
+      return;
+    }
+    scheduleHint(HINT_DELAY_MS);
+  };
   const handlePointerDown = (): void => {
-    didFocusFromPointer = true;
     closeHint();
-    window.setTimeout(() => {
-      didFocusFromPointer = false;
-    }, 0);
   };
   const handleFocus = (): void => {
     if (
-      !didFocusFromPointer
-      && !suppressWindowRestoreFocusHint
+      document.body.dataset.focusNav === 'tab'
       && node.matches(':focus-visible')
     ) {
       scheduleHint(0);
     }
   };
 
-  node.addEventListener('pointerenter', handlePointerEnter);
+  node.addEventListener('pointermove', handlePointerMove);
   node.addEventListener('pointerdown', handlePointerDown);
   node.addEventListener('pointerleave', closeHint);
   node.addEventListener('focus', handleFocus);
   node.addEventListener('blur', closeHint);
-  const unregisterWindowFocusHandlers = registerWindowFocusHandlers(closeHint);
+  const unregisterWindowBlurHandler = registerWindowBlurHandler(closeHint);
 
   return {
     update(nextValue: HintValue): void {
@@ -272,12 +247,12 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
       }
     },
     destroy(): void {
-      node.removeEventListener('pointerenter', handlePointerEnter);
+      node.removeEventListener('pointermove', handlePointerMove);
       node.removeEventListener('pointerdown', handlePointerDown);
       node.removeEventListener('pointerleave', closeHint);
       node.removeEventListener('focus', handleFocus);
       node.removeEventListener('blur', closeHint);
-      unregisterWindowFocusHandlers();
+      unregisterWindowBlurHandler();
       closeHint();
       cancelEnterAnimation?.();
       cancelExitAnimation?.();

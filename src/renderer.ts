@@ -23,13 +23,14 @@ const installTabOnlyFocusMode = (): void => {
     }
   };
 
-  const handlePointerInput = (): void => {
+  const clearTabFocusMode = (): void => {
     setTabFocusMode(false);
   };
 
   setTabFocusMode(false);
   window.addEventListener('keydown', handleKeyDown, true);
-  window.addEventListener('pointerdown', handlePointerInput, true);
+  window.addEventListener('pointerdown', clearTabFocusMode, true);
+  window.addEventListener('blur', clearTabFocusMode);
 };
 
 const renderFatal = (message: string): void => {
