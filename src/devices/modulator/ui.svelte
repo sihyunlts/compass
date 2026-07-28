@@ -243,7 +243,7 @@
     column-gap: var(--gap-10);
     flex: 0 0 auto;
     min-width: 0;
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
     font-size: var(--text-12);
     line-height: normal;
   }
@@ -293,8 +293,8 @@
     min-width: 0;
     height: 100%;
     border-radius: var(--radius-4);
-    background: var(--neutral-20);
-    color: var(--neutral-50);
+    background: var(--color-surface-interactive);
+    color: var(--color-text-tertiary);
     font-size: var(--text-12);
     padding: 0 var(--gap-6);
   }

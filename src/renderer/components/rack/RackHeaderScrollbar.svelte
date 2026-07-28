@@ -405,7 +405,7 @@
 
 <style lang="scss">
   .rack-header-scrollbar {
-    --scrollbar-track-border-color: var(--neutral-20);
+    --scrollbar-track-border-color: var(--color-border-tertiary);
     -webkit-app-region: no-drag;
 
     position: relative;
@@ -431,14 +431,14 @@
       position: absolute;
       top: 0;
       bottom: 0;
-      border: 1px solid var(--neutral-50);
+      border: 1px solid var(--color-border-primary);
       background: transparent;
       border-radius: var(--radius-4);
       z-index: 1;
     }
 
     &:focus-visible {
-      --scrollbar-track-border-color: var(--neutral-90);
+      --scrollbar-track-border-color: var(--color-focus-ring);
     }
   }
 </style>

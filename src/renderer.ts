@@ -1,6 +1,7 @@
 import './renderer/styles/index.scss';
 import { bootstrapMainWindow } from './renderer/bootstrap';
 import { bootstrapPreviewWindow } from './renderer/preview-window/bootstrap';
+import { initializeTheme } from './renderer/app/theme';
 
 const installTabOnlyFocusMode = (): void => {
   const { body } = document;
@@ -71,6 +72,7 @@ try {
 
   installTabOnlyFocusMode();
   installWebFallbackFrame(root);
+  initializeTheme();
   bootstrapRenderer(root);
 } catch (error) {
   const message = error instanceof Error ? error.stack || error.message : String(error);

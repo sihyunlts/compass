@@ -1,7 +1,7 @@
 import type { BridgeSettings } from '../shared/bridge/types';
 import type { LaunchpadModel } from '../shared/model';
 
-const RENDERER_STATE_KEY = 'compass.state.v1';
+export const RENDERER_STATE_KEY = 'compass.state.v1';
 
 export interface PersistedRendererState {
   bridge?: BridgeSettings;
@@ -14,6 +14,8 @@ export interface PersistedRendererState {
     launchpadModel?: LaunchpadModel;
     mainWindowAlwaysOnTop?: boolean;
     reduceAnimation?: boolean;
+    themeHue?: number;
+    themeSaturation?: number;
   };
   palette?: {
     name?: string;
@@ -73,6 +75,10 @@ const pickPersistedUi = (
       : {}),
     ...(ui.reduceAnimation !== undefined
       ? { reduceAnimation: ui.reduceAnimation }
+      : {}),
+    ...(ui.themeHue !== undefined ? { themeHue: ui.themeHue } : {}),
+    ...(ui.themeSaturation !== undefined
+      ? { themeSaturation: ui.themeSaturation }
       : {}),
   };
 };

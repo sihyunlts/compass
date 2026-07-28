@@ -185,7 +185,7 @@
 
 <style lang="scss">
   .time-window-editor {
-    --time-window-accent: var(--device-category-accent, var(--mint-50));
+    --time-window-accent: var(--device-category-accent, var(--color-category-time));
     display: flex;
     flex-direction: column;
     gap: var(--gap-8);
@@ -210,8 +210,8 @@
     height: 1.5rem;
     padding: 0 var(--gap-8);
     border-radius: var(--radius-round);
-    background: var(--neutral-90);
-    color: var(--neutral-00);
+    background: var(--color-surface-inverse);
+    color: var(--color-text-inverse);
     font-size: var(--text-12);
     white-space: nowrap;
   }
@@ -225,20 +225,20 @@
       min-width: 2rem;
       height: 1.5rem;
       border-radius: var(--radius-4);
-      background: var(--neutral-20);
-      color: var(--neutral-60);
+      background: var(--color-surface-interactive);
+      color: var(--color-text-secondary);
       cursor: pointer;
 
       &.selected {
         background: var(--time-window-accent);
-        color: var(--neutral-00);
+        color: var(--color-text-inverse);
       }
     }
   }
 
   .time-window-ruler {
     justify-content: space-between;
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
     font-size: var(--text-12);
   }
 
@@ -256,7 +256,7 @@
     position: relative;
     height: 1.75rem;
     border-radius: var(--radius-4);
-    background: var(--neutral-20);
+    background: var(--color-surface-interactive);
     overflow: hidden;
   }
 
@@ -281,7 +281,7 @@
     bottom: 0;
     left: var(--playhead, 0%);
     width: 2px;
-    background: var(--neutral-90);
+    background: var(--color-surface-inverse);
     transform: translateX(-1px);
   }
 
@@ -289,11 +289,11 @@
     top: 0;
     bottom: 0;
     width: 1px;
-    background: var(--white-overlay-18);
+    background: var(--color-overlay-highlight-secondary);
     transform: translateX(-0.5px);
 
     &.is-major {
-      background: var(--white-overlay-32);
+      background: var(--color-overlay-highlight-primary);
     }
   }
 
@@ -326,8 +326,8 @@
       height: 0.9rem;
       width: 0.9rem;
       border-radius: var(--radius-round);
-      border: 2px solid var(--neutral-10);
-      background: var(--neutral-90);
+      border: 2px solid var(--color-surface);
+      background: var(--color-surface-inverse);
       margin-top: 0;
       opacity: 1;
     }
@@ -341,7 +341,7 @@
     }
 
     :global(input[readonly]) {
-      color: var(--neutral-60);
+      color: var(--color-text-secondary);
       cursor: default;
     }
   }

@@ -104,21 +104,21 @@
     overflow: hidden;
 
     &-secondary {
-      background: var(--neutral-20);
+      background: var(--color-surface-interactive);
     }
 
     &-primary {
-      background: var(--neutral-90);
-      color: var(--neutral-00);
+      background: var(--color-surface-inverse);
+      color: var(--color-text-inverse);
     }
 
     &-outline {
       background: transparent;
-      outline: 1px solid var(--neutral-20);
+      outline: 1px solid var(--color-border-tertiary);
       outline-offset: -1px;
 
       .split-button-trigger {
-        border-left-color: var(--neutral-20);
+        border-left-color: var(--color-border-tertiary);
       }
     }
 
@@ -165,7 +165,7 @@
       justify-content: center;
 
       &[aria-expanded='true'] {
-        background: var(--neutral-30);
+        background: var(--color-surface-active);
       }
 
       .material-symbols-rounded {

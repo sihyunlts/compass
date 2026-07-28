@@ -291,31 +291,31 @@
 
 <style lang="scss">
   .device-card {
-    --device-category-accent: var(--yellow-50);
+    --device-category-accent: var(--color-category-generators);
     --device-control-accent: var(--device-category-accent);
     --device-card-radius: var(--radius-8);
     --device-head-radius: max(0px, calc(var(--device-card-radius) - 1px));
     display: flex;
     flex-direction: column;
     flex: 0 0 auto;
-    border: 1px solid var(--neutral-20);
+    border: 1px solid var(--color-border-tertiary);
     border-radius: var(--device-card-radius);
-    background: var(--neutral-10);
+    background: var(--color-surface);
     transition: transform 130ms ease, opacity 130ms ease;
 
     &.is-selected {
-      border-color: var(--neutral-40);
+      border-color: var(--color-border-secondary);
 
       .device-head {
-        border-bottom-color: var(--neutral-40);
-        background-color: var(--neutral-20);
+        border-bottom-color: var(--color-border-secondary);
+        background-color: var(--color-surface-interactive);
       }
     }
 
     .device-head {
       padding: var(--gap-6) var(--gap-8);
       border-top: 0.125rem solid var(--device-category-accent);
-      border-bottom: 1px solid var(--neutral-20);
+      border-bottom: 1px solid var(--color-border-tertiary);
       border-radius: var(--device-head-radius) var(--device-head-radius) 0 0;
       display: flex;
       align-items: center;
@@ -467,13 +467,13 @@
       :global(.color-slot) {
         width: 1.25rem;
         height: 1.25rem;
-        border: 1px solid var(--neutral-10);
+        border: 1px solid var(--color-surface);
         border-radius: var(--radius-2);
         padding: 0;
       }
 
       :global(.color-slot.is-selected) {
-        outline: 2px solid var(--neutral-90);
+        outline: 2px solid var(--color-focus-ring);
       }
 
       :global(.color-palette-container) {
@@ -493,7 +493,7 @@
       }
 
       :global(.color-palette-cell) {
-        border: 1px solid var(--neutral-10);
+        border: 1px solid var(--color-surface);
         border-radius: var(--radius-2);
         padding: 0;
       }
@@ -503,7 +503,7 @@
       }
 
       :global(.color-palette-cell.is-selected) {
-        outline: 2px solid var(--neutral-90);
+        outline: 2px solid var(--color-focus-ring);
       }
     }
 

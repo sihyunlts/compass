@@ -2,11 +2,15 @@ import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { UpdateCheckResponse } from '../../shared/contracts/ipc/releases';
 import type { EditorSession } from '../features/editor/session.svelte';
 import {
+  DEFAULT_THEME_HUE,
+  DEFAULT_THEME_SATURATION,
   loadReduceAnimation,
+  loadThemeSettings,
   saveReduceAnimation,
 } from '../features/editor/persistence-storage';
 import type { PlaybackSessionController } from './playback-session.svelte';
 import { createPaletteController, PaletteParseError } from './palette-controller';
+import { updateThemeSettings } from './theme';
 
 const ABOUT_SITE_URL = 'https://sihyunlights.com';
 const GITHUB_URL = 'https://github.com/sihyunlts/compass';
@@ -16,6 +20,8 @@ interface SettingsControllerState {
   updateCheckText: string;
   updateAvailable: boolean;
   reduceAnimation: boolean;
+  themeHue: number;
+  themeSaturation: number;
   paletteRevision: number;
   paletteDescriptionOverride: string;
   paletteDescriptionTone: 'neutral' | 'error';
@@ -30,11 +36,15 @@ interface SettingsControllerOptions {
 
 /** Owns settings UI side effects such as palette IO, model toggles, and about actions. */
 class SettingsController {
+  private readonly initialTheme = loadThemeSettings();
+
   public readonly state: SettingsControllerState = $state({
     appVersionText: '',
     updateCheckText: '',
     updateAvailable: false,
     reduceAnimation: loadReduceAnimation(),
+    themeHue: this.initialTheme.hue,
+    themeSaturation: this.initialTheme.saturation,
     paletteRevision: 0,
     paletteDescriptionOverride: '',
     paletteDescriptionTone: 'neutral',
@@ -131,6 +141,27 @@ class SettingsController {
   public handleReduceAnimationToggle(enabled: boolean): void {
     this.state.reduceAnimation = enabled;
     saveReduceAnimation(enabled);
+  }
+
+  public handleThemeHueChange(hue: number): void {
+    const next = updateThemeSettings({ hue });
+    this.state.themeHue = next.hue;
+    this.state.themeSaturation = next.saturation;
+  }
+
+  public handleThemeSaturationChange(saturation: number): void {
+    const next = updateThemeSettings({ saturation });
+    this.state.themeHue = next.hue;
+    this.state.themeSaturation = next.saturation;
+  }
+
+  public handleThemeReset(): void {
+    const next = updateThemeSettings({
+      hue: DEFAULT_THEME_HUE,
+      saturation: DEFAULT_THEME_SATURATION,
+    });
+    this.state.themeHue = next.hue;
+    this.state.themeSaturation = next.saturation;
   }
 
   public setAppVersion(version: string): void {

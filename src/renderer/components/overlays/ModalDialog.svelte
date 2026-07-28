@@ -381,15 +381,22 @@
     align-items: center;
     justify-content: center;
     padding: var(--gap-16);
-    background: oklch(0% 0 0 / 0.4);
+    background: var(--color-overlay-backdrop);
   }
 
   .modal-dialog {
     width: min(22rem, calc(100vw - 2rem));
     padding: var(--gap-16);
     border-radius: var(--radius-12);
-    background: var(--neutral-10);
-    border: 1px solid var(--neutral-20);
+    background: var(--color-surface-floating);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--color-border-floating);
+    box-shadow: var(--shadow-floating);
+
+    :global(input[type='text']),
+    :global(.button.modal-dialog-action-button) {
+      background: var(--color-surface-floating-interactive);
+    }
 
     &-title {
       margin: 0 0 var(--gap-12);
@@ -398,7 +405,7 @@
 
     &-description {
       margin: 0 0 var(--gap-16);
-      color: var(--neutral-60);
+      color: var(--color-text-secondary);
       font-size: var(--text-13);
     }
 

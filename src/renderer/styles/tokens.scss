@@ -1,30 +1,86 @@
 :root {
-  /* Colors */
+  /* ==========================================================================
+   * Theme controls
+   * ======================================================================= */
   color-scheme: dark;
-  --neutral-00: oklch(16% 0.003 265);
-  --neutral-10: oklch(23% 0.010 265);
-  --neutral-20: oklch(30% 0.017 265);
-  --neutral-30: oklch(36% 0.022 265);
-  --neutral-40: oklch(43% 0.026 265);
-  --neutral-50: oklch(55% 0.023 265);
-  --neutral-60: oklch(72% 0.026 265);
-  --neutral-90: oklch(93% 0.009 265);
-  --yellow-50: oklch(87% 0.160 96);
-  --cyan-50: oklch(80% 0.140 223);
-  --mint-50: oklch(89% 0.178 164);
-  --magenta-50: oklch(68% 0.262 318);
-  --white-overlay-18: oklch(100% 0 0 / 0.18);
-  --white-overlay-32: oklch(100% 0 0 / 0.32);
-  --rgb-led-default: 255 166 57;
+  --theme-hue: 265;
+  --theme-chroma-scale: 1;
 
-  /* Font sizes */
+  /* ==========================================================================
+   * Theme palette
+   * ======================================================================= */
+  --theme-tone-00: oklch(16% calc(0.003 * var(--theme-chroma-scale)) var(--theme-hue));
+  --theme-tone-10: oklch(23% calc(0.010 * var(--theme-chroma-scale)) var(--theme-hue));
+  --theme-tone-20: oklch(30% calc(0.017 * var(--theme-chroma-scale)) var(--theme-hue));
+  --theme-tone-30: oklch(36% calc(0.022 * var(--theme-chroma-scale)) var(--theme-hue));
+  --theme-tone-40: oklch(43% calc(0.026 * var(--theme-chroma-scale)) var(--theme-hue));
+  --theme-tone-50: oklch(55% calc(0.023 * var(--theme-chroma-scale)) var(--theme-hue));
+  --theme-tone-60: oklch(72% calc(0.026 * var(--theme-chroma-scale)) var(--theme-hue));
+  --theme-tone-90: oklch(93% calc(0.009 * var(--theme-chroma-scale)) var(--theme-hue));
+
+  /* ==========================================================================
+   * Semantic colors
+   * ======================================================================= */
+
+  /* Surfaces */
+  --color-background: var(--theme-tone-00);
+  --color-surface: var(--theme-tone-10);
+  --color-surface-interactive: var(--theme-tone-20);
+  --color-surface-active: var(--theme-tone-30);
+  --color-surface-emphasis: var(--theme-tone-40);
+  --color-surface-inverse: var(--theme-tone-90);
+  --color-surface-floating: color-mix(in oklch, var(--color-surface) 92%, transparent);
+  --color-surface-floating-interactive: oklch(100% 0 0 / 0.08);
+
+  /* Borders */
+  --color-border-primary: var(--theme-tone-50);
+  --color-border-secondary: var(--theme-tone-40);
+  --color-border-tertiary: var(--theme-tone-20);
+  --color-border-floating: oklch(100% 0 0 / 0.10);
+  --color-focus-ring: var(--theme-tone-90);
+
+  /* Text */
+  --color-text-primary: var(--theme-tone-90);
+  --color-text-secondary: var(--theme-tone-60);
+  --color-text-tertiary: var(--theme-tone-50);
+  --color-text-inverse: var(--theme-tone-00);
+
+  /* Indicators */
+  --color-indicator-secondary: var(--theme-tone-60);
+
+  /* Device categories */
+  --color-category-generators: oklch(87% 0.160 96);
+  --color-category-transform: oklch(80% 0.140 223);
+  --color-category-time: oklch(89% 0.178 164);
+  --color-category-utility: oklch(68% 0.262 318);
+
+  /* Overlays */
+  --color-overlay-highlight-primary: oklch(100% 0 0 / 0.32);
+  --color-overlay-highlight-secondary: oklch(100% 0 0 / 0.18);
+  --color-overlay-backdrop: oklch(0% 0 0 / 0.4);
+
+  /* ==========================================================================
+   * Preview
+   * ======================================================================= */
+  --preview-led-default-rgb: 255 166 57;
+
+  /* ==========================================================================
+   * Shadows
+   * ======================================================================= */
+  --shadow-floating: 0 0.5rem 1.5rem oklch(0% 0 0 / 0.32), 0 0.125rem 0.375rem oklch(0% 0 0 / 0.24);
+
+  /* ==========================================================================
+   * Font sizes
+   * ======================================================================= */
   --text-12: 0.75rem;
   --text-13: 0.8125rem;
   --text-14: 0.875rem;
   --text-16: 1rem;
   --text-18: 1.125rem;
 
-  /* Radius */
+  /* ==========================================================================
+   * Radius
+   * ======================================================================= */
   --radius-2: 0.125rem;
   --radius-4: 0.25rem;
   --radius-6: 0.375rem;
@@ -33,7 +89,9 @@
   --radius-percent-3: 3%;
   --radius-round: 100rem;
 
-  /* Spacing */
+  /* ==========================================================================
+   * Spacing
+   * ======================================================================= */
   --gap-0: 0;
   --gap-2: 0.125rem;
   --gap-4: 0.25rem;

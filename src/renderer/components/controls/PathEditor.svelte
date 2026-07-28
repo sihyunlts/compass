@@ -361,24 +361,24 @@
     &-count {
       min-width: 1.75rem;
       text-align: left;
-      color: var(--neutral-60);
+      color: var(--color-text-secondary);
       font-size: var(--text-12);
     }
 
     &-delete {
       width: 100%;
       appearance: none;
-      border: 1px solid var(--neutral-40);
+      border: 1px solid var(--color-border-secondary);
       border-radius: var(--radius-4);
-      background: var(--neutral-20);
-      color: var(--neutral-90);
+      background: var(--color-surface-interactive);
+      color: var(--color-text-primary);
       font: inherit;
       padding: var(--gap-4) var(--gap-8);
       cursor: pointer;
 
       &:disabled {
         cursor: default;
-        color: var(--neutral-60);
+        color: var(--color-text-secondary);
         opacity: 0.6;
       }
     }
@@ -387,8 +387,8 @@
       position: relative;
       aspect-ratio: 1 / 1;
       border-radius: var(--radius-6);
-      border: 1px solid var(--neutral-40);
-      background: var(--neutral-10);
+      border: 1px solid var(--color-border-secondary);
+      background: var(--color-surface);
       overflow: hidden;
       cursor: crosshair;
 
@@ -402,14 +402,14 @@
     }
 
     &-grid-line {
-      stroke: var(--neutral-20);
+      stroke: var(--color-border-tertiary);
       stroke-width: 1;
       vector-effect: non-scaling-stroke;
     }
 
     &-line {
       fill: none;
-      stroke: var(--device-control-accent, var(--neutral-90));
+      stroke: var(--device-control-accent, var(--color-surface-inverse));
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
@@ -423,12 +423,12 @@
       height: 0.9rem;
       padding: 0;
       border-radius: var(--radius-round);
-      border: 2px solid var(--neutral-10);
-      background: var(--neutral-90);
+      border: 2px solid var(--color-surface);
+      background: var(--color-surface-inverse);
       cursor: grab;
 
       &.is-selected {
-        background: var(--device-control-accent, var(--neutral-90));
+        background: var(--device-control-accent, var(--color-surface-inverse));
       }
 
       &:active {

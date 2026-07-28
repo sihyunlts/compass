@@ -8,10 +8,10 @@
   height: 0.875rem;
   padding: 0;
   border-radius: var(--radius-round);
-  background: var(--neutral-20);
-  color: var(--neutral-60);
+  background: var(--color-surface-interactive);
+  color: var(--color-text-secondary);
   line-height: 1;
-  outline: 1px solid var(--neutral-40);
+  outline: 1px solid var(--color-border-secondary);
   cursor: pointer;
   -webkit-app-region: no-drag;
 
@@ -25,8 +25,8 @@
 /* Input: Base */
 input {
   border: 0;
-  background: var(--neutral-20);
-  color: var(--neutral-90);
+  background: var(--color-surface-interactive);
+  color: var(--color-text-primary);
   border-radius: var(--radius-4);
   padding: var(--gap-4) var(--gap-6);
   max-width: 100%;
@@ -35,7 +35,7 @@ input {
 
 input {
   &[type='checkbox'] {
-    accent-color: var(--device-control-accent, var(--neutral-90));
+    accent-color: var(--device-control-accent, var(--color-surface-inverse));
 
     &.round-checkbox {
       appearance: none;
@@ -43,11 +43,11 @@ input {
       width: 0.875rem;
       height: 0.875rem;
       border-radius: var(--radius-round);
-      background-color: var(--neutral-40);
+      background-color: var(--color-surface-emphasis);
       margin: 0;
 
       &:checked {
-        background-color: var(--device-control-accent, var(--neutral-90));
+        background-color: var(--device-control-accent, var(--color-surface-inverse));
       }
     }
   }
@@ -61,7 +61,7 @@ input {
     }
 
     &:focus {
-      outline: 1px solid var(--neutral-40);
+      outline: 1px solid var(--color-border-secondary);
       outline-offset: -1px;
       caret-color: transparent;
     }
@@ -86,8 +86,8 @@ input {
     width: 100%;
     cursor: pointer;
     --range-fill: 0%;
-    --range-fill-color: var(--device-control-accent, var(--neutral-90));
-    --range-track-color: var(--neutral-40);
+    --range-fill-color: var(--device-control-accent, var(--color-surface-inverse));
+    --range-track-color: var(--color-surface-emphasis);
 
     &::-webkit-slider-runnable-track {
       width: 100%;
@@ -107,17 +107,11 @@ input {
       height: 0.74rem;
       width: 0.74rem;
       border-radius: var(--radius-round);
-      border: 1px solid var(--neutral-00);
-      background: var(--neutral-90);
+      border: 1px solid var(--color-background);
+      background: var(--color-surface-inverse);
       margin-top: var(--gap-neg-4);
-      opacity: 0;
-      transition: opacity 120ms ease;
-    }
-
-    &:hover::-webkit-slider-thumb,
-    &:active::-webkit-slider-thumb,
-    &:focus-visible::-webkit-slider-thumb {
       opacity: 1;
+      transition: opacity 120ms ease;
     }
   }
 }
@@ -179,9 +173,11 @@ html.reduce-animation {
   min-width: 6rem;
   max-width: calc(100vw - var(--gap-16));
   padding: var(--gap-4);
-  border: 1px solid var(--neutral-40);
+  border: 1px solid var(--color-border-floating);
   border-radius: var(--radius-8);
-  background: var(--neutral-10);
+  background: var(--color-surface-floating);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-floating);
 }
 
 @keyframes floating-hint-enter {
@@ -211,11 +207,11 @@ html.reduce-animation {
   border: 0;
   border-radius: var(--radius-4);
   background: transparent;
-  color: var(--neutral-90);
+  color: var(--color-text-primary);
   text-align: start;
   font-size: var(--text-13);
   white-space: nowrap;
-  padding: var(--gap-4) var(--gap-8);
+  padding: var(--gap-4) var(--gap-6);
   cursor: pointer;
 
   &::before {
@@ -226,7 +222,7 @@ html.reduce-animation {
 
   &:hover,
   &:focus-visible {
-    background: var(--neutral-20);
+    background: var(--color-surface-floating-interactive);
     outline: none;
   }
 }
@@ -234,7 +230,7 @@ html.reduce-animation {
 .floating-menu-separator {
   margin: var(--gap-4) var(--gap-6);
   border: 0;
-  border-top: 1px solid var(--neutral-40);
+  border-top: 1px solid var(--color-border-floating);
 }
 
 .app-hint {
@@ -243,10 +239,12 @@ html.reduce-animation {
   z-index: 70;
   max-width: min(16rem, calc(100vw - var(--gap-16)));
   padding: var(--gap-4) var(--gap-6);
-  border: 1px solid var(--neutral-40);
+  border: 1px solid var(--color-border-floating);
   border-radius: var(--radius-6);
-  background: var(--neutral-10);
-  color: var(--neutral-90);
+  background: var(--color-surface-floating);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-floating);
+  color: var(--color-text-primary);
   font-size: var(--text-12);
   line-height: 1.25;
   pointer-events: none;

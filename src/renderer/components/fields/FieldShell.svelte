@@ -93,7 +93,7 @@
   }
 
   .field-label {
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
     font-size: var(--text-12);
 
     &.is-hidden {

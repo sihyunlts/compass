@@ -648,17 +648,17 @@
 
     position: relative;
     min-height: 0;
-    border: 1px solid var(--neutral-40);
+    border: 1px solid var(--color-border-secondary);
     border-radius: var(--radius-6);
     background:
       linear-gradient(
         to bottom,
         transparent calc(var(--curve-guide-y, -100%) - 0.5px),
-        var(--neutral-40) calc(var(--curve-guide-y, -100%) - 0.5px),
-        var(--neutral-40) calc(var(--curve-guide-y, -100%) + 0.5px),
+        var(--color-border-secondary) calc(var(--curve-guide-y, -100%) - 0.5px),
+        var(--color-border-secondary) calc(var(--curve-guide-y, -100%) + 0.5px),
         transparent calc(var(--curve-guide-y, -100%) + 0.5px)
       ),
-      var(--neutral-10);
+      var(--color-surface);
     overflow: hidden;
 
     svg {
@@ -668,18 +668,18 @@
     }
 
     .curve-grid-line {
-      stroke: var(--neutral-20);
+      stroke: var(--color-border-tertiary);
       stroke-width: 1;
       vector-effect: non-scaling-stroke;
     }
 
     .curve-fill {
-      fill: color-mix(in oklch, var(--device-control-accent, var(--neutral-90)) 22%, transparent);
+      fill: color-mix(in oklch, var(--device-control-accent, var(--color-surface-inverse)) 22%, transparent);
     }
 
     .curve-line {
       fill: none;
-      stroke: var(--device-control-accent, var(--neutral-90));
+      stroke: var(--device-control-accent, var(--color-surface-inverse));
       stroke-width: 2;
       stroke-linejoin: round;
       stroke-linecap: round;
@@ -706,9 +706,9 @@
       z-index: 1;
       width: 0.5rem;
       height: 0.5rem;
-      border: 2px solid var(--device-control-accent, var(--neutral-90));
+      border: 2px solid var(--device-control-accent, var(--color-surface-inverse));
       border-radius: var(--radius-round);
-      background: var(--neutral-10);
+      background: var(--color-surface);
 
       &::before {
         content: '';
@@ -721,9 +721,9 @@
       z-index: 2;
       width: 0.9rem;
       height: 0.9rem;
-      border: 2px solid var(--neutral-10);
+      border: 2px solid var(--color-surface);
       border-radius: var(--radius-round);
-      background: var(--neutral-90);
+      background: var(--color-surface-inverse);
 
       &::before {
         content: '';
@@ -732,7 +732,7 @@
       }
 
       &.selected {
-        background: var(--device-control-accent, var(--neutral-90));
+        background: var(--device-control-accent, var(--color-surface-inverse));
       }
     }
 
@@ -741,7 +741,7 @@
       top: 0;
       bottom: 0;
       width: 1px;
-      background: var(--neutral-60);
+      background: var(--color-indicator-secondary);
       pointer-events: none;
       transform: translateX(-50%);
     }

@@ -159,19 +159,19 @@
     }
 
     &.is-selected:hover {
-      background: var(--neutral-30);
+      background: var(--color-surface-floating-interactive);
     }
 
     &.is-disabled {
       cursor: default;
-      color: var(--neutral-60);
+      color: var(--color-text-secondary);
     }
   }
 
   .dropdown-option-check {
     flex: 0 0 var(--text-16);
     width: var(--text-16);
-    color: var(--neutral-90);
+    color: var(--color-text-primary);
     font-size: var(--text-16);
     line-height: 1;
     font-variation-settings: 'FILL' 0, 'wght' 600;
@@ -193,7 +193,7 @@
   }
 
   .dropdown-option-meta {
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
     font-size: var(--text-12);
     flex: 0 0 auto;
   }

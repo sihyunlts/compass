@@ -109,13 +109,13 @@
     padding: var(--gap-4) var(--gap-4) var(--gap-4) var(--gap-6);
     border: 0;
     border-radius: var(--radius-4);
-    background: var(--neutral-20);
-    color: var(--neutral-90);
+    background: var(--color-surface-interactive);
+    color: var(--color-text-primary);
     font-size: var(--text-13);
     cursor: pointer;
 
     &:focus-visible {
-      outline: 1px solid var(--neutral-40);
+      outline: 1px solid var(--color-border-secondary);
       outline-offset: -1px;
     }
 
@@ -125,7 +125,7 @@
     }
 
     &[aria-expanded='true'] {
-      background: var(--neutral-30);
+      background: var(--color-surface-active);
     }
 
     .material-symbols-rounded {

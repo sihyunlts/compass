@@ -118,9 +118,9 @@
     --preview-edge-inset: var(--gap-2);
     --preview-radius: var(--radius-4);
 
-    border: var(--preview-border-width) solid var(--neutral-20);
+    border: var(--preview-border-width) solid var(--color-border-tertiary);
     border-radius: var(--preview-radius);
-    background: var(--neutral-00);
+    background: var(--color-background);
     flex: 1;
     display: grid;
     grid-template-columns: repeat(10, minmax(0, 1fr));
@@ -149,7 +149,7 @@
     border-radius: var(--radius-percent-3);
 
     &.is-button {
-      background: var(--neutral-20);
+      background: var(--color-surface-interactive);
 
       &.is-edge-button {
         position: relative;
@@ -159,7 +159,7 @@
           content: "";
           position: absolute;
           inset: var(--preview-edge-inset);
-          background: var(--neutral-00);
+          background: var(--color-background);
           pointer-events: none;
         }
       }
@@ -172,7 +172,7 @@
       }
 
       &.is-lit {
-        background: rgb(var(--led-rgb, var(--rgb-led-default)));
+        background: rgb(var(--led-rgb, var(--preview-led-default-rgb)));
       }
 
       &.is-center-corner-bottom-right {

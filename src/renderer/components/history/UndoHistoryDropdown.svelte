@@ -72,7 +72,7 @@
 
 <style lang="scss">
   :global(.undo-history-dropdown .undo-history-list .dropdown-option.is-disabled) {
-    color: var(--neutral-90);
+    color: var(--color-text-primary);
   }
 
   :global(.undo-history-dropdown .undo-history-list .dropdown-option-main) {

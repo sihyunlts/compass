@@ -61,12 +61,12 @@
 
 <style lang="scss">
   .button {
-    --button-disabled-color: color-mix(in oklch, var(--neutral-90) 60%, transparent);
+    --button-disabled-color: color-mix(in oklch, var(--color-text-primary) 60%, transparent);
 
     border: 0;
     border-radius: var(--radius-6);
-    background: var(--neutral-20);
-    color: var(--neutral-90);
+    background: var(--color-surface-interactive);
+    color: var(--color-text-primary);
     padding: var(--gap-6) var(--gap-8);
     font-size: var(--text-13);
     cursor: pointer;
@@ -78,15 +78,15 @@
     }
 
     &.is-active {
-      background: var(--neutral-30);
-      color: var(--neutral-90);
+      background: var(--color-surface-active);
+      color: var(--color-text-primary);
     }
 
     &-primary {
-      --button-disabled-color: color-mix(in oklch, var(--neutral-00) 60%, transparent);
+      --button-disabled-color: color-mix(in oklch, var(--color-text-inverse) 60%, transparent);
 
-      background: var(--neutral-90);
-      color: var(--neutral-00);
+      background: var(--color-surface-inverse);
+      color: var(--color-text-inverse);
     }
 
     &-icon {

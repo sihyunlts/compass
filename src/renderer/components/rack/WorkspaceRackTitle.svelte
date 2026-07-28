@@ -123,7 +123,7 @@
     align-items: center;
     flex: 0 1 auto;
     min-width: 0;
-    color: var(--neutral-90);
+    color: var(--color-text-primary);
     font-weight: 500;
 
     :global(.workspace-rack-title-button) {

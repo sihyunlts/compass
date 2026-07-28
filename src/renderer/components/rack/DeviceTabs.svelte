@@ -75,7 +75,7 @@
     border-radius: var(--radius-4);
     padding: 0 var(--gap-6);
     background: transparent;
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
     font-size: var(--text-12);
     line-height: 1;
     white-space: nowrap;
@@ -83,12 +83,12 @@
 
     &:disabled {
       cursor: default;
-      color: color-mix(in oklch, var(--neutral-60) 55%, transparent);
+      color: color-mix(in oklch, var(--color-text-secondary) 55%, transparent);
     }
 
     &.is-active {
-      background: var(--neutral-30);
-      color: var(--neutral-90);
+      background: var(--color-surface-active);
+      color: var(--color-text-primary);
     }
   }
 

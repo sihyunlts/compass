@@ -564,7 +564,7 @@
       top: 50%;
       margin: 0;
       transform: translate(-50%, -50%);
-      color: var(--neutral-60);
+      color: var(--color-text-secondary);
       font-size: var(--text-13);
       white-space: nowrap;
       pointer-events: none;
@@ -579,21 +579,21 @@
   }
 
   .device-group.is-rack {
-    background: var(--neutral-10);
-    border: 1px solid var(--neutral-20);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-tertiary);
     border-radius: var(--radius-8);
   }
 
   .device-group.is-rack.is-selected {
-    border-color: var(--neutral-40);
+    border-color: var(--color-border-secondary);
   }
 
   .device-group.is-rack.is-selected .group-rail-left {
-    background: var(--neutral-20);
+    background: var(--color-surface-interactive);
   }
 
   .device-group.is-rack.is-selected .group-rail-right {
-    background: var(--neutral-20);
+    background: var(--color-surface-interactive);
   }
 
   /* Visual state when group toggle is disabled. */
@@ -619,12 +619,12 @@
   }
 
   .device-group.is-rack .device-group-body > .device-slot + .device-slot :global(.device-card) {
-    border-left: 1px solid var(--group-device-divider-color, var(--neutral-20));
+    border-left: 1px solid var(--group-device-divider-color, var(--color-border-tertiary));
   }
 
   .device-group.is-rack .device-slot.is-selected :global(.device-card),
   .device-group.is-rack .device-slot.is-selected + .device-slot :global(.device-card) {
-    --group-device-divider-color: var(--neutral-40);
+    --group-device-divider-color: var(--color-border-secondary);
   }
   .device-slot {
     position: relative;
@@ -653,7 +653,7 @@
     bottom: 6px;
     width: 2px;
     transform: translateX(-1px);
-    background: var(--neutral-90);
+    background: var(--color-surface-inverse);
     border-radius: 1px;
   }
 
@@ -664,7 +664,7 @@
     align-items: center;
     padding: var(--gap-10) var(--gap-6);
     gap: var(--gap-12);
-    background: var(--neutral-10);
+    background: var(--color-surface);
 
     &-controls {
       display: flex;
@@ -676,23 +676,23 @@
 
     &-left {
       min-width: 2rem;
-      border-right: 1px solid var(--neutral-20);
+      border-right: 1px solid var(--color-border-tertiary);
       border-top-left-radius: var(--radius-8);
       border-bottom-left-radius: var(--radius-8);
 
       &.is-selected {
-        border-right-color: var(--neutral-40);
+        border-right-color: var(--color-border-secondary);
       }
     }
 
     &-right {
       min-width: 0.75rem;
-      border-left: 1px solid var(--neutral-20);
+      border-left: 1px solid var(--color-border-tertiary);
       border-top-right-radius: var(--radius-8);
       border-bottom-right-radius: var(--radius-8);
 
       &.is-selected {
-        border-left-color: var(--neutral-40);
+        border-left-color: var(--color-border-secondary);
       }
     }
   }

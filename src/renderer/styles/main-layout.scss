@@ -31,7 +31,7 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--gap-8) var(--gap-10);
-    border-bottom: 1px solid var(--neutral-20);
+    border-bottom: 1px solid var(--color-border-tertiary);
     -webkit-app-region: drag;
 
     button,
@@ -68,7 +68,7 @@
 }
 .header {
   &-bpm-text {
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
     font-size: var(--text-12);
     white-space: nowrap;
   }
@@ -77,7 +77,7 @@
     display: inline-flex;
     align-items: center;
     gap: var(--gap-6);
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
     font-size: var(--text-12);
 
     .dropdown-select,
@@ -87,7 +87,7 @@
   }
 
   &-preview-meta {
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
     font-size: var(--text-12);
     max-width: min(36vw, 420px);
     min-width: 0;

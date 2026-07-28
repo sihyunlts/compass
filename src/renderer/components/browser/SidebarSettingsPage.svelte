@@ -5,6 +5,8 @@
   let {
     launchpadMk2Enabled,
     reduceAnimation,
+    themeHue,
+    themeSaturation,
     paletteDescription,
     paletteDescriptionTone = 'neutral',
     appVersionText = '',
@@ -15,6 +17,9 @@
     githubDescription,
     onLaunchpadModelToggle,
     onReduceAnimationToggle,
+    onThemeHueChange,
+    onThemeSaturationChange,
+    onThemeReset,
     onPaletteReset,
     onPaletteFileChange,
     onOpenAboutSite,
@@ -23,6 +28,8 @@
   } = $props<{
     launchpadMk2Enabled: boolean;
     reduceAnimation: boolean;
+    themeHue: number;
+    themeSaturation: number;
     paletteDescription: string;
     paletteDescriptionTone?: 'neutral' | 'error';
     appVersionText?: string;
@@ -33,6 +40,9 @@
     githubDescription: string;
     onLaunchpadModelToggle: (enabled: boolean) => void;
     onReduceAnimationToggle: (enabled: boolean) => void;
+    onThemeHueChange: (hue: number) => void;
+    onThemeSaturationChange: (saturation: number) => void;
+    onThemeReset: () => void;
     onPaletteReset: () => void;
     onPaletteFileChange: (event: Event) => void | Promise<void>;
     onOpenAboutSite: () => void | Promise<void>;
@@ -110,6 +120,52 @@
     <div class="sidebar-settings-card">
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
+          <span class="sidebar-settings-label">Hue</span>
+          <span class="sidebar-settings-description">{themeHue}°</span>
+        </div>
+        <input
+          class="sidebar-settings-range"
+          type="range"
+          min="0"
+          max="360"
+          value={themeHue}
+          aria-label="Theme Hue"
+          oninput={(event) => onThemeHueChange(event.currentTarget.valueAsNumber)}
+        />
+      </div>
+
+      <div class="sidebar-settings-row">
+        <div class="sidebar-settings-info">
+          <span class="sidebar-settings-label">Saturation</span>
+          <span class="sidebar-settings-description">{themeSaturation}%</span>
+        </div>
+        <input
+          class="sidebar-settings-range"
+          type="range"
+          min="0"
+          max="100"
+          value={themeSaturation}
+          aria-label="Theme Saturation"
+          oninput={(event) => onThemeSaturationChange(event.currentTarget.valueAsNumber)}
+        />
+      </div>
+
+      <div class="sidebar-settings-row">
+        <div class="sidebar-settings-info">
+          <span class="sidebar-settings-label">Reset Theme</span>
+          <span class="sidebar-settings-description">Restore the default theme colors</span>
+        </div>
+        <Button
+          id="theme-reset"
+          text="Reset"
+          onClick={() => onThemeReset()}
+        />
+      </div>
+    </div>
+
+    <div class="sidebar-settings-card">
+      <div class="sidebar-settings-row">
+        <div class="sidebar-settings-info">
           <span class="sidebar-settings-label">Reduce Animation</span>
           <span class="sidebar-settings-description">Minimize interface motion and transitions</span>
         </div>
@@ -180,14 +236,14 @@
     &-title {
       font-size: var(--text-12);
       font-weight: 500;
-      color: var(--neutral-50);
+      color: var(--color-text-tertiary);
       padding-left: var(--gap-2);
     }
   }
 
   .sidebar-settings-card {
-    background: var(--neutral-10);
-    border: 1px solid var(--neutral-20);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-tertiary);
     border-radius: var(--radius-8);
     display: flex;
     flex-direction: column;
@@ -216,11 +272,11 @@
 
   .sidebar-settings-description {
     font-size: var(--text-12);
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
     word-break: break-word;
 
     &.is-error {
-      color: var(--neutral-90);
+      color: var(--color-text-primary);
     }
   }
 
@@ -229,6 +285,11 @@
     align-items: center;
     justify-content: flex-end;
     gap: var(--gap-8);
+  }
+
+  .sidebar-settings-range {
+    align-self: center;
+    width: 8rem;
   }
 
   .sidebar-settings-row > :global(.switch),
@@ -253,7 +314,7 @@
 
   .sidebar-settings-file-button {
     pointer-events: none;
-    background: var(--neutral-20);
+    background: var(--color-surface-interactive);
     padding: var(--gap-6) var(--gap-8);
     border-radius: var(--radius-6);
     font-size: var(--text-13);

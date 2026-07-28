@@ -94,7 +94,7 @@
     gap: var(--gap-2);
     padding: var(--gap-6);
     border-radius: var(--radius-6);
-    border: 1px solid var(--neutral-40);
+    border: 1px solid var(--color-border-secondary);
     user-select: none;
     touch-action: none;
   }
@@ -103,13 +103,13 @@
     appearance: none;
     border: none;
     border-radius: var(--radius-2);
-    background: var(--neutral-20);
+    background: var(--color-surface-interactive);
     aspect-ratio: 1 / 1;
     padding: 0;
     cursor: pointer;
 
     &.is-selected {
-      background: var(--device-control-accent, var(--neutral-90));
+      background: var(--device-control-accent, var(--color-surface-inverse));
     }
   }
 </style>

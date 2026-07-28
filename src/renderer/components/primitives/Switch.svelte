@@ -58,16 +58,16 @@
     padding: 0;
     border: 0;
     border-radius: var(--radius-round);
-    background: var(--neutral-40);
+    background: var(--color-surface-emphasis);
     cursor: pointer;
     transition: background-color 200ms ease;
     -webkit-app-region: no-drag;
 
     &.is-checked {
-      background: var(--neutral-90);
+      background: var(--color-surface-inverse);
 
       .switch-thumb {
-        background: var(--neutral-10);
+        background: var(--color-surface);
       }
     }
 
@@ -84,7 +84,7 @@
     width: var(--gap-12);
     height: var(--gap-12);
     border-radius: var(--radius-round);
-    background: var(--neutral-90);
+    background: var(--color-surface-inverse);
     pointer-events: none;
     transition: background-color 200ms ease;
   }

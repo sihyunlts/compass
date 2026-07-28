@@ -292,7 +292,7 @@
     flex: 0 0 auto;
     cursor: n-resize;
     touch-action: none;
-    background-color: var(--neutral-20);
+    background-color: var(--color-surface-interactive);
 
     &-ring {
       position: absolute;
@@ -305,12 +305,12 @@
       width: 0.5rem;
       height: 0.5rem;
       border-radius: var(--radius-round);
-      background: var(--device-control-accent, var(--neutral-90));
+      background: var(--device-control-accent, var(--color-surface-inverse));
       transform: rotate(var(--angle-deg)) translateY(-0.75rem);
     }
 
     &:focus-visible {
-      outline: 2px solid var(--device-control-accent, var(--neutral-90));
+      outline: 2px solid var(--device-control-accent, var(--color-surface-inverse));
       outline-offset: 2px;
     }
   }

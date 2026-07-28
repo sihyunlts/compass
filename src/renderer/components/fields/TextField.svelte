@@ -52,19 +52,19 @@
     display: grid;
     gap: var(--gap-6);
     min-width: 0;
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
     font-size: var(--text-12);
 
     input {
       width: 100%;
       box-sizing: border-box;
-      color: var(--neutral-90);
+      color: var(--color-text-primary);
       padding: var(--gap-6) var(--gap-8);
       font-size: var(--text-13);
     }
   }
 
   .text-field-label {
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
   }
 </style>

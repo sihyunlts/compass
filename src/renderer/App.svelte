@@ -457,6 +457,8 @@
       canToggleWindowLayer={!isWebFallback}
       {mainWindowAlwaysOnTop}
       reduceAnimation={settingsState.reduceAnimation}
+      themeHue={settingsState.themeHue}
+      themeSaturation={settingsState.themeSaturation}
       activePage={uiState.sidebarPage}
       deviceTree={DEVICE_BROWSER_TREE}
       presetTree={presetState.presetTree}
@@ -478,6 +480,10 @@
       onMainWindowAlwaysOnTopToggle={() => void handleMainWindowAlwaysOnTopToggle()}
       onReduceAnimationToggle={(enabled) =>
         settingsController.handleReduceAnimationToggle(enabled)}
+      onThemeHueChange={(hue) => settingsController.handleThemeHueChange(hue)}
+      onThemeSaturationChange={(saturation) =>
+        settingsController.handleThemeSaturationChange(saturation)}
+      onThemeReset={() => settingsController.handleThemeReset()}
       onDeviceAdd={editorSession.commands.addBrowserDevice}
       onBrowserPointerDown={editorSession.commands.handleBrowserPointerDown}
       onOpenContextMenu={(x, y, target) => contextMenuComponent?.open(x, y, target)}

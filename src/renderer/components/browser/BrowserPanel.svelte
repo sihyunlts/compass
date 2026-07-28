@@ -230,6 +230,8 @@
     canToggleWindowLayer = false,
     mainWindowAlwaysOnTop = false,
     reduceAnimation = false,
+    themeHue = 265,
+    themeSaturation = 100,
     launchpadMk2Enabled = false,
     paletteDescription = 'Default palette',
     paletteDescriptionTone = 'neutral',
@@ -242,6 +244,9 @@
     onPageSelect = () => {},
     onMainWindowAlwaysOnTopToggle = () => {},
     onReduceAnimationToggle = () => {},
+    onThemeHueChange = () => {},
+    onThemeSaturationChange = () => {},
+    onThemeReset = () => {},
     onDeviceAdd,
     onBrowserPointerDown,
     onOpenContextMenu = () => {},
@@ -268,6 +273,8 @@
     canToggleWindowLayer?: boolean;
     mainWindowAlwaysOnTop?: boolean;
     reduceAnimation?: boolean;
+    themeHue?: number;
+    themeSaturation?: number;
     launchpadMk2Enabled?: boolean;
     paletteDescription?: string;
     paletteDescriptionTone?: 'neutral' | 'error';
@@ -280,6 +287,9 @@
     onPageSelect?: (page: BrowserPanelPage) => void;
     onMainWindowAlwaysOnTopToggle?: () => void;
     onReduceAnimationToggle?: (enabled: boolean) => void;
+    onThemeHueChange?: (hue: number) => void;
+    onThemeSaturationChange?: (saturation: number) => void;
+    onThemeReset?: () => void;
     onDeviceAdd: (kind: RendererDeviceKind) => void;
     onBrowserPointerDown: (payload: BrowserPointerDownPayload) => void;
     onOpenContextMenu?: (
@@ -709,6 +719,8 @@
         <SidebarSettingsPage
           {launchpadMk2Enabled}
           {reduceAnimation}
+          {themeHue}
+          {themeSaturation}
           {paletteDescription}
           {paletteDescriptionTone}
           {appVersionText}
@@ -719,6 +731,9 @@
           {githubDescription}
           onLaunchpadModelToggle={onLaunchpadModelToggle}
           onReduceAnimationToggle={onReduceAnimationToggle}
+          onThemeHueChange={onThemeHueChange}
+          onThemeSaturationChange={onThemeSaturationChange}
+          onThemeReset={onThemeReset}
           onPaletteReset={onPaletteReset}
           onPaletteFileChange={onPaletteFileChange}
           onOpenAboutSite={onOpenAboutSite}
@@ -849,8 +864,8 @@
     min-width: 0;
     min-height: 0;
     padding: var(--gap-10);
-    background: var(--neutral-10);
-    border-right: 1px solid var(--neutral-20);
+    background: var(--color-surface);
+    border-right: 1px solid var(--color-border-tertiary);
 
     &.has-titlebar-spacer {
       --floating-layer-viewport-top: 48px;
@@ -904,8 +919,8 @@
 
   :global(.button.browser-page-switch-button) {
     position: relative;
-    color: var(--neutral-90);
-    background: var(--neutral-20);
+    color: var(--color-text-primary);
+    background: var(--color-surface-interactive);
   }
 
   :global(.button.browser-page-switch-button.has-update-indicator)::after {
@@ -916,12 +931,12 @@
     width: 0.35rem;
     height: 0.35rem;
     border-radius: var(--radius-round);
-    background: var(--neutral-90);
+    background: var(--color-surface-inverse);
   }
 
   :global(.button.browser-page-switch-button.is-active) {
-    color: var(--neutral-00);
-    background: var(--neutral-90);
+    color: var(--color-text-inverse);
+    background: var(--color-surface-inverse);
   }
 
   .browser-page-panel {
@@ -939,7 +954,7 @@
     list-style: none;
 
     li.is-selected {
-      background: var(--neutral-20);
+      background: var(--color-surface-interactive);
       border-radius: var(--radius-4);
     }
   }
@@ -957,7 +972,7 @@
     border: 0;
     padding: 0;
     background: transparent;
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
     cursor: pointer;
 
     .material-symbols-rounded {
@@ -991,7 +1006,7 @@
     &-icon {
       font-size: var(--text-14);
       line-height: 1;
-      color: var(--browser-icon-accent, var(--neutral-60));
+      color: var(--browser-icon-accent, var(--color-text-secondary));
       font-variation-settings: 'FILL' 1, 'wght' 400;
     }
 
@@ -1015,10 +1030,10 @@
 
   .browser-status {
     font-size: var(--text-12);
-    color: var(--neutral-60);
+    color: var(--color-text-secondary);
 
     &-error {
-      color: var(--neutral-90);
+      color: var(--color-text-primary);
     }
   }
 </style>

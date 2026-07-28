@@ -106,7 +106,7 @@
     display: flex;
     gap: var(--gap-8);
 
-    border-left: 1px solid var(--neutral-20);
+    border-left: 1px solid var(--color-border-tertiary);
     padding: var(--gap-10);
 
     &-main {
@@ -122,13 +122,13 @@
     }
 
     :global(.button.preview-panel-control-button) {
-      color: var(--neutral-90);
-      background: var(--neutral-20);
+      color: var(--color-text-primary);
+      background: var(--color-surface-interactive);
     }
 
     :global(.button.preview-panel-control-button.is-active) {
-      color: var(--neutral-00);
-      background: var(--neutral-90);
+      color: var(--color-text-inverse);
+      background: var(--color-surface-inverse);
     }
 
     &-scrub-frame {
@@ -147,6 +147,16 @@
 
     &-scrub {
       height: 1rem;
+
+      &::-webkit-slider-thumb {
+        opacity: 0;
+      }
+
+      &:hover::-webkit-slider-thumb,
+      &:active::-webkit-slider-thumb,
+      &:focus-visible::-webkit-slider-thumb {
+        opacity: 1;
+      }
     }
 
     &-scrub-loader {
@@ -157,7 +167,7 @@
       height: 0.28rem;
       overflow: hidden;
       border-radius: var(--radius-2);
-      background: var(--neutral-40);
+      background: var(--color-surface-emphasis);
       transform: translateY(-50%);
       pointer-events: none;
     }
@@ -167,7 +177,7 @@
       inset-block: 0;
       width: 34%;
       border-radius: inherit;
-      background: var(--neutral-60);
+      background: var(--color-indicator-secondary);
       transform: translateX(-120%);
       will-change: transform;
       animation: preview-loader-slide 1.1s ease-in-out infinite;

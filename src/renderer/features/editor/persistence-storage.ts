@@ -26,6 +26,12 @@ const DEFAULT_SIDEBAR_WIDTH_PX = 240;
 const MIN_SIDEBAR_WIDTH_PX = 160;
 const MAX_SIDEBAR_WIDTH_PX = 240;
 const DEFAULT_LAUNCHPAD_MODEL: LaunchpadModel = 'mk3';
+export const DEFAULT_THEME_HUE = 265;
+export const DEFAULT_THEME_SATURATION = 100;
+const MIN_THEME_HUE = 0;
+const MAX_THEME_HUE = 360;
+const MIN_THEME_SATURATION = 0;
+const MAX_THEME_SATURATION = 100;
 
 const createDefaultChain = (): GeneratorChain => ({
   name: null,
@@ -38,6 +44,20 @@ const toBoolean = (value: unknown, fallback: boolean): boolean =>
 
 const toLaunchpadModel = (value: unknown): LaunchpadModel =>
   value === 'mk2' ? 'mk2' : DEFAULT_LAUNCHPAD_MODEL;
+
+const sanitizeNumberInRange = (
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+): number => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+
+  return Math.round(clamp(numeric, min, max));
+};
 
 /** Clamps preview BPM to the supported renderer range. */
 export const sanitizePreviewBpm = (value: unknown): number => {
@@ -153,4 +173,50 @@ export const saveReduceAnimation = (enabled: boolean): void => {
       reduceAnimation: enabled === true,
     },
   });
+};
+
+export interface ThemeSettings {
+  hue: number;
+  saturation: number;
+}
+
+/** Clamps theme values to the ranges exposed by the interface controls. */
+export const sanitizeThemeSettings = (
+  settings: Partial<ThemeSettings>,
+): ThemeSettings => ({
+  hue: sanitizeNumberInRange(
+    settings.hue,
+    MIN_THEME_HUE,
+    MAX_THEME_HUE,
+    DEFAULT_THEME_HUE,
+  ),
+  saturation: sanitizeNumberInRange(
+    settings.saturation,
+    MIN_THEME_SATURATION,
+    MAX_THEME_SATURATION,
+    DEFAULT_THEME_SATURATION,
+  ),
+});
+
+/** Loads the persisted dark-theme tint settings. */
+export const loadThemeSettings = (): ThemeSettings => {
+  const ui = readPersistedRendererState().ui;
+  return sanitizeThemeSettings({
+    hue: ui?.themeHue,
+    saturation: ui?.themeSaturation,
+  });
+};
+
+/** Persists sanitized dark-theme tint settings. */
+export const saveThemeSettings = (
+  settings: Partial<ThemeSettings>,
+): ThemeSettings => {
+  const sanitized = sanitizeThemeSettings(settings);
+  writePersistedRendererState({
+    ui: {
+      themeHue: sanitized.hue,
+      themeSaturation: sanitized.saturation,
+    },
+  });
+  return sanitized;
 };

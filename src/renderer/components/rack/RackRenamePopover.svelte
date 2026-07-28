@@ -65,9 +65,11 @@
     z-index: 43;
     min-width: 120px;
     padding: var(--gap-4);
-    border: 1px solid var(--neutral-40);
+    border: 1px solid var(--color-border-floating);
     border-radius: var(--radius-8);
-    background: var(--neutral-10);
+    background: var(--color-surface-floating);
+    backdrop-filter: blur(8px);
+    box-shadow: var(--shadow-floating);
   }
 
   .rack-rename-input {
@@ -76,7 +78,7 @@
     height: 1.75rem;
     padding: var(--gap-6) var(--gap-8);
     border-radius: var(--radius-4);
-    background: var(--neutral-20);
+    background: var(--color-surface-floating-interactive);
     font-size: var(--text-13);
   }
 </style>

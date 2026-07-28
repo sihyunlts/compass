@@ -97,23 +97,23 @@
   .center-picker-surface {
     position: relative;
     flex: 1;
-    border: 1px solid var(--neutral-40);
+    border: 1px solid var(--color-border-secondary);
     border-radius: var(--radius-4);
     cursor: crosshair;
     --picker-guide-x-color: transparent;
     --picker-guide-y-color: transparent;
-    background: var(--neutral-10);
+    background: var(--color-surface);
 
     &:active {
-      --picker-guide-x-color: var(--neutral-40);
-      --picker-guide-y-color: var(--neutral-40);
+      --picker-guide-x-color: var(--color-border-secondary);
+      --picker-guide-y-color: var(--color-border-secondary);
     }
     &:active[data-center-x-state='center'] {
-      --picker-guide-x-color: var(--device-control-accent, var(--neutral-90));
+      --picker-guide-x-color: var(--device-control-accent, var(--color-surface-inverse));
     }
 
     &:active[data-center-y-state='center'] {
-      --picker-guide-y-color: var(--device-control-accent, var(--neutral-90));
+      --picker-guide-y-color: var(--device-control-accent, var(--color-surface-inverse));
     }
 
     &::before {
@@ -143,7 +143,7 @@
       width: 0.5rem;
       height: 0.5rem;
       border-radius: var(--radius-round);
-      background: var(--device-control-accent, var(--neutral-90));
+      background: var(--device-control-accent, var(--color-surface-inverse));
       transform: translate(-50%, -50%);
       z-index: 3;
     }
@@ -153,7 +153,7 @@
     position: absolute;
     pointer-events: none;
     z-index: 1;
-    background: var(--neutral-20);
+    background: var(--color-surface-interactive);
 
     &.is-vertical {
       top: 0;

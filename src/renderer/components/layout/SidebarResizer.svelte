@@ -113,13 +113,13 @@
     &:hover,
     &.is-active {
       &::before {
-        background: var(--neutral-40);
+        background: var(--color-surface-emphasis);
       }
     }
 
     :global(#app.is-sidebar-resizing) & {
       &::before {
-        background-color: var(--neutral-40);
+        background-color: var(--color-surface-emphasis);
       }
     }
   }
