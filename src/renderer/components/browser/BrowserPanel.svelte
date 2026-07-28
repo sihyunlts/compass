@@ -20,6 +20,10 @@
   } from '../../features/browser/types';
   import type { ContextMenuTarget } from '../../features/context-menu/types';
   import type { BrowserInsertSource } from '../../features/rack/types';
+  import type {
+    ThemePresetId,
+    ThemeSelectionId,
+  } from '../../theme-presets';
 
   export type BrowserPanelPage = 'devices' | 'presets' | 'settings';
 
@@ -230,6 +234,7 @@
     canToggleWindowLayer = false,
     mainWindowAlwaysOnTop = false,
     reduceAnimation = false,
+    themePreset = 'default',
     themeHue = 265,
     themeSaturation = 100,
     launchpadMk2Enabled = false,
@@ -244,9 +249,9 @@
     onPageSelect = () => {},
     onMainWindowAlwaysOnTopToggle = () => {},
     onReduceAnimationToggle = () => {},
+    onThemePresetChange = () => {},
     onThemeHueChange = () => {},
     onThemeSaturationChange = () => {},
-    onThemeReset = () => {},
     onDeviceAdd,
     onBrowserPointerDown,
     onOpenContextMenu = () => {},
@@ -273,6 +278,7 @@
     canToggleWindowLayer?: boolean;
     mainWindowAlwaysOnTop?: boolean;
     reduceAnimation?: boolean;
+    themePreset?: ThemeSelectionId;
     themeHue?: number;
     themeSaturation?: number;
     launchpadMk2Enabled?: boolean;
@@ -287,9 +293,9 @@
     onPageSelect?: (page: BrowserPanelPage) => void;
     onMainWindowAlwaysOnTopToggle?: () => void;
     onReduceAnimationToggle?: (enabled: boolean) => void;
+    onThemePresetChange?: (presetId: ThemePresetId) => void;
     onThemeHueChange?: (hue: number) => void;
     onThemeSaturationChange?: (saturation: number) => void;
-    onThemeReset?: () => void;
     onDeviceAdd: (kind: RendererDeviceKind) => void;
     onBrowserPointerDown: (payload: BrowserPointerDownPayload) => void;
     onOpenContextMenu?: (
@@ -719,6 +725,7 @@
         <SidebarSettingsPage
           {launchpadMk2Enabled}
           {reduceAnimation}
+          {themePreset}
           {themeHue}
           {themeSaturation}
           {paletteDescription}
@@ -731,9 +738,9 @@
           {githubDescription}
           onLaunchpadModelToggle={onLaunchpadModelToggle}
           onReduceAnimationToggle={onReduceAnimationToggle}
+          onThemePresetChange={onThemePresetChange}
           onThemeHueChange={onThemeHueChange}
           onThemeSaturationChange={onThemeSaturationChange}
-          onThemeReset={onThemeReset}
           onPaletteReset={onPaletteReset}
           onPaletteFileChange={onPaletteFileChange}
           onOpenAboutSite={onOpenAboutSite}

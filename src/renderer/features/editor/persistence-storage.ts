@@ -12,6 +12,7 @@ import {
   readPersistedRendererState,
   writePersistedRendererState,
 } from '../../persisted-state';
+import { DEFAULT_THEME_PRESET } from '../../theme-presets';
 import {
   createInitialChainDevices,
   syncDeviceNodeIdSeeds,
@@ -26,8 +27,8 @@ const DEFAULT_SIDEBAR_WIDTH_PX = 240;
 const MIN_SIDEBAR_WIDTH_PX = 160;
 const MAX_SIDEBAR_WIDTH_PX = 240;
 const DEFAULT_LAUNCHPAD_MODEL: LaunchpadModel = 'mk3';
-export const DEFAULT_THEME_HUE = 265;
-export const DEFAULT_THEME_SATURATION = 100;
+const DEFAULT_THEME_HUE = DEFAULT_THEME_PRESET.hue;
+const DEFAULT_THEME_SATURATION = DEFAULT_THEME_PRESET.saturation;
 const MIN_THEME_HUE = 0;
 const MAX_THEME_HUE = 360;
 const MIN_THEME_SATURATION = 0;

@@ -2,12 +2,16 @@ import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { UpdateCheckResponse } from '../../shared/contracts/ipc/releases';
 import type { EditorSession } from '../features/editor/session.svelte';
 import {
-  DEFAULT_THEME_HUE,
-  DEFAULT_THEME_SATURATION,
   loadReduceAnimation,
   loadThemeSettings,
   saveReduceAnimation,
 } from '../features/editor/persistence-storage';
+import {
+  findThemePreset,
+  resolveThemeSelection,
+  type ThemePresetId,
+  type ThemeSelectionId,
+} from '../theme-presets';
 import type { PlaybackSessionController } from './playback-session.svelte';
 import { createPaletteController, PaletteParseError } from './palette-controller';
 import { updateThemeSettings } from './theme';
@@ -20,6 +24,7 @@ interface SettingsControllerState {
   updateCheckText: string;
   updateAvailable: boolean;
   reduceAnimation: boolean;
+  themePreset: ThemeSelectionId;
   themeHue: number;
   themeSaturation: number;
   paletteRevision: number;
@@ -43,6 +48,10 @@ class SettingsController {
     updateCheckText: '',
     updateAvailable: false,
     reduceAnimation: loadReduceAnimation(),
+    themePreset: resolveThemeSelection(
+      this.initialTheme.hue,
+      this.initialTheme.saturation,
+    ),
     themeHue: this.initialTheme.hue,
     themeSaturation: this.initialTheme.saturation,
     paletteRevision: 0,
@@ -145,21 +154,25 @@ class SettingsController {
 
   public handleThemeHueChange(hue: number): void {
     const next = updateThemeSettings({ hue });
+    this.state.themePreset = 'custom';
     this.state.themeHue = next.hue;
     this.state.themeSaturation = next.saturation;
   }
 
   public handleThemeSaturationChange(saturation: number): void {
     const next = updateThemeSettings({ saturation });
+    this.state.themePreset = 'custom';
     this.state.themeHue = next.hue;
     this.state.themeSaturation = next.saturation;
   }
 
-  public handleThemeReset(): void {
+  public handleThemePresetChange(presetId: ThemePresetId): void {
+    const preset = findThemePreset(presetId);
     const next = updateThemeSettings({
-      hue: DEFAULT_THEME_HUE,
-      saturation: DEFAULT_THEME_SATURATION,
+      hue: preset.hue,
+      saturation: preset.saturation,
     });
+    this.state.themePreset = preset.id;
     this.state.themeHue = next.hue;
     this.state.themeSaturation = next.saturation;
   }

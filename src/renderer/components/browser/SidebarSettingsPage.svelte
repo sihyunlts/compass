@@ -1,10 +1,26 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
+
   import Button from '../primitives/Button.svelte';
+  import DropdownSelect from '../primitives/DropdownSelect.svelte';
   import Switch from '../primitives/Switch.svelte';
+  import type { DropdownOption } from '../primitives/dropdown-types';
+  import {
+    isThemePresetId,
+    THEME_PRESETS,
+    type ThemePresetId,
+    type ThemeSelectionId,
+  } from '../../theme-presets';
+
+  const themeOptions: readonly DropdownOption[] = THEME_PRESETS.map((preset) => ({
+    value: preset.id,
+    label: preset.label,
+  }));
 
   let {
     launchpadMk2Enabled,
     reduceAnimation,
+    themePreset,
     themeHue,
     themeSaturation,
     paletteDescription,
@@ -17,9 +33,9 @@
     githubDescription,
     onLaunchpadModelToggle,
     onReduceAnimationToggle,
+    onThemePresetChange,
     onThemeHueChange,
     onThemeSaturationChange,
-    onThemeReset,
     onPaletteReset,
     onPaletteFileChange,
     onOpenAboutSite,
@@ -28,6 +44,7 @@
   } = $props<{
     launchpadMk2Enabled: boolean;
     reduceAnimation: boolean;
+    themePreset: ThemeSelectionId;
     themeHue: number;
     themeSaturation: number;
     paletteDescription: string;
@@ -40,15 +57,45 @@
     githubDescription: string;
     onLaunchpadModelToggle: (enabled: boolean) => void;
     onReduceAnimationToggle: (enabled: boolean) => void;
+    onThemePresetChange: (presetId: ThemePresetId) => void;
     onThemeHueChange: (hue: number) => void;
     onThemeSaturationChange: (saturation: number) => void;
-    onThemeReset: () => void;
     onPaletteReset: () => void;
     onPaletteFileChange: (event: Event) => void | Promise<void>;
     onOpenAboutSite: () => void | Promise<void>;
     onOpenGitHub: () => void | Promise<void>;
     onOpenLatestReleasePage: () => void | Promise<void>;
   }>();
+
+  const handleThemePresetChange = (value: string | number): void => {
+    if (isThemePresetId(value)) {
+      onThemePresetChange(value);
+    }
+  };
+
+  let themeAdjustingTimer: number | null = null;
+
+  const handleThemeInput = (
+    onChange: (value: number) => void,
+    value: number,
+  ): void => {
+    document.documentElement.classList.add('is-theme-adjusting');
+    if (themeAdjustingTimer !== null) {
+      window.clearTimeout(themeAdjustingTimer);
+    }
+    themeAdjustingTimer = window.setTimeout(() => {
+      themeAdjustingTimer = null;
+      document.documentElement.classList.remove('is-theme-adjusting');
+    }, 100);
+    onChange(value);
+  };
+
+  onDestroy(() => {
+    if (themeAdjustingTimer !== null) {
+      window.clearTimeout(themeAdjustingTimer);
+    }
+    document.documentElement.classList.remove('is-theme-adjusting');
+  });
 </script>
 
 <section class="sidebar-settings-page">
@@ -120,17 +167,33 @@
     <div class="sidebar-settings-card">
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
+          <span class="sidebar-settings-label">Theme</span>
+          <span class="sidebar-settings-description">Choose a color preset</span>
+        </div>
+        <DropdownSelect
+          class="sidebar-settings-theme-select"
+          value={themePreset}
+          valueLabel={themePreset === 'custom' ? 'Custom' : undefined}
+          options={themeOptions}
+          ariaLabel="Theme"
+          onValueChange={handleThemePresetChange}
+        />
+      </div>
+
+      <div class="sidebar-settings-row">
+        <div class="sidebar-settings-info">
           <span class="sidebar-settings-label">Hue</span>
           <span class="sidebar-settings-description">{themeHue}°</span>
         </div>
         <input
-          class="sidebar-settings-range"
+          class="sidebar-settings-range sidebar-settings-hue-range"
           type="range"
           min="0"
           max="360"
           value={themeHue}
           aria-label="Theme Hue"
-          oninput={(event) => onThemeHueChange(event.currentTarget.valueAsNumber)}
+          oninput={(event) =>
+            handleThemeInput(onThemeHueChange, event.currentTarget.valueAsNumber)}
         />
       </div>
 
@@ -140,25 +203,14 @@
           <span class="sidebar-settings-description">{themeSaturation}%</span>
         </div>
         <input
-          class="sidebar-settings-range"
+          class="sidebar-settings-range sidebar-settings-saturation-range"
           type="range"
           min="0"
           max="100"
           value={themeSaturation}
           aria-label="Theme Saturation"
-          oninput={(event) => onThemeSaturationChange(event.currentTarget.valueAsNumber)}
-        />
-      </div>
-
-      <div class="sidebar-settings-row">
-        <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">Reset Theme</span>
-          <span class="sidebar-settings-description">Restore the default theme colors</span>
-        </div>
-        <Button
-          id="theme-reset"
-          text="Reset"
-          onClick={() => onThemeReset()}
+          oninput={(event) =>
+            handleThemeInput(onThemeSaturationChange, event.currentTarget.valueAsNumber)}
         />
       </div>
     </div>
@@ -290,6 +342,36 @@
   .sidebar-settings-range {
     align-self: center;
     width: 8rem;
+  }
+
+  .sidebar-settings-hue-range {
+    --range-track-background: linear-gradient(
+      to right,
+      oklch(65% 0.14 0),
+      oklch(65% 0.14 60),
+      oklch(65% 0.14 120),
+      oklch(65% 0.14 180),
+      oklch(65% 0.14 240),
+      oklch(65% 0.14 300),
+      oklch(65% 0.14 360)
+    );
+  }
+
+  .sidebar-settings-saturation-range {
+    --range-track-background: linear-gradient(
+      to right,
+      oklch(65% 0 var(--theme-hue)),
+      oklch(65% 0.14 var(--theme-hue))
+    );
+  }
+
+  :global(.sidebar-settings-theme-select) {
+    align-self: center;
+    --dropdown-select-radius: var(--radius-6);
+  }
+
+  :global(.sidebar-settings-theme-select .dropdown-select-trigger) {
+    width: 6rem;
   }
 
   .sidebar-settings-row > :global(.switch),

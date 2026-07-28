@@ -11,6 +11,7 @@
     value,
     options,
     ariaLabel,
+    valueLabel,
     showHint = false,
     disabled = false,
     class: className = '',
@@ -20,6 +21,7 @@
     value: DropdownValue;
     options: readonly DropdownOption[];
     ariaLabel: string;
+    valueLabel?: string;
     showHint?: boolean;
     disabled?: boolean;
     class?: string;
@@ -32,7 +34,7 @@
 
   const selectedOption = $derived.by(() =>
     options.find((option) => String(option.value) === String(value)) ?? options[0] ?? null);
-  const triggerText = $derived(selectedOption?.label ?? '');
+  const triggerText = $derived(valueLabel ?? selectedOption?.label ?? '');
   const hasEnabledOptions = $derived(options.some((option) => !option.disabled));
   const isDisabled = $derived(disabled || !hasEnabledOptions);
   const rootClass = $derived(`dropdown-select ${className}`.trim());
