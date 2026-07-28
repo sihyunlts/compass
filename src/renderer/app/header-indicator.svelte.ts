@@ -9,8 +9,16 @@ interface HeaderIndicatorOptions {
   fadeOutMs?: number;
 }
 
+type HeaderIndicatorPriority = 'normal' | 'high';
+
 interface HeaderIndicatorShowOptions {
   autoClear?: boolean;
+  priority?: HeaderIndicatorPriority;
+}
+
+interface PendingHeaderIndicatorMessage {
+  text: string;
+  options: HeaderIndicatorShowOptions;
 }
 
 interface HeaderIndicatorState {
@@ -31,6 +39,12 @@ export class HeaderIndicatorController {
 
   private fadeOutTimer: number | null = null;
 
+  private activePriority: HeaderIndicatorPriority = 'normal';
+
+  private activeMessage: PendingHeaderIndicatorMessage | null = null;
+
+  private pendingMessage: PendingHeaderIndicatorMessage | null = null;
+
   public constructor(
     private readonly source: HeaderIndicatorSource,
     private readonly options: HeaderIndicatorOptions = {},
@@ -40,7 +54,27 @@ export class HeaderIndicatorController {
     text: string,
     options: HeaderIndicatorShowOptions = {},
   ): void {
+    const priority = options.priority ?? 'normal';
+    if (
+      this.source.getText().trim()
+      && this.activePriority === 'high'
+      && priority === 'normal'
+    ) {
+      this.pendingMessage = { text, options };
+      return;
+    }
+
+    if (
+      priority === 'high'
+      && this.activePriority === 'normal'
+      && this.activeMessage?.options.autoClear === false
+    ) {
+      this.pendingMessage = this.activeMessage;
+    }
+
     this.source.setText(text);
+    this.activePriority = priority;
+    this.activeMessage = { text, options };
     this.clearVisibilityTimer();
     if (options.autoClear === false) {
       return;
@@ -50,12 +84,18 @@ export class HeaderIndicatorController {
       this.visibilityTimer = null;
       if (this.source.getText() === text) {
         this.source.clearText();
+        this.activePriority = 'normal';
+        this.activeMessage = null;
+        this.showPendingMessage();
       }
     }, this.options.visibilityMs ?? DEFAULT_VISIBILITY_MS);
   }
 
   public clear(): void {
     this.clearVisibilityTimer();
+    this.activeMessage = null;
+    this.pendingMessage = null;
+    this.activePriority = 'normal';
     this.source.clearText();
   }
 
@@ -86,6 +126,8 @@ export class HeaderIndicatorController {
   public dispose(): void {
     this.clearVisibilityTimer();
     this.clearFadeOutTimer();
+    this.activeMessage = null;
+    this.pendingMessage = null;
   }
 
   private clearVisibilityTimer(): void {
@@ -104,6 +146,14 @@ export class HeaderIndicatorController {
 
     window.clearTimeout(this.fadeOutTimer);
     this.fadeOutTimer = null;
+  }
+
+  private showPendingMessage(): void {
+    const pending = this.pendingMessage;
+    this.pendingMessage = null;
+    if (pending) {
+      this.show(pending.text, pending.options);
+    }
   }
 }
 

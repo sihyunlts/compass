@@ -3,7 +3,7 @@
    * Main renderer composition root.
    * Delegates non-visual orchestration to renderer/app modules and keeps UI wiring here.
    */
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
 
   import { clamp } from '../shared/math';
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
@@ -39,6 +39,7 @@
   import { mountKeyboardShortcuts } from './app/keyboard-shortcuts';
   import { createPlaybackSession } from './app/playback-session.svelte';
   import { createSendFlow } from './app/send-flow';
+  import { setKaguyaThemeEnabled } from './app/theme';
   import {
     createEditorSession,
     type EditorRackBinding,
@@ -142,6 +143,9 @@
   });
   let rackMiniMapContentRevision = $state(0);
   const currentPreviewBeatBeats = $derived(playbackSession.state.currentBeat);
+  const isKaguyaRack = $derived(
+    presetState.currentRackDisplayName.trim().toLowerCase() === 'kaguya',
+  );
   const currentPreviewProgress01 = $derived.by(() => {
     const sourceTimelineEndBeat = previewState.sourceTimelineEndBeat;
     if (!Number.isFinite(sourceTimelineEndBeat) || sourceTimelineEndBeat <= 0) {
@@ -157,6 +161,21 @@
     void presetState.currentRackFilePath;
     void presetState.isRackDirty;
     presetController.syncMainWindowDocumentState();
+  });
+
+  $effect(() => {
+    const enabled = isKaguyaRack;
+    setKaguyaThemeEnabled(enabled);
+    if (enabled) {
+      untrack(() => {
+        headerIndicator.show('かぐやっほー！', { priority: 'high' });
+      });
+    }
+    return () => {
+      if (enabled) {
+        setKaguyaThemeEnabled(false);
+      }
+    };
   });
 
   const createRackBinding = (): EditorRackBinding | null => {
