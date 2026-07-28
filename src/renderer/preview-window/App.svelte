@@ -20,7 +20,6 @@
 
   const isPlaying = $derived(previewState?.isPlaying === true);
   const isLoopEnabled = $derived(previewState?.isLoopEnabled === true);
-  const isPreviewReady = $derived(previewState !== null && previewState.noteCount > 0);
   const playButtonIcon = $derived(isPlaying ? 'pause' : 'play_arrow');
   const playButtonLabel = $derived(isPlaying ? 'Pause preview' : 'Play preview');
   const playButtonHint = $derived(isPlaying ? 'Pause' : 'Play');
@@ -110,7 +109,6 @@
         label={playButtonLabel}
         title={playButtonHint}
         icon={playButtonIcon}
-        disabled={!isPreviewReady}
         onClick={handlePlayClick}
       />
       <Button
