@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import { hint } from '../overlays/hint';
+  import { buttonPress } from './button-press.svelte';
   import FloatingDropdown from './FloatingDropdown.svelte';
   import DropdownOptionList from './DropdownOptionList.svelte';
   import type { DropdownOption, DropdownValue } from './dropdown-types';
@@ -69,6 +70,7 @@
     aria-expanded={isOpen}
     disabled={isDisabled}
     use:hint={showHint ? ariaLabel : undefined}
+    use:buttonPress
     onclick={() => isOpen = !isOpen}
     onkeydown={handleTriggerKeyDown}
   >
@@ -108,11 +110,14 @@
     height: 1.75rem;
     padding: var(--gap-4) var(--gap-4) var(--gap-4) var(--gap-6);
     border: 0;
-    border-radius: var(--radius-4);
+    border-radius: var(--dropdown-select-radius, var(--radius-4));
     background: var(--color-surface-interactive);
     color: var(--color-text-primary);
     font-size: var(--text-13);
     cursor: pointer;
+    transition:
+      background-color 80ms linear,
+      color 80ms linear;
 
     &:focus-visible {
       outline: 1px solid var(--color-border-secondary);
@@ -124,6 +129,7 @@
       opacity: 0.6;
     }
 
+    &:not(:disabled):hover,
     &[aria-expanded='true'] {
       background: var(--color-surface-active);
     }

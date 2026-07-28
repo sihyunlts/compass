@@ -74,6 +74,8 @@
   }
 
   &-length-select {
+    --dropdown-select-radius: var(--radius-6);
+
     display: inline-flex;
     align-items: center;
     gap: var(--gap-6);
@@ -82,7 +84,7 @@
 
     .dropdown-select,
     .dropdown-select-trigger {
-      width: 5rem;
+      width: 4rem;
     }
   }
 

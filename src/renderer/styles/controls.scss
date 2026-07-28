@@ -220,10 +220,17 @@ html.reduce-animation {
     inset: -1px 0;
   }
 
-  &:hover,
-  &:focus-visible {
+  &:not(:disabled):not([aria-disabled='true']):not(.is-disabled):hover,
+  &:not(:disabled):not([aria-disabled='true']):not(.is-disabled):focus-visible {
     background: var(--color-surface-floating-interactive);
     outline: none;
+  }
+
+  &:disabled,
+  &[aria-disabled='true'],
+  &.is-disabled {
+    color: var(--color-text-tertiary);
+    cursor: default;
   }
 }
 

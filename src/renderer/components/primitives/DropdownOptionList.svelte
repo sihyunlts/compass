@@ -158,13 +158,8 @@
       background: transparent;
     }
 
-    &.is-selected:hover {
+    &.is-selected:not(.is-disabled):hover {
       background: var(--color-surface-floating-interactive);
-    }
-
-    &.is-disabled {
-      cursor: default;
-      color: var(--color-text-secondary);
     }
   }
 

@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import { hint } from '../overlays/hint';
+  import { buttonPress } from './button-press.svelte';
 
   type SplitButtonVariant = 'secondary' | 'primary' | 'outline';
   type ButtonType = 'button' | 'submit' | 'reset';
@@ -56,7 +57,10 @@
   };
 </script>
 
-<div class={rootClass}>
+<div
+  class={rootClass}
+  use:buttonPress
+>
   {#if onClick}
     <button
       {...rest}
@@ -108,6 +112,9 @@
     }
 
     &-primary {
+      --split-button-hover-background: transparent;
+      --split-button-hover-color: inherit;
+
       background: var(--color-surface-inverse);
       color: var(--color-text-inverse);
     }
@@ -130,10 +137,18 @@
       cursor: pointer;
       white-space: nowrap;
       -webkit-app-region: no-drag;
+      transition:
+        background-color 80ms linear,
+        color 80ms linear;
 
       &:disabled {
         cursor: default;
         opacity: 0.6;
+      }
+
+      &:not(:disabled):hover {
+        background: var(--split-button-hover-background, var(--color-surface-active));
+        color: var(--split-button-hover-color, var(--color-text-primary));
       }
     }
 
@@ -165,7 +180,7 @@
       justify-content: center;
 
       &[aria-expanded='true'] {
-        background: var(--color-surface-active);
+        background: var(--split-button-expanded-background, var(--color-surface-active));
       }
 
       .material-symbols-rounded {

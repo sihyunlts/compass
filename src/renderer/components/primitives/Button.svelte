@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import { hint } from '../overlays/hint';
+  import { buttonPress } from './button-press.svelte';
 
   type ButtonVariant = 'secondary' | 'primary' | 'icon';
   type ButtonType = 'button' | 'submit' | 'reset';
@@ -50,6 +51,7 @@
   aria-pressed={pressed}
   {disabled}
   use:hint={hintText}
+  use:buttonPress
   onclick={onClick}
 >
   {#if isIconButton}
@@ -71,15 +73,13 @@
     font-size: var(--text-13);
     cursor: pointer;
     white-space: nowrap;
+    transition:
+      background-color 80ms linear,
+      color 80ms linear;
 
     &:disabled {
       cursor: default;
       color: var(--button-disabled-color);
-    }
-
-    &.is-active {
-      background: var(--color-surface-inverse);
-      color: var(--color-text-inverse);
     }
 
     &-primary {
@@ -102,6 +102,16 @@
         line-height: 1;
         font-variation-settings: 'FILL' 1, 'wght' 400;
       }
+    }
+
+    &:not(:disabled):not(.button-primary):not(.is-active):hover {
+      background: var(--color-surface-active);
+      color: var(--color-text-primary);
+    }
+
+    &.is-active {
+      background: var(--color-surface-inverse);
+      color: var(--color-text-inverse);
     }
   }
 </style>

@@ -119,6 +119,9 @@
 
 <style lang="scss">
   .workspace-rack-title {
+    --split-button-expanded-background: var(--color-surface-interactive);
+    --split-button-hover-background: var(--color-surface-interactive);
+
     display: inline-flex;
     align-items: center;
     flex: 0 1 auto;
