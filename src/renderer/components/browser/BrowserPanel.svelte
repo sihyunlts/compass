@@ -919,8 +919,6 @@
 
   :global(.button.browser-page-switch-button) {
     position: relative;
-    color: var(--color-text-primary);
-    background: var(--color-surface-interactive);
   }
 
   :global(.button.browser-page-switch-button.has-update-indicator)::after {
@@ -931,11 +929,6 @@
     width: 0.35rem;
     height: 0.35rem;
     border-radius: var(--radius-round);
-    background: var(--color-surface-inverse);
-  }
-
-  :global(.button.browser-page-switch-button.is-active) {
-    color: var(--color-text-inverse);
     background: var(--color-surface-inverse);
   }
 

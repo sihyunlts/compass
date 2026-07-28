@@ -121,16 +121,6 @@
       gap: var(--gap-6);
     }
 
-    :global(.button.preview-panel-control-button) {
-      color: var(--color-text-primary);
-      background: var(--color-surface-interactive);
-    }
-
-    :global(.button.preview-panel-control-button.is-active) {
-      color: var(--color-text-inverse);
-      background: var(--color-surface-inverse);
-    }
-
     &-scrub-frame {
       position: relative;
       height: 1rem;

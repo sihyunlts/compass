@@ -78,8 +78,8 @@
     }
 
     &.is-active {
-      background: var(--color-surface-active);
-      color: var(--color-text-primary);
+      background: var(--color-surface-inverse);
+      color: var(--color-text-inverse);
     }
 
     &-primary {
