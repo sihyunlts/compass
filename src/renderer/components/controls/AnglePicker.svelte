@@ -1,12 +1,10 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
-  import { onMount } from 'svelte';
   import type { RendererControlChange } from '../../../devices/control-types';
   import {
     formatNumericParameterDisplayValue,
     formatNumericParameterValue,
-    normalizeNumericParameterValue,
     type NumericParameterRule,
   } from '../../../devices/numeric-parameters';
   import FieldShell from '../fields/FieldShell.svelte';
@@ -42,22 +40,9 @@
   const dialMin = $derived(resolvedMin ?? 0);
   const dialMax = $derived(resolvedMax ?? 360);
   const valueSpan = $derived(Math.max(dialMax - dialMin, 0));
-  const hasFiniteRange = $derived(
-    resolvedMin !== undefined
-    && resolvedMax !== undefined
-    && resolvedMax > resolvedMin,
-  );
 
   const numberLabel = $derived(`${label} input`);
   const dialLabel = $derived(`${label} dial`);
-
-  let dialEl = $state<HTMLElement | null>(null);
-  let dialInputEl = $state<HTMLInputElement | null>(null);
-  let activePointerId = $state<number | null>(null);
-  let lastPointerX = $state(0);
-  let lastPointerY = $state(0);
-  let dragRawValue = $state(0);
-  let isPointerLocked = $state(false);
 
   const stepDecimals = $derived.by(() => {
     const stepText = String(resolvedStep);
@@ -90,54 +75,6 @@
       ? formatNumericParameterDisplayValue(parameter, value, valueText)
       : formatNumericParameterValue(valueText, resolvedUnit),
   );
-  const dragSensitivity = $derived(
-    hasFiniteRange
-      ? Math.max(((resolvedMax as number) - (resolvedMin as number)) / 480, resolvedStep)
-      : resolvedStep,
-  );
-  const canUsePointerLock = $derived(Boolean(dialEl && 'requestPointerLock' in dialEl));
-
-  const formatValue = (nextValue: number): string =>
-    stepDecimals > 0 ? nextValue.toFixed(stepDecimals) : String(Math.round(nextValue));
-
-  const normalizeDialValue = (rawValue: number): number => {
-    const stepOrigin = resolvedMin ?? 0;
-    const stepped = Math.round((rawValue - stepOrigin) / resolvedStep)
-      * resolvedStep + stepOrigin;
-
-    if (parameter) {
-      return normalizeNumericParameterValue(
-        parameter,
-        stepped,
-        {},
-        { step: resolvedStep },
-      ) ?? value;
-    }
-
-    if (valueSpan <= 0) {
-      return Number(stepped.toFixed(stepDecimals));
-    }
-
-    let wrapped = (stepped - dialMin) % valueSpan;
-    if (wrapped < 0) {
-      wrapped += valueSpan;
-    }
-    return Number((dialMin + wrapped).toFixed(stepDecimals));
-  };
-
-  const emitDialInput = (nextValue: number): void => {
-    if (!dialInputEl) {
-      return;
-    }
-
-    const nextText = formatValue(nextValue);
-    if (dialInputEl.value === nextText) {
-      return;
-    }
-
-    dialInputEl.value = nextText;
-    dialInputEl.dispatchEvent(new Event('input', { bubbles: true }));
-  };
 
   const emitControlChange = (event: Event, finalize: boolean): void => {
     const input = event.currentTarget;
@@ -154,160 +91,28 @@
       step: Number(input.step),
     });
   };
-
-  const applyDragDelta = (deltaX: number, deltaY: number): void => {
-    if (activePointerId === null) {
-      return;
-    }
-    dragRawValue += (deltaY + deltaX * 0.5) * dragSensitivity;
-    emitDialInput(normalizeDialValue(dragRawValue));
-  };
-
-  const requestDialPointerLock = (): void => {
-    if (!dialEl || !canUsePointerLock) {
-      return;
-    }
-    try {
-      dialEl.requestPointerLock();
-    } catch {
-      // If pointer lock fails, regular drag behavior still works.
-    }
-  };
-
-  const exitDialPointerLock = (): void => {
-    if (document.pointerLockElement !== dialEl) {
-      return;
-    }
-    document.exitPointerLock();
-  };
-
-  const handleDialPointerDown = (event: PointerEvent): void => {
-    if (!event.isPrimary || event.button !== 0) {
-      return;
-    }
-
-    if (!dialEl) {
-      return;
-    }
-
-    activePointerId = event.pointerId;
-    lastPointerX = event.clientX;
-    lastPointerY = event.clientY;
-    dragRawValue = value;
-    dialEl.setPointerCapture(event.pointerId);
-    if (event.pointerType === 'mouse') {
-      requestDialPointerLock();
-    }
-    event.preventDefault();
-  };
-
-  const handleDialPointerMove = (event: PointerEvent): void => {
-    if (activePointerId !== event.pointerId) {
-      return;
-    }
-    if (isPointerLocked) {
-      return;
-    }
-
-    const deltaY = lastPointerY - event.clientY;
-    const deltaX = event.clientX - lastPointerX;
-    lastPointerX = event.clientX;
-    lastPointerY = event.clientY;
-    applyDragDelta(deltaX, deltaY);
-  };
-
-  const clearDialPointer = (): void => {
-    activePointerId = null;
-    isPointerLocked = false;
-    exitDialPointerLock();
-  };
-
-  const handleDialPointerUp = (event: PointerEvent): void => {
-    if (activePointerId !== event.pointerId) {
-      return;
-    }
-    clearDialPointer();
-  };
-
-  const handleDialPointerCancel = (event: PointerEvent): void => {
-    if (activePointerId !== event.pointerId) {
-      return;
-    }
-    clearDialPointer();
-  };
-
-  onMount(() => {
-    const handlePointerLockChange = (): void => {
-      const locked = document.pointerLockElement === dialEl;
-      isPointerLocked = locked;
-      if (!locked && activePointerId !== null) {
-        activePointerId = null;
-      }
-    };
-
-    const handleLockedMouseMove = (event: MouseEvent): void => {
-      if (!isPointerLocked || activePointerId === null) {
-        return;
-      }
-      applyDragDelta(event.movementX, -event.movementY);
-    };
-
-    const handleWindowMouseUp = (): void => {
-      if (activePointerId === null) {
-        return;
-      }
-      clearDialPointer();
-    };
-
-    document.addEventListener('pointerlockchange', handlePointerLockChange);
-    document.addEventListener('mousemove', handleLockedMouseMove);
-    window.addEventListener('mouseup', handleWindowMouseUp);
-    window.addEventListener('blur', handleWindowMouseUp);
-
-    return () => {
-      document.removeEventListener('pointerlockchange', handlePointerLockChange);
-      document.removeEventListener('mousemove', handleLockedMouseMove);
-      window.removeEventListener('mouseup', handleWindowMouseUp);
-      window.removeEventListener('blur', handleWindowMouseUp);
-      clearDialPointer();
-    };
-  });
 </script>
 
 <FieldShell {label} class="angle-picker">
-  <div class="angle-picker-controls">
+  <div class="angle-picker-controls" data-numeric-input-scope>
     <div
-      bind:this={dialEl}
       class="angle-picker-dial"
       role="slider"
       tabindex="0"
+      data-numeric-input-proxy
+      data-control-action={dataAction}
+      data-device-id={dataId}
+      data-param={dataParam}
       aria-label={dialLabel}
       aria-valuemin={resolvedMin}
       aria-valuemax={resolvedMax}
       aria-valuenow={value}
       aria-valuetext={accessibleValueText}
-      onpointerdown={handleDialPointerDown}
-      onpointermove={handleDialPointerMove}
-      onpointerup={handleDialPointerUp}
-      onpointercancel={handleDialPointerCancel}
       style={`--angle-deg:${dialDeg.toFixed(3)}deg;`}
     >
       <div class="angle-picker-dial-ring"></div>
       <div class="angle-picker-dial-knob"></div>
     </div>
-    <input
-      bind:this={dialInputEl}
-      class="angle-picker-dial-input"
-      type="number"
-      min={resolvedMin}
-      max={resolvedMax}
-      step={resolvedStep}
-      value={value}
-      aria-hidden="true"
-      tabindex="-1"
-      oninput={(event) => emitControlChange(event, false)}
-      onchange={(event) => emitControlChange(event, true)}
-    />
     <input
       class="angle-picker-number-input"
       class:has-display-unit={resolvedUnit !== undefined}
@@ -375,10 +180,6 @@
       outline: 2px solid var(--device-control-accent, var(--color-surface-inverse));
       outline-offset: 2px;
     }
-  }
-
-  .angle-picker-dial-input {
-    display: none;
   }
 
   .angle-picker-number-input {

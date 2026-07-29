@@ -8,6 +8,14 @@ export interface RackControlTarget {
 export const RACK_CONTROL_TARGET_SELECTOR = '[data-control-action][data-device-id]';
 export const RACK_CONTROL_TARGET_WITH_PARAM_SELECTOR = `${RACK_CONTROL_TARGET_SELECTOR}[data-param]`;
 export const RACK_NUMERIC_INPUT_SELECTOR = `input[type="number"]${RACK_CONTROL_TARGET_SELECTOR}`;
+const RACK_NUMERIC_INPUT_PROXY_SELECTOR =
+  `[data-numeric-input-proxy]${RACK_CONTROL_TARGET_SELECTOR}`;
+const RACK_NUMERIC_INPUT_SCOPE_SELECTOR = '[data-numeric-input-scope]';
+
+interface RackNumericInputTarget {
+  input: HTMLInputElement;
+  pointerElement: HTMLElement;
+}
 
 export const readRackControlTarget = (
   element: HTMLElement,
@@ -64,15 +72,42 @@ export const closestRackControlTarget = (
   return resolved;
 };
 
-export const closestRackNumericInput = (
+export const closestRackNumericInputTarget = (
   target: EventTarget | null,
-): HTMLInputElement | null => {
+): RackNumericInputTarget | null => {
   if (!(target instanceof Element)) {
     return null;
   }
 
   const input = target.closest<HTMLInputElement>(RACK_NUMERIC_INPUT_SELECTOR);
-  return input && readRackControlTarget(input) ? input : null;
+  if (input && readRackControlTarget(input)) {
+    return {
+      input,
+      pointerElement: input,
+    };
+  }
+
+  const proxy = target.closest<HTMLElement>(RACK_NUMERIC_INPUT_PROXY_SELECTOR);
+  const scope = proxy?.closest<HTMLElement>(RACK_NUMERIC_INPUT_SCOPE_SELECTOR);
+  const proxyInput = scope?.querySelector<HTMLInputElement>(RACK_NUMERIC_INPUT_SELECTOR);
+  const proxyControl = proxy ? readRackControlTarget(proxy) : null;
+  const inputControl = proxyInput ? readRackControlTarget(proxyInput) : null;
+  if (
+    !proxy
+    || !proxyInput
+    || !proxyControl
+    || !inputControl
+    || proxyControl.action !== inputControl.action
+    || proxyControl.deviceId !== inputControl.deviceId
+    || proxyControl.paramKey !== inputControl.paramKey
+  ) {
+    return null;
+  }
+
+  return {
+    input: proxyInput,
+    pointerElement: proxy,
+  };
 };
 
 export const isRackNumericInput = (

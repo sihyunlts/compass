@@ -1,11 +1,12 @@
 import {
-  closestRackNumericInput,
+  closestRackNumericInputTarget,
   isRackNumericInput,
 } from '../control-target';
 
 interface NumericInputDragState {
   pointerId: number | null;
   inputEl: HTMLInputElement | null;
+  pointerEl: HTMLElement | null;
   lastPointerX: number;
   lastPointerY: number;
   didMove: boolean;
@@ -28,6 +29,7 @@ const NUMERIC_RESET_DOUBLE_CLICK_WINDOW_MS = 400;
 const createNumericInputDragState = (): NumericInputDragState => ({
   pointerId: null,
   inputEl: null,
+  pointerEl: null,
   lastPointerX: 0,
   lastPointerY: 0,
   didMove: false,
@@ -101,11 +103,12 @@ export class NumericInputInteraction {
   }
 
   tryStart(event: PointerEvent, target: HTMLElement): boolean {
-    const input = closestRackNumericInput(target);
-    if (!input || input.disabled || input.readOnly) {
+    const resolved = closestRackNumericInputTarget(target);
+    if (!resolved || resolved.input.disabled || resolved.input.readOnly) {
       return false;
     }
 
+    const { input, pointerElement } = resolved;
     const min = this.parseInputBound(input.min);
     const max = this.parseInputBound(input.max);
     const step = this.resolveNumberStep(input);
@@ -118,6 +121,7 @@ export class NumericInputInteraction {
 
     this.dragState.pointerId = event.pointerId;
     this.dragState.inputEl = input;
+    this.dragState.pointerEl = pointerElement;
     this.dragState.lastPointerX = event.clientX;
     this.dragState.lastPointerY = event.clientY;
     this.dragState.didMove = false;
@@ -132,11 +136,11 @@ export class NumericInputInteraction {
     this.overwriteOnTypeInput = input;
     delete input.dataset.keyboardEditing;
 
-    input.dataset.dragActive = 'true';
-    input.focus();
-    input.setPointerCapture(event.pointerId);
+    pointerElement.dataset.dragActive = 'true';
+    pointerElement.focus();
+    pointerElement.setPointerCapture(event.pointerId);
     if (event.pointerType === 'mouse') {
-      this.requestPointerLock(input);
+      this.requestPointerLock(pointerElement);
     }
 
     return true;
@@ -203,9 +207,10 @@ export class NumericInputInteraction {
   }
 
   handlePointerLockChange(): void {
-    const input = this.dragState.inputEl;
+    const pointerElement = this.dragState.pointerEl;
     const wasPointerLocked = this.dragState.isPointerLocked;
-    const isPointerLocked = !!input && document.pointerLockElement === input;
+    const isPointerLocked = !!pointerElement
+      && document.pointerLockElement === pointerElement;
     this.dragState.isPointerLocked = isPointerLocked;
 
     if (wasPointerLocked && !isPointerLocked && this.isActive()) {
@@ -223,7 +228,8 @@ export class NumericInputInteraction {
   }
 
   tryResetFromDoubleClick(target: EventTarget | null): boolean {
-    return this.onResetInput(target);
+    const resolved = closestRackNumericInputTarget(target);
+    return resolved ? this.onResetInput(resolved.input) : false;
   }
 
   private parseInputBound(rawValue: string): number | null {
@@ -269,20 +275,20 @@ export class NumericInputInteraction {
     return next;
   }
 
-  private requestPointerLock(input: HTMLInputElement): void {
-    if (!('requestPointerLock' in input)) {
+  private requestPointerLock(pointerElement: HTMLElement): void {
+    if (!('requestPointerLock' in pointerElement)) {
       return;
     }
 
     try {
-      input.requestPointerLock();
+      pointerElement.requestPointerLock();
     } catch {
       // Pointer lock is optional; drag still works without it.
     }
   }
 
-  private exitPointerLock(input: HTMLInputElement | null): void {
-    if (!input || document.pointerLockElement !== input) {
+  private exitPointerLock(pointerElement: HTMLElement | null): void {
+    if (!pointerElement || document.pointerLockElement !== pointerElement) {
       return;
     }
 
@@ -344,14 +350,14 @@ export class NumericInputInteraction {
   }
 
   private clearDragState(): void {
-    const { inputEl, pointerId } = this.dragState;
-    if (inputEl && pointerId !== null && inputEl.hasPointerCapture(pointerId)) {
-      inputEl.releasePointerCapture(pointerId);
+    const { pointerEl, pointerId } = this.dragState;
+    if (pointerEl && pointerId !== null && pointerEl.hasPointerCapture(pointerId)) {
+      pointerEl.releasePointerCapture(pointerId);
     }
 
-    this.exitPointerLock(inputEl);
-    if (inputEl) {
-      delete inputEl.dataset.dragActive;
+    this.exitPointerLock(pointerEl);
+    if (pointerEl) {
+      delete pointerEl.dataset.dragActive;
     }
 
     Object.assign(this.dragState, createNumericInputDragState());
