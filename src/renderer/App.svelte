@@ -147,6 +147,7 @@
   let isRackRenameDialogOpen = $state(false);
   let isRackRenamePending = $state(false);
   let rackRenameDraft = $state('');
+  let isRackRevertDialogOpen = $state(false);
   const sendFlow = createSendFlow({
     bridgeClient,
     editorSession,
@@ -333,6 +334,19 @@
 
     event.preventDefault();
     void confirmRackRenameDialog();
+  };
+
+  const openRackRevertDialog = (): void => {
+    isRackRevertDialogOpen = true;
+  };
+
+  const closeRackRevertDialog = (): void => {
+    isRackRevertDialogOpen = false;
+  };
+
+  const confirmRackRevertDialog = (): void => {
+    isRackRevertDialogOpen = false;
+    presetController.handleRevertRack();
   };
 
   const handlePreviewLengthChange = (nextValue: string | number): void => {
@@ -595,7 +609,7 @@
             onNewRack={() => presetController.handleNewRack()}
             onSaveRack={() => presetController.handleSaveRack()}
             onSaveRackAs={() => presetController.handleSaveRackAs()}
-            onRevertRack={() => presetController.handleRevertRack()}
+            onRevertRack={openRackRevertDialog}
             canRevertRack={presetState.canRevertRack && presetState.isRackDirty}
             onRenameRack={openRackRenameDialog}
           />
@@ -734,6 +748,16 @@
       onKeyDown={handleRackRenameInputKeyDown}
     />
   </ModalDialog>
+
+  <ModalDialog
+    open={isRackRevertDialogOpen}
+    title="Revert to saved rack?"
+    description="All changes made since this rack was last saved will be discarded."
+    confirmLabel="Revert"
+    cancelLabel="Cancel"
+    onConfirm={confirmRackRevertDialog}
+    onCancel={closeRackRevertDialog}
+  />
 
   <ModalDialog
     open={presetState.pendingPresetDeleteTarget !== null}
