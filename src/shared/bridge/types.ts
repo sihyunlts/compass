@@ -28,6 +28,7 @@ export interface LiveBridgeNotesEnvelope extends LiveBridgeBaseEnvelope {
   chunkCount?: number;
   targetLengthBeats?: number;
   autoCreateLengthBeats?: number;
+  clipName: string;
   notes: Array<{
     pitch: number;
     channel: number;

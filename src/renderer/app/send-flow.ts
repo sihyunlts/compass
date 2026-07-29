@@ -22,7 +22,7 @@ class SendFlowController {
 
   public constructor(private readonly options: SendFlowOptions) {}
 
-  public async send(): Promise<void> {
+  public async send(clipName: string): Promise<void> {
     const { bridgeClient, editorSession, headerIndicator, playbackSession } = this.options;
     const uiState = editorSession.state;
 
@@ -59,6 +59,7 @@ class SendFlowController {
       await bridgeClient.sendGeneratedPreview({
         preview,
         bridge,
+        clipName,
       });
 
       if (preview.noteCount > 0) {

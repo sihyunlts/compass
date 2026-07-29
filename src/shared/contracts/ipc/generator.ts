@@ -4,6 +4,7 @@ import type { GeneratorPreview } from '../preview/generator-preview';
 export interface SendGeneratedPreviewRequest {
   preview: GeneratorPreview;
   bridge: BridgeSettings;
+  clipName: string;
 }
 
 export interface SendGeneratedPreviewResponse {

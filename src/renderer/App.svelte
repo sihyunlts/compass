@@ -659,7 +659,7 @@
             variant="primary"
             text={uiState.sendButtonLabel}
             disabled={uiState.sendButtonDisabled}
-            onClick={() => sendFlow.send()}
+            onClick={() => sendFlow.send(presetState.currentRackDisplayName)}
           />
         </div>
       </header>

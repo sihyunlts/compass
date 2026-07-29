@@ -53,6 +53,7 @@ const splitEnvelopeBySize = (
     path: envelope.path,
     targetLengthBeats: envelope.targetLengthBeats,
     autoCreateLengthBeats: envelope.autoCreateLengthBeats,
+    clipName: envelope.clipName,
   };
 
   const chunks: LiveBridgeNotesEnvelope[] = [];

@@ -163,36 +163,44 @@ function applyClipNotesEnvelope(envelope) {
     return;
   }
   var requiredClipLength = resolveRequiredClipLength(envelope, normalized);
+  var clipName = normalizeClipName(envelope.clipName);
   var shouldRetrySelection = shouldUseLegacyNoteApi();
 
   applyResolvedClipNotes(
     normalized.notes,
     requiredClipLength,
-    shouldRetrySelection
+    shouldRetrySelection,
+    clipName
   );
 }
 
-function applyResolvedClipNotes(notes, requiredClipLength, shouldRetrySelection) {
+function applyResolvedClipNotes(
+  notes,
+  requiredClipLength,
+  shouldRetrySelection,
+  clipName
+) {
   var target = resolveSelectedMidiClipTarget();
   if (target) {
-    applyNotesToSelectedTarget(target, notes, requiredClipLength);
+    applyNotesToSelectedTarget(target, notes, requiredClipLength, clipName);
     return;
   }
 
   if (shouldRetrySelection) {
-    deferApplyResolvedClipNotes(notes, requiredClipLength);
+    deferApplyResolvedClipNotes(notes, requiredClipLength, clipName);
     return;
   }
 
   applyNotesToNewArrangementClipOnSelectedTrack(
     notes,
-    requiredClipLength
+    requiredClipLength,
+    clipName
   );
 }
 
-function deferApplyResolvedClipNotes(notes, requiredClipLength) {
+function deferApplyResolvedClipNotes(notes, requiredClipLength, clipName) {
   if (typeof Task !== "function") {
-    applyResolvedClipNotes(notes, requiredClipLength, false);
+    applyResolvedClipNotes(notes, requiredClipLength, false, clipName);
     return;
   }
 
@@ -205,7 +213,7 @@ function deferApplyResolvedClipNotes(notes, requiredClipLength) {
 
   selectionRetryTask = new Task(function () {
     selectionRetryTask = null;
-    applyResolvedClipNotes(notes, requiredClipLength, false);
+    applyResolvedClipNotes(notes, requiredClipLength, false, clipName);
   }, this);
   selectionRetryTask.schedule(LIVE10_DETAIL_CLIP_RETRY_MS);
   status("selection_retry_scheduled", LIVE10_DETAIL_CLIP_RETRY_MS);
@@ -278,15 +286,16 @@ function resetPendingChunkTransfer() {
   pendingChunkReceived = 0;
 }
 
-function applyNotesToSelectedClip(targetClip, notes, sourceLength) {
+function applyNotesToSelectedClip(targetClip, notes, sourceLength, clipName) {
   var clipLength = readClipLengthBeats(targetClip, sourceLength);
-  applyNotesToClip(targetClip, notes, sourceLength, clipLength);
+  applyNotesToClip(targetClip, notes, sourceLength, clipLength, clipName);
 }
 
-function applyNotesToClip(targetClip, notes, sourceLength, clipLength) {
+function applyNotesToClip(targetClip, notes, sourceLength, clipLength, clipName) {
   var fittedNotes = fitNotesToClipLength(notes, sourceLength, clipLength);
 
   replaceClipNotes(targetClip, fittedNotes, clipLength);
+  setClipName(targetClip, clipName);
   status("applied", "replace", "notes", fittedNotes.length);
 }
 
@@ -523,7 +532,7 @@ function resolveSelectedMidiClipTarget() {
   return null;
 }
 
-function applyNotesToSelectedTarget(target, notes, sourceLength) {
+function applyNotesToSelectedTarget(target, notes, sourceLength, clipName) {
   if (target.mode === "unusable_live10_detail_clip") {
     errorOut(
       "live10_detail_clip_unavailable",
@@ -532,7 +541,7 @@ function applyNotesToSelectedTarget(target, notes, sourceLength) {
     return;
   }
 
-  applyNotesToSelectedClip(target.clip, notes, sourceLength);
+  applyNotesToSelectedClip(target.clip, notes, sourceLength, clipName);
 }
 
 function resolveMidiClipById(clipId) {
@@ -550,7 +559,8 @@ function resolveMidiClipById(clipId) {
 
 function applyNotesToNewArrangementClipOnSelectedTrack(
   notes,
-  requiredClipLength
+  requiredClipLength,
+  clipName
 ) {
   var view = getLiveSetViewApi();
   if (!view) {
@@ -578,14 +588,26 @@ function applyNotesToNewArrangementClipOnSelectedTrack(
   if (!canResolveArrangementClips()) {
     // Live 10 cannot resolve newly-created Arrangement clip ids reliably, but it
     // can duplicate a populated Session clip into the Arrangement.
-    applyNotesToSessionClipThenDuplicate(track, startTime, length, notes);
+    applyNotesToSessionClipThenDuplicate(
+      track,
+      startTime,
+      length,
+      notes,
+      clipName
+    );
     return;
   }
 
   var createdId = tryCreateArrangementClip(track, startTime, length);
 
   if (!createdId) {
-    applyNotesToSessionClipThenDuplicate(track, startTime, length, notes);
+    applyNotesToSessionClipThenDuplicate(
+      track,
+      startTime,
+      length,
+      notes,
+      clipName
+    );
     return;
   }
 
@@ -599,17 +621,23 @@ function applyNotesToNewArrangementClipOnSelectedTrack(
   safeSetClipMarkers(clip, length);
 
   status("target", "created_arrangement_clip", createdId);
-  applyNotesToClip(clip, notes, length, length);
+  applyNotesToClip(clip, notes, length, length, clipName);
 }
 
-function applyNotesToSessionClipThenDuplicate(trackApi, startTime, length, notes) {
+function applyNotesToSessionClipThenDuplicate(
+  trackApi,
+  startTime,
+  length,
+  notes,
+  clipName
+) {
   var temp = createSessionClipOnTrack(trackApi, length);
   if (!temp) {
     return;
   }
 
   try {
-    applyNotesToClip(temp.clip, notes, length, length);
+    applyNotesToClip(temp.clip, notes, length, length, clipName);
   } catch (e1) {
     safeDeleteClipInSlot(temp.slot);
     errorOut("write_session_clip_failed", safeErrorMessage(e1));
@@ -823,6 +851,20 @@ function safeSetClipMarkers(clipApi, length) {
     clipApi.set("loop_end", length);
     clipApi.set("end_marker", length);
   } catch (_e) {}
+}
+
+function normalizeClipName(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value.replace(/^\s+|\s+$/g, "");
+}
+
+function setClipName(clipApi, clipName) {
+  if (!clipName) {
+    return;
+  }
+  clipApi.set("name", clipName);
 }
 
 function isMidiTrack(trackApi) {

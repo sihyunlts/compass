@@ -23,6 +23,7 @@ const toEnvelope = (
   bridge: BridgeSettings,
   notes: ReadonlyArray<ClipNote>,
   sourceTimelineEndBeat: number,
+  clipName: string,
 ): LiveBridgeNotesEnvelope => ({
   event: 'clip_notes.replace',
   source: 'compass',
@@ -31,6 +32,7 @@ const toEnvelope = (
   applyMode: 'replace',
   targetLengthBeats: sourceTimelineEndBeat,
   autoCreateLengthBeats: bridge.autoCreateLengthBeats,
+  clipName,
   notes: notes.map((note) => ({
     pitch: note.pitch,
     channel: note.channel,
@@ -56,10 +58,17 @@ export class GeneratorService {
     request: SendGeneratedPreviewRequest,
   ): Promise<SendGeneratedPreviewResponse> {
     const bridgeSettings = sanitizeBridgeSettings(request.bridge);
+    const clipName = typeof request.clipName === 'string'
+      ? request.clipName.trim()
+      : '';
+    if (!clipName) {
+      throw new Error('Clip name is required.');
+    }
     const envelope = toEnvelope(
       bridgeSettings,
       request.preview.notes,
       request.preview.sourceTimelineEndBeat,
+      clipName,
     );
 
     await this.bridge.send(envelope, LIVE_BRIDGE_TARGET);
