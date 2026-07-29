@@ -33,6 +33,7 @@ import {
   createRackOperator,
   type OriginFrameRemap,
   type RackOperator,
+  type RackOperatorInputPreparation,
   type RackStageExecutionContext,
   type RackStageOfKind,
 } from './types';
@@ -227,8 +228,9 @@ export const createTemporalStateUpdateOperator = <TKind extends RackStageDeviceK
     context: RackStageExecutionContext,
   ) => ReadonlyMap<string, SceneTemporalState>,
   finalCleanupMode?: GenerationFinalCleanupMode,
+  prepareInput: RackOperatorInputPreparation = (state) => state,
 ): RackOperator => createRackOperator<TKind>(
-  (state) => state,
+  prepareInput,
   (state, stage, context) => applyTemporalStateUpdates(
     state,
     buildTemporalUpdates(state, stage, context),

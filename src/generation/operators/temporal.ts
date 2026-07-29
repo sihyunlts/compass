@@ -29,6 +29,7 @@ import {
   buildTemporalStateUpdatesForTargetOrigins,
   createTemporalStateUpdateOperator,
   isFrameWithinWindow,
+  materializePendingRackOperatorInput,
   resolveModulatedDeviceAtFrame,
   type ModulationContext,
 } from './runtime';
@@ -37,6 +38,7 @@ type TemporalEffectKind = 'reverse' | 'trim' | 'stretch' | 'timewarp';
 
 type TemporalSourceWindowPolicy =
   | 'playback-window'
+  | 'observed-output'
   | 'current-output-when-pending';
 
 type TemporalPlacementWindowPolicy =
@@ -67,7 +69,7 @@ const TEMPORAL_EFFECT_POLICIES = {
     cleanupMode: 'preserve',
   },
   timewarp: {
-    sourceWindow: 'playback-window',
+    sourceWindow: 'observed-output',
     placementWindow: 'current-placement',
   },
 } satisfies Record<TemporalEffectKind, TemporalEffectPolicy>;
@@ -80,12 +82,18 @@ const resolveTemporalEffectSourceWindow = (
   kind: TemporalEffectKind,
   timelineState: OriginTimelineState,
   sourceWindow: TimelineWindow,
-): TimelineWindow => (
-  TEMPORAL_EFFECT_POLICIES[kind].sourceWindow === 'current-output-when-pending'
-    && hasPendingTemporalState(timelineState)
-      ? DEFAULT_TIMELINE_WINDOW
-      : sourceWindow
-);
+): TimelineWindow => {
+  switch (TEMPORAL_EFFECT_POLICIES[kind].sourceWindow) {
+    case 'observed-output':
+      return timelineState.observedWindow;
+    case 'current-output-when-pending':
+      return hasPendingTemporalState(timelineState)
+        ? DEFAULT_TIMELINE_WINDOW
+        : sourceWindow;
+    case 'playback-window':
+      return sourceWindow;
+  }
+};
 
 const resolveTemporalEffectPlacementWindow = (
   kind: TemporalEffectKind,
@@ -456,4 +464,5 @@ export const timeWarpOperator = createTemporalStateUpdateOperator<'timewarp'>(
     );
   },
   resolveTemporalCleanupMode('timewarp'),
+  materializePendingRackOperatorInput,
 );

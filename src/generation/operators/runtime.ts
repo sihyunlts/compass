@@ -6,6 +6,7 @@ export {
 export {
   createPendingFrameApplicationOperator,
   createPendingGeometryApplicationOperator,
+  materializePendingRackOperatorInput,
   materializeAndNormalizeRackState,
   preservePendingRackOperatorInput,
   replaceTimelineAndRefreshRackState,
