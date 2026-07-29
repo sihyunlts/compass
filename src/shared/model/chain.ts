@@ -1,4 +1,4 @@
-export interface WaterdropParams {
+export interface RippleParams {
   centerX: number;
   centerY: number;
   curvature: number;
@@ -9,11 +9,11 @@ export interface GroupedDeviceNode {
   name?: string | null;
 }
 
-export interface WaterdropGeneratorNode extends GroupedDeviceNode {
+export interface RippleGeneratorNode extends GroupedDeviceNode {
   id: string;
-  kind: 'waterdrop';
+  kind: 'ripple';
   enabled: boolean;
-  params: WaterdropParams;
+  params: RippleParams;
 }
 
 export interface ScannerParams {
@@ -72,7 +72,7 @@ export interface PathGeneratorNode extends GroupedDeviceNode {
 }
 
 export type GeneratorNode =
-  | WaterdropGeneratorNode
+  | RippleGeneratorNode
   | ScannerGeneratorNode
   | RainGeneratorNode
   | SpiralGeneratorNode

@@ -5,8 +5,8 @@
   "chain": {
     "devices": [
       {
-        "id": "generator-merge-waterdrop",
-        "kind": "waterdrop",
+        "id": "generator-merge-ripple",
+        "kind": "ripple",
         "enabled": true,
         "groupId": "group-1",
         "name": null,

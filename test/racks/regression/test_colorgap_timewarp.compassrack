@@ -6,7 +6,7 @@
     "devices": [
       {
         "id": "generator-9",
-        "kind": "waterdrop",
+        "kind": "ripple",
         "enabled": true,
         "groupId": null,
         "name": null,

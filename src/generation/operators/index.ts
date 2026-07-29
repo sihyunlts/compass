@@ -24,7 +24,7 @@ import {
 import { reverseOperator, stretchOperator, timeWarpOperator, trimOperator } from './temporal';
 
 const RACK_OPERATORS: Record<RackStageDeviceKind, RackOperator> = {
-  waterdrop: generatorOperator,
+  ripple: generatorOperator,
   scanner: generatorOperator,
   rain: generatorOperator,
   spiral: generatorOperator,

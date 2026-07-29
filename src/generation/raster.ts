@@ -5,7 +5,7 @@ import { buildPathPolyline } from '../core/generators/path';
 import { buildRainPolylines } from '../core/generators/rain';
 import { buildScannerPolyline } from '../core/generators/scanner';
 import { buildSpiralPolyline } from '../core/generators/spiral';
-import { buildWaterdropPolyline } from '../core/generators/waterdrop';
+import { buildRipplePolyline } from '../core/generators/ripple';
 import { normalizeOptionalId } from '../shared/normalize-id';
 import type { GeneratorNode } from '../shared/model';
 import { toBounds } from './analysis/bounds';
@@ -47,9 +47,9 @@ const buildGeneratorPolylines = (
   sampleStepBeats: number,
   evaluationBounds: SpatialRequirement,
 ): Polyline[] => {
-  if (device.kind === 'waterdrop') {
+  if (device.kind === 'ripple') {
     return toPolylineArray(
-      buildWaterdropPolyline(
+      buildRipplePolyline(
         device.id,
         device.params,
         beat01,

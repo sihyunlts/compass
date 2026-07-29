@@ -5,7 +5,7 @@ import type {
 } from './chain';
 
 const GENERATOR_DEVICE_KINDS = new Set<GeneratorDeviceNode['kind']>([
-  'waterdrop',
+  'ripple',
   'scanner',
   'rain',
   'spiral',

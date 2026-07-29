@@ -7,6 +7,7 @@ import {
   hydrateImportedGeneratorChain,
   hydrateImportedGeneratorDevice,
   hydrateImportedGeneratorDevices,
+  isLegacyRendererDeviceKind,
 } from './model/chain-normalization';
 
 export const PRESET_FILE_SCHEMA_VERSION = 1 as const;
@@ -147,6 +148,12 @@ const hasLegacyModulatorSingleTarget = (value: unknown): boolean => {
 const hasLegacyModulatorSingleTargetInDevices = (devices: unknown): boolean =>
   Array.isArray(devices) && devices.some((device) => hasLegacyModulatorSingleTarget(device));
 
+const hasLegacyRendererDeviceKind = (value: unknown): boolean =>
+  isRecord(value) && isLegacyRendererDeviceKind(value.kind);
+
+const hasLegacyRendererDeviceKindInDevices = (devices: unknown): boolean =>
+  Array.isArray(devices) && devices.some((device) => hasLegacyRendererDeviceKind(device));
+
 export const toStandaloneDevicePresetDevice = (
   device: GeneratorDeviceNode,
 ): GeneratorDeviceNode => {
@@ -174,7 +181,9 @@ const parseDevicePresetPayload = (
       savedAtIso: header.savedAtIso,
       device: toStandaloneDevicePresetDevice(device),
     },
-    needsSave: hasLegacyModulatorSingleTarget(rawDevice),
+    needsSave:
+      hasLegacyModulatorSingleTarget(rawDevice)
+      || hasLegacyRendererDeviceKind(rawDevice),
   };
 };
 
@@ -225,7 +234,9 @@ const parseGroupPresetPayload = (
           }
         : {}),
     },
-    needsSave: hasLegacyModulatorSingleTargetInDevices(group.devices),
+    needsSave:
+      hasLegacyModulatorSingleTargetInDevices(group.devices)
+      || hasLegacyRendererDeviceKindInDevices(group.devices),
   };
 };
 
@@ -265,7 +276,9 @@ const parseRackPresetPayload = (
           }
         : {}),
     },
-    needsSave: hasLegacyModulatorSingleTargetInDevices(sourceDevices),
+    needsSave:
+      hasLegacyModulatorSingleTargetInDevices(sourceDevices)
+      || hasLegacyRendererDeviceKindInDevices(sourceDevices),
   };
 };
 

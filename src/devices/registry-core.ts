@@ -27,14 +27,14 @@ import type {
   RendererDeviceNodeOfKind,
   RendererDeviceSchema,
 } from './types';
-import { waterdropDeviceSchema } from './waterdrop/schema';
+import { rippleDeviceSchema } from './ripple/schema';
 
 type RendererDeviceSchemaEntry = {
   [K in RendererDeviceKind]: RendererDeviceSchema<K>;
 }[RendererDeviceKind];
 
 export const RENDERER_DEVICE_SCHEMAS = [
-  waterdropDeviceSchema,
+  rippleDeviceSchema,
   scannerDeviceSchema,
   rainDeviceSchema,
   spiralDeviceSchema,

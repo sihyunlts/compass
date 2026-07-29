@@ -5,8 +5,8 @@
   "chain": {
     "devices": [
       {
-        "id": "generator-mask-waterdrop",
-        "kind": "waterdrop",
+        "id": "generator-mask-ripple",
+        "kind": "ripple",
         "enabled": true,
         "groupId": null,
         "name": null,

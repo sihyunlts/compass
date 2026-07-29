@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "presetType": "rack",
-  "savedAtIso": "2026-06-16T03:59:39.336Z",
+  "savedAtIso": "2026-07-29T16:31:26.856Z",
   "chain": {
     "devices": [
       {
-        "id": "generator-active-waterdrop",
-        "kind": "waterdrop",
+        "id": "generator-active-ripple",
+        "kind": "ripple",
         "enabled": true,
         "groupId": "group-active",
         "name": null,

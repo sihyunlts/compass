@@ -32,10 +32,10 @@ export function cloneDeviceNode<TDevice extends GeneratorDeviceNode>(device: TDe
 export function cloneDeviceNode(
   device: GeneratorDeviceNode,
 ): GeneratorDeviceNode {
-  if (device.kind === 'waterdrop') {
+  if (device.kind === 'ripple') {
     return {
       id: device.id,
-      kind: 'waterdrop',
+      kind: 'ripple',
       enabled: device.enabled,
       groupId: device.groupId ?? null,
       name: device.name ?? null,

@@ -34,7 +34,7 @@ const createGeneratedDeviceNode = (
 };
 
 export const createInitialChainDevices = (): GeneratorDeviceNode[] => [
-  createGeneratedDeviceNode('waterdrop'),
+  createGeneratedDeviceNode('ripple'),
 ];
 
 export const syncDeviceNodeIdSeeds = (

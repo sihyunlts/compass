@@ -107,7 +107,7 @@ const mergeTargetedTimeDomain = (
 const buildGeneratorAnalysis = (
   device: GeneratorNode,
 ): OperatorAnalysis => {
-  if (device.kind === 'waterdrop') {
+  if (device.kind === 'ripple') {
     const radius = Math.max(Math.abs(device.params.curvature), 0.5);
     return createOperatorAnalysis({
       outputBounds: createSpatialBounds(

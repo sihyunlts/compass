@@ -1,4 +1,4 @@
-import type { WaterdropGeneratorNode } from '../../shared/model';
+import type { RippleGeneratorNode } from '../../shared/model';
 import {
   applyImportedDeviceMeta,
   resolveImportedDeviceEnabled,
@@ -13,69 +13,69 @@ import {
 } from '../numeric-parameters';
 import type { RendererDeviceSchema } from '../types';
 
-const DEFAULT_WATERDROP_PARAMS: WaterdropGeneratorNode['params'] = {
+const DEFAULT_RIPPLE_PARAMS: RippleGeneratorNode['params'] = {
   centerX: 4.5,
   centerY: 4.5,
   curvature: 2,
 };
 
-export const WATERDROP_NUMERIC_PARAMETERS = defineNumericParameterRules<
-  WaterdropGeneratorNode['params']
+export const RIPPLE_NUMERIC_PARAMETERS = defineNumericParameterRules<
+  RippleGeneratorNode['params']
 >()({
   centerX: boundedNumericParameter({
-    defaultValue: DEFAULT_WATERDROP_PARAMS.centerX,
+    defaultValue: DEFAULT_RIPPLE_PARAMS.centerX,
     min: 0,
     max: 9,
     step: 0.5,
     modulationLabel: 'Center X',
   }),
   centerY: boundedNumericParameter({
-    defaultValue: DEFAULT_WATERDROP_PARAMS.centerY,
+    defaultValue: DEFAULT_RIPPLE_PARAMS.centerY,
     min: 0,
     max: 9,
     step: 0.5,
     modulationLabel: 'Center Y',
   }),
   curvature: finiteNumericParameter({
-    defaultValue: DEFAULT_WATERDROP_PARAMS.curvature,
+    defaultValue: DEFAULT_RIPPLE_PARAMS.curvature,
     step: 0.1,
     modulationLabel: 'Curvature',
   }),
 });
 
-const createDefaultWaterdropNode = (
+const createDefaultRippleNode = (
   id: string,
   enabled: boolean,
-): WaterdropGeneratorNode => ({
+): RippleGeneratorNode => ({
   id,
-  kind: 'waterdrop',
+  kind: 'ripple',
   enabled: enabled !== false,
   groupId: null,
-  params: { ...DEFAULT_WATERDROP_PARAMS },
+  params: { ...DEFAULT_RIPPLE_PARAMS },
 });
 
-const hydrateImportedWaterdropNode = (
+const hydrateImportedRippleNode = (
   source: Record<string, unknown>,
-): WaterdropGeneratorNode | null => {
+): RippleGeneratorNode | null => {
   const id = resolveImportedDeviceId(source);
   if (!id) {
     return null;
   }
 
   const device = applyImportedDeviceMeta(
-    createDefaultWaterdropNode(id, resolveImportedDeviceEnabled(source)),
+    createDefaultRippleNode(id, resolveImportedDeviceEnabled(source)),
     source,
   );
   const params = resolveImportedParams(source);
-  hydrateImportedNumericParameters(device.params, params, WATERDROP_NUMERIC_PARAMETERS);
+  hydrateImportedNumericParameters(device.params, params, RIPPLE_NUMERIC_PARAMETERS);
   return device;
 };
 
-export const waterdropDeviceSchema = {
-  kind: 'waterdrop',
-  label: 'Waterdrop',
+export const rippleDeviceSchema = {
+  kind: 'ripple',
+  label: 'Ripple',
   group: 'generator',
-  numericParameters: WATERDROP_NUMERIC_PARAMETERS,
-  createDefaultNode: createDefaultWaterdropNode,
-  hydrateImportedNode: hydrateImportedWaterdropNode,
-} satisfies RendererDeviceSchema<'waterdrop'>;
+  numericParameters: RIPPLE_NUMERIC_PARAMETERS,
+  createDefaultNode: createDefaultRippleNode,
+  hydrateImportedNode: hydrateImportedRippleNode,
+} satisfies RendererDeviceSchema<'ripple'>;

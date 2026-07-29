@@ -294,7 +294,7 @@
 
 <style lang="scss">
   .device-card {
-    --device-category-accent: var(--color-category-generators);
+    --device-category-accent: var(--color-category-generate);
     --device-control-accent: var(--device-category-accent);
     --device-card-radius: var(--radius-8);
     --device-head-radius: max(0px, calc(var(--device-card-radius) - 1px));

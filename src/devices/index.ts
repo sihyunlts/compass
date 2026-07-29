@@ -33,7 +33,7 @@ import type {
   RendererDeviceNodeOfKind,
   RendererDeviceTabDefinition,
 } from './types';
-import { waterdropDeviceControls } from './waterdrop/controls';
+import { rippleDeviceControls } from './ripple/controls';
 
 type RendererDeviceEditorComponent = Component<Record<string, unknown>>;
 type RendererDeviceEditorModulePath = `./${string}/ui.svelte`;
@@ -120,9 +120,9 @@ const rendererDeviceViewByKind: RendererDeviceViewByKind = {
     editor: './trim/ui.svelte',
     controls: trimDeviceControls,
   },
-  waterdrop: {
-    editor: './waterdrop/ui.svelte',
-    controls: waterdropDeviceControls,
+  ripple: {
+    editor: './ripple/ui.svelte',
+    controls: rippleDeviceControls,
   },
 };
 

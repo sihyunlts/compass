@@ -5,13 +5,13 @@
   import CenterPointPicker from '../../renderer/components/controls/CenterPointPicker.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
-  import { WATERDROP_NUMERIC_PARAMETERS } from './schema';
+  import { RIPPLE_NUMERIC_PARAMETERS } from './schema';
 
-  type WaterdropDeviceEditorProps = RendererDeviceEditorPropsBase & {
-    device: Extract<GeneratorDeviceNode, { kind: 'waterdrop' }>;
+  type RippleDeviceEditorProps = RendererDeviceEditorPropsBase & {
+    device: Extract<GeneratorDeviceNode, { kind: 'ripple' }>;
   };
 
-  let { device, onControlChange }: WaterdropDeviceEditorProps = $props();
+  let { device, onControlChange }: RippleDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -19,14 +19,14 @@
     deviceId={device.id}
     centerX={device.params.centerX}
     centerY={device.params.centerY}
-    parameter={WATERDROP_NUMERIC_PARAMETERS.centerX}
+    parameter={RIPPLE_NUMERIC_PARAMETERS.centerX}
     {onControlChange}
   />
   <NumberField
     label="Curvature"
-    parameter={WATERDROP_NUMERIC_PARAMETERS.curvature}
+    parameter={RIPPLE_NUMERIC_PARAMETERS.curvature}
     value={device.params.curvature}
-    dataAction="set-waterdrop-param"
+    dataAction="set-ripple-param"
     dataId={device.id}
     dataParam="curvature"
     {onControlChange}

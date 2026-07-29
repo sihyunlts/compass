@@ -1,7 +1,7 @@
 import { getRendererDeviceLabel, RENDERER_DEVICE_KINDS } from './registry-core';
 import type { RendererDeviceKind } from './types';
 
-export type DeviceBrowserCategoryId = 'generators' | 'transform' | 'time' | 'utility';
+export type DeviceBrowserCategoryId = 'generate' | 'transform' | 'time' | 'utility';
 
 export interface DeviceBrowserCategoryDefinition {
   categoryId: DeviceBrowserCategoryId;
@@ -11,13 +11,15 @@ export interface DeviceBrowserCategoryDefinition {
   deviceKinds: readonly RendererDeviceKind[];
 }
 
+export const GENERATE_DEVICE_CATEGORY_DIRECTORY_NAME = 'Generate';
+
 export const DEVICE_BROWSER_CATEGORY_DEFINITIONS = [
   {
-    categoryId: 'generators',
-    label: 'Generators',
-    directoryName: 'Generators',
-    accentColorVar: '--color-category-generators',
-    deviceKinds: ['waterdrop', 'scanner', 'rain', 'spiral', 'path'],
+    categoryId: 'generate',
+    label: 'Generate',
+    directoryName: GENERATE_DEVICE_CATEGORY_DIRECTORY_NAME,
+    accentColorVar: '--color-category-generate',
+    deviceKinds: ['ripple', 'scanner', 'rain', 'spiral', 'path'],
   },
   {
     categoryId: 'transform',
@@ -69,17 +71,27 @@ const validateDeviceBrowserCategories = (
 validateDeviceBrowserCategories(DEVICE_BROWSER_CATEGORY_DEFINITIONS);
 
 const DEVICE_BROWSER_CATEGORY_BY_KIND = new Map<RendererDeviceKind, DeviceBrowserCategoryDefinition>();
+const DEVICE_BROWSER_CATEGORY_BY_DIRECTORY_NAME = new Map<
+  string,
+  DeviceBrowserCategoryDefinition
+>();
+const DEVICE_BROWSER_KIND_BY_DIRECTORY_PATH = new Map<string, RendererDeviceKind>();
 const DEVICE_BROWSER_CATEGORY_ORDER = new Map<string, number>();
 
 for (const [index, definition] of DEVICE_BROWSER_CATEGORY_DEFINITIONS.entries()) {
+  DEVICE_BROWSER_CATEGORY_BY_DIRECTORY_NAME.set(definition.directoryName, definition);
   DEVICE_BROWSER_CATEGORY_ORDER.set(definition.directoryName, index);
   for (const kind of definition.deviceKinds) {
     DEVICE_BROWSER_CATEGORY_BY_KIND.set(kind, definition);
+    DEVICE_BROWSER_KIND_BY_DIRECTORY_PATH.set(
+      `${definition.directoryName}\0${getRendererDeviceLabel(kind)}`,
+      kind,
+    );
   }
 }
 
 const DEVICE_BROWSER_ICON_BY_KIND: Record<RendererDeviceKind, string> = {
-  waterdrop: 'water_drop',
+  ripple: 'water_drop',
   scanner: 'scan',
   rain: 'rainy',
   spiral: 'cyclone',
@@ -112,6 +124,19 @@ export const getDeviceBrowserCategory = (
 export const getDeviceBrowserCategoryDirectoryName = (
   kind: RendererDeviceKind,
 ): string => getDeviceBrowserCategory(kind).directoryName;
+
+export const getDeviceBrowserCategoryByDirectoryName = (
+  directoryName: string,
+): DeviceBrowserCategoryDefinition | null =>
+  DEVICE_BROWSER_CATEGORY_BY_DIRECTORY_NAME.get(directoryName) ?? null;
+
+export const getDeviceBrowserKindByDirectoryPath = (
+  categoryDirectoryName: string,
+  deviceDirectoryName: string,
+): RendererDeviceKind | null =>
+  DEVICE_BROWSER_KIND_BY_DIRECTORY_PATH.get(
+    `${categoryDirectoryName}\0${deviceDirectoryName}`,
+  ) ?? null;
 
 export const compareDeviceBrowserCategoryDirectoryNames = (
   left: string,

@@ -1,5 +1,5 @@
+import type { RippleParams } from '../../shared/model';
 import type { Polyline, Vec2 } from '../core-types';
-import type { WaterdropParams } from '../../shared/model';
 
 const RING_TRAVEL_SPAN = 18;
 
@@ -17,9 +17,9 @@ const toSuperellipsePoint = (
   return { x: center.x + x, y: center.y + y };
 };
 
-export const buildWaterdropPolyline = (
+export const buildRipplePolyline = (
   originId: string,
-  params: WaterdropParams,
+  params: RippleParams,
   t01: number,
   step: number,
   velocity: number,

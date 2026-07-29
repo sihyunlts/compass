@@ -3,6 +3,10 @@ import type { Dirent } from 'node:fs';
 import { access, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import {
+  GENERATE_DEVICE_CATEGORY_DIRECTORY_NAME,
+} from '../../../devices/browser-categories';
+import { getRendererDeviceLabel } from '../../../devices/schema-registry';
 import type { ReadPresetEntryResponse } from '../../../shared/contracts/ipc/presets';
 import {
   parsePresetFileText,
@@ -11,12 +15,41 @@ import {
 } from '../../../shared/presets';
 import { PRESET_FILE_SPECS, PRESET_ROOT_DIR_NAME } from './preset-config';
 import {
+  migratePresetDirectory,
+  type PresetDirectoryMigration,
+} from './preset-directory-migration';
+import {
   isValidPresetPathSegment,
   normalizePresetPathSegment,
   resolvePresetPath,
   ensurePresetExtension,
   sanitizeFileStem,
 } from './preset-paths';
+
+const DEVICE_PRESET_DIRECTORY_MIGRATIONS = [
+  {
+    sourceRelativePath: ['Generators'],
+    targetRelativePath: [GENERATE_DEVICE_CATEGORY_DIRECTORY_NAME],
+  },
+  {
+    sourceRelativePath: [
+      GENERATE_DEVICE_CATEGORY_DIRECTORY_NAME,
+      'Waterdrop',
+    ],
+    targetRelativePath: [
+      GENERATE_DEVICE_CATEGORY_DIRECTORY_NAME,
+      getRendererDeviceLabel('ripple'),
+    ],
+  },
+] as const satisfies readonly PresetDirectoryMigration[];
+
+const migrateDevicePresetDirectories = async (
+  devicePresetDirectory: string,
+): Promise<void> => {
+  for (const migration of DEVICE_PRESET_DIRECTORY_MIGRATIONS) {
+    await migratePresetDirectory(devicePresetDirectory, migration);
+  }
+};
 
 const serializePresetFile = (payload: PresetFile): unknown => {
   if (payload.presetType === 'device') {
@@ -50,6 +83,8 @@ const serializePresetFile = (payload: PresetFile): unknown => {
 
 /** Reads and writes preset files under the app's preset root. */
 export class PresetStorage {
+  private deviceDirectoryMigration: Promise<void> | null = null;
+
   public async resolvePresetsRootDirectory(): Promise<string> {
     const directory = path.join(app.getPath('userData'), PRESET_ROOT_DIR_NAME);
     await mkdir(directory, { recursive: true });
@@ -64,6 +99,10 @@ export class PresetStorage {
       PRESET_FILE_SPECS[presetType].directory,
     );
     await mkdir(directory, { recursive: true });
+    if (presetType === 'device') {
+      this.deviceDirectoryMigration ??= migrateDevicePresetDirectories(directory);
+      await this.deviceDirectoryMigration;
+    }
     return directory;
   }
 

@@ -34,8 +34,8 @@ export type {
   TimeWarpEffectNode,
   TrimEffectNode,
   TranslateEffectNode,
-  WaterdropGeneratorNode,
-  WaterdropParams,
+  RippleGeneratorNode,
+  RippleParams,
 } from './chain';
 export type { ClipNote } from './clip';
 export { cloneChainForIpc } from './chain-clone';
