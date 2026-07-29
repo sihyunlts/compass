@@ -2,11 +2,12 @@
 
 <script lang="ts">
   import type { RendererDeviceTabDefinition } from '../../../devices/types';
+  import { i18n } from '../../i18n.svelte';
 
   let {
     tabs,
     activeTab,
-    ariaLabel = 'Device tabs',
+    ariaLabel = i18n.t('rack.deviceTabs'),
     class: className = '',
     onChange,
   } = $props<{
@@ -47,7 +48,13 @@
       disabled={tab.disabled}
       onclick={() => selectTab(tab)}
     >
-      <span class="device-tab-label">{tab.label}</span>
+      <span class="device-tab-label">
+        {tab.id === 'curve'
+          ? i18n.t('tab.curve')
+          : tab.id === 'map'
+            ? i18n.t('tab.map')
+            : tab.label}
+      </span>
     </button>
   {/each}
 </div>

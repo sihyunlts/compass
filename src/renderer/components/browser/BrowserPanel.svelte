@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
 
   import type { RendererDeviceKind } from '../../../devices';
+  import type { AppLocale } from '../../../shared/i18n';
   import type { PresetFileKind } from '../../../shared/presets';
   import {
     getDeviceBrowserCategory,
@@ -24,6 +25,12 @@
     ThemePresetId,
     ThemeSelectionId,
   } from '../../theme-presets';
+  import { i18n } from '../../i18n.svelte';
+  import {
+    getDeviceCategoryMessageKey,
+    getDeviceMessageKey,
+    getPresetSystemFolderMessageKey,
+  } from '../../device-i18n';
 
   export type BrowserPanelPage = 'devices' | 'presets' | 'settings';
 
@@ -238,6 +245,7 @@
     themeHue = 265,
     themeSaturation = 100,
     launchpadMk2Enabled = false,
+    locale = 'en',
     paletteDescription = 'Default palette',
     paletteDescriptionTone = 'neutral',
     appVersionText = '',
@@ -256,6 +264,7 @@
     onBrowserPointerDown,
     onOpenContextMenu = () => {},
     onLaunchpadModelToggle = () => {},
+    onLocaleChange = () => {},
     onPaletteReset = () => {},
     onPaletteFileChange = () => {},
     onOpenAboutSite = () => {},
@@ -282,6 +291,7 @@
     themeHue?: number;
     themeSaturation?: number;
     launchpadMk2Enabled?: boolean;
+    locale?: AppLocale;
     paletteDescription?: string;
     paletteDescriptionTone?: 'neutral' | 'error';
     appVersionText?: string;
@@ -304,6 +314,7 @@
       target: ContextMenuTarget,
     ) => void;
     onLaunchpadModelToggle?: (enabled: boolean) => void;
+    onLocaleChange?: (locale: AppLocale) => void;
     onPaletteReset?: () => void;
     onPaletteFileChange?: (event: Event) => void | Promise<void>;
     onOpenAboutSite?: () => void | Promise<void>;
@@ -332,8 +343,32 @@
     updateAvailable && activePage !== 'settings',
   );
   const settingsButtonLabel = $derived(
-    updateAvailable ? 'Settings (Update available)' : 'Settings',
+    updateAvailable
+      ? i18n.t('browser.settingsUpdate')
+      : i18n.t('browser.settings'),
   );
+
+  const resolveTreeNodeLabel = (node: VisibleBrowserTreeNode): string => {
+    if (node.kind === 'device') {
+      return i18n.t(getDeviceMessageKey(node.deviceKind));
+    }
+
+    if (node.kind === 'folder' && node.treeKind === 'device') {
+      return i18n.t(getDeviceCategoryMessageKey(node.categoryId));
+    }
+
+    if (node.kind === 'folder' && node.treeKind === 'preset') {
+      const messageKey = getPresetSystemFolderMessageKey(
+        node.presetType,
+        node.relativePath,
+      );
+      if (messageKey) {
+        return i18n.t(messageKey);
+      }
+    }
+
+    return node.label;
+  };
 
   const activeTreeRoots = $derived.by(() => {
     if (activePage === 'devices') {
@@ -432,7 +467,7 @@
           kind: 'device-kind',
           deviceKind: node.deviceKind,
         },
-        badgeLabel: `+ ${node.label}`,
+        badgeLabel: `+ ${resolveTreeNodeLabel(node)}`,
         sourceEvent: event,
         itemEl,
       });
@@ -678,7 +713,7 @@
         <Button
           class="browser-page-switch-button"
           variant="icon"
-          label="Devices"
+          label={i18n.t('browser.devices')}
           icon="widgets"
           pressed={activePage === 'devices'}
           onClick={() => onPageSelect('devices')}
@@ -686,7 +721,7 @@
         <Button
           class="browser-page-switch-button"
           variant="icon"
-          label="Presets"
+          label={i18n.t('browser.presets')}
           icon="inventory_2"
           pressed={activePage === 'presets'}
           onClick={() => onPageSelect('presets')}
@@ -703,7 +738,9 @@
           <Button
             class="browser-page-switch-button"
             variant="icon"
-            label={mainWindowAlwaysOnTop ? 'Unpin window' : 'Pin window on top'}
+            label={mainWindowAlwaysOnTop
+              ? i18n.t('browser.unpinWindow')
+              : i18n.t('browser.pinWindow')}
             icon="push_pin"
             pressed={mainWindowAlwaysOnTop}
             onClick={onMainWindowAlwaysOnTopToggle}
@@ -724,6 +761,7 @@
       {#if activePage === 'settings'}
         <SidebarSettingsPage
           {launchpadMk2Enabled}
+          {locale}
           {reduceAnimation}
           {themePreset}
           {themeHue}
@@ -737,6 +775,7 @@
           {aboutDescriptionTone}
           {githubDescription}
           onLaunchpadModelToggle={onLaunchpadModelToggle}
+          onLocaleChange={onLocaleChange}
           onReduceAnimationToggle={onReduceAnimationToggle}
           onThemePresetChange={onThemePresetChange}
           onThemeHueChange={onThemeHueChange}
@@ -753,7 +792,9 @@
         <ul
           class="browser-tree-list browser-tree-root"
           role="tree"
-          aria-label={activePage === 'devices' ? 'Devices browser' : 'Presets browser'}
+          aria-label={activePage === 'devices'
+            ? i18n.t('browser.devicesAria')
+            : i18n.t('browser.presetsAria')}
         >
           {#each visibleRows as row (row.node.id)}
             <li role="none" class:is-selected={selectedRowId === row.node.id}>
@@ -791,7 +832,9 @@
                 oncontextmenu={(event) => handleTreeItemContextMenu(row.node, event)}
               >
                 {#if row.node.kind === 'folder'}
-                  {@const folderToggleLabel = isFolderExpanded(row.node.id) ? 'Collapse folder' : 'Expand folder'}
+                  {@const folderToggleLabel = isFolderExpanded(row.node.id)
+                    ? i18n.t('browser.collapseFolder')
+                    : i18n.t('browser.expandFolder')}
                   <button
                     class="browser-tree-leading-slot browser-tree-chevron"
                     type="button"
@@ -823,8 +866,8 @@
                     type="text"
                     value={pendingPresetFolderDraft?.draftName ?? ''}
                     aria-label={pendingPresetFolderDraft?.entryKind === 'file'
-                      ? 'Preset file name'
-                      : 'Preset folder name'}
+                      ? i18n.t('browser.presetFileName')
+                      : i18n.t('browser.presetFolderName')}
                     onpointerdown={(event) => event.stopPropagation()}
                     onclick={(event) => event.stopPropagation()}
                     ondblclick={(event) => event.stopPropagation()}
@@ -852,7 +895,7 @@
                     onblur={() => handlePendingPresetFolderDraftBlur(row.node.id)}
                   />
                 {:else}
-                  <span class="browser-tree-item-label">{row.node.label}</span>
+                  <span class="browser-tree-item-label">{resolveTreeNodeLabel(row.node)}</span>
                 {/if}
               </div>
             </li>

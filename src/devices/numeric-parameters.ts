@@ -1,4 +1,5 @@
 import { clamp } from '../shared/math';
+import type { MessageKey } from '../shared/i18n';
 
 interface NumericParameterInput {
   min?: number;
@@ -49,7 +50,7 @@ export const formatNumericParameterDisplayValue = (
 
 export interface ModulationParameterDefinition {
   key: string;
-  label: string;
+  messageKey: MessageKey;
   unit?: NumericParameterUnit;
 }
 
@@ -63,7 +64,7 @@ export interface NumericParameterRule {
   defaultValue: number;
   input: Readonly<NumericParameterInput>;
   display: Readonly<NumericParameterDisplay>;
-  modulationLabel?: string;
+  modulationMessageKey?: MessageKey;
   normalize: (
     value: number,
     currentParams: Readonly<NumericParameterRecord>,
@@ -89,7 +90,7 @@ interface NumericParameterOptions {
   max?: number;
   dragMode?: 'circular';
   display?: NumericParameterDisplay;
-  modulationLabel?: string;
+  modulationMessageKey?: MessageKey;
 }
 
 interface BoundedNumericParameterOptions extends NumericParameterOptions {
@@ -147,7 +148,7 @@ const createNumericParameterRule = (
       unit: options.display?.unit,
       format: options.display?.format,
     }),
-    modulationLabel: options.modulationLabel,
+    modulationMessageKey: options.modulationMessageKey,
     normalize,
   });
 };

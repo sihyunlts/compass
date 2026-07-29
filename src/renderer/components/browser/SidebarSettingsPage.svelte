@@ -5,6 +5,8 @@
   import DropdownSelect from '../primitives/DropdownSelect.svelte';
   import Switch from '../primitives/Switch.svelte';
   import type { DropdownOption } from '../primitives/dropdown-types';
+  import { isAppLocale, type AppLocale } from '../../../shared/i18n';
+  import { i18n } from '../../i18n.svelte';
   import {
     isThemePresetId,
     THEME_PRESETS,
@@ -12,13 +14,11 @@
     type ThemeSelectionId,
   } from '../../theme-presets';
 
-  const themeOptions: readonly DropdownOption[] = THEME_PRESETS.map((preset) => ({
-    value: preset.id,
-    label: preset.label,
-  }));
+  type ThemeMessageKey = `theme.${ThemePresetId}`;
 
   let {
     launchpadMk2Enabled,
+    locale,
     reduceAnimation,
     themePreset,
     themeHue,
@@ -32,6 +32,7 @@
     aboutDescriptionTone = 'neutral',
     githubDescription,
     onLaunchpadModelToggle,
+    onLocaleChange,
     onReduceAnimationToggle,
     onThemePresetChange,
     onThemeHueChange,
@@ -43,6 +44,7 @@
     onOpenLatestReleasePage,
   } = $props<{
     launchpadMk2Enabled: boolean;
+    locale: AppLocale;
     reduceAnimation: boolean;
     themePreset: ThemeSelectionId;
     themeHue: number;
@@ -56,6 +58,7 @@
     aboutDescriptionTone?: 'neutral' | 'error';
     githubDescription: string;
     onLaunchpadModelToggle: (enabled: boolean) => void;
+    onLocaleChange: (locale: AppLocale) => void;
     onReduceAnimationToggle: (enabled: boolean) => void;
     onThemePresetChange: (presetId: ThemePresetId) => void;
     onThemeHueChange: (hue: number) => void;
@@ -67,9 +70,26 @@
     onOpenLatestReleasePage: () => void | Promise<void>;
   }>();
 
+  const localeOptions = $derived<readonly DropdownOption[]>([
+    { value: 'en', label: i18n.t('language.english') },
+    { value: 'ko', label: i18n.t('language.korean') },
+  ]);
+  const themeOptions = $derived<readonly DropdownOption[]>(
+    THEME_PRESETS.map((preset) => ({
+      value: preset.id,
+      label: i18n.t(`theme.${preset.id}` as ThemeMessageKey),
+    })),
+  );
+
   const handleThemePresetChange = (value: string | number): void => {
     if (isThemePresetId(value)) {
       onThemePresetChange(value);
+    }
+  };
+
+  const handleLocaleChange = (value: string | number): void => {
+    if (isAppLocale(value)) {
+      onLocaleChange(value);
     }
   };
 
@@ -103,11 +123,11 @@
     <section class="sidebar-settings-card" aria-live="polite">
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">Update available</span>
+          <span class="sidebar-settings-label">{i18n.t('settings.updateAvailable')}</span>
           <span class="sidebar-settings-description">{updateCheckText}</span>
         </div>
         <Button
-          text="Download"
+          text={i18n.t('settings.download')}
           onClick={() => onOpenLatestReleasePage()}
         />
       </div>
@@ -115,24 +135,24 @@
   {/if}
 
   <section class="sidebar-settings-section">
-    <h2 class="sidebar-settings-section-title">Lightshow</h2>
+    <h2 class="sidebar-settings-section-title">{i18n.t('settings.lightshow')}</h2>
     <div class="sidebar-settings-card">
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">Pro MK2 Mode</span>
-          <span class="sidebar-settings-description">Enable mapping for Launchpad Pro MK2</span>
+          <span class="sidebar-settings-label">{i18n.t('settings.mk2Mode')}</span>
+          <span class="sidebar-settings-description">{i18n.t('settings.mk2Description')}</span>
         </div>
         <Switch
           id="launchpad-model-mk2"
           checked={launchpadMk2Enabled}
-          label="Pro MK2 Mode"
+          label={i18n.t('settings.mk2Mode')}
           onCheckedChange={onLaunchpadModelToggle}
         />
       </div>
 
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">Color Palette</span>
+          <span class="sidebar-settings-label">{i18n.t('settings.colorPalette')}</span>
           <span
             class="sidebar-settings-description"
             class:is-error={paletteDescriptionTone === 'error'}
@@ -146,11 +166,11 @@
         <div class="sidebar-settings-actions">
           <Button
             id="palette-reset"
-            text="Reset"
+            text={i18n.t('settings.reset')}
             onClick={() => onPaletteReset()}
           />
           <div class="sidebar-settings-file-input">
-            <div class="sidebar-settings-file-button">Load</div>
+            <div class="sidebar-settings-file-button">{i18n.t('settings.load')}</div>
             <input
               id="palette-file-input"
               type="file"
@@ -163,26 +183,26 @@
   </section>
 
   <section class="sidebar-settings-section">
-    <h2 class="sidebar-settings-section-title">Interface</h2>
+    <h2 class="sidebar-settings-section-title">{i18n.t('settings.interface')}</h2>
     <div class="sidebar-settings-card">
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">Theme</span>
-          <span class="sidebar-settings-description">Choose a color preset</span>
+          <span class="sidebar-settings-label">{i18n.t('settings.theme')}</span>
+          <span class="sidebar-settings-description">{i18n.t('settings.chooseTheme')}</span>
         </div>
         <DropdownSelect
           class="sidebar-settings-theme-select"
           value={themePreset}
-          valueLabel={themePreset === 'custom' ? 'Custom' : undefined}
+          valueLabel={themePreset === 'custom' ? i18n.t('theme.custom') : undefined}
           options={themeOptions}
-          ariaLabel="Theme"
+          ariaLabel={i18n.t('settings.theme')}
           onValueChange={handleThemePresetChange}
         />
       </div>
 
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">Hue</span>
+          <span class="sidebar-settings-label">{i18n.t('settings.hue')}</span>
           <span class="sidebar-settings-description">{themeHue}°</span>
         </div>
         <input
@@ -191,7 +211,7 @@
           min="0"
           max="360"
           value={themeHue}
-          aria-label="Theme Hue"
+          aria-label={i18n.t('settings.themeHue')}
           oninput={(event) =>
             handleThemeInput(onThemeHueChange, event.currentTarget.valueAsNumber)}
         />
@@ -199,7 +219,7 @@
 
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">Saturation</span>
+          <span class="sidebar-settings-label">{i18n.t('settings.saturation')}</span>
           <span class="sidebar-settings-description">{themeSaturation}%</span>
         </div>
         <input
@@ -208,7 +228,7 @@
           min="0"
           max="100"
           value={themeSaturation}
-          aria-label="Theme Saturation"
+          aria-label={i18n.t('settings.themeSaturation')}
           oninput={(event) =>
             handleThemeInput(onThemeSaturationChange, event.currentTarget.valueAsNumber)}
         />
@@ -218,26 +238,44 @@
     <div class="sidebar-settings-card">
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">Reduce Animation</span>
-          <span class="sidebar-settings-description">Minimize interface motion and transitions</span>
+          <span class="sidebar-settings-label">{i18n.t('settings.reduceAnimation')}</span>
+          <span class="sidebar-settings-description">{i18n.t('settings.reduceAnimationDescription')}</span>
         </div>
         <Switch
           id="reduce-animation"
           checked={reduceAnimation}
-          label="Reduce Animation"
+          label={i18n.t('settings.reduceAnimation')}
           onCheckedChange={onReduceAnimationToggle}
+        />
+      </div>
+    </div>
+
+    <div class="sidebar-settings-card">
+      <div class="sidebar-settings-row">
+        <div class="sidebar-settings-info">
+          <span class="sidebar-settings-label">{i18n.t('settings.language')}</span>
+          <span class="sidebar-settings-description">
+            {i18n.t('settings.languageGreeting')}
+          </span>
+        </div>
+        <DropdownSelect
+          class="sidebar-settings-theme-select"
+          value={locale}
+          options={localeOptions}
+          ariaLabel={i18n.t('settings.language')}
+          onValueChange={handleLocaleChange}
         />
       </div>
     </div>
   </section>
 
   <section class="sidebar-settings-section">
-    <h2 class="sidebar-settings-section-title">About</h2>
+    <h2 class="sidebar-settings-section-title">{i18n.t('settings.about')}</h2>
     <div class="sidebar-settings-card">
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">Version</span>
-          <span class="sidebar-settings-description">{appVersionText ? `v${appVersionText}` : 'Loading...'}</span>
+          <span class="sidebar-settings-label">{i18n.t('app.version')}</span>
+          <span class="sidebar-settings-description">{appVersionText ? `v${appVersionText}` : i18n.t('app.loading')}</span>
         </div>
       </div>
 
@@ -247,7 +285,7 @@
           <span class="sidebar-settings-description">{githubDescription}</span>
         </div>
         <Button
-          text="Open"
+          text={i18n.t('app.open')}
           onClick={() => onOpenGitHub()}
         />
       </div>
@@ -265,7 +303,7 @@
           </span>
         </div>
         <Button
-          text="Open"
+          text={i18n.t('app.open')}
           onClick={() => onOpenAboutSite()}
         />
       </div>

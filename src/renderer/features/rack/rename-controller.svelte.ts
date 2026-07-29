@@ -16,6 +16,8 @@ import {
   resolveRenamePopoverTarget,
   type RackRenameTarget,
 } from './rename';
+import { i18n } from '../../i18n.svelte';
+import { getDeviceMessageKey } from '../../device-i18n';
 
 type RackRenamePopoverHandle = {
   measure(): { width: number; height: number };
@@ -88,7 +90,10 @@ class RackRenameController {
     const label = target.kind === 'device'
       ? resolveDeviceDisplayName(this.options.getDeviceDisplayNameById(), target.id)
       : resolveGroupDisplayName(this.options.getGroupDisplayNameById(), target.id);
-    return `Rename ${label}`;
+    return i18n.t(
+      target.kind === 'device' ? 'device.rename' : 'group.rename',
+      { name: label },
+    );
   }
 
   public isRenamingDevice(deviceId: string): boolean {
@@ -155,7 +160,11 @@ class RackRenameController {
 
     return this.openEditor(
       { kind: 'group', id: groupId },
-      resolveEditableGroupName(groupId, this.options.getGroupStateById()),
+      resolveEditableGroupName(
+        groupId,
+        this.options.getGroupStateById(),
+        i18n.t('group.defaultTemplate'),
+      ),
     );
   }
 
@@ -265,8 +274,9 @@ class RackRenameController {
       renameTarget: this.target,
       renameDraft: this.draft,
       devices: this.options.getDevices(),
-      groupStateById: this.options.getGroupStateById(),
-      deviceDisplayNameById: this.options.getDeviceDisplayNameById(),
+      resolveDefaultDeviceName: (kind) =>
+        i18n.t(getDeviceMessageKey(kind)),
+      defaultGroupNameTemplate: i18n.t('group.defaultTemplate'),
     });
     const didRename = this.target.kind === 'device'
       ? this.options.renameDevice(this.target.id, committedDraft)

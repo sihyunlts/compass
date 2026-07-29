@@ -29,7 +29,7 @@ export const createTimeWindowNumericParameters = (
     min: 0,
     max: 1,
     step: MIN_TIME_WINDOW_SPAN,
-    modulationLabel: 'Start',
+    modulationMessageKey: 'control.start',
     normalize: (value, currentParams, context) => {
       const minimumSpan = resolveMinimumSpan(context.step);
       const end = typeof currentParams.end === 'number' && Number.isFinite(currentParams.end)
@@ -43,7 +43,7 @@ export const createTimeWindowNumericParameters = (
     min: 0,
     max: 1,
     step: MIN_TIME_WINDOW_SPAN,
-    modulationLabel: 'End',
+    modulationMessageKey: 'control.end',
     normalize: (value, currentParams, context) => {
       const minimumSpan = resolveMinimumSpan(context.step);
       const start = typeof currentParams.start === 'number' && Number.isFinite(currentParams.start)

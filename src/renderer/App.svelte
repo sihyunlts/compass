@@ -56,6 +56,8 @@
     type BadAppleAnimation,
   } from './features/preview/bad-apple';
   import type { RackViewApi } from './features/rack/api';
+  import { i18n } from './i18n.svelte';
+  import { resolveHistoryActionLabel } from './features/editor/history-i18n';
 
   const AUTO_PREVIEW_DEBOUNCE_MS = 120;
   const HISTORY_MAX_ENTRIES = 100;
@@ -94,6 +96,11 @@
   const uiState = editorSession.state;
   const previewState = previewSession.state;
   const historyControls = $derived.by(() => selectHistoryControls(uiState));
+  const localizedRedoActionLabel = $derived(
+    historyControls.redoActionKind
+      ? resolveHistoryActionLabel(historyControls.redoActionKind)
+      : '',
+  );
   const historyEntries = $derived.by(() => {
     void uiState.chainRevision;
     return editorSession.listUndoHistoryEntries();
@@ -122,6 +129,24 @@
   });
   const presetState = presetController.state;
   const settingsState = settingsController.state;
+  const paletteDescription = $derived.by(() => {
+    if (settingsState.paletteDescriptionOverride) {
+      return settingsState.paletteDescriptionOverride;
+    }
+
+    if (uiState.paletteSource === 'loading') {
+      return i18n.t('settings.paletteLoading');
+    }
+    if (uiState.paletteSource === 'fallback') {
+      return i18n.t('settings.paletteFallback');
+    }
+    return i18n.t(
+      uiState.paletteSource === 'custom'
+        ? 'settings.paletteCustom'
+        : 'settings.paletteDefault',
+      { name: uiState.paletteName },
+    );
+  });
   const resolvePaletteRgb = (velocity: number): string =>
     settingsController.resolvePaletteRgb(velocity, '0 0 0');
   const playbackSession = createPlaybackSession({
@@ -420,6 +445,7 @@
   };
 
   onMount(() => {
+    void bridgeClient.setApplicationLocale(i18n.locale);
     void loadBadAppleAnimation().then((animation) => {
       badAppleAnimation = animation;
     }).catch(() => {
@@ -532,6 +558,7 @@
       reserveTitlebarSpace={reserveBrowserTitlebarSpace}
       canToggleWindowLayer={!isWebFallback}
       {mainWindowAlwaysOnTop}
+      locale={i18n.locale}
       reduceAnimation={settingsState.reduceAnimation}
       themePreset={settingsState.themePreset}
       themeHue={settingsState.themeHue}
@@ -543,7 +570,7 @@
       pendingPresetFolderDraft={presetState.pendingPresetFolderDraft}
       presetFolderSelectionTarget={presetState.presetFolderSelectionTarget}
       launchpadMk2Enabled={uiState.launchpadModel === 'mk2'}
-      paletteDescription={settingsState.paletteDescriptionOverride || uiState.paletteNameText || 'Default palette'}
+      {paletteDescription}
       paletteDescriptionTone={settingsState.paletteDescriptionTone}
       appVersionText={settingsState.appVersionText}
       updateCheckText={settingsState.updateCheckText}
@@ -555,6 +582,12 @@
         void handleSidebarPageSelect(nextPage);
       }}
       onMainWindowAlwaysOnTopToggle={() => void handleMainWindowAlwaysOnTopToggle()}
+      onLocaleChange={(locale) => {
+        i18n.setLocale(locale);
+        presetController.syncLocaleDependentDefaults();
+        playbackSession.renderPreviewFrame();
+        void bridgeClient.setApplicationLocale(locale);
+      }}
       onReduceAnimationToggle={(enabled) =>
         settingsController.handleReduceAnimationToggle(enabled)}
       onThemePresetChange={(presetId) =>
@@ -628,17 +661,21 @@
         <div class="workspace-actions">
           <UndoHistoryControl
             canUndo={historyControls.canUndo}
-            undoActionLabel={historyControls.undoActionLabel}
+            undoActionKind={historyControls.undoActionKind}
             {historyEntries}
             onUndo={handleUndoClick}
             onCheckout={editorSession.commands.checkoutHistory}
           />
           <Button
             id="redo-button"
-            text="Redo"
+            text={i18n.t('history.redo')}
             disabled={!historyControls.canRedo}
-            title={historyControls.canRedo ? `Redo: ${historyControls.redoActionLabel}` : 'Nothing to redo'}
-            label={historyControls.canRedo ? `Redo: ${historyControls.redoActionLabel}` : 'Redo unavailable'}
+            title={historyControls.canRedo
+              ? i18n.t('history.redoAction', { action: localizedRedoActionLabel })
+              : i18n.t('history.nothingToRedo')}
+            label={historyControls.canRedo
+              ? i18n.t('history.redoAction', { action: localizedRedoActionLabel })
+              : i18n.t('history.redoUnavailable')}
             onClick={handleRedoClick}
           />
           <div class="header-length-select">
@@ -649,7 +686,7 @@
                 value: option.label,
                 label: option.label,
               }))}
-              ariaLabel="Lightshow Length"
+              ariaLabel={i18n.t('preview.length')}
               showHint
               onValueChange={handlePreviewLengthChange}
             />
@@ -657,7 +694,13 @@
           <Button
             id="send-button"
             variant="primary"
-            text={uiState.sendButtonLabel}
+            text={i18n.t(
+              uiState.sendButtonState === 'sending'
+                ? 'status.sending'
+                : uiState.sendButtonState === 'done'
+                  ? 'status.done'
+                  : 'status.send',
+            )}
             disabled={uiState.sendButtonDisabled}
             onClick={() => sendFlow.send(presetState.currentRackDisplayName)}
           />
@@ -730,10 +773,10 @@
 
   <ModalDialog
     open={isRackRenameDialogOpen}
-    title="Rename rack"
-    description="Set the rack file name."
-    confirmLabel="Rename"
-    cancelLabel="Cancel"
+    title={i18n.t('rack.rename')}
+    description={i18n.t('rack.renameDescription')}
+    confirmLabel={i18n.t('context.rename')}
+    cancelLabel={i18n.t('app.cancel')}
     busy={isRackRenamePending}
     onConfirm={confirmRackRenameDialog}
     onCancel={closeRackRenameDialog}
@@ -741,7 +784,7 @@
     <TextField
       value={rackRenameDraft}
       disabled={isRackRenamePending}
-      ariaLabel="Rack file name"
+      ariaLabel={i18n.t('rack.fileName')}
       onValueChange={(value) => {
         rackRenameDraft = value;
       }}
@@ -751,10 +794,10 @@
 
   <ModalDialog
     open={isRackRevertDialogOpen}
-    title="Revert to saved rack?"
-    description="All changes made since this rack was last saved will be discarded."
-    confirmLabel="Revert"
-    cancelLabel="Cancel"
+    title={i18n.t('rack.revertPrompt')}
+    description={i18n.t('rack.revertDescription')}
+    confirmLabel={i18n.t('rack.revert')}
+    cancelLabel={i18n.t('app.cancel')}
     onConfirm={confirmRackRevertDialog}
     onCancel={closeRackRevertDialog}
   />
@@ -767,8 +810,8 @@
     description={presetState.pendingPresetDeleteTarget
       ? presetController.getPresetDeleteDescription(presetState.pendingPresetDeleteTarget)
       : null}
-    confirmLabel="Move to Trash"
-    cancelLabel="Cancel"
+    confirmLabel={i18n.t('rack.trash')}
+    cancelLabel={i18n.t('app.cancel')}
     busy={presetState.isPresetDeletePending}
     onConfirm={() => presetController.confirmPresetBrowserDelete()}
     onCancel={() => presetController.closePresetDeleteDialog()}
@@ -776,13 +819,13 @@
 
   <ModalDialog
     open={presetState.pendingRackPresetLoadTarget !== null}
-    title="Save current rack?"
+    title={i18n.t('rack.saveCurrentPrompt')}
     description={presetState.pendingRackPresetLoadTarget
       ? presetController.getRackPresetLoadDescription(presetState.pendingRackPresetLoadTarget)
       : null}
-    confirmLabel="Save"
-    secondaryLabel="Don't Save"
-    cancelLabel="Cancel"
+    confirmLabel={i18n.t('rack.save')}
+    secondaryLabel={i18n.t('rack.dontSave')}
+    cancelLabel={i18n.t('app.cancel')}
     busy={presetState.isRackPresetLoadPending}
     onConfirm={() => presetController.confirmRackSaveBeforeLoad()}
     onSecondary={() => presetController.confirmRackDiscardBeforeLoad()}

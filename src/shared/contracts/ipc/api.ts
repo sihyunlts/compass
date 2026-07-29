@@ -1,4 +1,5 @@
 import type { LiveTempoUpdate } from '../../bridge/types';
+import type { AppLocale } from '../../i18n';
 import type { PresetFileKind } from '../../presets';
 import type {
   CreatePresetFolderRequest,
@@ -67,6 +68,7 @@ export interface CompassApi {
     request: SendGeneratedPreviewRequest,
   ) => Promise<SendGeneratedPreviewResponse>;
   requestAppVersion: () => Promise<string>;
+  setApplicationLocale: (locale: AppLocale) => Promise<void>;
   checkForUpdates: () => Promise<UpdateCheckResponse>;
   openLatestReleasePage: () => Promise<void>;
   requestLiveTempo: () => Promise<RequestLiveTempoResponse>;

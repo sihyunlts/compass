@@ -8,7 +8,6 @@ export interface RendererControlChange {
   paramKey?: string;
   value: unknown;
   finalize: boolean;
-  label?: string;
   step?: number;
 }
 

@@ -13,7 +13,6 @@ type EditorHistoryOptions = Parameters<typeof createChainHistory>[1];
 interface EditorHistoryEntryMeta {
   id: string;
   revision: number;
-  label: string;
   createdAt: number;
   kind: ChainHistoryKind;
 }
@@ -37,7 +36,7 @@ export interface EditorHistory {
   canRedo(): boolean;
   getUndoEntry(): EditorHistorySnapshotEntry | null;
   getRedoEntry(): EditorHistorySnapshotEntry | null;
-  replaceCurrent(chain: GeneratorChain, label?: string): void;
+  replaceCurrent(chain: GeneratorChain): void;
   flushPendingMerge(): void;
 }
 
@@ -129,8 +128,8 @@ class EditorHistoryImpl implements EditorHistory {
     return this.toSnapshotEntry(entry);
   }
 
-  public replaceCurrent(chain: GeneratorChain, label?: string): void {
-    this.chainHistory.replaceCurrent(chain, label);
+  public replaceCurrent(chain: GeneratorChain): void {
+    this.chainHistory.replaceCurrent(chain);
     this.syncMetadata();
   }
 
@@ -175,7 +174,6 @@ class EditorHistoryImpl implements EditorHistory {
     return {
       id: item.id,
       revision: metadata.revision,
-      label: item.label,
       createdAt: metadata.createdAt,
       kind: item.kind,
       isCurrent: item.isCurrent,
@@ -188,7 +186,6 @@ class EditorHistoryImpl implements EditorHistory {
     return {
       id: entry.id,
       revision: metadata.revision,
-      label: entry.label,
       createdAt: metadata.createdAt,
       kind: entry.kind,
       chain: entry.chain,

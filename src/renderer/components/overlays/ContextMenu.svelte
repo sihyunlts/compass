@@ -7,6 +7,8 @@
     resolveViewportFloatingLayerPosition,
   } from './floating-layer';
   import { FloatingLayerPresence } from './floating-layer-presence.svelte';
+  import { i18n } from '../../i18n.svelte';
+  import type { MessageKey } from '../../../shared/i18n';
 
   let {
     onCopy,
@@ -60,14 +62,14 @@
   type ClipboardActionMeta = {
     id: string;
     kind: ClipboardActionKind;
-    label: string;
+    labelKey: MessageKey;
     requiresClipboard?: boolean;
   };
   const CLIPBOARD_ACTIONS: readonly ClipboardActionMeta[] = [
-    { id: 'context-cut', kind: 'cut', label: 'Cut' },
-    { id: 'context-copy', kind: 'copy', label: 'Copy' },
-    { id: 'context-paste', kind: 'paste', label: 'Paste', requiresClipboard: true },
-    { id: 'context-duplicate', kind: 'duplicate', label: 'Duplicate' },
+    { id: 'context-cut', kind: 'cut', labelKey: 'context.cut' },
+    { id: 'context-copy', kind: 'copy', labelKey: 'context.copy' },
+    { id: 'context-paste', kind: 'paste', labelKey: 'context.paste', requiresClipboard: true },
+    { id: 'context-duplicate', kind: 'duplicate', labelKey: 'context.duplicate' },
   ];
   const visibleClipboardActions = $derived.by(() =>
     target?.kind === 'preset-entry' || target?.kind === 'presets-root'
@@ -247,35 +249,35 @@
   {#if target}
     {#if isPresetBrowserTarget}
       {#if canCreatePresetFolder}
-        {@render menuItem('context-new-folder', 'New Folder', handleCreatePresetFolderClick)}
+        {@render menuItem('context-new-folder', i18n.t('context.newFolder'), handleCreatePresetFolderClick)}
       {/if}
       {#if canRenameTarget}
-        {@render menuItem('context-rename', 'Rename', handleRenameClick)}
+        {@render menuItem('context-rename', i18n.t('context.rename'), handleRenameClick)}
       {/if}
       {#if isDeletablePresetTarget}
         {#if canCreatePresetFolder || canRenameTarget}
           <hr class="context-menu-separator floating-menu-separator" />
         {/if}
-        {@render menuItem('context-delete', 'Delete', handleDeleteClick)}
+        {@render menuItem('context-delete', i18n.t('context.delete'), handleDeleteClick)}
         <hr class="context-menu-separator floating-menu-separator" />
       {/if}
-      {@render menuItem('context-show-in-folder', 'Show in Folder', handleShowInFolderClick)}
+      {@render menuItem('context-show-in-folder', i18n.t('context.showInFolder'), handleShowInFolderClick)}
     {:else}
       {#each visibleClipboardActions as action (action.id)}
-        {@render menuItem(action.id, action.label, () => handleClipboardAction(action.kind))}
+        {@render menuItem(action.id, i18n.t(action.labelKey), () => handleClipboardAction(action.kind))}
       {/each}
       {#if canRenameTarget}
-        {@render menuItem('context-rename', 'Rename', handleRenameClick)}
+        {@render menuItem('context-rename', i18n.t('context.rename'), handleRenameClick)}
       {/if}
       <hr class="context-menu-separator floating-menu-separator" />
       {#if target.kind === 'devices'}
-        {@render menuItem('context-delete', 'Delete', handleDeleteClick)}
+        {@render menuItem('context-delete', i18n.t('context.delete'), handleDeleteClick)}
         {#if target.canGroup}
-          {@render menuItem('context-group', 'Group', handleGroupClick)}
+          {@render menuItem('context-group', i18n.t('context.group'), handleGroupClick)}
         {/if}
       {:else}
-        {@render menuItem('context-delete', 'Delete', handleDeleteClick)}
-        {@render menuItem('context-ungroup', 'Ungroup', handleUngroupClick)}
+        {@render menuItem('context-delete', i18n.t('context.delete'), handleDeleteClick)}
+        {@render menuItem('context-ungroup', i18n.t('context.ungroup'), handleUngroupClick)}
       {/if}
     {/if}
   {/if}

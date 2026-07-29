@@ -6,6 +6,7 @@ import {
   createPreviewSourceKey,
   type PlaybackSessionController,
 } from './playback-session.svelte';
+import { i18n } from '../i18n.svelte';
 
 interface SendFlowOptions {
   bridgeClient: CompassApi;
@@ -28,9 +29,9 @@ class SendFlowController {
 
     editorSession.cancelAutoPreview();
     this.clearSendDoneTimer();
-    uiState.sendButtonLabel = 'Sending...';
+    uiState.sendButtonState = 'sending';
     uiState.sendButtonDisabled = true;
-    headerIndicator.show('Sending...', { autoClear: false });
+    headerIndicator.show(i18n.t('status.sending'), { autoClear: false });
     playbackSession.prepareForSend();
 
     try {
@@ -63,23 +64,25 @@ class SendFlowController {
       });
 
       if (preview.noteCount > 0) {
-        headerIndicator.show('Send complete');
+        headerIndicator.show(i18n.t('status.sendComplete'));
       } else {
         headerIndicator.clear();
       }
 
-      uiState.sendButtonLabel = 'Done!';
+      uiState.sendButtonState = 'done';
       uiState.sendButtonDisabled = false;
       this.sendDoneTimer = window.setTimeout(() => {
         this.sendDoneTimer = null;
-        uiState.sendButtonLabel = 'Send';
+        uiState.sendButtonState = 'idle';
         uiState.sendButtonDisabled = false;
       }, this.options.sendDoneMs ?? DEFAULT_SEND_DONE_MS);
     } catch (error) {
       playbackSession.stopPlayback();
-      const errorText = error instanceof Error ? error.message : 'Unknown send error';
-      headerIndicator.show(`Send failed | ${errorText}`);
-      uiState.sendButtonLabel = 'Send';
+      const errorText = error instanceof Error
+        ? error.message
+        : i18n.t('status.unknownSendError');
+      headerIndicator.show(i18n.t('status.sendFailed', { error: errorText }));
+      uiState.sendButtonState = 'idle';
       uiState.sendButtonDisabled = false;
     }
   }

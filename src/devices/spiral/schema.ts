@@ -26,21 +26,21 @@ export const SPIRAL_NUMERIC_PARAMETERS = defineNumericParameterRules<
     min: 0,
     max: 9,
     step: 0.5,
-    modulationLabel: 'Center X',
+    modulationMessageKey: 'control.centerX',
   }),
   centerY: boundedNumericParameter({
     defaultValue: DEFAULT_SPIRAL_PARAMS.centerY,
     min: 0,
     max: 9,
     step: 0.5,
-    modulationLabel: 'Center Y',
+    modulationMessageKey: 'control.centerY',
   }),
   turns: boundedNumericParameter({
     defaultValue: DEFAULT_SPIRAL_PARAMS.turns,
     min: 0.25,
     max: 8,
     step: 0.1,
-    modulationLabel: 'Turns',
+    modulationMessageKey: 'control.turns',
   }),
 });
 

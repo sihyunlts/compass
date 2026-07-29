@@ -21,6 +21,7 @@ export const DEVICE_BROWSER_TREE: BrowserTreeDeviceFolderNode[] =
   DEVICE_BROWSER_CATEGORY_DEFINITIONS.map((definition) => ({
     kind: 'folder',
     treeKind: 'device',
+    categoryId: definition.categoryId,
     id: `device-group:${definition.categoryId}`,
     label: definition.label,
     children: definition.deviceKinds.map((kind) => toDeviceLeafNode(kind)),

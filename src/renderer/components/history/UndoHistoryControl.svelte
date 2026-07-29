@@ -2,18 +2,21 @@
 
 <script lang="ts">
   import type { EditorHistoryListEntry } from '../../features/editor/editor-history';
+  import type { ChainHistoryKind } from '../../features/editor/history-core';
+  import { resolveHistoryActionLabel } from '../../features/editor/history-i18n';
   import SplitButton from '../primitives/SplitButton.svelte';
   import UndoHistoryDropdown from './UndoHistoryDropdown.svelte';
+  import { i18n } from '../../i18n.svelte';
 
   let {
     canUndo,
-    undoActionLabel,
+    undoActionKind,
     historyEntries,
     onUndo,
     onCheckout,
   } = $props<{
     canUndo: boolean;
-    undoActionLabel: string;
+    undoActionKind: ChainHistoryKind | null;
     historyEntries: EditorHistoryListEntry[];
     onUndo: () => void;
     onCheckout: (id: string) => void;
@@ -24,6 +27,9 @@
   let isOpen = $state(false);
   const canCheckoutHistory = $derived.by(() =>
     historyEntries.some((entry: EditorHistoryListEntry) => !entry.isCurrent));
+  const localizedUndoActionLabel = $derived(
+    undoActionKind ? resolveHistoryActionLabel(undoActionKind) : '',
+  );
 
   const handleUndoClick = (): void => {
     isOpen = false;
@@ -42,14 +48,18 @@
 <div bind:this={rootEl} class="undo-history-control">
   <SplitButton
     id="undo-button"
-    text="Undo"
+    text={i18n.t('history.undo')}
     disabled={!canUndo}
-    title={canUndo ? `Undo: ${undoActionLabel}` : 'Nothing to undo'}
-    label={canUndo ? `Undo: ${undoActionLabel}` : 'Undo unavailable'}
+    title={canUndo
+      ? i18n.t('history.undoAction', { action: localizedUndoActionLabel })
+      : i18n.t('history.nothingToUndo')}
+    label={canUndo
+      ? i18n.t('history.undoAction', { action: localizedUndoActionLabel })
+      : i18n.t('history.undoUnavailable')}
     menuId="undo-history-trigger"
     menuDisabled={!canCheckoutHistory}
-    menuLabel="Show undo history"
-    menuTitle="Show undo history"
+    menuLabel={i18n.t('history.showUndoHistory')}
+    menuTitle={i18n.t('history.showUndoHistory')}
     menuExpanded={isOpen}
     menuPopupType="dialog"
     onClick={handleUndoClick}

@@ -15,6 +15,7 @@ import {
 import type { PlaybackSessionController } from './playback-session.svelte';
 import { createPaletteController, PaletteParseError } from './palette-controller';
 import { updateThemeSettings } from './theme';
+import { i18n } from '../i18n.svelte';
 
 const ABOUT_SITE_URL = 'https://sihyunlights.com';
 const GITHUB_URL = 'https://github.com/sihyunlts/compass';
@@ -71,8 +72,9 @@ class SettingsController {
 
   public constructor(private readonly options: SettingsControllerOptions) {
     this.paletteController = createPaletteController({
-      onPaletteNameChanged: (nameText) => {
-        this.options.editorSession.state.paletteNameText = nameText;
+      onPaletteChanged: ({ name, source }) => {
+        this.options.editorSession.state.paletteName = name;
+        this.options.editorSession.state.paletteSource = source;
         this.state.paletteRevision += 1;
       },
     });
@@ -82,7 +84,7 @@ class SettingsController {
     try {
       this.paletteController.initialize();
     } catch (error) {
-      this.showPaletteError('Palette initialization failed', error);
+      this.showPaletteError(i18n.t('settings.paletteInitializationFailed'), error);
     }
   }
 
@@ -106,7 +108,7 @@ class SettingsController {
       try {
         content = await file.text();
       } catch (error) {
-        this.showPaletteError('Failed to read palette file', error);
+        this.showPaletteError(i18n.t('settings.paletteReadFailed'), error);
         return;
       }
 
@@ -121,9 +123,9 @@ class SettingsController {
       }
 
       this.playbackSession?.renderPreviewFrame();
-      this.showPaletteDescription(`Palette loaded | ${file.name}`);
+      this.showPaletteDescription(i18n.t('settings.paletteLoaded', { name: file.name }));
     } catch (error) {
-      this.showPaletteError('Palette upload failed', error);
+      this.showPaletteError(i18n.t('settings.paletteLoadFailed'), error);
     } finally {
       if (input) {
         input.value = '';
@@ -136,8 +138,8 @@ class SettingsController {
     this.playbackSession?.renderPreviewFrame();
     this.showPaletteDescription(
       restoredDefault
-        ? 'Palette reset to default.'
-        : 'Palette reset used embedded fallback.',
+        ? i18n.t('settings.paletteReset')
+        : i18n.t('settings.paletteResetFallback'),
     );
   }
 
@@ -196,7 +198,7 @@ class SettingsController {
     try {
       await this.options.bridgeClient.openExternal(ABOUT_SITE_URL);
     } catch (error) {
-      this.showAboutError('Failed to open website', error);
+      this.showAboutError(i18n.t('settings.openWebsiteFailed'), error);
     }
   }
 
@@ -204,7 +206,7 @@ class SettingsController {
     try {
       await this.options.bridgeClient.openExternal(GITHUB_URL);
     } catch (error) {
-      this.showAboutError('Failed to open GitHub', error);
+      this.showAboutError(i18n.t('settings.openGithubFailed'), error);
     }
   }
 
@@ -212,7 +214,7 @@ class SettingsController {
     try {
       await this.options.bridgeClient.openLatestReleasePage();
     } catch (error) {
-      this.showAboutError('Failed to open release page', error);
+      this.showAboutError(i18n.t('settings.openReleaseFailed'), error);
     }
   }
 
@@ -243,7 +245,7 @@ class SettingsController {
   private showPaletteError(summary: string, error: unknown): void {
     const detail = error instanceof Error && error.message.trim()
       ? error.message.trim()
-      : 'Unknown error.';
+      : i18n.t('settings.unknownError');
     const message = detail === summary ? summary : `${summary} | ${detail}`;
     this.state.paletteDescriptionOverride = message;
     this.state.paletteDescriptionTone = 'error';
@@ -252,21 +254,21 @@ class SettingsController {
 
   private resolvePaletteUploadErrorSummary(error: unknown): string {
     if (!(error instanceof PaletteParseError)) {
-      return 'Palette upload failed';
+      return i18n.t('settings.paletteLoadFailed');
     }
 
     switch (error.code) {
       case 'empty':
-        return 'Palette is empty';
+        return i18n.t('settings.paletteEmpty');
       case 'format':
-        return 'Palette format is not recognized';
+        return i18n.t('settings.paletteInvalid');
     }
   }
 
   private showAboutError(summary: string, error: unknown): void {
     const detail = error instanceof Error && error.message.trim()
       ? error.message.trim()
-      : 'Unknown error.';
+      : i18n.t('settings.unknownError');
     const message = `${summary} | ${detail}`;
     this.state.aboutDescriptionOverride = message;
     this.state.aboutDescriptionTone = 'error';

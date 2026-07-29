@@ -3,7 +3,10 @@
 <script lang="ts">
   /** Renders the shared device card shell and mounts the kind-specific editor body. */
   import { tick } from 'svelte';
-  import type { GeneratorDeviceNode } from '../../../shared/model';
+  import {
+    normalizeCustomName,
+    type GeneratorDeviceNode,
+  } from '../../../shared/model';
   import type { RendererControlChange } from '../../../devices/control-types';
   import type { RendererDeviceTabDefinition } from '../../../devices/types';
   import { getDeviceBrowserCategory } from '../../features/editor/device-browser-categories';
@@ -14,6 +17,8 @@
   import { closestRackControlTarget } from '../../features/rack/control-target';
   import DeviceTabs from './DeviceTabs.svelte';
   import { hint } from '../overlays/hint';
+  import { i18n } from '../../i18n.svelte';
+  import { getDeviceMessageKey } from '../../device-i18n';
 
   let {
     device,
@@ -25,7 +30,6 @@
     currentProgress01 = 0,
     modulationReadoutById = {},
     resolvePaletteRgb,
-    title,
     isCollapsed = false,
     isDisabledByGroup = false,
     isSelected = false,
@@ -56,7 +60,6 @@
     currentProgress01?: number;
     modulationReadoutById?: Record<string, string>;
     resolvePaletteRgb: (velocity: number) => string;
-    title: string;
     isCollapsed?: boolean;
     isDisabledByGroup?: boolean;
     isSelected?: boolean;
@@ -90,7 +93,16 @@
   const DeviceEditor = $derived(deviceDefinition.editor);
   const deviceTabs = $derived.by((): readonly RendererDeviceTabDefinition[] =>
     deviceDefinition.tabs?.(device) ?? []);
-  const enabledToggleLabel = $derived(`${device.enabled ? 'Disable' : 'Enable'} ${title}`);
+  const localizedTitle = $derived(
+    deviceDisplayNameById[device.id]
+      ?? normalizeCustomName(device.name)
+      ?? i18n.t(getDeviceMessageKey(device.kind)),
+  );
+  const enabledToggleLabel = $derived(
+    i18n.t(device.enabled ? 'device.disable' : 'device.enable', {
+      name: localizedTitle,
+    }),
+  );
   const modulationTargetParamKeys = $derived.by(() =>
     new Set(getRendererModulationTargetParamDefinitions(device.kind).map((param) => param.key)));
 
@@ -223,8 +235,8 @@
         <button
           class="preset-save-button"
           type="button"
-          aria-label={`Save ${title}`}
-          use:hint={`Save ${title}`}
+          aria-label={i18n.t('device.save', { name: localizedTitle })}
+          use:hint={i18n.t('device.save', { name: localizedTitle })}
           onpointerdown={handleSavePresetPointerDown}
           onclick={handleSavePresetClick}
           oncontextmenu={handleSavePresetContextMenu}
@@ -239,7 +251,7 @@
           type="text"
           value={renameValue}
           data-preserve-rack-selection="true"
-          aria-label={`Rename ${title}`}
+          aria-label={i18n.t('device.rename', { name: localizedTitle })}
           oninput={onRenameInput}
           onblur={onRenameBlur}
           onkeydown={onRenameKeyDown}
@@ -248,14 +260,14 @@
           oncontextmenu={(event) => event.stopPropagation()}
         />
       {:else}
-        <span class="device-title">{title}</span>
+        <span class="device-title">{localizedTitle}</span>
       {/if}
     </div>
     {#if !isCollapsed && deviceTabs.length > 0}
       <DeviceTabs
         tabs={deviceTabs}
         activeTab={activeDeviceTab}
-        ariaLabel={`${title} views`}
+        ariaLabel={i18n.t('device.views', { name: localizedTitle })}
         class="device-head-tabs"
         onChange={(tabId) => {
           activeDeviceTab = tabId;

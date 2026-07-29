@@ -14,13 +14,13 @@ import { clamp } from '../../../shared/math';
 import type { GeneratorChain } from '../../../shared/model';
 import { LatestSourceKeyFamilyCache } from './source-key-cache';
 import { toWrappedLoopBeat01 } from './utils';
+import { i18n } from '../../i18n.svelte';
 
 const EMPTY_MODULATION_READOUT_BY_ID: Readonly<Record<string, string>> = Object.freeze({});
 
 interface ModulationCacheEntry {
   key: string;
   program: CompiledModulationProgram;
-  baselineById: Readonly<Record<string, string>>;
   modulatorIds: readonly string[];
 }
 
@@ -44,9 +44,12 @@ class ModulationReadoutCache {
     const modulationBeat01 = isLoopEnabled
       ? toWrappedLoopBeat01(beat)
       : clamp(beat, 0, 1);
-    const readoutById = {
-      ...modulationCache.baselineById,
-    };
+    const readoutById = Object.fromEntries(
+      modulationCache.modulatorIds.map((modulatorId) => [
+        modulatorId,
+        i18n.t('modulation.noValidTarget'),
+      ]),
+    );
 
     const readouts = evaluateModulationProgramReadouts(
       modulationCache.program,
@@ -72,15 +75,17 @@ class ModulationReadoutCache {
             valueText,
           )
         : formatNumericParameterValue(valueText, undefined);
-      const parameterLabel = parameterRule?.modulationLabel ?? readout.targetParamKey;
+      const parameterLabel = parameterRule?.modulationMessageKey
+        ? i18n.t(parameterRule.modulationMessageKey)
+        : readout.targetParamKey;
       segments.push(`${parameterLabel} ${formattedValue}`);
       readoutSegmentsByModulatorId.set(readout.modulatorId, segments);
     }
 
     for (const [modulatorId, segments] of readoutSegmentsByModulatorId.entries()) {
       readoutById[modulatorId] = segments.length === 1
-        ? `Current ${segments[0]}`
-        : `${segments.length} targets | ${segments.join(' | ')}`;
+        ? i18n.t('modulation.current', { target: segments[0] })
+        : `${i18n.t('modulation.targetCount', { count: segments.length })} | ${segments.join(' | ')}`;
     }
 
     return readoutById;
@@ -99,15 +104,9 @@ class ModulationReadoutCache {
     const modulatorIds = chain.devices
       .filter((device) => device.kind === 'modulator')
       .map((device) => device.id);
-    const baselineById: Record<string, string> = {};
-    for (const modulatorId of modulatorIds) {
-      baselineById[modulatorId] = 'No valid target';
-    }
-
     const entry: ModulationCacheEntry = {
       key: sourceKey,
       program: compileModulationProgram(chain),
-      baselineById,
       modulatorIds,
     };
     this.modulationCacheByKey.set(sourceKey, entry);

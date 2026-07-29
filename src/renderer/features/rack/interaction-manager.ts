@@ -70,14 +70,12 @@ export class RackInteractionManager {
       persistChange: () => {
         this.saveChain(this.getChainState(), {
           kind: 'center-picker-edit',
-          label: 'Edit center point',
           finalize: true,
         });
       },
       commitReset: () => {
         this.commitChainChange({
           kind: 'center-picker-edit',
-          label: 'Edit center point',
           finalize: true,
         });
       },
@@ -90,7 +88,6 @@ export class RackInteractionManager {
       commitChange: () => {
         this.saveChain(this.getChainState(), {
           kind: 'mask-tile-edit',
-          label: 'Paint mask tiles',
           finalize: true,
         });
       },
@@ -123,7 +120,6 @@ export class RackInteractionManager {
     this.commitChainChange(
       {
         kind: 'control-edit',
-        label: change.label ?? 'Edit parameter',
         mergeKey,
         finalize: change.finalize,
       },

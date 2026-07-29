@@ -8,10 +8,12 @@ export const syncHistoryState = (
   state: EditorSessionState,
   history: EditorHistory,
 ): void => {
+  const undoEntry = history.getUndoEntry();
+  const redoEntry = history.getRedoEntry();
   state.canUndo = history.canUndo();
   state.canRedo = history.canRedo();
-  state.undoActionLabel = history.getUndoEntry()?.label ?? 'Undo';
-  state.redoActionLabel = history.getRedoEntry()?.label ?? 'Redo';
+  state.undoActionKind = undoEntry?.kind ?? null;
+  state.redoActionKind = redoEntry?.kind ?? null;
 };
 
 export const initializeHistoryBridge = (

@@ -4,6 +4,7 @@
   import type { PreviewSurfaceViewModel } from '../../features/preview/view-model';
   import Button from '../primitives/Button.svelte';
   import PreviewSurface from './PreviewSurface.svelte';
+  import { i18n } from '../../i18n.svelte';
 
   let {
     surfaceModel,
@@ -29,13 +30,13 @@
 
   const resolvePlayIcon = (): string => (isPlaying ? 'pause' : 'play_arrow');
   const resolvePlayButtonLabel = (): string =>
-    isPlaying ? 'Pause preview' : 'Play preview';
+    isPlaying ? i18n.t('preview.pauseAria') : i18n.t('preview.playAria');
   const resolvePlayButtonHint = (): string =>
-    isPlaying ? 'Pause' : 'Play';
+    isPlaying ? i18n.t('preview.pause') : i18n.t('preview.play');
   const resolveLoopButtonLabel = (): string =>
-    loopEnabled ? 'Disable preview loop' : 'Enable preview loop';
+    loopEnabled ? i18n.t('preview.disableLoop') : i18n.t('preview.enableLoop');
   const resolveLoopButtonHint = (): string =>
-    loopEnabled ? 'Unloop' : 'Loop';
+    loopEnabled ? i18n.t('preview.unloop') : i18n.t('preview.loop');
 
   const handlePopout = (): void => {
     void onPopout();
@@ -93,8 +94,8 @@
       id="preview-popout"
       class="preview-panel-control-button preview-popout-toggle"
       variant="icon"
-      label="Open preview in a separate window"
-      title="Preview popout"
+      label={i18n.t('preview.openPopout')}
+      title={i18n.t('preview.openPopout')}
       icon="open_in_new"
       onClick={handlePopout}
     />

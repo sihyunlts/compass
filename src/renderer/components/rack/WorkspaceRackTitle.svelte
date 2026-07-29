@@ -1,6 +1,7 @@
 <script lang="ts">
   import FloatingDropdown from '../primitives/FloatingDropdown.svelte';
   import SplitButton from '../primitives/SplitButton.svelte';
+  import { i18n } from '../../i18n.svelte';
 
   type RackActionItem = {
     id: string;
@@ -37,15 +38,21 @@
   let isOpen = $state(false);
 
   const displayTitle = $derived(dirty ? `${title}*` : title);
-  const titleHint = $derived(dirty ? 'Rename rack (Unsaved changes)' : 'Rename rack');
-  const titleLabel = $derived(dirty ? `Rack: ${title}, unsaved changes` : `Rack: ${title}`);
+  const titleHint = $derived(
+    dirty ? i18n.t('rack.renameDirty') : i18n.t('rack.rename'),
+  );
+  const titleLabel = $derived(
+    dirty
+      ? i18n.t('rack.titleDirtyAria', { title })
+      : i18n.t('rack.titleAria', { title }),
+  );
   const rackActions = $derived.by((): RackActionItem[] => [
-    { id: 'rack-new-button', label: 'New', run: onNewRack },
-    { id: 'rack-save-button', label: 'Save', run: onSaveRack },
-    { id: 'rack-save-as-button', label: 'Save As', run: onSaveRackAs },
+    { id: 'rack-new-button', label: i18n.t('rack.new'), run: onNewRack },
+    { id: 'rack-save-button', label: i18n.t('rack.save'), run: onSaveRack },
+    { id: 'rack-save-as-button', label: i18n.t('rack.saveAs'), run: onSaveRackAs },
     {
       id: 'rack-revert-button',
-      label: 'Revert to Saved',
+      label: i18n.t('rack.revertSaved'),
       run: onRevertRack,
       disabled: !canRevertRack,
       separatorBefore: true,
@@ -84,8 +91,8 @@
     onClick={onRenameRack}
     menuId="rack-file-actions-trigger"
     menuDisabled={disabled}
-    menuLabel="Rack actions"
-    menuTitle="Rack actions"
+    menuLabel={i18n.t('rack.actions')}
+    menuTitle={i18n.t('rack.actions')}
     menuExpanded={isOpen}
     menuPopupType="menu"
     onMenuClick={toggleMenu}
@@ -97,7 +104,11 @@
     class="rack-file-actions-menu"
     onClose={closeMenu}
   >
-    <div class="rack-file-actions-list floating-menu-list" role="menu" aria-label="Rack actions">
+    <div
+      class="rack-file-actions-list floating-menu-list"
+      role="menu"
+      aria-label={i18n.t('rack.actions')}
+    >
       {#each rackActions as action (action.id)}
         {#if action.separatorBefore}
           <hr class="floating-menu-separator" />

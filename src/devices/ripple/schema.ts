@@ -27,19 +27,19 @@ export const RIPPLE_NUMERIC_PARAMETERS = defineNumericParameterRules<
     min: 0,
     max: 9,
     step: 0.5,
-    modulationLabel: 'Center X',
+    modulationMessageKey: 'control.centerX',
   }),
   centerY: boundedNumericParameter({
     defaultValue: DEFAULT_RIPPLE_PARAMS.centerY,
     min: 0,
     max: 9,
     step: 0.5,
-    modulationLabel: 'Center Y',
+    modulationMessageKey: 'control.centerY',
   }),
   curvature: finiteNumericParameter({
     defaultValue: DEFAULT_RIPPLE_PARAMS.curvature,
     step: 0.1,
-    modulationLabel: 'Curvature',
+    modulationMessageKey: 'control.curvature',
   }),
 });
 
@@ -67,7 +67,11 @@ const hydrateImportedRippleNode = (
     source,
   );
   const params = resolveImportedParams(source);
-  hydrateImportedNumericParameters(device.params, params, RIPPLE_NUMERIC_PARAMETERS);
+  hydrateImportedNumericParameters(
+    device.params,
+    params,
+    RIPPLE_NUMERIC_PARAMETERS,
+  );
   return device;
 };
 

@@ -28,28 +28,28 @@ export const SCALE_NUMERIC_PARAMETERS = defineNumericParameterRules<
     min: 0,
     max: 9,
     step: 0.5,
-    modulationLabel: 'Center X',
+    modulationMessageKey: 'control.centerX',
   }),
   centerY: boundedNumericParameter({
     defaultValue: DEFAULT_SCALE_PARAMS.centerY,
     min: 0,
     max: 9,
     step: 0.5,
-    modulationLabel: 'Center Y',
+    modulationMessageKey: 'control.centerY',
   }),
   scaleX: positiveNumericParameter({
     defaultValue: DEFAULT_SCALE_PARAMS.scaleX,
     min: 0.000001,
     step: 0.1,
     display: { unit: '×' },
-    modulationLabel: 'Scale X',
+    modulationMessageKey: 'control.scaleX',
   }),
   scaleY: positiveNumericParameter({
     defaultValue: DEFAULT_SCALE_PARAMS.scaleY,
     min: 0.000001,
     step: 0.1,
     display: { unit: '×' },
-    modulationLabel: 'Scale Y',
+    modulationMessageKey: 'control.scaleY',
   }),
 });
 

@@ -1,4 +1,5 @@
 import type { BridgeSettings } from '../shared/bridge/types';
+import type { AppLocale } from '../shared/i18n';
 import type { LaunchpadModel } from '../shared/model';
 
 export const RENDERER_STATE_KEY = 'compass.state.v1';
@@ -12,6 +13,7 @@ export interface PersistedRendererState {
   ui?: {
     sidebarWidthPx?: number;
     launchpadModel?: LaunchpadModel;
+    locale?: AppLocale;
     mainWindowAlwaysOnTop?: boolean;
     reduceAnimation?: boolean;
     themeHue?: number;
@@ -70,6 +72,7 @@ const pickPersistedUi = (
   return {
     ...(ui.sidebarWidthPx !== undefined ? { sidebarWidthPx: ui.sidebarWidthPx } : {}),
     ...(ui.launchpadModel !== undefined ? { launchpadModel: ui.launchpadModel } : {}),
+    ...(ui.locale !== undefined ? { locale: ui.locale } : {}),
     ...(ui.mainWindowAlwaysOnTop !== undefined
       ? { mainWindowAlwaysOnTop: ui.mainWindowAlwaysOnTop }
       : {}),

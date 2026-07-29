@@ -4,6 +4,10 @@ import type {
   RackPresetFile,
 } from '../../../shared/presets';
 import {
+  getRendererDeviceLabel,
+  type RendererDeviceKind,
+} from '../../../devices';
+import {
   PRESET_FILE_SCHEMA_VERSION,
   sanitizeCollapsedDeviceIdsForChain,
   sanitizeCollapsedDeviceIdsForDevices,
@@ -36,15 +40,23 @@ import {
 } from './chain-ops';
 import { syncDeviceNodeIdSeeds } from './device-node-factory';
 
+export type PresetApplyStatus =
+  | 'device-insert-failed'
+  | 'device-inserted'
+  | 'group-insert-failed'
+  | 'group-inserted'
+  | 'rack-load-failed'
+  | 'rack-loaded';
+
 export type PresetApplyResult =
   | {
       ok: true;
       chain: GeneratorChain;
-      message: string;
+      status: 'device-inserted';
     }
   | {
       ok: false;
-      message: string;
+      status: 'device-insert-failed';
     };
 
 export type GroupPresetApplyResult =
@@ -53,11 +65,11 @@ export type GroupPresetApplyResult =
       chain: GeneratorChain;
       groupId: string;
       collapsedDeviceIds: string[];
-      message: string;
+      status: 'group-inserted';
     }
   | {
       ok: false;
-      message: string;
+      status: 'group-insert-failed';
     };
 
 export type RackPresetApplyResult =
@@ -65,11 +77,11 @@ export type RackPresetApplyResult =
       ok: true;
       chain: GeneratorChain;
       collapsedDeviceIds: string[];
-      message: string;
+      status: 'rack-loaded';
     }
   | {
       ok: false;
-      message: string;
+      status: 'rack-load-failed';
     };
 
 const createSavedAtIso = (): string => new Date().toISOString();
@@ -172,18 +184,24 @@ const coerceGroupInsertDropZone = (
 export const resolveDevicePresetSuggestedName = (
   chain: GeneratorChain,
   deviceId: string,
+  resolveFallbackName: (kind: RendererDeviceKind) => string = getRendererDeviceLabel,
 ): string => {
-  const displayNameById = buildDeviceDisplayNameById(chain.devices);
+  const displayNameById = buildDeviceDisplayNameById(
+    chain.devices,
+    resolveFallbackName,
+  );
   return displayNameById[deviceId] ?? 'Device';
 };
 
 export const resolveGroupPresetSuggestedName = (
   chain: GeneratorChain,
   groupId: string,
+  defaultNameTemplate?: string,
 ): string => {
   const displayNameById = buildGroupDisplayNameById(
     chain.devices,
     chain.groupStateById,
+    defaultNameTemplate,
   );
   return displayNameById[groupId] ?? groupId;
 };
@@ -275,14 +293,14 @@ export const insertDevicePresetFile = (
   if (!prepared) {
     return {
       ok: false,
-      message: 'Device could not be inserted.',
+      status: 'device-insert-failed',
     };
   }
 
   return {
     ok: true,
     chain: buildChainWithPreparedPresetInsert(chain, dropZone, prepared),
-    message: 'Device inserted.',
+    status: 'device-inserted',
   };
 };
 
@@ -296,14 +314,14 @@ export const insertGroupPresetFile = (
   if (!prepared) {
     return {
       ok: false,
-      message: 'Group could not be inserted.',
+      status: 'group-insert-failed',
     };
   }
   const groupId = prepared.groupStatePatch?.groupId ?? prepared.forcedGroupId;
   if (!groupId) {
     return {
       ok: false,
-      message: 'Group could not be inserted.',
+      status: 'group-insert-failed',
     };
   }
 
@@ -319,7 +337,7 @@ export const insertGroupPresetFile = (
       coerceGroupInsertDropZone(chain, dropZone),
       prepared,
     ),
-    message: 'Group inserted.',
+    status: 'group-inserted',
   };
 };
 
@@ -335,6 +353,6 @@ export const applyRackPresetFile = (
     ok: true,
     chain: preset.chain,
     collapsedDeviceIds,
-    message: 'Rack loaded.',
+    status: 'rack-loaded',
   };
 };

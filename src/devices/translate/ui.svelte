@@ -5,6 +5,7 @@
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { TRANSLATE_NUMERIC_PARAMETERS } from './schema';
+  import { i18n } from '../../renderer/i18n.svelte';
 
   type TranslateDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'translate' }>;
@@ -16,7 +17,7 @@
 <div class="device-controls">
   <div class="column-wrapper">
     <NumberField
-      label="Offset X"
+      label={i18n.t('control.offsetX')}
       parameter={TRANSLATE_NUMERIC_PARAMETERS.offsetX}
       value={device.params.offsetX}
       dataAction="set-translate-param"
@@ -25,7 +26,7 @@
       {onControlChange}
     />
     <NumberField
-      label="Offset Y"
+      label={i18n.t('control.offsetY')}
       parameter={TRANSLATE_NUMERIC_PARAMETERS.offsetY}
       value={device.params.offsetY}
       dataAction="set-translate-param"

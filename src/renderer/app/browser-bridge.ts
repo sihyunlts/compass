@@ -261,6 +261,7 @@ export const createBrowserCompassBridge = (): CompassApi => ({
     throw new Error('Desktop app required to send to Ableton.');
   },
   requestAppVersion: async () => __APP_VERSION__,
+  setApplicationLocale: async () => {},
   checkForUpdates: async () => {
     const currentVersion = __APP_VERSION__;
 

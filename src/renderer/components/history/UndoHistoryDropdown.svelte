@@ -5,12 +5,8 @@
   import FloatingDropdown from '../primitives/FloatingDropdown.svelte';
   import DropdownOptionList from '../primitives/DropdownOptionList.svelte';
   import type { DropdownOption, DropdownValue } from '../primitives/dropdown-types';
-
-  const timestampFormatter = new Intl.DateTimeFormat(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-  });
+  import { i18n } from '../../i18n.svelte';
+  import { resolveHistoryActionLabel } from '../../features/editor/history-i18n';
 
   let {
     open = false,
@@ -28,12 +24,17 @@
     onClose: () => void;
   }>();
 
+  const timestampFormatter = $derived.by(() => new Intl.DateTimeFormat(i18n.locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  }));
   const displayItems = $derived.by(() => [...items].reverse());
   const currentItem = $derived.by(() => displayItems.find((item) => item.isCurrent) ?? null);
   const options = $derived.by((): DropdownOption[] =>
     displayItems.map((item) => ({
       value: item.id,
-      label: item.label,
+      label: resolveHistoryActionLabel(item.kind),
       meta: timestampFormatter.format(new Date(item.createdAt)),
       disabled: item.isCurrent,
     })));
@@ -63,7 +64,7 @@
   <DropdownOptionList
     {options}
     value={currentItem?.id ?? null}
-    ariaLabel="Undo history"
+    ariaLabel={i18n.t('history.undoAria')}
     class="undo-history-list"
     onSelect={handleSelect}
     onClose={() => closeDropdown(true)}

@@ -36,14 +36,14 @@ export const RAIN_NUMERIC_PARAMETERS = defineNumericParameterRules<
     period: 360,
     step: 1,
     display: { unit: '°' },
-    modulationLabel: 'Direction',
+    modulationMessageKey: 'control.direction',
   }),
   density: boundedNumericParameter({
     defaultValue: DEFAULT_RAIN_PARAMS.density,
     min: 0,
     max: 32,
     step: 1,
-    modulationLabel: 'Density',
+    modulationMessageKey: 'control.density',
   }),
   speed: boundedNumericParameter({
     defaultValue: DEFAULT_RAIN_PARAMS.speed,
@@ -51,7 +51,7 @@ export const RAIN_NUMERIC_PARAMETERS = defineNumericParameterRules<
     max: 6,
     step: 0.1,
     display: { unit: '×' },
-    modulationLabel: 'Speed',
+    modulationMessageKey: 'control.speed',
   }),
 });
 

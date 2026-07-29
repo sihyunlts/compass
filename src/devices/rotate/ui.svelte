@@ -5,6 +5,7 @@
   import AnglePicker from '../../renderer/components/controls/AnglePicker.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { ROTATE_NUMERIC_PARAMETERS } from './schema';
+  import { i18n } from '../../renderer/i18n.svelte';
 
   type RotateDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'rotate' }>;
@@ -15,7 +16,7 @@
 
 <div class="device-controls">
   <AnglePicker
-    label="Rotation"
+    label={i18n.t('control.rotation')}
     value={device.params.angleDeg}
     dataAction="set-rotate-param"
     dataId={device.id}

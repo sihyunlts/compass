@@ -5,6 +5,7 @@
   import AnglePicker from '../../renderer/components/controls/AnglePicker.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { MIRROR_NUMERIC_PARAMETERS } from './schema';
+  import { i18n } from '../../renderer/i18n.svelte';
 
   type MirrorDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'mirror' }>;
@@ -15,7 +16,7 @@
 
 <div class="device-controls">
   <AnglePicker
-    label="Mirror Axis Angle"
+    label={i18n.t('control.mirrorAxisAngle')}
     value={device.params.angleDeg}
     dataAction="set-angle-param"
     dataId={device.id}

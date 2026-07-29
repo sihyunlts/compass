@@ -1,8 +1,18 @@
-import { app, Menu } from 'electron';
+import {
+  app,
+  Menu,
+  type MenuItemConstructorOptions,
+} from 'electron';
 
 import { getMainWindow } from './app-window';
 import { IPC_CHANNELS } from '../shared/contracts/ipc/channels';
 import type { RackFileMenuAction } from '../shared/contracts/ipc/api';
+import {
+  resolveAppLocale,
+  translate,
+  type AppLocale,
+  type MessageKey,
+} from '../shared/i18n';
 
 const sendRackFileMenuAction = (action: RackFileMenuAction): void => {
   const mainWindow = getMainWindow();
@@ -13,7 +23,35 @@ const sendRackFileMenuAction = (action: RackFileMenuAction): void => {
   mainWindow.webContents.send(IPC_CHANNELS.mainWindowRackFileMenuRequest, action);
 };
 
-export const installApplicationMenu = (): void => {
+let applicationMenuLocale: AppLocale = 'en';
+
+const translatedRole = (
+  locale: AppLocale,
+  role: MenuItemConstructorOptions['role'],
+  key: MessageKey,
+  values?: Readonly<Record<string, string | number>>,
+): MenuItemConstructorOptions => ({
+  role,
+  label: translate(locale, key, values),
+});
+
+const rackActionItem = (
+  locale: AppLocale,
+  key: MessageKey,
+  accelerator: string,
+  action: RackFileMenuAction,
+): MenuItemConstructorOptions => ({
+  label: translate(locale, key),
+  accelerator,
+  click: () => sendRackFileMenuAction(action),
+});
+
+const separator = (): MenuItemConstructorOptions => ({ type: 'separator' });
+
+export const installApplicationMenu = (
+  locale: AppLocale = resolveAppLocale(app.getLocale()),
+): void => {
+  applicationMenuLocale = locale;
   if (process.platform !== 'darwin') {
     Menu.setApplicationMenu(null);
     return;
@@ -23,76 +61,76 @@ export const installApplicationMenu = (): void => {
     {
       label: app.name,
       submenu: [
-        { role: 'about' },
-        { type: 'separator' },
-        { role: 'services' },
-        { type: 'separator' },
-        { role: 'hide' },
-        { role: 'hideOthers' },
-        { role: 'unhide' },
-        { type: 'separator' },
-        { role: 'quit' },
+        translatedRole(locale, 'about', 'menu.aboutApp', { app: app.name }),
+        separator(),
+        translatedRole(locale, 'services', 'menu.services'),
+        separator(),
+        translatedRole(locale, 'hide', 'menu.hideApp', { app: app.name }),
+        translatedRole(locale, 'hideOthers', 'menu.hideOthers'),
+        translatedRole(locale, 'unhide', 'menu.showAll'),
+        separator(),
+        translatedRole(locale, 'quit', 'menu.quitApp', { app: app.name }),
       ],
     },
     {
-      label: 'File',
+      label: translate(locale, 'menu.file'),
       submenu: [
-        {
-          label: 'New Rack',
-          accelerator: 'CommandOrControl+N',
-          click: () => sendRackFileMenuAction('new'),
-        },
-        { type: 'separator' },
-        {
-          label: 'Save Rack',
-          accelerator: 'CommandOrControl+S',
-          click: () => sendRackFileMenuAction('save'),
-        },
-        {
-          label: 'Save Rack As...',
-          accelerator: 'CommandOrControl+Shift+S',
-          click: () => sendRackFileMenuAction('save-as'),
-        },
-        { type: 'separator' },
-        { role: 'close' },
+        rackActionItem(locale, 'menu.newRack', 'CommandOrControl+N', 'new'),
+        separator(),
+        rackActionItem(locale, 'menu.saveRack', 'CommandOrControl+S', 'save'),
+        rackActionItem(
+          locale,
+          'menu.saveRackAs',
+          'CommandOrControl+Shift+S',
+          'save-as',
+        ),
+        separator(),
+        translatedRole(locale, 'close', 'menu.closeWindow'),
       ],
     },
     {
-      label: 'Edit',
+      label: translate(locale, 'menu.edit'),
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' },
+        translatedRole(locale, 'undo', 'menu.undo'),
+        translatedRole(locale, 'redo', 'menu.redo'),
+        separator(),
+        translatedRole(locale, 'cut', 'menu.cut'),
+        translatedRole(locale, 'copy', 'menu.copy'),
+        translatedRole(locale, 'paste', 'menu.paste'),
+        translatedRole(locale, 'selectAll', 'menu.selectAll'),
       ],
     },
     {
-      label: 'View',
+      label: translate(locale, 'menu.view'),
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' },
+        translatedRole(locale, 'reload', 'menu.reload'),
+        translatedRole(locale, 'forceReload', 'menu.forceReload'),
+        translatedRole(locale, 'toggleDevTools', 'menu.toggleDevTools'),
+        separator(),
+        translatedRole(locale, 'resetZoom', 'menu.resetZoom'),
+        translatedRole(locale, 'zoomIn', 'menu.zoomIn'),
+        translatedRole(locale, 'zoomOut', 'menu.zoomOut'),
+        separator(),
+        translatedRole(locale, 'togglefullscreen', 'menu.toggleFullscreen'),
       ],
     },
     {
-      label: 'Window',
+      label: translate(locale, 'menu.window'),
       submenu: [
-        { role: 'minimize' },
-        { role: 'zoom' },
-        { type: 'separator' },
-        { role: 'front' },
+        translatedRole(locale, 'minimize', 'menu.minimize'),
+        translatedRole(locale, 'zoom', 'menu.zoom'),
+        separator(),
+        translatedRole(locale, 'front', 'menu.bringAllToFront'),
       ],
     },
   ]);
 
   Menu.setApplicationMenu(menu);
+};
+
+export const setApplicationMenuLocale = (locale: AppLocale): void => {
+  if (locale === applicationMenuLocale) {
+    return;
+  }
+  installApplicationMenu(locale);
 };

@@ -20,14 +20,15 @@ export const createInitialEditorState = (): EditorSessionState => {
     chainRevision: 1,
     launchpadModel: loadLaunchpadModel(),
     headerIndicatorText: '',
-    paletteNameText: 'Default palette: loading...',
+    paletteName: '',
+    paletteSource: 'loading',
     previewBpm: loadPreviewBpm(),
     previewLoopLengthBeats: bridge.autoCreateLengthBeats,
     isPreviewLoopEnabled: loadPreviewLoopEnabled(),
     isPreviewPopoutOpen: false,
     previewScrubValue: 0,
     autoCreateLengthLabel: resolveBridgeLengthLabel(bridge),
-    sendButtonLabel: 'Send',
+    sendButtonState: 'idle',
     sendButtonDisabled: false,
     sidebarWidthPx: loadSidebarWidth(),
     isSidebarResizing: false,
@@ -35,8 +36,8 @@ export const createInitialEditorState = (): EditorSessionState => {
     clipboardAvailable: false,
     canUndo: false,
     canRedo: false,
-    undoActionLabel: 'Undo',
-    redoActionLabel: 'Redo',
+    undoActionKind: null,
+    redoActionKind: null,
   };
 };
 

@@ -25,7 +25,7 @@ export const SCANNER_NUMERIC_PARAMETERS = defineNumericParameterRules<
     period: 360,
     step: 1,
     display: { unit: '°' },
-    modulationLabel: 'Sweep Direction',
+    modulationMessageKey: 'control.sweepDirection',
   }),
 });
 

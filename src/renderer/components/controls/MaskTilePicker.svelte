@@ -3,6 +3,7 @@
 <script lang="ts">
   import FieldShell from '../fields/FieldShell.svelte';
   import { hint } from '../overlays/hint';
+  import { i18n } from '../../i18n.svelte';
 
   const GRID_SIZE = 10;
 
@@ -35,7 +36,7 @@
 </script>
 
 <FieldShell
-  label={`Tile Selected ${selectionCount}`}
+  label={i18n.t('control.tilesSelected', { count: selectionCount })}
   class="mask-tile-control"
   style={`--mask-tile-grid-size:${tileGridSize};`}
 >

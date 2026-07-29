@@ -6,6 +6,7 @@
   import { clamp } from '../../../shared/math';
   import FieldShell from '../fields/FieldShell.svelte';
   import NumberField from '../fields/NumberField.svelte';
+  import { i18n } from '../../i18n.svelte';
 
   const SNAP_DIVISION_OPTIONS = [4, 8, 16, 32] as const;
   type TimeWindowEditorMode = 'stretch' | 'trim';
@@ -50,7 +51,9 @@
   const visibleStart = $derived(hasValidWindow ? clampedStart : 0);
   const visibleEnd = $derived(hasValidWindow ? clampedEnd : 0);
   const windowLengthText = $derived(
-    hasValidWindow ? (visibleEnd - visibleStart).toFixed(3) : 'Invalid',
+    hasValidWindow
+      ? (visibleEnd - visibleStart).toFixed(3)
+      : i18n.t('control.invalid'),
   );
   const normalizedPlayhead = $derived(
     clamp(Number.isFinite(currentProgress01) ? currentProgress01 : 0, 0, 1),
@@ -95,7 +98,11 @@
     {#if modeBadgeText}
       <span class="time-window-badge">{modeBadgeText}</span>
     {/if}
-    <div class="time-window-snap" role="group" aria-label="Snap divisions">
+    <div
+      class="time-window-snap"
+      role="group"
+      aria-label={i18n.t('control.snapDivisions')}
+    >
       {#each SNAP_DIVISION_OPTIONS as divisions (divisions)}
         <button
           class:selected={snapDivisions === divisions}
@@ -141,7 +148,7 @@
         max={resolvedMax}
         step={rangeStep}
         value={clampedStart}
-        aria-label="Window start"
+        aria-label={i18n.t('control.windowStart')}
         oninput={(event) => emitControlChange(event, 'start', false)}
         onchange={(event) => emitControlChange(event, 'start', true)}
       />
@@ -152,7 +159,7 @@
         max={resolvedMax}
         step={rangeStep}
         value={clampedEnd}
-        aria-label="Window end"
+        aria-label={i18n.t('control.windowEnd')}
         oninput={(event) => emitControlChange(event, 'end', false)}
         onchange={(event) => emitControlChange(event, 'end', true)}
       />
@@ -161,7 +168,7 @@
 
   <div class="time-window-inputs">
     <NumberField
-      label="Start"
+      label={i18n.t('control.start')}
       {parameter}
       value={resolvedStart}
       dataAction={dataAction}
@@ -170,7 +177,7 @@
       {onControlChange}
     />
     <NumberField
-      label="End"
+      label={i18n.t('control.end')}
       {parameter}
       value={resolvedEnd}
       dataAction={dataAction}
@@ -178,7 +185,7 @@
       dataParam="end"
       {onControlChange}
     />
-    <FieldShell label="Length">
+    <FieldShell label={i18n.t('control.length')}>
       <input type="text" value={windowLengthText} readonly tabindex="-1" />
     </FieldShell>
   </div>

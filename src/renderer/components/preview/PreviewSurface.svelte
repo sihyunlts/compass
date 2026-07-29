@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { i18n } from '../../i18n.svelte';
   /** Renders Launchpad preview cells for rack and popout modes. */
   import { SvelteMap } from "svelte/reactivity";
 
@@ -95,7 +96,7 @@
   bind:clientHeight={surfaceHeight}
   style={surfaceStyle}
   role="img"
-  aria-label="Launchpad LED preview"
+  aria-label={i18n.t('preview.launchpadAria')}
 >
   {#each surfaceModel.cells as cell (cell.key)}
     {@const ledRgb = ledRgbByCellKey.get(cell.key)}

@@ -23,12 +23,12 @@ export const TRANSLATE_NUMERIC_PARAMETERS = defineNumericParameterRules<
   offsetX: finiteNumericParameter({
     defaultValue: DEFAULT_TRANSLATE_PARAMS.offsetX,
     step: 0.1,
-    modulationLabel: 'Offset X',
+    modulationMessageKey: 'control.offsetX',
   }),
   offsetY: finiteNumericParameter({
     defaultValue: DEFAULT_TRANSLATE_PARAMS.offsetY,
     step: 0.1,
-    modulationLabel: 'Offset Y',
+    modulationMessageKey: 'control.offsetY',
   }),
 });
 

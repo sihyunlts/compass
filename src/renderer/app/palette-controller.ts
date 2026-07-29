@@ -61,7 +61,10 @@ const getDefaultPalette = (): PaletteFilePayload => ({
 });
 
 interface PaletteControllerOptions {
-  onPaletteNameChanged: (nameText: string) => void;
+  onPaletteChanged: (palette: {
+    name: string;
+    source: PaletteSource | 'fallback';
+  }) => void;
 }
 
 /** Resolves LED color values from default or imported palette files. */
@@ -128,16 +131,25 @@ class PaletteController {
       if (persistCustom) {
         saveCustomPalette(payload);
       }
-      this.options.onPaletteNameChanged(`Custom palette: ${payload.name}`);
+      this.options.onPaletteChanged({
+        name: payload.name,
+        source: 'custom',
+      });
       return;
     }
 
-    this.options.onPaletteNameChanged(`Default palette: ${payload.name}`);
+    this.options.onPaletteChanged({
+      name: payload.name,
+      source: 'default',
+    });
   }
 
   private applyEmbeddedFallback(): void {
     this.paletteColorsByVelocity = new Map();
-    this.options.onPaletteNameChanged('Default palette: embedded orange');
+    this.options.onPaletteChanged({
+      name: 'embedded orange',
+      source: 'fallback',
+    });
   }
 }
 

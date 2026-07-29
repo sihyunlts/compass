@@ -20,6 +20,7 @@ import {
 import { sanitizePreviewBpm } from '../features/editor/persistence-storage';
 import { createPreviewGenerationWorkerClient } from '../features/preview/generation-worker-client';
 import type { HeaderIndicatorController } from './header-indicator.svelte';
+import { i18n } from '../i18n.svelte';
 
 interface PlaybackSessionState {
   currentBeat: number;
@@ -264,8 +265,12 @@ export class PlaybackSessionController {
         return;
       }
       this.stopPlayback();
-      const errorText = error instanceof Error ? error.message : 'Unknown preview error';
-      this.options.headerIndicator.show(`Preview update failed | ${errorText}`);
+      const errorText = error instanceof Error
+        ? error.message
+        : i18n.t('status.unknownPreviewError');
+      this.options.headerIndicator.show(
+        i18n.t('status.previewUpdateFailed', { error: errorText }),
+      );
     }
   }
 
@@ -305,9 +310,11 @@ export class PlaybackSessionController {
     if (input.preview.noteCount > 0) {
       if (shouldAnnounce) {
         if (input.source === 'preview') {
-          this.options.headerIndicator.show(`${input.preview.noteCount} notes generated`);
+          this.options.headerIndicator.show(
+            i18n.t('status.notesGenerated', { count: input.preview.noteCount }),
+          );
         } else {
-          this.options.headerIndicator.show('Send complete');
+          this.options.headerIndicator.show(i18n.t('status.sendComplete'));
         }
       }
       this.startPlayback();
@@ -397,7 +404,7 @@ export class PlaybackSessionController {
       this.options.editorSession.state.isPreviewPopoutOpen = true;
       this.renderPreviewFrame();
     } catch {
-      this.options.headerIndicator.show('Failed to open preview popout');
+      this.options.headerIndicator.show(i18n.t('status.previewOpenFailed'));
     }
   }
 
@@ -422,7 +429,7 @@ export class PlaybackSessionController {
 
   public syncPreviewBpm(nextBpm: number): void {
     if (this.options.editorSession.commands.syncPreviewBpm(nextBpm)) {
-      this.options.headerIndicator.show('BPM synced');
+      this.options.headerIndicator.show(i18n.t('status.bpmSynced'));
     }
   }
 

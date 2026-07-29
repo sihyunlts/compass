@@ -1,4 +1,7 @@
-import { getRendererDeviceLabel } from '../../../devices';
+import {
+  getRendererDeviceLabel,
+  type RendererDeviceKind,
+} from '../../../devices';
 import {
   DEFAULT_GROUP_NAME_TEMPLATE,
   applyNameIndex,
@@ -70,10 +73,11 @@ export const resolveStoredGroupName = (
 
 export const buildDeviceDisplayNameById = (
   devices: readonly GeneratorDeviceNode[],
+  resolveFallbackName: (kind: RendererDeviceKind) => string = getRendererDeviceLabel,
 ): Record<string, string> => buildDisplayNameById(
   devices.map((device) => ({
     id: device.id,
-    fallbackName: getRendererDeviceLabel(device.kind),
+    fallbackName: resolveFallbackName(device.kind),
     rawName: resolveStoredDeviceName(device),
   })),
 );
@@ -81,6 +85,7 @@ export const buildDeviceDisplayNameById = (
 export const buildGroupDisplayNameById = (
   devices: readonly GeneratorDeviceNode[],
   groupStateById: GeneratorChain['groupStateById'],
+  defaultNameTemplate: string = DEFAULT_GROUP_NAME_TEMPLATE,
 ): Record<string, string> => {
   const orderedGroupIds = collectOrderedGroupIds(devices);
   return buildDisplayNameById(
@@ -88,7 +93,7 @@ export const buildGroupDisplayNameById = (
       id: groupId,
       fallbackName: groupId,
       rawName: resolveStoredGroupName(groupStateById, groupId)
-        ?? DEFAULT_GROUP_NAME_TEMPLATE,
+        ?? defaultNameTemplate,
     })),
   );
 };

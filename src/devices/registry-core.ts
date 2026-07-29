@@ -102,10 +102,10 @@ const getModulationParameterDefinitions = (
   kind: RendererDeviceKind,
 ): readonly ModulationParameterDefinition[] =>
   Object.entries(getNumericParameterRules(kind) ?? {}).flatMap(([key, rule]) => (
-    rule.modulationLabel
+    rule.modulationMessageKey
       ? [{
           key,
-          label: rule.modulationLabel,
+          messageKey: rule.modulationMessageKey,
           unit: rule.display.unit,
         }]
       : []
@@ -118,7 +118,7 @@ export const isModulationTargetDeviceKind = (
 export const isModulationTargetParamKey = (
   kind: RendererDeviceKind,
   paramKey: string,
-): boolean => Boolean(getNumericParameterRule(kind, paramKey)?.modulationLabel);
+): boolean => Boolean(getNumericParameterRule(kind, paramKey)?.modulationMessageKey);
 
 export const readNumericDeviceParam = (
   device: GeneratorDeviceNode,

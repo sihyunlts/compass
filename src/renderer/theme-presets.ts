@@ -1,9 +1,9 @@
 export const THEME_PRESETS = [
-  { id: 'default', label: 'Default', hue: 265, saturation: 100 },
-  { id: 'dune', label: 'Dune', hue: 45, saturation: 20 },
-  { id: 'lagoon', label: 'Lagoon', hue: 180, saturation: 50 },
-  { id: 'crimson', label: 'Crimson', hue: 0, saturation: 60 },
-  { id: 'ultraviolet', label: 'Ultraviolet', hue: 300, saturation: 80 },
+  { id: 'default', hue: 265, saturation: 100 },
+  { id: 'dune', hue: 45, saturation: 20 },
+  { id: 'lagoon', hue: 180, saturation: 50 },
+  { id: 'crimson', hue: 0, saturation: 60 },
+  { id: 'ultraviolet', hue: 300, saturation: 80 },
 ] as const;
 
 export type ThemePresetId = (typeof THEME_PRESETS)[number]['id'];

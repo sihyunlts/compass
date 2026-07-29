@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { i18n } from '../../i18n.svelte';
   let {
     width = $bindable(),
     isResizing = $bindable(false),
@@ -82,7 +83,7 @@
   class:is-active={isResizing}
   role="separator"
   aria-orientation="vertical"
-  aria-label="Resize sidebar width"
+  aria-label={i18n.t('browser.resizeSidebar')}
   onpointerdown={handlePointerDown}
 ></div>
 

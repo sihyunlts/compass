@@ -10,6 +10,7 @@
   import { createPreviewSession } from '../features/preview/session.svelte';
   import Button from '../components/primitives/Button.svelte';
   import PreviewSurface from '../components/preview/PreviewSurface.svelte';
+  import { i18n } from '../i18n.svelte';
 
   const previewSession = createPreviewSession();
   const previewViewState = previewSession.state;
@@ -21,12 +22,18 @@
   const isPlaying = $derived(previewState?.isPlaying === true);
   const isLoopEnabled = $derived(previewState?.isLoopEnabled === true);
   const playButtonIcon = $derived(isPlaying ? 'pause' : 'play_arrow');
-  const playButtonLabel = $derived(isPlaying ? 'Pause preview' : 'Play preview');
-  const playButtonHint = $derived(isPlaying ? 'Pause' : 'Play');
-  const loopButtonLabel = $derived(
-    isLoopEnabled ? 'Disable preview loop' : 'Enable preview loop',
+  const playButtonLabel = $derived(
+    isPlaying ? i18n.t('preview.pauseAria') : i18n.t('preview.playAria'),
   );
-  const loopButtonHint = $derived(isLoopEnabled ? 'Unloop' : 'Loop');
+  const playButtonHint = $derived(
+    isPlaying ? i18n.t('preview.pause') : i18n.t('preview.play'),
+  );
+  const loopButtonLabel = $derived(
+    isLoopEnabled ? i18n.t('preview.disableLoop') : i18n.t('preview.enableLoop'),
+  );
+  const loopButtonHint = $derived(
+    isLoopEnabled ? i18n.t('preview.unloop') : i18n.t('preview.loop'),
+  );
   const stageSize = $derived(
     stageWidth > 0 && stageHeight > 0
       ? Math.min(stageWidth, stageHeight)

@@ -1,4 +1,5 @@
 import type { RendererDeviceKind } from '../../../devices';
+import type { DeviceBrowserCategoryId } from '../../../devices/browser-categories';
 import type { PresetFileKind } from '../../../shared/presets';
 
 interface BrowserTreeBaseFolderNode {
@@ -10,6 +11,7 @@ interface BrowserTreeBaseFolderNode {
 
 export interface BrowserTreeDeviceFolderNode extends BrowserTreeBaseFolderNode {
   treeKind: 'device';
+  categoryId: DeviceBrowserCategoryId;
 }
 
 export interface BrowserTreePresetFolderNode extends BrowserTreeBaseFolderNode {

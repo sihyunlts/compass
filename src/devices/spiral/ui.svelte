@@ -6,6 +6,7 @@
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { SPIRAL_NUMERIC_PARAMETERS } from './schema';
+  import { i18n } from '../../renderer/i18n.svelte';
 
   type SpiralDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'spiral' }>;
@@ -23,7 +24,7 @@
     {onControlChange}
   />
   <NumberField
-    label="Turns"
+    label={i18n.t('control.turns')}
     parameter={SPIRAL_NUMERIC_PARAMETERS.turns}
     value={device.params.turns}
     dataAction="set-spiral-param"

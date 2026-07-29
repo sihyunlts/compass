@@ -6,6 +6,7 @@
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { SCALE_NUMERIC_PARAMETERS } from './schema';
+  import { i18n } from '../../renderer/i18n.svelte';
 
   type ScaleDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'scale' }>;
@@ -24,7 +25,7 @@
   />
   <div class="column-wrapper">
     <NumberField
-      label="Scale X"
+      label={i18n.t('control.scaleX')}
       parameter={SCALE_NUMERIC_PARAMETERS.scaleX}
       value={device.params.scaleX}
       dataAction="set-scale-param"
@@ -33,7 +34,7 @@
       {onControlChange}
     />
     <NumberField
-      label="Scale Y"
+      label={i18n.t('control.scaleY')}
       parameter={SCALE_NUMERIC_PARAMETERS.scaleY}
       value={device.params.scaleY}
       dataAction="set-scale-param"

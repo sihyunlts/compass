@@ -5,27 +5,10 @@
   import { normalizeOptionalId } from '../../shared/normalize-id';
   import MaskTilePicker from '../../renderer/components/controls/MaskTilePicker.svelte';
   import SelectField from '../../renderer/components/fields/SelectField.svelte';
-  import {
-    getRendererDeviceGroup,
-    getRendererDeviceLabel,
-  } from '../schema-registry';
+  import { getRendererDeviceGroup } from '../schema-registry';
   import type { RendererDeviceEditorPropsBase } from '../types';
-
-  const MASK_MODE_OPTIONS = [
-    { value: 'include', label: 'Show Selection Only' },
-    { value: 'exclude', label: 'Hide Selection Only' },
-  ] as const;
-
-  const MASK_SOURCE_KIND_OPTIONS = [
-    { value: 'tiles', label: 'Tiles' },
-    { value: 'group', label: 'Group' },
-    { value: 'generator', label: 'Generator' },
-  ] as const;
-
-  const MASK_SOURCE_VISIBILITY_OPTIONS = [
-    { value: 'hide', label: 'Hide' },
-    { value: 'show', label: 'Show' },
-  ] as const;
+  import { getDeviceMessageKey } from '../../renderer/device-i18n';
+  import { i18n } from '../../renderer/i18n.svelte';
 
   type MaskDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'mask' }>;
@@ -38,6 +21,20 @@
     deviceDisplayNameById = {},
     onControlChange,
   }: MaskDeviceEditorProps = $props();
+
+  const maskModeOptions = $derived([
+    { value: 'include', label: i18n.t('option.showSelection') },
+    { value: 'exclude', label: i18n.t('option.hideSelection') },
+  ]);
+  const maskSourceKindOptions = $derived([
+    { value: 'tiles', label: i18n.t('option.tiles') },
+    { value: 'group', label: i18n.t('control.group') },
+    { value: 'generator', label: i18n.t('control.generator') },
+  ]);
+  const maskSourceVisibilityOptions = $derived([
+    { value: 'hide', label: i18n.t('option.hide') },
+    { value: 'show', label: i18n.t('option.show') },
+  ]);
 
   const maskGroupOptions = $derived.by(() => {
     const groups: string[] = [];
@@ -57,7 +54,9 @@
   const maskGroupSelectOptions = $derived.by(() => [
     {
       value: '',
-      label: maskGroupOptions.length === 0 ? 'No Groups' : 'None',
+      label: maskGroupOptions.length === 0
+        ? i18n.t('option.noGroups')
+        : i18n.t('option.none'),
     },
     ...maskGroupOptions.map((groupId) => ({
       value: groupId,
@@ -67,11 +66,14 @@
   const maskGeneratorSelectOptions = $derived.by(() => [
     {
       value: '',
-      label: maskGeneratorOptions.length === 0 ? 'No Generators' : 'None',
+      label: maskGeneratorOptions.length === 0
+        ? i18n.t('option.noGenerators')
+        : i18n.t('option.none'),
     },
     ...maskGeneratorOptions.map((generator) => ({
       value: generator.id,
-      label: deviceDisplayNameById[generator.id] ?? getRendererDeviceLabel(generator.kind),
+      label: deviceDisplayNameById[generator.id]
+        ?? i18n.t(getDeviceMessageKey(generator.kind)),
     })),
   ]);
 </script>
@@ -79,25 +81,25 @@
 <div class="device-controls">
   <div class="column-wrapper">
     <SelectField
-      label="Mode"
+      label={i18n.t('control.mode')}
       value={device.params.mode}
-      options={MASK_MODE_OPTIONS}
+      options={maskModeOptions}
       dataAction="set-mask-mode"
       dataId={device.id}
       {onControlChange}
     />
     <SelectField
-      label="Mask Source"
+      label={i18n.t('control.maskSource')}
       value={device.params.sourceKind}
-      options={MASK_SOURCE_KIND_OPTIONS}
+      options={maskSourceKindOptions}
       dataAction="set-mask-source-kind"
       dataId={device.id}
       {onControlChange}
     />
     <SelectField
-      label="Source Visibility"
+      label={i18n.t('control.sourceVisibility')}
       value={device.params.sourceVisibility}
-      options={MASK_SOURCE_VISIBILITY_OPTIONS}
+      options={maskSourceVisibilityOptions}
       dataAction="set-mask-source-visibility"
       dataId={device.id}
       {onControlChange}
@@ -111,7 +113,7 @@
       />
     {:else if device.params.sourceKind === 'group'}
       <SelectField
-        label="Group"
+        label={i18n.t('control.group')}
         value={device.params.sourceId ?? ''}
         options={maskGroupSelectOptions}
         dataAction="set-mask-source-id"
@@ -121,7 +123,7 @@
       />
     {:else}
       <SelectField
-        label="Generator"
+        label={i18n.t('control.generator')}
         value={device.params.sourceId ?? ''}
         options={maskGeneratorSelectOptions}
         dataAction="set-mask-source-id"

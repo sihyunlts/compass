@@ -5,6 +5,7 @@
   import type { PathPoint } from '../../../shared/model';
   import ControlSurfaceFrame from './ControlSurfaceFrame.svelte';
   import FieldShell from '../fields/FieldShell.svelte';
+  import { i18n } from '../../i18n.svelte';
   import {
     PATH_COORDINATE_MAX,
     PATH_COORDINATE_MIN,
@@ -304,7 +305,7 @@
       </svg>
 
       {#each plottedPoints as plottedPoint (plottedPoint.index)}
-        {@const pointLabel = `Path point ${plottedPoint.index + 1}`}
+        {@const pointLabel = i18n.t('control.pathPoint', { index: plottedPoint.index + 1 })}
         <button
           type="button"
           class="path-editor-point"
@@ -318,7 +319,7 @@
     </div>
   </ControlSurfaceFrame>
 
-  <FieldShell label="Path Points" class="path-editor-controls">
+  <FieldShell label={i18n.t('control.pathPoints')} class="path-editor-controls">
     <div class="path-editor-actions">
       <span class="path-editor-count">{localPoints.length}</span>
       <button
@@ -327,7 +328,7 @@
         disabled={!canDeleteSelectedPoint}
         onclick={deleteSelectedPoint}
       >
-        Delete Selected
+        {i18n.t('control.deleteSelected')}
       </button>
     </div>
   </FieldShell>

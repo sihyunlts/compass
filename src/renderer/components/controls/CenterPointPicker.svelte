@@ -6,6 +6,7 @@
   import { clamp } from '../../../shared/math';
   import FieldShell from '../fields/FieldShell.svelte';
   import NumberField from '../fields/NumberField.svelte';
+  import { i18n } from '../../i18n.svelte';
 
   let {
     deviceId,
@@ -53,10 +54,10 @@
 </script>
 
 <FieldShell
-  label="Center"
+  label={i18n.t('control.center')}
   class="center-point-control"
   role="group"
-  aria-label="Center point picker"
+  aria-label={i18n.t('control.centerPointPicker')}
 >
   <div
     class="center-picker-surface"
@@ -68,7 +69,7 @@
     data-step={resolvedStep}
     data-center-x-state={isCenterX ? 'center' : 'off-center'}
     data-center-y-state={isCenterY ? 'center' : 'off-center'}
-    aria-label="Center point area"
+    aria-label={i18n.t('control.centerPointArea')}
     style={`width:${surfaceHeight}px;--picker-x:${xPercent}%;--picker-y:${yPercent}%;`}
   >
     {#each gridLineOffsets as offset (`x:${offset}`)}

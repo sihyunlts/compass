@@ -6,6 +6,7 @@
   import { resolveLedSurfaceRgb } from '../../renderer/app/led-surface-color';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { COLOR_NUMERIC_PARAMETERS } from './schema';
+  import { i18n } from '../../renderer/i18n.svelte';
 
   const BLACK_RGB = '0 0 0';
 
@@ -141,7 +142,7 @@
   </div>
   <div class="column-wrapper">
     <NumberField
-      label="Note Length"
+      label={i18n.t('control.noteLength')}
       parameter={COLOR_NUMERIC_PARAMETERS.noteLengthPercent}
       value={device.params.noteLengthPercent}
       dataAction="set-color-note-length-percent"
@@ -150,7 +151,7 @@
     />
 
     <NumberField
-      label="Gap"
+      label={i18n.t('control.gap')}
       parameter={COLOR_NUMERIC_PARAMETERS.gapPercent}
       value={device.params.gapPercent}
       dataAction="set-color-gap-percent"
@@ -159,13 +160,13 @@
     />
 
     <NumberField
-      label="Slots"
+      label={i18n.t('control.slots')}
       min="1"
       step="1"
       value={device.params.velocities.length}
       dataAction="set-color-slot-count"
       dataId={device.id}
-      ariaLabel="Color slot count"
+      ariaLabel={i18n.t('control.colorSlotCount')}
       {onControlChange}
     />
   </div>

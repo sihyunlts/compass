@@ -4,6 +4,7 @@ const DEFAULT_MAX_ENTRIES = 100;
 const DEFAULT_MERGE_IDLE_MS = 500;
 
 export type ChainHistoryKind =
+  | 'initial'
   | 'add-device'
   | 'insert-device'
   | 'move-devices'
@@ -25,7 +26,6 @@ export type ChainHistoryKind =
 
 export interface ChainMutationMeta {
   kind: ChainHistoryKind;
-  label: string;
   mergeKey?: string | null;
   finalize?: boolean;
   mergeIdleMs?: number;
@@ -35,7 +35,6 @@ export interface ChainHistoryEntry {
   id: string;
   timestampMs: number;
   kind: ChainHistoryKind;
-  label: string;
   chain: GeneratorChain;
 }
 
@@ -44,7 +43,6 @@ export interface ChainHistoryListItem {
   index: number;
   timestampMs: number;
   kind: ChainHistoryKind;
-  label: string;
   isCurrent: boolean;
 }
 
@@ -142,8 +140,7 @@ export class ChainHistory {
       : DEFAULT_MERGE_IDLE_MS;
 
     this.addEntry(initialChain, {
-      kind: 'control-edit',
-      label: 'Initial state',
+      kind: 'initial',
     });
   }
 
@@ -179,7 +176,6 @@ export class ChainHistory {
       index,
       timestampMs: entry.timestampMs,
       kind: entry.kind,
-      label: entry.label,
       isCurrent: index === this.cursor,
     }));
   }
@@ -225,16 +221,13 @@ export class ChainHistory {
     this.addEntry(chain, meta);
   }
 
-  public replaceCurrent(chain: GeneratorChain, label?: string): void {
+  public replaceCurrent(chain: GeneratorChain): void {
     this.flushPendingMerge();
     const snapshot = toSnapshot(chain);
     const current = this.entries[this.cursor];
     current.chain = snapshot.chain;
     current.signature = snapshot.signature;
     current.timestampMs = Date.now();
-    if (label) {
-      current.label = label;
-    }
   }
 
   public undo(): GeneratorChain | null {
@@ -283,7 +276,6 @@ export class ChainHistory {
       id: entry.id,
       timestampMs: entry.timestampMs,
       kind: entry.kind,
-      label: entry.label,
       chain: cloneChainForIpc(entry.chain),
     };
   }
@@ -306,7 +298,6 @@ export class ChainHistory {
       id: this.createEntryId(),
       timestampMs: Date.now(),
       kind: meta.kind,
-      label: meta.label,
       chain: snapshot.chain,
       signature: snapshot.signature,
     });
@@ -319,7 +310,6 @@ export class ChainHistory {
   ): void {
     const entry = this.entries[this.cursor];
     entry.timestampMs = Date.now();
-    entry.label = meta.label;
 
     this.pendingMergeKey = mergeKey;
     this.pendingMergeIndex = this.cursor;

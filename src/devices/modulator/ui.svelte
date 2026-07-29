@@ -13,10 +13,11 @@
     NumericParameterUnit,
   } from '../numeric-parameters';
   import {
-    getRendererDeviceLabel,
     getRendererModulationTargetParamDefinitions,
   } from '../schema-registry';
   import type { RendererDeviceEditorPropsBase } from '../types';
+  import { i18n } from '../../renderer/i18n.svelte';
+  import { getDeviceMessageKey } from '../../renderer/device-i18n';
 
   type ModulatorDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'modulator' }>;
@@ -54,7 +55,8 @@
     devices.filter((item: GeneratorDeviceNode) =>
       item.id !== device.id && getRendererModulationTargetParamDefinitions(item.kind).length > 0));
   const modulationReadoutText = $derived.by(() => {
-    const rawText = modulationReadoutById[device.id] ?? 'No active modulation value';
+    const rawText = modulationReadoutById[device.id]
+      ?? i18n.t('control.noActiveModulation');
     const separatorIndex = rawText.indexOf('|');
     return separatorIndex >= 0 ? rawText.slice(separatorIndex + 1).trim() : rawText;
   });
@@ -100,10 +102,13 @@
   const resolveTargetLabel = (target: ModulationTarget): string => {
     const selectedTargetDevice = findSelectedTargetDevice(target);
     const deviceLabel = selectedTargetDevice
-      ? deviceDisplayNameById[selectedTargetDevice.id] ?? getRendererDeviceLabel(selectedTargetDevice.kind)
-      : 'Missing target';
-    const paramLabel = resolveTargetParameterDefinition(target)?.label
-      ?? target.paramKey;
+      ? deviceDisplayNameById[selectedTargetDevice.id]
+        ?? i18n.t(getDeviceMessageKey(selectedTargetDevice.kind))
+      : i18n.t('control.missingTarget');
+    const parameterDefinition = resolveTargetParameterDefinition(target);
+    const paramLabel = parameterDefinition
+      ? i18n.t(parameterDefinition.messageKey)
+      : target.paramKey;
     return `${deviceLabel} / ${paramLabel}`;
   };
 
@@ -137,7 +142,7 @@
   {#if activeTab === 'curve'}
     <div class="modulation-tab-panel modulation-curve-panel">
       <SelectField
-        label="Divisions"
+        label={i18n.t('control.divisions')}
         value={device.params.curve.divisions}
         options={MODULATION_DIVISION_OPTIONS}
         dataAction="set-modulation-divisions"
@@ -162,12 +167,12 @@
     <div class="modulation-tab-panel modulation-map-panel">
       <div class="modulation-target-labels" aria-hidden="true">
         <div class="modulation-target-label-group">
-          <span>Parameter</span>
-          <span>Amount</span>
+          <span>{i18n.t('control.parameter')}</span>
+          <span>{i18n.t('control.amount')}</span>
         </div>
         <div class="modulation-target-label-group">
-          <span>Parameter</span>
-          <span>Amount</span>
+          <span>{i18n.t('control.parameter')}</span>
+          <span>{i18n.t('control.amount')}</span>
         </div>
       </div>
       <div class="modulation-target-list">
@@ -181,17 +186,17 @@
               {@const targetLabel = resolveTargetLabel(target)}
               <ValueButton
                 text={targetLabel}
-                label={`Map target: ${targetLabel}`}
+                label={i18n.t('control.mapTargetNamed', { target: targetLabel })}
                 pressed={isActiveTargetSlot}
                 outlinePulse={isActiveTargetSlot}
-                clearLabel="Clear mapping"
-                clearTitle="Clear mapping"
+                clearLabel={i18n.t('control.clearMapping')}
+                clearTitle={i18n.t('control.clearMapping')}
                 onPointerDown={handleTargetSlotPointerDown}
                 onClick={() => selectTargetSlot(slotIndex)}
                 onClear={() => clearTargetSlot(slotIndex)}
               />
               <NumberField
-                label="Amount"
+                label={i18n.t('control.amount')}
                 size="compact"
                 labelVisibility="hidden"
                 fill={true}
@@ -206,8 +211,8 @@
             {:else}
               <ValueButton
                 text=""
-                label="Map target"
-                placeholder="Map"
+                label={i18n.t('control.mapTarget')}
+                placeholder={i18n.t('control.map')}
                 pressed={isActiveTargetSlot}
                 outlinePulse={isActiveTargetSlot}
                 onPointerDown={handleTargetSlotPointerDown}

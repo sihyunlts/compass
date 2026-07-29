@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { i18n } from '../../i18n.svelte';
   import { onMount } from 'svelte';
   import { clamp } from '../../../shared/math';
   import type { RackScrollMetrics } from '../../features/rack/types';
@@ -365,7 +366,7 @@
     bind:clientHeight={trackHeightPx}
     class="rack-header-scrollbar"
     role="scrollbar"
-    aria-label="Rack minimap scrollbar"
+    aria-label={i18n.t('rack.minimapAria')}
     aria-orientation="horizontal"
     aria-controls={controlsId}
     aria-valuemin={0}

@@ -3,6 +3,7 @@ import type { GroupSelectionContext } from '../rack/selection.svelte';
 import type { GeneratorChain } from '../../../shared/model';
 import { resolveExistingOrderedDeviceIds } from './chain-ops';
 import { sanitizePreviewBpm } from './persistence-storage';
+import type { ChainHistoryKind } from './history-core';
 
 export type RackSelectionSnapshot =
   | {
@@ -32,13 +33,13 @@ export const selectPreviewBpmText = (previewBpm: number): string =>
 export const selectHistoryControls = (state: {
   canUndo: boolean;
   canRedo: boolean;
-  undoActionLabel: string;
-  redoActionLabel: string;
+  undoActionKind: ChainHistoryKind | null;
+  redoActionKind: ChainHistoryKind | null;
 }) => ({
   canUndo: state.canUndo,
   canRedo: state.canRedo,
-  undoActionLabel: state.undoActionLabel,
-  redoActionLabel: state.redoActionLabel,
+  undoActionKind: state.undoActionKind,
+  redoActionKind: state.redoActionKind,
 });
 
 export const selectClipboardAvailable = (state: {

@@ -110,6 +110,8 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.sendGeneratedPreview, request),
   requestAppVersion: () =>
     ipcRenderer.invoke(IPC_CHANNELS.requestAppVersion),
+  setApplicationLocale: (locale) =>
+    ipcRenderer.invoke(IPC_CHANNELS.setApplicationLocale, locale),
   checkForUpdates: () =>
     ipcRenderer.invoke(IPC_CHANNELS.checkForUpdates),
   openLatestReleasePage: () =>

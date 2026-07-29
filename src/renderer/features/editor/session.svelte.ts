@@ -90,6 +90,7 @@ import {
   resolveCurrentSelectionSnapshot,
   type RackSelectionSnapshot,
 } from './selectors';
+import type { ChainHistoryKind } from './history-core';
 
 const DEFAULT_AUTO_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_HISTORY_MAX_ENTRIES = 100;
@@ -100,14 +101,15 @@ export interface EditorSessionState {
   chainRevision: number;
   launchpadModel: LaunchpadModel;
   headerIndicatorText: string;
-  paletteNameText: string;
+  paletteName: string;
+  paletteSource: 'loading' | 'default' | 'custom' | 'fallback';
   previewBpm: number;
   previewLoopLengthBeats: number;
   isPreviewLoopEnabled: boolean;
   isPreviewPopoutOpen: boolean;
   previewScrubValue: number;
   autoCreateLengthLabel: string;
-  sendButtonLabel: string;
+  sendButtonState: 'idle' | 'sending' | 'done';
   sendButtonDisabled: boolean;
   sidebarWidthPx: number;
   isSidebarResizing: boolean;
@@ -115,8 +117,8 @@ export interface EditorSessionState {
   clipboardAvailable: boolean;
   canUndo: boolean;
   canRedo: boolean;
-  undoActionLabel: string;
-  redoActionLabel: string;
+  undoActionKind: ChainHistoryKind | null;
+  redoActionKind: ChainHistoryKind | null;
 }
 
 export interface EditorRackBinding {

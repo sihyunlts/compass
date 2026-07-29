@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import { hint } from '../overlays/hint';
+  import { i18n } from '../../i18n.svelte';
 
   let {
     text,
@@ -35,7 +36,7 @@
   const rootClass = $derived(`value-button ${className}`.trim());
   const hasClearAction = $derived(typeof onClear === 'function');
   const isDisabled = $derived(disabled === true);
-  const clearHint = $derived(clearTitle ?? clearLabel ?? 'Clear value');
+  const clearHint = $derived(clearTitle ?? clearLabel ?? i18n.t('control.clearValue'));
 
   const handleClearPointerDown = (event: PointerEvent): void => {
     event.stopPropagation();
@@ -70,7 +71,7 @@
     <button
       type="button"
       class="value-button-clear"
-      aria-label={clearLabel ?? 'Clear value'}
+      aria-label={clearLabel ?? i18n.t('control.clearValue')}
       use:hint={clearHint}
       disabled={isDisabled}
       onpointerdown={handleClearPointerDown}

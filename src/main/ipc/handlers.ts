@@ -20,6 +20,8 @@ import {
 import { GeneratorService } from '../services/generator-service';
 import { PresetService } from '../services/preset-service';
 import { UpdateCheckService } from '../services/update-check-service';
+import { isAppLocale } from '../../shared/i18n';
+import { setApplicationMenuLocale } from '../application-menu';
 
 let latestPreviewWindowState: PreviewWindowState | null = null;
 
@@ -68,6 +70,15 @@ export const registerIpcHandlers = (
   ipcMain.handle(
     IPC_CHANNELS.requestAppVersion,
     () => app.getVersion(),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.setApplicationLocale,
+    (_event, locale: unknown) => {
+      if (isAppLocale(locale)) {
+        setApplicationMenuLocale(locale);
+      }
+    },
   );
 
   ipcMain.handle(

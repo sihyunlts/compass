@@ -1,4 +1,10 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
+import type { MessageKey } from '../../shared/i18n';
+import {
+  getDeviceMessageKey,
+  getPresetSystemFolderMessageKey,
+} from '../device-i18n';
+import { i18n } from '../i18n.svelte';
 import type {
   CreatePresetFolderRequest,
   PresetBrowserTreeNode,
@@ -30,6 +36,7 @@ import {
   buildRackPresetFile,
   resolveDevicePresetSuggestedName,
   resolveGroupPresetSuggestedName,
+  type PresetApplyStatus,
 } from '../features/editor/presets';
 import { createDefaultChainSettings } from '../features/editor/persistence-storage';
 import type { EditorSession } from '../features/editor/session.svelte';
@@ -42,11 +49,47 @@ const DEFAULT_PRESET_DROP_ZONE: RackDropZone = {
   placement: 'after',
 };
 
-const PRESET_ROOT_LABELS = {
-  device: 'Devices',
-  group: 'Groups',
-  rack: 'Racks',
-} as const;
+const PRESET_APPLY_MESSAGE_KEY_BY_STATUS = {
+  'device-insert-failed': 'status.deviceInsertFailed',
+  'device-inserted': 'status.deviceInserted',
+  'group-insert-failed': 'status.groupInsertFailed',
+  'group-inserted': 'status.groupInserted',
+  'rack-load-failed': 'status.rackLoadFailed',
+  'rack-loaded': 'status.rackLoaded',
+} as const satisfies Readonly<Record<PresetApplyStatus, MessageKey>>;
+
+const resolvePresetApplyMessage = (status: PresetApplyStatus): string =>
+  i18n.t(PRESET_APPLY_MESSAGE_KEY_BY_STATUS[status]);
+
+const formatErrorMessage = (
+  summaryKey: MessageKey,
+  detail?: string | null,
+): string => {
+  const summary = i18n.t(summaryKey);
+  const normalizedDetail = detail?.trim();
+  if (!normalizedDetail || normalizedDetail === summary) {
+    return summary;
+  }
+
+  return i18n.t('status.errorDetail', {
+    summary: summary.trim().replace(/[.!?。]+$/u, ''),
+    error: normalizedDetail,
+  });
+};
+
+const resolvePresetDraftErrorMessageKey = (
+  draft: PendingPresetFolderDraft,
+): MessageKey => {
+  if (draft.entryKind === 'file') {
+    return draft.mode === 'create'
+      ? 'status.presetFileCreateFailed'
+      : 'status.presetFileRenameFailed';
+  }
+
+  return draft.mode === 'create'
+    ? 'status.presetFolderCreateFailed'
+    : 'status.presetFolderRenameFailed';
+};
 
 type PresetEntryTarget = Extract<ContextMenuTarget, { kind: 'preset-entry' }>;
 type PresetsRootTarget = Extract<ContextMenuTarget, { kind: 'presets-root' }>;
@@ -111,8 +154,8 @@ const mapPresetTreeNode = (
   };
 };
 
-const DEFAULT_RACK_FILE_DISPLAY_NAME = 'Untitled';
 const RACK_FILE_EXTENSION = '.compassrack';
+const resolveDefaultRackFileDisplayName = (): string => i18n.t('rack.untitled');
 
 const resolveFileName = (filePath: string): string => {
   const separatorIndex = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
@@ -128,12 +171,12 @@ const stripRackExtension = (fileName: string): string => {
 
 const resolveRackDisplayNameFromPath = (filePath: string): string => {
   const name = stripRackExtension(resolveFileName(filePath)).trim();
-  return name || DEFAULT_RACK_FILE_DISPLAY_NAME;
+  return name || resolveDefaultRackFileDisplayName();
 };
 
 const resolveRackDisplayNameFromFileName = (fileName: string): string => {
   const name = stripRackExtension(resolveFileName(fileName)).trim();
-  return name || DEFAULT_RACK_FILE_DISPLAY_NAME;
+  return name || resolveDefaultRackFileDisplayName();
 };
 
 const toCollapsedDeviceIdsKey = (ids: readonly string[]): string =>
@@ -141,6 +184,8 @@ const toCollapsedDeviceIdsKey = (ids: readonly string[]): string =>
 
 /** Owns renderer-side preset browser state and preset IPC workflows. */
 class PresetController {
+  private defaultRackFileDisplayName = resolveDefaultRackFileDisplayName();
+
   public readonly state: PresetControllerState = $state({
     presetTree: [],
     presetErrorText: null,
@@ -151,7 +196,7 @@ class PresetController {
     pendingRackPresetLoadTarget: null,
     isRackPresetLoadPending: false,
     currentRackFilePath: null,
-    currentRackDisplayName: DEFAULT_RACK_FILE_DISPLAY_NAME,
+    currentRackDisplayName: this.defaultRackFileDisplayName,
     isRackDirty: false,
     canRevertRack: false,
   });
@@ -166,7 +211,7 @@ class PresetController {
 
   private cleanCollapsedDeviceIdsKey = '';
 
-  private cleanRackDisplayName = DEFAULT_RACK_FILE_DISPLAY_NAME;
+  private cleanRackDisplayName = this.defaultRackFileDisplayName;
 
   private cleanRackPreset: RackPresetFile | null = null;
 
@@ -176,6 +221,27 @@ class PresetController {
 
   public constructor(private readonly options: PresetControllerOptions) {
     this.markCurrentRackClean();
+  }
+
+  public syncLocaleDependentDefaults(): void {
+    const previousDefaultName = this.defaultRackFileDisplayName;
+    const nextDefaultName = resolveDefaultRackFileDisplayName();
+    this.defaultRackFileDisplayName = nextDefaultName;
+    if (
+      this.state.currentRackFilePath !== null
+      || this.state.currentRackDisplayName !== previousDefaultName
+    ) {
+      return;
+    }
+
+    this.state.currentRackDisplayName = nextDefaultName;
+    if (this.cleanRackDisplayName === previousDefaultName) {
+      this.cleanRackDisplayName = nextDefaultName;
+    }
+    if (this.state.pendingRackPresetLoadTarget?.label === previousDefaultName) {
+      this.state.pendingRackPresetLoadTarget.label = nextDefaultName;
+    }
+    this.syncRackDirtyState();
   }
 
   public syncRackDirtyState(): void {
@@ -216,7 +282,7 @@ class PresetController {
   public async handleNewRack(): Promise<void> {
     await this.runPresetAction(async () => {
       await this.requestNewRack();
-    }, 'New rack failed.');
+    }, 'status.newRackFailed');
   }
 
   public handleRevertRack(): void {
@@ -227,13 +293,13 @@ class PresetController {
 
     const result = this.options.editorSession.commands.applyRackPreset(this.cleanRackPreset);
     if (!result.ok) {
-      this.showMessage(result.message);
+      this.showMessage(resolvePresetApplyMessage(result.status));
       return;
     }
 
     this.state.currentRackDisplayName = this.cleanRackDisplayName;
     this.markCurrentRackClean({ captureRevertTarget: true });
-    this.showMessage('Rack reverted to saved state.');
+    this.showMessage(i18n.t('status.rackReverted'));
   }
 
   public async renameCurrentRack(rawName: string): Promise<boolean> {
@@ -254,7 +320,7 @@ class PresetController {
       fileName: nextName,
     });
     if (response.status === 'error') {
-      this.showMessage(`Rack rename failed | ${response.message}`);
+      this.showError('status.rackRenameFailed', response.message);
       return false;
     }
 
@@ -262,7 +328,7 @@ class PresetController {
     this.cleanRackDisplayName = this.state.currentRackDisplayName;
     this.syncRackDirtyState();
     await this.loadTree();
-    this.showMessage('Rack renamed.');
+    this.showMessage(i18n.t('status.rackRenamed'));
     return true;
   }
 
@@ -293,7 +359,8 @@ class PresetController {
 
   private setCurrentRackFile(filePath: string | null, displayName: string): void {
     this.state.currentRackFilePath = filePath;
-    this.state.currentRackDisplayName = displayName.trim() || DEFAULT_RACK_FILE_DISPLAY_NAME;
+    this.state.currentRackDisplayName = displayName.trim()
+      || resolveDefaultRackFileDisplayName();
   }
 
   private syncCurrentRackAfterPresetFileRename(
@@ -350,13 +417,13 @@ class PresetController {
       this.setCurrentRackFile(response.filePath, resolveRackDisplayNameFromPath(response.filePath));
       this.markCurrentRackClean({ captureRevertTarget: true });
       if (options.showSuccessMessage) {
-        this.showMessage('Rack saved.');
+        this.showMessage(i18n.t('status.rackSaved'));
       }
       await this.loadTree();
       return true;
     }
 
-    this.showMessage(`Rack save failed | ${response.message}`);
+    this.showError('status.rackSaveFailed', response.message);
     return false;
   }
 
@@ -368,14 +435,14 @@ class PresetController {
       this.setCurrentRackFile(response.filePath, resolveRackDisplayNameFromPath(response.filePath));
       this.markCurrentRackClean({ captureRevertTarget: true });
       if (options.showSuccessMessage) {
-        this.showMessage('Rack saved.');
+        this.showMessage(i18n.t('status.rackSaved'));
       }
       await this.loadTree();
       return true;
     }
 
     if (response.status === 'error') {
-      this.showMessage(`Rack save failed | ${response.message}`);
+      this.showError('status.rackSaveFailed', response.message);
     }
     return false;
   }
@@ -403,16 +470,17 @@ class PresetController {
       }
 
       this.state.presetTree = [];
-      this.state.presetErrorText = error instanceof Error && error.message.trim()
-        ? error.message.trim()
-        : 'Failed to load presets.';
+      this.state.presetErrorText = formatErrorMessage(
+        'status.presetsLoadFailed',
+        error instanceof Error ? error.message : null,
+      );
     }
   }
 
   public async handlePresetEntryOpen(entry: BrowserTreePresetLeafNode): Promise<void> {
     await this.runPresetAction(async () => {
       await this.loadPresetFromBrowserEntry(entry);
-    }, 'Preset load failed.');
+    }, 'status.presetLoadFailed');
   }
 
   public async handlePresetFilePointerDown(
@@ -429,7 +497,7 @@ class PresetController {
         this.toReadPresetEntryRequest(entry),
       );
       if (response.status === 'error') {
-        this.showMessage(`Preset load failed | ${response.message}`);
+        this.showError('status.presetLoadFailed', response.message);
         return;
       }
 
@@ -444,7 +512,7 @@ class PresetController {
         sourceEvent,
         itemEl,
       });
-    }, 'Preset load failed.');
+    }, 'status.presetLoadFailed');
   }
 
   public openRackPresetDropDialog(
@@ -459,7 +527,7 @@ class PresetController {
           needsSave: source.needsSave === true,
         });
       },
-      'Rack load failed.',
+      'status.rackLoadFailed',
     );
   }
 
@@ -581,7 +649,10 @@ class PresetController {
           folderName: entryName,
         } satisfies RenamePresetFolderRequest);
     if (response.status === 'error') {
-      this.showMessage(`${draft.entryKind === 'file' ? 'File' : 'Folder'} ${draft.mode} failed | ${response.message}`);
+      this.showError(
+        resolvePresetDraftErrorMessageKey(draft),
+        response.message,
+      );
       return;
     }
 
@@ -629,17 +700,17 @@ class PresetController {
       });
       if (response.status === 'error') {
         this.state.pendingPresetDeleteTarget = null;
-        this.showMessage(`Delete failed | ${response.message}`);
+        this.showError('status.moveToTrashFailed', response.message);
         return;
       }
 
       await this.loadTree();
       this.state.pendingPresetDeleteTarget = null;
     } catch (error) {
-      const message = error instanceof Error && error.message.trim()
-        ? error.message.trim()
-        : 'Delete failed.';
-      this.showMessage(`Delete failed | ${message}`);
+      this.showError(
+        'status.moveToTrashFailed',
+        error instanceof Error ? error.message : null,
+      );
     } finally {
       this.state.isPresetDeletePending = false;
     }
@@ -647,23 +718,27 @@ class PresetController {
 
   public getPresetDeleteTitle(target: PresetEntryTarget): string {
     return target.entryKind === 'directory'
-      ? 'Move folder to Trash?'
-      : 'Move item to Trash?';
+      ? i18n.t('preset.moveFolderPrompt')
+      : i18n.t('preset.moveItemPrompt');
   }
 
   public getPresetDeleteDescription(target: PresetEntryTarget): string {
-    const label = target.relativePath[target.relativePath.length - 1]
-      ?? PRESET_ROOT_LABELS[target.presetType];
+    const systemFolderMessageKey = target.entryKind === 'directory'
+      ? getPresetSystemFolderMessageKey(target.presetType, target.relativePath)
+      : null;
+    const label = systemFolderMessageKey
+      ? i18n.t(systemFolderMessageKey)
+      : target.relativePath[target.relativePath.length - 1] ?? '';
     return target.entryKind === 'directory'
-      ? `The folder "${label}" and everything inside it will be moved to the trash.`
-      : `The item "${label}" will be moved to the trash.`;
+      ? i18n.t('preset.moveFolderDescription', { label })
+      : i18n.t('preset.moveItemDescription', { label });
   }
 
   public async handleShowPresetEntryInFolder(target: ShowInFolderTarget): Promise<void> {
     if (target.kind === 'presets-root') {
       const response = await this.options.bridgeClient.showPresetsRootInFolder();
       if (response.status === 'error') {
-        this.showMessage(`Show in Folder failed | ${response.message}`);
+        this.showError('status.showInFolderFailed', response.message);
       }
       return;
     }
@@ -674,7 +749,7 @@ class PresetController {
       entryKind: target.entryKind,
     });
     if (response.status === 'error') {
-      this.showMessage(`Show in Folder failed | ${response.message}`);
+      this.showError('status.showInFolderFailed', response.message);
     }
   }
 
@@ -684,14 +759,18 @@ class PresetController {
     await this.savePreset(
       payload
         ? {
-            suggestedName: resolveDevicePresetSuggestedName(chain, deviceId),
+            suggestedName: resolveDevicePresetSuggestedName(
+              chain,
+              deviceId,
+              (kind) => i18n.t(getDeviceMessageKey(kind)),
+            ),
             payload,
           }
         : null,
       {
-        emptyMessage: 'Unable to build device.',
-        successMessage: 'Device saved.',
-        errorSummary: 'Device save failed',
+        emptyMessage: 'status.deviceBuildFailed',
+        successMessage: 'status.deviceSaved',
+        errorSummary: 'status.deviceSaveFailed',
       },
     );
   }
@@ -708,14 +787,18 @@ class PresetController {
     await this.savePreset(
       payload
         ? {
-            suggestedName: resolveGroupPresetSuggestedName(chain, groupId),
+            suggestedName: resolveGroupPresetSuggestedName(
+              chain,
+              groupId,
+              i18n.t('group.defaultTemplate'),
+            ),
             payload,
           }
         : null,
       {
-        emptyMessage: 'Unable to build group.',
-        successMessage: 'Group saved.',
-        errorSummary: 'Group save failed',
+        emptyMessage: 'status.groupBuildFailed',
+        successMessage: 'status.groupSaved',
+        errorSummary: 'status.groupSaveFailed',
       },
     );
   }
@@ -733,7 +816,7 @@ class PresetController {
 
     this.state.pendingRackPresetLoadTarget = {
       label: 'Compass',
-      description: 'Save changes to the current rack before closing Compass?',
+      description: i18n.t('rack.saveBeforeClose'),
       load: async () => {
         await this.options.bridgeClient.confirmMainWindowClose();
       },
@@ -765,7 +848,7 @@ class PresetController {
       await this.runPresetAction(async () => {
         await target.load();
         this.state.pendingRackPresetLoadTarget = null;
-      }, 'Rack load failed.');
+      }, 'status.rackLoadFailed');
     } finally {
       this.state.isRackPresetLoadPending = false;
     }
@@ -782,19 +865,21 @@ class PresetController {
       await this.runPresetAction(async () => {
         await target.load();
         this.state.pendingRackPresetLoadTarget = null;
-      }, 'Rack load failed.');
+      }, 'status.rackLoadFailed');
     } finally {
       this.state.isRackPresetLoadPending = false;
     }
   }
 
   public getRackPresetLoadDescription(target: PendingRackPresetLoadTarget): string {
-    return target.description ?? `Save changes to the current rack before opening "${target.label}"?`;
+    return target.description ?? i18n.t('rack.saveBeforeOpen', {
+      label: target.label,
+    });
   }
 
   public async handlePresetFileDrop(payload: RackPresetFileDrop): Promise<void> {
     if (payload.fileCount !== 1) {
-      this.showMessage('Drop a single preset file at a time.');
+      this.showMessage(i18n.t('status.dropSinglePreset'));
       return;
     }
 
@@ -802,7 +887,7 @@ class PresetController {
     try {
       fileText = await payload.file.text();
     } catch {
-      this.showMessage('File load failed | Unable to read the dropped file.');
+      this.showError('status.fileLoadFailed', i18n.t('status.fileReadFailed'));
       return;
     }
 
@@ -810,7 +895,7 @@ class PresetController {
       fileName: payload.file.name,
     });
     if (parsed.ok === false) {
-      this.showMessage(`File load failed | ${parsed.message}`);
+      this.showError('status.fileLoadFailed', parsed.message);
       return;
     }
 
@@ -825,7 +910,7 @@ class PresetController {
     }
 
     if (!payload.dropZone) {
-      this.showMessage('Drop the item onto the rack to load it.');
+      this.showMessage(i18n.t('status.dropOntoRack'));
       return;
     }
 
@@ -838,24 +923,28 @@ class PresetController {
           payload.dropZone,
           parsed.preset,
         );
-    this.showMessage(result.message);
+    this.showMessage(resolvePresetApplyMessage(result.status));
   }
 
   private showMessage(message: string): void {
     this.options.showMessage(message);
   }
 
+  private showError(summaryKey: MessageKey, detail?: string | null): void {
+    this.showMessage(formatErrorMessage(summaryKey, detail));
+  }
+
   private async runPresetAction(
     action: () => Promise<void>,
-    fallbackMessage: string,
+    fallbackMessageKey: MessageKey,
   ): Promise<void> {
     try {
       await action();
     } catch (error) {
-      const message = error instanceof Error && error.message.trim()
-        ? error.message.trim()
-        : fallbackMessage;
-      this.showMessage(message);
+      this.showError(
+        fallbackMessageKey,
+        error instanceof Error ? error.message : null,
+      );
     }
   }
 
@@ -908,7 +997,7 @@ class PresetController {
       this.toReadPresetEntryRequest(entry),
     );
     if (response.status === 'error') {
-      this.showMessage(`Preset load failed | ${response.message}`);
+      this.showError('status.presetLoadFailed', response.message);
       return;
     }
 
@@ -917,7 +1006,7 @@ class PresetController {
         DEFAULT_PRESET_DROP_ZONE,
         response.payload,
       );
-      this.showMessage(result.message);
+      this.showMessage(resolvePresetApplyMessage(result.status));
       return;
     }
 
@@ -926,7 +1015,7 @@ class PresetController {
         DEFAULT_PRESET_DROP_ZONE,
         response.payload,
       );
-      this.showMessage(result.message);
+      this.showMessage(resolvePresetApplyMessage(result.status));
       return;
     }
 
@@ -959,7 +1048,7 @@ class PresetController {
   private async loadRackOpenTarget(target: RackOpenTarget): Promise<void> {
     const result = this.options.editorSession.commands.applyRackPreset(target.preset);
     if (!result.ok) {
-      this.showMessage(result.message);
+      this.showMessage(resolvePresetApplyMessage(result.status));
       return;
     }
 
@@ -967,12 +1056,12 @@ class PresetController {
     if (target.needsSave) {
       this.captureCurrentRackRevertTarget();
       this.syncRackDirtyState();
-      this.showMessage('Rack loaded. Save to update the file format.');
+      this.showMessage(i18n.t('status.rackLoadedNeedsSave'));
       return;
     }
 
     this.markCurrentRackClean({ captureRevertTarget: true });
-    this.showMessage('Rack loaded.');
+    this.showMessage(i18n.t('status.rackLoaded'));
   }
 
   private async requestNewRack(): Promise<void> {
@@ -983,8 +1072,8 @@ class PresetController {
 
     if (this.state.isRackDirty) {
       this.state.pendingRackPresetLoadTarget = {
-        label: DEFAULT_RACK_FILE_DISPLAY_NAME,
-        description: 'Save changes to the current rack before creating a new rack?',
+        label: resolveDefaultRackFileDisplayName(),
+        description: i18n.t('rack.saveBeforeNew'),
         load,
       };
       this.state.isRackPresetLoadPending = false;
@@ -999,42 +1088,42 @@ class PresetController {
       buildRackPresetFile(createDefaultChainSettings(), []),
     );
     if (!result.ok) {
-      this.showMessage(result.message);
+      this.showMessage(resolvePresetApplyMessage(result.status));
       return;
     }
 
-    this.setCurrentRackFile(null, DEFAULT_RACK_FILE_DISPLAY_NAME);
+    this.setCurrentRackFile(null, resolveDefaultRackFileDisplayName());
     this.clearRevertTarget();
     this.markCurrentRackClean();
-    this.showMessage('New rack created.');
+    this.showMessage(i18n.t('status.newRackCreated'));
   }
 
   private async savePreset(
     request: SavePresetFileRequest | null,
     options: {
-      emptyMessage?: string;
-      successMessage: string;
-      errorSummary: string;
+      emptyMessage?: MessageKey;
+      successMessage: MessageKey;
+      errorSummary: MessageKey;
     },
   ): Promise<void> {
     await this.runPresetAction(async () => {
       if (!request) {
         if (options.emptyMessage) {
-          this.showMessage(options.emptyMessage);
+          this.showMessage(i18n.t(options.emptyMessage));
         }
         return;
       }
 
       const response = await this.options.bridgeClient.savePresetFile(request);
       if (response.status === 'saved') {
-        this.showMessage(options.successMessage);
+        this.showMessage(i18n.t(options.successMessage));
         return;
       }
 
       if (response.status === 'error') {
-        this.showMessage(`${options.errorSummary} | ${response.message}`);
+        this.showError(options.errorSummary, response.message);
       }
-    }, `${options.errorSummary}.`);
+    }, options.errorSummary);
   }
 }
 

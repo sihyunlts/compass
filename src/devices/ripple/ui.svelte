@@ -4,6 +4,7 @@
   import type { GeneratorDeviceNode } from '../../shared/model';
   import CenterPointPicker from '../../renderer/components/controls/CenterPointPicker.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
+  import { i18n } from '../../renderer/i18n.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { RIPPLE_NUMERIC_PARAMETERS } from './schema';
 
@@ -23,7 +24,7 @@
     {onControlChange}
   />
   <NumberField
-    label="Curvature"
+    label={i18n.t('control.curvature')}
     parameter={RIPPLE_NUMERIC_PARAMETERS.curvature}
     value={device.params.curvature}
     dataAction="set-ripple-param"

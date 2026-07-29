@@ -38,6 +38,8 @@
   import { createDeviceRackController } from '../../features/rack/device-rack-controller.svelte';
   import RackRenamePopover from './RackRenamePopover.svelte';
   import DeviceCard from './DeviceCard.svelte';
+  import { i18n } from '../../i18n.svelte';
+  import { getDeviceMessageKey } from '../../device-i18n';
 
   let {
     devices,
@@ -121,9 +123,16 @@
     devices.map((device: GeneratorDeviceNode) => device.id));
   const orderedGroupIds = $derived.by(() => buildOrderedGroupIds(devices));
   const collapsedSet = $derived.by(() => new Set<string>(collapsedDeviceIds));
-  const deviceDisplayNameById = $derived.by(() => buildDeviceDisplayNameById(devices));
+  const deviceDisplayNameById = $derived.by(() => buildDeviceDisplayNameById(
+    devices,
+    (kind) => i18n.t(getDeviceMessageKey(kind)),
+  ));
   const groupDisplayNameById = $derived.by(() =>
-    buildGroupDisplayNameById(devices, chainState.groupStateById));
+    buildGroupDisplayNameById(
+      devices,
+      chainState.groupStateById,
+      i18n.t('group.defaultTemplate'),
+    ));
   const rackContentItems = $derived.by(() =>
     buildRackContentItems(devices, resolveGroupEnabled));
 
@@ -340,7 +349,7 @@
     ondrop={(event) => void controller.externalFileDrop.handleDrop(event)}
   >
     {#if isRackEmpty}
-      <p class="rack-empty-message">Drop a Device, Group, or Rack Here</p>
+      <p class="rack-empty-message">{i18n.t('rack.dropHere')}</p>
     {/if}
 
     {#each rackContentItems as item (item.key)}
@@ -363,7 +372,6 @@
             {currentProgress01}
             {modulationReadoutById}
             {resolvePaletteRgb}
-            title={resolveDeviceDisplayName(deviceDisplayNameById, item.device.id)}
             isCollapsed={collapsedSet.has(item.device.id)}
             isDisabledByGroup={false}
             isSelected={selectedDeviceIds.includes(item.device.id)}
@@ -446,7 +454,6 @@
                     {currentProgress01}
                     {modulationReadoutById}
                     {resolvePaletteRgb}
-                    title={resolveDeviceDisplayName(deviceDisplayNameById, col.device.id)}
                     isCollapsed={collapsedSet.has(col.device.id)}
                     isDisabledByGroup={!item.enabled}
                     isSelected={isGroupSelected || selectedDeviceIds.includes(col.device.id)}
@@ -475,8 +482,14 @@
                     onHeaderDoubleClick={(event) => controller.handleDeviceHeaderDoubleClick(event, col.device.id)}
                   />
                 {:else if col.kind === 'left-rail'}
-                  {@const groupName = resolveGroupDisplayName(groupDisplayNameById, col.groupId)}
-                  {@const groupToggleLabel = `${col.enabled ? 'Disable' : 'Enable'} ${groupName}`}
+                  {@const groupName = resolveGroupDisplayName(
+                    groupDisplayNameById,
+                    col.groupId,
+                  )}
+                  {@const groupToggleLabel = i18n.t(
+                    col.enabled ? 'group.disable' : 'group.enable',
+                    { name: groupName },
+                  )}
                   <div class="group-rail-controls">
                     <input
                       class="group-enabled-toggle round-checkbox"
@@ -491,8 +504,8 @@
                     <button
                       class="preset-save-button"
                       type="button"
-                      aria-label={`Save ${groupName}`}
-                      use:hint={`Save ${groupName}`}
+                      aria-label={i18n.t('group.save', { name: groupName })}
+                      use:hint={i18n.t('group.save', { name: groupName })}
                       onpointerdown={(event) => controller.handleGroupSavePointerDown(event)}
                       onclick={(event) => controller.handleGroupSaveClick(event, col.groupId)}
                       oncontextmenu={(event) => controller.handleGroupSaveContextMenu(event)}

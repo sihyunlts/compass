@@ -5,6 +5,7 @@
   import { sanitizeTimeWarpCurveNodes } from '../../core/timewarp/curve';
   import type { GeneratorDeviceNode } from '../../shared/model';
   import type { RendererDeviceEditorPropsBase } from '../types';
+  import { i18n } from '../../renderer/i18n.svelte';
 
   type TimeWarpDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'timewarp' }>;
@@ -15,7 +16,7 @@
 
 <div class="device-controls">
   <CurveEditor
-    label="Curve"
+    label={i18n.t('tab.curve')}
     deviceId={device.id}
     curve={device.params.curve}
     controlAction="set-timewarp-curve-nodes"
