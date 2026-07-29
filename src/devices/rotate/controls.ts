@@ -1,13 +1,15 @@
 import type { GeneratorDeviceNode } from '../../shared/model';
 import {
-  createDefaultNumericValueResolver,
   createMergeKeyResolver,
-  createNumericParamSetter,
+  createNumericParameterDefaultResolver,
+  createNumericParameterSetter,
   readControlParam,
   resolveNumericControlParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
-import { ROTATE_NUMERIC_PARAM_KEYS } from './schema';
+import { ROTATE_NUMERIC_PARAMETERS } from './schema';
+
+const ROTATE_ANGLE_PARAM_KEYS = ['angleDeg'] as const;
 
 const isRotateDevice = (
   device: GeneratorDeviceNode,
@@ -16,20 +18,19 @@ const isRotateDevice = (
 
 export const rotateDeviceControls = {
   descriptors: {
-    'set-angle-param': {
-      resolveMergeKey: createMergeKeyResolver('set-angle-param', resolveNumericControlParam),
-      resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readControlParam(input, ROTATE_NUMERIC_PARAM_KEYS),
+    'set-rotate-param': {
+      resolveMergeKey: createMergeKeyResolver('set-rotate-param', resolveNumericControlParam),
+      resolveDefaultValue: createNumericParameterDefaultResolver(
+        ROTATE_NUMERIC_PARAMETERS,
+        (input) => readControlParam(input, ROTATE_ANGLE_PARAM_KEYS),
       ),
     },
   },
   createHandlers: () => ({
-    'set-angle-param': createNumericParamSetter({
+    'set-rotate-param': createNumericParameterSetter({
       isKind: isRotateDevice,
-      readParam: (input) => readControlParam(input, ROTATE_NUMERIC_PARAM_KEYS),
-      assign: (device, param, value) => {
-        device.params[param] = value;
-      },
+      rules: ROTATE_NUMERIC_PARAMETERS,
+      readParam: (input) => readControlParam(input, ROTATE_ANGLE_PARAM_KEYS),
     }),
   }),
 } satisfies RendererKindControlDefinition;

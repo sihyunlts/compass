@@ -49,6 +49,7 @@
 
 <style lang="scss">
   .control-field {
+    position: relative;
     display: inline-flex;
     flex-direction: column;
     gap: var(--gap-6);

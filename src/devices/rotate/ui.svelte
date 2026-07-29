@@ -4,6 +4,7 @@
   import type { GeneratorDeviceNode } from '../../shared/model';
   import AnglePicker from '../../renderer/components/controls/AnglePicker.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
+  import { ROTATE_NUMERIC_PARAMETERS } from './schema';
 
   type RotateDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'rotate' }>;
@@ -14,11 +15,12 @@
 
 <div class="device-controls">
   <AnglePicker
-    label="Angle (0-360)"
+    label="Rotation"
     value={device.params.angleDeg}
-    dataAction="set-angle-param"
+    dataAction="set-rotate-param"
     dataId={device.id}
     dataParam="angleDeg"
+    parameter={ROTATE_NUMERIC_PARAMETERS.angleDeg}
     {onControlChange}
   />
 </div>

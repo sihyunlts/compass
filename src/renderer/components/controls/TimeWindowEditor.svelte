@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import type { RendererControlChange } from '../../../devices/control-types';
+  import type { NumericParameterRule } from '../../../devices/numeric-parameters';
   import { clamp } from '../../../shared/math';
   import FieldShell from '../fields/FieldShell.svelte';
   import NumberField from '../fields/NumberField.svelte';
@@ -15,6 +16,7 @@
     start,
     end,
     mode,
+    parameter,
     modeBadgeText = null,
     currentProgress01,
     onControlChange,
@@ -24,22 +26,25 @@
     start: number;
     end: number;
     mode: TimeWindowEditorMode;
+    parameter?: NumericParameterRule;
     modeBadgeText?: string | null;
     currentProgress01?: number;
     onControlChange: (change: RendererControlChange) => void;
   }>();
 
   let snapDivisions = $state<number>(16);
+  const resolvedMin = $derived(parameter?.input.min ?? 0);
+  const resolvedMax = $derived(parameter?.input.max ?? 1);
 
-  const resolvedStart = $derived(Number.isFinite(start) ? start : 0);
-  const resolvedEnd = $derived(Number.isFinite(end) ? end : 0);
-  const clampedStart = $derived(clamp(resolvedStart, 0, 1));
-  const clampedEnd = $derived(clamp(resolvedEnd, 0, 1));
+  const resolvedStart = $derived(Number.isFinite(start) ? start : resolvedMin);
+  const resolvedEnd = $derived(Number.isFinite(end) ? end : resolvedMin);
+  const clampedStart = $derived(clamp(resolvedStart, resolvedMin, resolvedMax));
+  const clampedEnd = $derived(clamp(resolvedEnd, resolvedMin, resolvedMax));
   const hasValidWindow = $derived(
     Number.isFinite(start)
     && Number.isFinite(end)
-    && start >= 0
-    && end <= 1
+    && start >= resolvedMin
+    && end <= resolvedMax
     && end > start,
   );
   const visibleStart = $derived(hasValidWindow ? clampedStart : 0);
@@ -132,8 +137,8 @@
       <input
         class="time-window-range time-window-range-start"
         type="range"
-        min="0"
-        max="1"
+        min={resolvedMin}
+        max={resolvedMax}
         step={rangeStep}
         value={clampedStart}
         aria-label="Window start"
@@ -143,8 +148,8 @@
       <input
         class="time-window-range time-window-range-end"
         type="range"
-        min="0"
-        max="1"
+        min={resolvedMin}
+        max={resolvedMax}
         step={rangeStep}
         value={clampedEnd}
         aria-label="Window end"
@@ -157,9 +162,7 @@
   <div class="time-window-inputs">
     <NumberField
       label="Start"
-      min="0"
-      max="1"
-      step="0.001"
+      {parameter}
       value={resolvedStart}
       dataAction={dataAction}
       dataId={deviceId}
@@ -168,9 +171,7 @@
     />
     <NumberField
       label="End"
-      min="0"
-      max="1"
-      step="0.001"
+      {parameter}
       value={resolvedEnd}
       dataAction={dataAction}
       dataId={deviceId}

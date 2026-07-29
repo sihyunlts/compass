@@ -7,7 +7,11 @@
   import SelectField from '../../renderer/components/fields/SelectField.svelte';
   import ValueButton from '../../renderer/components/primitives/ValueButton.svelte';
   import { sanitizeCurveNodes } from '../../core/modulation/curve';
-  import { MODULATION_TARGET_SLOT_COUNT } from '../../core/modulation/routing';
+  import { MODULATION_TARGET_SLOT_COUNT } from '../../core/modulation/targets';
+  import type {
+    ModulationParameterDefinition,
+    NumericParameterUnit,
+  } from '../numeric-parameters';
   import {
     getRendererDeviceLabel,
     getRendererModulationTargetParamDefinitions,
@@ -83,18 +87,30 @@
   const findSelectedTargetDevice = (target: ModulationTarget): GeneratorDeviceNode | null =>
     targetableDevices.find((item: GeneratorDeviceNode) => item.id === target.deviceId) ?? null;
 
+  const resolveTargetParameterDefinition = (
+    target: ModulationTarget,
+  ): ModulationParameterDefinition | null => {
+    const selectedTargetDevice = findSelectedTargetDevice(target);
+    return selectedTargetDevice
+      ? getRendererModulationTargetParamDefinitions(selectedTargetDevice.kind)
+        .find((option) => option.key === target.paramKey) ?? null
+      : null;
+  };
+
   const resolveTargetLabel = (target: ModulationTarget): string => {
     const selectedTargetDevice = findSelectedTargetDevice(target);
     const deviceLabel = selectedTargetDevice
       ? deviceDisplayNameById[selectedTargetDevice.id] ?? getRendererDeviceLabel(selectedTargetDevice.kind)
       : 'Missing target';
-    const paramOptions = selectedTargetDevice
-      ? getRendererModulationTargetParamDefinitions(selectedTargetDevice.kind)
-      : [];
-    const paramLabel = paramOptions.find((option) => option.key === target.paramKey)?.label
+    const paramLabel = resolveTargetParameterDefinition(target)?.label
       ?? target.paramKey;
     return `${deviceLabel} / ${paramLabel}`;
   };
+
+  const resolveTargetUnit = (
+    target: ModulationTarget,
+  ): NumericParameterUnit | undefined =>
+    resolveTargetParameterDefinition(target)?.unit;
 
   const clearTargetSlot = (slotIndex: number): void => {
     onControlChange({
@@ -176,11 +192,11 @@
               />
               <NumberField
                 label="Amount"
-                ariaLabel="Amount"
                 size="compact"
                 labelVisibility="hidden"
                 fill={true}
                 step="0.1"
+                unit={resolveTargetUnit(target)}
                 value={target.amount}
                 dataAction="set-modulation-target-amount"
                 dataId={device.id}

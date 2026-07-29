@@ -1,3 +1,4 @@
+import { writeNumericDeviceParam } from '../../../devices/modulation';
 import type { GeneratorChain } from '../../../shared/model';
 import { clamp } from '../../../shared/math';
 
@@ -66,7 +67,7 @@ const resolvePickerBounds = (surface: HTMLElement): { min: number; max: number; 
 const snapPickerCoordinate = (value: number, min: number, max: number, step: number): number => {
   const safeStep = Number.isFinite(step) && step > 0 ? step : DEFAULT_PICKER_STEP;
   const clamped = clamp(value, min, max);
-  const snapped = Math.round(clamped / safeStep) * safeStep;
+  const snapped = Math.round((clamped - min) / safeStep) * safeStep + min;
   return Number(clamp(snapped, min, max).toFixed(3));
 };
 
@@ -243,9 +244,14 @@ export class CenterPickerController {
       return false;
     }
 
-    device.params.centerX = point.x;
-    device.params.centerY = point.y;
-    updateCenterPickerSurface(surface, point.x, point.y);
+    const { step } = resolvePickerBounds(surface);
+    const centerX = writeNumericDeviceParam(device, 'centerX', point.x, step);
+    const centerY = writeNumericDeviceParam(device, 'centerY', point.y, step);
+    if (centerX === null || centerY === null) {
+      return false;
+    }
+
+    updateCenterPickerSurface(surface, centerX, centerY);
     this.syncSelection(id);
     return true;
   }
@@ -272,9 +278,13 @@ export class CenterPickerController {
       return false;
     }
 
-    device.params.centerX = midpoint;
-    device.params.centerY = midpoint;
-    updateCenterPickerSurface(surface, midpoint, midpoint);
+    const centerX = writeNumericDeviceParam(device, 'centerX', midpoint, step);
+    const centerY = writeNumericDeviceParam(device, 'centerY', midpoint, step);
+    if (centerX === null || centerY === null) {
+      return false;
+    }
+
+    updateCenterPickerSurface(surface, centerX, centerY);
     this.syncSelection(id);
     return true;
   }

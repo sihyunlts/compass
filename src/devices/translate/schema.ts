@@ -4,8 +4,12 @@ import {
   resolveImportedDeviceEnabled,
   resolveImportedDeviceId,
   resolveImportedParams,
-  toFiniteNumber,
 } from '../import-hydration';
+import {
+  defineNumericParameterRules,
+  finiteNumericParameter,
+  hydrateImportedNumericParameters,
+} from '../numeric-parameters';
 import type { RendererDeviceSchema } from '../types';
 
 const DEFAULT_TRANSLATE_PARAMS: TranslateEffectNode['params'] = {
@@ -13,11 +17,20 @@ const DEFAULT_TRANSLATE_PARAMS: TranslateEffectNode['params'] = {
   offsetY: 0,
 };
 
-const TRANSLATE_MODULATION_TARGET_PARAMS = [
-  { key: 'offsetX', label: 'Offset X' },
-  { key: 'offsetY', label: 'Offset Y' },
-] as const;
-export const TRANSLATE_NUMERIC_PARAM_KEYS = ['offsetX', 'offsetY'] as const;
+export const TRANSLATE_NUMERIC_PARAMETERS = defineNumericParameterRules<
+  TranslateEffectNode['params']
+>()({
+  offsetX: finiteNumericParameter({
+    defaultValue: DEFAULT_TRANSLATE_PARAMS.offsetX,
+    step: 0.1,
+    modulationLabel: 'Offset X',
+  }),
+  offsetY: finiteNumericParameter({
+    defaultValue: DEFAULT_TRANSLATE_PARAMS.offsetY,
+    step: 0.1,
+    modulationLabel: 'Offset Y',
+  }),
+});
 
 const createDefaultTranslateNode = (
   id: string,
@@ -43,8 +56,7 @@ const hydrateImportedTranslateNode = (
     source,
   );
   const params = resolveImportedParams(source);
-  device.params.offsetX = toFiniteNumber(params.offsetX, device.params.offsetX);
-  device.params.offsetY = toFiniteNumber(params.offsetY, device.params.offsetY);
+  hydrateImportedNumericParameters(device.params, params, TRANSLATE_NUMERIC_PARAMETERS);
   return device;
 };
 
@@ -52,8 +64,7 @@ export const translateDeviceSchema = {
   kind: 'translate',
   label: 'Translate',
   group: 'effect',
-  modulationTargetParams: TRANSLATE_MODULATION_TARGET_PARAMS,
-  numericParamKeys: TRANSLATE_NUMERIC_PARAM_KEYS,
+  numericParameters: TRANSLATE_NUMERIC_PARAMETERS,
   createDefaultNode: createDefaultTranslateNode,
   hydrateImportedNode: hydrateImportedTranslateNode,
 } satisfies RendererDeviceSchema<'translate'>;

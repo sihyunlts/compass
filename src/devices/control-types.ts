@@ -1,8 +1,6 @@
 import type { GeneratorDeviceNode } from '../shared/model';
-import type {
-  RendererDeviceKind,
-  RendererModulationParamDefinition,
-} from './types';
+import type { ModulationParameterDefinition } from './numeric-parameters';
+import type { RendererDeviceKind } from './types';
 
 export interface RendererControlChange {
   action: string;
@@ -25,7 +23,7 @@ export interface RendererControlContext {
   getMaskSourceGeneratorIds: () => string[];
   getModulationTargetParamDefinitions: (
     kind: RendererDeviceKind,
-  ) => readonly RendererModulationParamDefinition[];
+  ) => readonly ModulationParameterDefinition[];
 }
 
 export interface RendererControlDescriptor {

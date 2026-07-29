@@ -1,20 +1,18 @@
 import type { RainGeneratorNode } from '../../shared/model';
-import { clamp } from '../../shared/math';
 import {
   applyImportedDeviceMeta,
   resolveImportedDeviceEnabled,
   resolveImportedDeviceId,
   resolveImportedParams,
-  toFiniteNumber,
 } from '../import-hydration';
+import {
+  boundedIntegerParameter,
+  boundedNumericParameter,
+  cyclicNumericParameter,
+  defineNumericParameterRules,
+  hydrateImportedNumericParameters,
+} from '../numeric-parameters';
 import type { RendererDeviceSchema } from '../types';
-
-export const RAIN_SEED_MIN = 0;
-export const RAIN_SEED_MAX = 9999;
-export const RAIN_DENSITY_MIN = 0;
-export const RAIN_DENSITY_MAX = 32;
-export const RAIN_SPEED_MIN = 0.3;
-export const RAIN_SPEED_MAX = 6;
 
 const DEFAULT_RAIN_PARAMS: RainGeneratorNode['params'] = {
   seed: 1,
@@ -23,30 +21,39 @@ const DEFAULT_RAIN_PARAMS: RainGeneratorNode['params'] = {
   speed: 1,
 };
 
-const RAIN_MODULATION_TARGET_PARAMS = [
-  { key: 'angleDeg', label: 'Direction' },
-  { key: 'density', label: 'Density' },
-  { key: 'speed', label: 'Speed' },
-] as const;
-
-export const RAIN_NUMERIC_PARAM_KEYS = [
-  'seed',
-  'angleDeg',
-  'density',
-  'speed',
-] as const;
-
-export const normalizeRainSeed = (
-  value: number,
-): number => clamp(Math.trunc(value), RAIN_SEED_MIN, RAIN_SEED_MAX);
-
-export const normalizeRainDensity = (
-  value: number,
-): number => clamp(value, RAIN_DENSITY_MIN, RAIN_DENSITY_MAX);
-
-export const normalizeRainSpeed = (
-  value: number,
-): number => clamp(value, RAIN_SPEED_MIN, RAIN_SPEED_MAX);
+export const RAIN_NUMERIC_PARAMETERS = defineNumericParameterRules<
+  RainGeneratorNode['params']
+>()({
+  seed: boundedIntegerParameter({
+    defaultValue: DEFAULT_RAIN_PARAMS.seed,
+    min: 0,
+    max: 9999,
+    step: 1,
+  }),
+  angleDeg: cyclicNumericParameter({
+    defaultValue: DEFAULT_RAIN_PARAMS.angleDeg,
+    min: 0,
+    period: 360,
+    step: 1,
+    display: { unit: '°' },
+    modulationLabel: 'Direction',
+  }),
+  density: boundedNumericParameter({
+    defaultValue: DEFAULT_RAIN_PARAMS.density,
+    min: 0,
+    max: 32,
+    step: 1,
+    modulationLabel: 'Density',
+  }),
+  speed: boundedNumericParameter({
+    defaultValue: DEFAULT_RAIN_PARAMS.speed,
+    min: 0.3,
+    max: 6,
+    step: 0.1,
+    display: { unit: '×' },
+    modulationLabel: 'Speed',
+  }),
+});
 
 const createDefaultRainNode = (
   id: string,
@@ -72,12 +79,7 @@ const hydrateImportedRainNode = (
     source,
   );
   const params = resolveImportedParams(source);
-  device.params.seed = normalizeRainSeed(toFiniteNumber(params.seed, device.params.seed));
-  device.params.angleDeg = toFiniteNumber(params.angleDeg, device.params.angleDeg);
-  device.params.density = normalizeRainDensity(
-    toFiniteNumber(params.density, device.params.density),
-  );
-  device.params.speed = normalizeRainSpeed(toFiniteNumber(params.speed, device.params.speed));
+  hydrateImportedNumericParameters(device.params, params, RAIN_NUMERIC_PARAMETERS);
   return device;
 };
 
@@ -85,8 +87,7 @@ export const rainDeviceSchema = {
   kind: 'rain',
   label: 'Rain',
   group: 'generator',
-  modulationTargetParams: RAIN_MODULATION_TARGET_PARAMS,
-  numericParamKeys: RAIN_NUMERIC_PARAM_KEYS,
+  numericParameters: RAIN_NUMERIC_PARAMETERS,
   createDefaultNode: createDefaultRainNode,
   hydrateImportedNode: hydrateImportedRainNode,
 } satisfies RendererDeviceSchema<'rain'>;

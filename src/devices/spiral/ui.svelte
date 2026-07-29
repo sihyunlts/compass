@@ -5,6 +5,7 @@
   import CenterPointPicker from '../../renderer/components/controls/CenterPointPicker.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
+  import { SPIRAL_NUMERIC_PARAMETERS } from './schema';
 
   type SpiralDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'spiral' }>;
@@ -18,13 +19,12 @@
     deviceId={device.id}
     centerX={device.params.centerX}
     centerY={device.params.centerY}
+    parameter={SPIRAL_NUMERIC_PARAMETERS.centerX}
     {onControlChange}
   />
   <NumberField
     label="Turns"
-    step="0.1"
-    min="0.25"
-    max="8"
+    parameter={SPIRAL_NUMERIC_PARAMETERS.turns}
     value={device.params.turns}
     dataAction="set-spiral-param"
     dataId={device.id}

@@ -1,6 +1,5 @@
 export {
   createRendererDeviceNode,
-  getRendererDeviceControlDefinition,
   getRendererDeviceGroup,
   getRendererDeviceLabel,
   getRendererModulationTargetParamDefinitions,

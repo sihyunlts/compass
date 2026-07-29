@@ -4,6 +4,7 @@
   import type { GeneratorDeviceNode } from '../../shared/model';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
+  import { TRANSLATE_NUMERIC_PARAMETERS } from './schema';
 
   type TranslateDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'translate' }>;
@@ -16,7 +17,7 @@
   <div class="column-wrapper">
     <NumberField
       label="Offset X"
-      step="0.1"
+      parameter={TRANSLATE_NUMERIC_PARAMETERS.offsetX}
       value={device.params.offsetX}
       dataAction="set-translate-param"
       dataId={device.id}
@@ -25,7 +26,7 @@
     />
     <NumberField
       label="Offset Y"
-      step="0.1"
+      parameter={TRANSLATE_NUMERIC_PARAMETERS.offsetY}
       value={device.params.offsetY}
       dataAction="set-translate-param"
       dataId={device.id}

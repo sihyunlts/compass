@@ -7,7 +7,10 @@
   import type { RendererControlChange } from '../../../devices/control-types';
   import type { RendererDeviceTabDefinition } from '../../../devices/types';
   import { getDeviceBrowserCategory } from '../../features/editor/device-browser-categories';
-  import { getRendererDeviceDefinition } from '../../../devices';
+  import {
+    getRendererDeviceDefinition,
+    getRendererModulationTargetParamDefinitions,
+  } from '../../../devices';
   import { closestRackControlTarget } from '../../features/rack/control-target';
   import DeviceTabs from './DeviceTabs.svelte';
   import { hint } from '../overlays/hint';
@@ -89,7 +92,7 @@
     deviceDefinition.tabs?.(device) ?? []);
   const enabledToggleLabel = $derived(`${device.enabled ? 'Disable' : 'Enable'} ${title}`);
   const modulationTargetParamKeys = $derived.by(() =>
-    new Set(deviceDefinition.modulationTargetParams?.map((param) => param.key) ?? []));
+    new Set(getRendererModulationTargetParamDefinitions(device.kind).map((param) => param.key)));
 
   $effect(() => {
     if (!isInlineRenaming) {

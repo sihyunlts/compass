@@ -1,19 +1,15 @@
 import type { GeneratorDeviceNode } from '../../shared/model';
 import {
-  createDefaultNumericValueResolver,
   createMergeKeyResolver,
-  createNumericParamSetter,
+  createNumericParameterDefaultResolver,
+  createNumericParameterSetter,
   readControlParam,
   resolveNumericControlParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
-import {
-  normalizeRainDensity,
-  normalizeRainSeed,
-  normalizeRainSpeed,
-  RAIN_NUMERIC_PARAM_KEYS,
-} from './schema';
+import { RAIN_NUMERIC_PARAMETERS } from './schema';
 
+const RAIN_PARAM_KEYS = ['seed', 'density', 'speed'] as const;
 const RAIN_ANGLE_PARAM_KEYS = ['angleDeg'] as const;
 
 const isRainDevice = (
@@ -25,43 +21,29 @@ export const rainDeviceControls = {
   descriptors: {
     'set-rain-param': {
       resolveMergeKey: createMergeKeyResolver('set-rain-param', resolveNumericControlParam),
-      resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readControlParam(input, RAIN_NUMERIC_PARAM_KEYS),
+      resolveDefaultValue: createNumericParameterDefaultResolver(
+        RAIN_NUMERIC_PARAMETERS,
+        (input) => readControlParam(input, RAIN_PARAM_KEYS),
       ),
     },
     'set-angle-param': {
       resolveMergeKey: createMergeKeyResolver('set-angle-param', resolveNumericControlParam),
-      resolveDefaultValue: createDefaultNumericValueResolver(
+      resolveDefaultValue: createNumericParameterDefaultResolver(
+        RAIN_NUMERIC_PARAMETERS,
         (input) => readControlParam(input, RAIN_ANGLE_PARAM_KEYS),
       ),
     },
   },
   createHandlers: () => ({
-    'set-rain-param': createNumericParamSetter({
+    'set-rain-param': createNumericParameterSetter({
       isKind: isRainDevice,
-      readParam: (input) => readControlParam(input, RAIN_NUMERIC_PARAM_KEYS),
-      assign: (device, param, value) => {
-        if (param === 'seed') {
-          device.params.seed = normalizeRainSeed(value);
-          return;
-        }
-        if (param === 'density') {
-          device.params.density = normalizeRainDensity(value);
-          return;
-        }
-        if (param === 'speed') {
-          device.params.speed = normalizeRainSpeed(value);
-          return;
-        }
-        device.params.angleDeg = value;
-      },
+      rules: RAIN_NUMERIC_PARAMETERS,
+      readParam: (input) => readControlParam(input, RAIN_PARAM_KEYS),
     }),
-    'set-angle-param': createNumericParamSetter({
+    'set-angle-param': createNumericParameterSetter({
       isKind: isRainDevice,
+      rules: RAIN_NUMERIC_PARAMETERS,
       readParam: (input) => readControlParam(input, RAIN_ANGLE_PARAM_KEYS),
-      assign: (device, param, value) => {
-        device.params[param] = value;
-      },
     }),
   }),
 } satisfies RendererKindControlDefinition;

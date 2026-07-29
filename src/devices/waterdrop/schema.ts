@@ -4,8 +4,13 @@ import {
   resolveImportedDeviceEnabled,
   resolveImportedDeviceId,
   resolveImportedParams,
-  toFiniteNumber,
 } from '../import-hydration';
+import {
+  boundedNumericParameter,
+  defineNumericParameterRules,
+  finiteNumericParameter,
+  hydrateImportedNumericParameters,
+} from '../numeric-parameters';
 import type { RendererDeviceSchema } from '../types';
 
 const DEFAULT_WATERDROP_PARAMS: WaterdropGeneratorNode['params'] = {
@@ -14,12 +19,29 @@ const DEFAULT_WATERDROP_PARAMS: WaterdropGeneratorNode['params'] = {
   curvature: 2,
 };
 
-const WATERDROP_MODULATION_TARGET_PARAMS = [
-  { key: 'centerX', label: 'Center X' },
-  { key: 'centerY', label: 'Center Y' },
-  { key: 'curvature', label: 'Curvature' },
-] as const;
-export const WATERDROP_NUMERIC_PARAM_KEYS = ['centerX', 'centerY', 'curvature'] as const;
+export const WATERDROP_NUMERIC_PARAMETERS = defineNumericParameterRules<
+  WaterdropGeneratorNode['params']
+>()({
+  centerX: boundedNumericParameter({
+    defaultValue: DEFAULT_WATERDROP_PARAMS.centerX,
+    min: 0,
+    max: 9,
+    step: 0.5,
+    modulationLabel: 'Center X',
+  }),
+  centerY: boundedNumericParameter({
+    defaultValue: DEFAULT_WATERDROP_PARAMS.centerY,
+    min: 0,
+    max: 9,
+    step: 0.5,
+    modulationLabel: 'Center Y',
+  }),
+  curvature: finiteNumericParameter({
+    defaultValue: DEFAULT_WATERDROP_PARAMS.curvature,
+    step: 0.1,
+    modulationLabel: 'Curvature',
+  }),
+});
 
 const createDefaultWaterdropNode = (
   id: string,
@@ -45,9 +67,7 @@ const hydrateImportedWaterdropNode = (
     source,
   );
   const params = resolveImportedParams(source);
-  device.params.centerX = toFiniteNumber(params.centerX, device.params.centerX);
-  device.params.centerY = toFiniteNumber(params.centerY, device.params.centerY);
-  device.params.curvature = toFiniteNumber(params.curvature, device.params.curvature);
+  hydrateImportedNumericParameters(device.params, params, WATERDROP_NUMERIC_PARAMETERS);
   return device;
 };
 
@@ -55,8 +75,7 @@ export const waterdropDeviceSchema = {
   kind: 'waterdrop',
   label: 'Waterdrop',
   group: 'generator',
-  modulationTargetParams: WATERDROP_MODULATION_TARGET_PARAMS,
-  numericParamKeys: WATERDROP_NUMERIC_PARAM_KEYS,
+  numericParameters: WATERDROP_NUMERIC_PARAMETERS,
   createDefaultNode: createDefaultWaterdropNode,
   hydrateImportedNode: hydrateImportedWaterdropNode,
 } satisfies RendererDeviceSchema<'waterdrop'>;

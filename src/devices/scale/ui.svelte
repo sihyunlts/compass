@@ -5,6 +5,7 @@
   import CenterPointPicker from '../../renderer/components/controls/CenterPointPicker.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
+  import { SCALE_NUMERIC_PARAMETERS } from './schema';
 
   type ScaleDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'scale' }>;
@@ -18,13 +19,13 @@
     deviceId={device.id}
     centerX={device.params.centerX}
     centerY={device.params.centerY}
+    parameter={SCALE_NUMERIC_PARAMETERS.centerX}
     {onControlChange}
   />
   <div class="column-wrapper">
     <NumberField
       label="Scale X"
-      step="0.1"
-      min="0.000001"
+      parameter={SCALE_NUMERIC_PARAMETERS.scaleX}
       value={device.params.scaleX}
       dataAction="set-scale-param"
       dataId={device.id}
@@ -33,8 +34,7 @@
     />
     <NumberField
       label="Scale Y"
-      step="0.1"
-      min="0.000001"
+      parameter={SCALE_NUMERIC_PARAMETERS.scaleY}
       value={device.params.scaleY}
       dataAction="set-scale-param"
       dataId={device.id}

@@ -6,6 +6,7 @@ import {
   resolveImportedDeviceId,
   resolveImportedParams,
 } from '../import-hydration';
+import { createTimeWindowNumericParameters } from '../time-window-parameters';
 import type { RendererDeviceSchema } from '../types';
 
 const DEFAULT_STRETCH_PARAMS: StretchEffectNode['params'] = {
@@ -13,11 +14,9 @@ const DEFAULT_STRETCH_PARAMS: StretchEffectNode['params'] = {
   end: 1,
 };
 
-const STRETCH_MODULATION_TARGET_PARAMS = [
-  { key: 'start', label: 'Start' },
-  { key: 'end', label: 'End' },
-] as const;
-const STRETCH_NUMERIC_PARAM_KEYS = ['start', 'end'] as const;
+export const STRETCH_NUMERIC_PARAMETERS = createTimeWindowNumericParameters(
+  DEFAULT_STRETCH_PARAMS,
+);
 
 const createDefaultStretchNode = (
   id: string,
@@ -56,8 +55,7 @@ export const stretchDeviceSchema = {
   kind: 'stretch',
   label: 'Stretch',
   group: 'effect',
-  modulationTargetParams: STRETCH_MODULATION_TARGET_PARAMS,
-  numericParamKeys: STRETCH_NUMERIC_PARAM_KEYS,
+  numericParameters: STRETCH_NUMERIC_PARAMETERS,
   createDefaultNode: createDefaultStretchNode,
   hydrateImportedNode: hydrateImportedStretchNode,
 } satisfies RendererDeviceSchema<'stretch'>;

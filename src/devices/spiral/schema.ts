@@ -4,8 +4,12 @@ import {
   resolveImportedDeviceEnabled,
   resolveImportedDeviceId,
   resolveImportedParams,
-  toFiniteNumber,
 } from '../import-hydration';
+import {
+  boundedNumericParameter,
+  defineNumericParameterRules,
+  hydrateImportedNumericParameters,
+} from '../numeric-parameters';
 import type { RendererDeviceSchema } from '../types';
 
 const DEFAULT_SPIRAL_PARAMS: SpiralGeneratorNode['params'] = {
@@ -14,12 +18,31 @@ const DEFAULT_SPIRAL_PARAMS: SpiralGeneratorNode['params'] = {
   turns: 2,
 };
 
-const SPIRAL_MODULATION_TARGET_PARAMS = [
-  { key: 'centerX', label: 'Center X' },
-  { key: 'centerY', label: 'Center Y' },
-  { key: 'turns', label: 'Turns' },
-] as const;
-export const SPIRAL_NUMERIC_PARAM_KEYS = ['centerX', 'centerY', 'turns'] as const;
+export const SPIRAL_NUMERIC_PARAMETERS = defineNumericParameterRules<
+  SpiralGeneratorNode['params']
+>()({
+  centerX: boundedNumericParameter({
+    defaultValue: DEFAULT_SPIRAL_PARAMS.centerX,
+    min: 0,
+    max: 9,
+    step: 0.5,
+    modulationLabel: 'Center X',
+  }),
+  centerY: boundedNumericParameter({
+    defaultValue: DEFAULT_SPIRAL_PARAMS.centerY,
+    min: 0,
+    max: 9,
+    step: 0.5,
+    modulationLabel: 'Center Y',
+  }),
+  turns: boundedNumericParameter({
+    defaultValue: DEFAULT_SPIRAL_PARAMS.turns,
+    min: 0.25,
+    max: 8,
+    step: 0.1,
+    modulationLabel: 'Turns',
+  }),
+});
 
 const createDefaultSpiralNode = (
   id: string,
@@ -45,9 +68,7 @@ const hydrateImportedSpiralNode = (
     source,
   );
   const params = resolveImportedParams(source);
-  device.params.centerX = toFiniteNumber(params.centerX, device.params.centerX);
-  device.params.centerY = toFiniteNumber(params.centerY, device.params.centerY);
-  device.params.turns = toFiniteNumber(params.turns, device.params.turns);
+  hydrateImportedNumericParameters(device.params, params, SPIRAL_NUMERIC_PARAMETERS);
   return device;
 };
 
@@ -55,8 +76,7 @@ export const spiralDeviceSchema = {
   kind: 'spiral',
   label: 'Spiral',
   group: 'generator',
-  modulationTargetParams: SPIRAL_MODULATION_TARGET_PARAMS,
-  numericParamKeys: SPIRAL_NUMERIC_PARAM_KEYS,
+  numericParameters: SPIRAL_NUMERIC_PARAMETERS,
   createDefaultNode: createDefaultSpiralNode,
   hydrateImportedNode: hydrateImportedSpiralNode,
 } satisfies RendererDeviceSchema<'spiral'>;

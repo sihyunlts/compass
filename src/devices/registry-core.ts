@@ -1,180 +1,72 @@
-import { colorDeviceControls } from './color/controls';
+import type { GeneratorDeviceNode } from '../shared/model';
 import { colorDeviceSchema } from './color/schema';
-import type { RendererKindControlDefinition } from './control-types';
-import { maskDeviceControls } from './mask/controls';
 import { maskDeviceSchema } from './mask/schema';
-import { mirrorDeviceControls } from './mirror/controls';
 import { mirrorDeviceSchema } from './mirror/schema';
-import { modulatorDeviceControls } from './modulator/controls';
 import { modulatorDeviceSchema } from './modulator/schema';
-import { pathDeviceControls } from './path/controls';
+import {
+  readNumericParameterValue,
+  writeNumericParameterValue,
+  type ModulationParameterDefinition,
+  type NumericParameterRule,
+} from './numeric-parameters';
 import { pathDeviceSchema } from './path/schema';
-import { rainDeviceControls } from './rain/controls';
 import { rainDeviceSchema } from './rain/schema';
 import { reverseDeviceSchema } from './reverse/schema';
-import { rotateDeviceControls } from './rotate/controls';
 import { rotateDeviceSchema } from './rotate/schema';
-import { scannerDeviceControls } from './scanner/controls';
 import { scannerDeviceSchema } from './scanner/schema';
-import { scaleDeviceControls } from './scale/controls';
 import { scaleDeviceSchema } from './scale/schema';
-import { spiralDeviceControls } from './spiral/controls';
 import { spiralDeviceSchema } from './spiral/schema';
-import { stretchDeviceControls } from './stretch/controls';
 import { stretchDeviceSchema } from './stretch/schema';
-import { symmetryDeviceControls } from './symmetry/controls';
 import { symmetryDeviceSchema } from './symmetry/schema';
-import { timeWarpDeviceControls } from './timewarp/controls';
 import { timeWarpDeviceSchema } from './timewarp/schema';
-import { trimDeviceControls } from './trim/controls';
 import { trimDeviceSchema } from './trim/schema';
-import { translateDeviceControls } from './translate/controls';
 import { translateDeviceSchema } from './translate/schema';
 import type {
   RendererDeviceGroup,
   RendererDeviceKind,
   RendererDeviceNodeOfKind,
   RendererDeviceSchema,
-  RendererDeviceTabDefinition,
-  RendererModulationParamDefinition,
 } from './types';
-import { waterdropDeviceControls } from './waterdrop/controls';
 import { waterdropDeviceSchema } from './waterdrop/schema';
 
-export type RendererDeviceEditorModulePath = `./${string}/ui.svelte`;
-
-export type RendererDeviceManifestEntry = {
-  [K in RendererDeviceKind]: RendererDeviceSchema<K> & {
-    controls?: RendererKindControlDefinition;
-    defaultTabId?: string;
-    editor: RendererDeviceEditorModulePath;
-    tabs?: (device: RendererDeviceNodeOfKind<K>) => readonly RendererDeviceTabDefinition[];
-  };
+type RendererDeviceSchemaEntry = {
+  [K in RendererDeviceKind]: RendererDeviceSchema<K>;
 }[RendererDeviceKind];
 
-export const RENDERER_DEVICE_MANIFEST = [
-  {
-    ...waterdropDeviceSchema,
-    controls: waterdropDeviceControls,
-    editor: './waterdrop/ui.svelte',
-  },
-  {
-    ...scannerDeviceSchema,
-    controls: scannerDeviceControls,
-    editor: './scanner/ui.svelte',
-  },
-  {
-    ...rainDeviceSchema,
-    controls: rainDeviceControls,
-    editor: './rain/ui.svelte',
-  },
-  {
-    ...spiralDeviceSchema,
-    controls: spiralDeviceControls,
-    editor: './spiral/ui.svelte',
-  },
-  {
-    ...pathDeviceSchema,
-    controls: pathDeviceControls,
-    editor: './path/ui.svelte',
-  },
-  {
-    ...modulatorDeviceSchema,
-    controls: modulatorDeviceControls,
-    defaultTabId: 'curve',
-    editor: './modulator/ui.svelte',
-    tabs: () => [
-      { id: 'curve', label: 'Curve' },
-      { id: 'map', label: 'Map' },
-    ],
-  },
-  {
-    ...mirrorDeviceSchema,
-    controls: mirrorDeviceControls,
-    editor: './mirror/ui.svelte',
-  },
-  {
-    ...rotateDeviceSchema,
-    controls: rotateDeviceControls,
-    editor: './rotate/ui.svelte',
-  },
-  {
-    ...scaleDeviceSchema,
-    controls: scaleDeviceControls,
-    editor: './scale/ui.svelte',
-  },
-  {
-    ...translateDeviceSchema,
-    controls: translateDeviceControls,
-    editor: './translate/ui.svelte',
-  },
-  {
-    ...symmetryDeviceSchema,
-    controls: symmetryDeviceControls,
-    editor: './symmetry/ui.svelte',
-  },
-  {
-    ...maskDeviceSchema,
-    controls: maskDeviceControls,
-    editor: './mask/ui.svelte',
-  },
-  {
-    ...trimDeviceSchema,
-    controls: trimDeviceControls,
-    editor: './trim/ui.svelte',
-  },
-  {
-    ...stretchDeviceSchema,
-    controls: stretchDeviceControls,
-    editor: './stretch/ui.svelte',
-  },
-  {
-    ...timeWarpDeviceSchema,
-    controls: timeWarpDeviceControls,
-    editor: './timewarp/ui.svelte',
-  },
-  {
-    ...reverseDeviceSchema,
-    editor: './reverse/ui.svelte',
-  },
-  {
-    ...colorDeviceSchema,
-    controls: colorDeviceControls,
-    editor: './color/ui.svelte',
-  },
-] as const satisfies readonly RendererDeviceManifestEntry[];
-
-export type RendererDeviceSchemaEntry = {
-  [K in RendererDeviceKind]: RendererDeviceSchema<K> & {
-    controls?: RendererKindControlDefinition;
-  };
-}[RendererDeviceKind];
+export const RENDERER_DEVICE_SCHEMAS = [
+  waterdropDeviceSchema,
+  scannerDeviceSchema,
+  rainDeviceSchema,
+  spiralDeviceSchema,
+  pathDeviceSchema,
+  modulatorDeviceSchema,
+  mirrorDeviceSchema,
+  rotateDeviceSchema,
+  scaleDeviceSchema,
+  translateDeviceSchema,
+  symmetryDeviceSchema,
+  maskDeviceSchema,
+  trimDeviceSchema,
+  stretchDeviceSchema,
+  timeWarpDeviceSchema,
+  reverseDeviceSchema,
+  colorDeviceSchema,
+] as const satisfies readonly RendererDeviceSchemaEntry[];
 
 type RendererDeviceSchemaByKind = {
   [K in RendererDeviceKind]: Extract<RendererDeviceSchemaEntry, { kind: K }>;
 };
 
-const toRendererDeviceSchema = (
-  definition: RendererDeviceManifestEntry,
-): RendererDeviceSchemaEntry => {
-  const { editor, ...schema } = definition;
-  void editor;
-  return schema;
-};
-
 const rendererDeviceSchemas = Object.fromEntries(
-  RENDERER_DEVICE_MANIFEST.map((definition) => {
-    const schema = toRendererDeviceSchema(definition);
-    return [schema.kind, schema];
-  }),
+  RENDERER_DEVICE_SCHEMAS.map((schema) => [schema.kind, schema]),
 ) as RendererDeviceSchemaByKind;
 
 const collectRendererDeviceKindsByGroup = (
   group: RendererDeviceGroup,
 ): readonly RendererDeviceKind[] => Object.freeze(
-  RENDERER_DEVICE_MANIFEST
-    .filter((definition) => definition.group === group)
-    .map((definition) => definition.kind),
+  RENDERER_DEVICE_SCHEMAS
+    .filter((schema) => schema.group === group)
+    .map((schema) => schema.kind),
 );
 
 export const RENDERER_DEVICE_GROUPS = {
@@ -183,7 +75,7 @@ export const RENDERER_DEVICE_GROUPS = {
 } as const satisfies Record<RendererDeviceGroup, readonly RendererDeviceKind[]>;
 
 export const RENDERER_DEVICE_KINDS = Object.freeze(
-  RENDERER_DEVICE_MANIFEST.map((definition) => definition.kind),
+  RENDERER_DEVICE_SCHEMAS.map((schema) => schema.kind),
 ) as readonly RendererDeviceKind[];
 
 const RENDERER_DEVICE_KIND_SET = new Set<RendererDeviceKind>(RENDERER_DEVICE_KINDS);
@@ -192,16 +84,71 @@ const getRendererDeviceSchema = <K extends RendererDeviceKind>(
   kind: K,
 ): RendererDeviceSchemaByKind[K] => rendererDeviceSchemas[kind];
 
+const getNumericParameterRules = (
+  kind: RendererDeviceKind,
+): Readonly<Record<string, NumericParameterRule>> | null => {
+  const schema = getRendererDeviceSchema(kind) as RendererDeviceSchema;
+  return schema.numericParameters as Readonly<Record<string, NumericParameterRule>> | undefined
+    ?? null;
+};
+
+export const getNumericParameterRule = (
+  kind: RendererDeviceKind,
+  paramKey: string,
+): NumericParameterRule | null =>
+  getNumericParameterRules(kind)?.[paramKey] ?? null;
+
+const getModulationParameterDefinitions = (
+  kind: RendererDeviceKind,
+): readonly ModulationParameterDefinition[] =>
+  Object.entries(getNumericParameterRules(kind) ?? {}).flatMap(([key, rule]) => (
+    rule.modulationLabel
+      ? [{
+          key,
+          label: rule.modulationLabel,
+          unit: rule.display.unit,
+        }]
+      : []
+  ));
+
+export const isModulationTargetDeviceKind = (
+  kind: RendererDeviceKind,
+): boolean => getModulationParameterDefinitions(kind).length > 0;
+
+export const isModulationTargetParamKey = (
+  kind: RendererDeviceKind,
+  paramKey: string,
+): boolean => Boolean(getNumericParameterRule(kind, paramKey)?.modulationLabel);
+
+export const readNumericDeviceParam = (
+  device: GeneratorDeviceNode,
+  paramKey: string,
+): number | null => {
+  const rules = getNumericParameterRules(device.kind);
+  if (!rules || !('params' in device)) {
+    return null;
+  }
+  return readNumericParameterValue(device.params, rules, paramKey);
+};
+
+export const writeNumericDeviceParam = (
+  device: GeneratorDeviceNode,
+  paramKey: string,
+  value: unknown,
+  step?: number,
+): number | null => {
+  const rules = getNumericParameterRules(device.kind);
+  if (!rules || !('params' in device)) {
+    return null;
+  }
+  return writeNumericParameterValue(device.params, rules, paramKey, value, { step });
+};
+
 export const isRendererDeviceKind = (
   value: string | undefined,
 ): value is RendererDeviceKind => (
   !!value && RENDERER_DEVICE_KIND_SET.has(value as RendererDeviceKind)
 );
-
-export const getRendererDeviceControlDefinition = <K extends RendererDeviceKind>(
-  kind: K,
-): RendererKindControlDefinition | null =>
-  getRendererDeviceSchema(kind).controls ?? null;
 
 export const getRendererDeviceLabel = (kind: RendererDeviceKind): string =>
   getRendererDeviceSchema(kind).label;
@@ -211,8 +158,8 @@ export const getRendererDeviceGroup = (kind: RendererDeviceKind): RendererDevice
 
 export const getRendererModulationTargetParamDefinitions = (
   kind: RendererDeviceKind,
-): readonly RendererModulationParamDefinition[] =>
-  getRendererDeviceSchema(kind).modulationTargetParams ?? [];
+): readonly ModulationParameterDefinition[] =>
+  getModulationParameterDefinitions(kind);
 
 export const createRendererDeviceNode = <K extends RendererDeviceKind>(
   kind: K,

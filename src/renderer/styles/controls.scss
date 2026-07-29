@@ -75,6 +75,18 @@ input {
       cursor: text;
       caret-color: currentColor;
     }
+
+    &.has-display-unit {
+      color: transparent;
+    }
+
+    &.has-display-unit[data-keyboard-editing='true']:focus {
+      color: var(--color-text-primary);
+    }
+
+    &.has-display-unit[data-keyboard-editing='true']:focus + .numeric-value-display {
+      display: none;
+    }
   }
 
   &[type='range'] {
@@ -117,6 +129,19 @@ input {
       transition: opacity 120ms ease;
     }
   }
+}
+
+.numeric-value-display {
+  display: flex;
+  align-items: center;
+  height: 1.75rem;
+  padding: var(--gap-4) var(--gap-6);
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: var(--text-13);
+  line-height: normal;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 html.is-theme-adjusting {

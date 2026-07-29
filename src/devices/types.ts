@@ -2,6 +2,7 @@ import type { Component } from 'svelte';
 
 import type { GeneratorDeviceNode } from '../shared/model';
 import type { RendererControlChange, RendererKindControlDefinition } from './control-types';
+import type { NumericParameterRules } from './numeric-parameters';
 
 export type RendererDeviceKind = GeneratorDeviceNode['kind'];
 export type RendererDeviceGroup = 'generator' | 'effect';
@@ -9,6 +10,10 @@ export type RendererDeviceNodeOfKind<K extends RendererDeviceKind> = Extract<
   GeneratorDeviceNode,
   { kind: K }
 >;
+type RendererDeviceParams<K extends RendererDeviceKind> =
+  RendererDeviceNodeOfKind<K> extends { params: infer Params extends object }
+    ? Params
+    : never;
 
 export interface RendererDeviceEditorPropsBase {
   devices?: GeneratorDeviceNode[];
@@ -29,11 +34,6 @@ type RendererDeviceEditorProps<K extends RendererDeviceKind = RendererDeviceKind
     device: RendererDeviceNodeOfKind<K>;
   };
 
-export interface RendererModulationParamDefinition {
-  key: string;
-  label: string;
-}
-
 type RendererDeviceNodeFactory<K extends RendererDeviceKind = RendererDeviceKind> = (
   id: string,
   enabled: boolean,
@@ -47,8 +47,7 @@ export interface RendererDeviceSchema<K extends RendererDeviceKind = RendererDev
   kind: K;
   label: string;
   group: RendererDeviceGroup;
-  modulationTargetParams?: readonly RendererModulationParamDefinition[];
-  numericParamKeys?: readonly string[];
+  numericParameters?: NumericParameterRules<RendererDeviceParams<K>>;
   createDefaultNode: RendererDeviceNodeFactory<K>;
   hydrateImportedNode: ImportedRendererDeviceHydrator<K>;
 }

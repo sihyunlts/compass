@@ -4,18 +4,30 @@ import {
   resolveImportedDeviceEnabled,
   resolveImportedDeviceId,
   resolveImportedParams,
-  toFiniteNumber,
 } from '../import-hydration';
+import {
+  cyclicNumericParameter,
+  defineNumericParameterRules,
+  hydrateImportedNumericParameters,
+} from '../numeric-parameters';
 import type { RendererDeviceSchema } from '../types';
 
 const DEFAULT_SCANNER_PARAMS: ScannerGeneratorNode['params'] = {
   angleDeg: 0,
 };
 
-const SCANNER_MODULATION_TARGET_PARAMS = [
-  { key: 'angleDeg', label: 'Angle' },
-] as const;
-export const SCANNER_NUMERIC_PARAM_KEYS = ['angleDeg'] as const;
+export const SCANNER_NUMERIC_PARAMETERS = defineNumericParameterRules<
+  ScannerGeneratorNode['params']
+>()({
+  angleDeg: cyclicNumericParameter({
+    defaultValue: DEFAULT_SCANNER_PARAMS.angleDeg,
+    min: 0,
+    period: 360,
+    step: 1,
+    display: { unit: '°' },
+    modulationLabel: 'Sweep Direction',
+  }),
+});
 
 const createDefaultScannerNode = (
   id: string,
@@ -41,7 +53,7 @@ const hydrateImportedScannerNode = (
     source,
   );
   const params = resolveImportedParams(source);
-  device.params.angleDeg = toFiniteNumber(params.angleDeg, device.params.angleDeg);
+  hydrateImportedNumericParameters(device.params, params, SCANNER_NUMERIC_PARAMETERS);
   return device;
 };
 
@@ -49,8 +61,7 @@ export const scannerDeviceSchema = {
   kind: 'scanner',
   label: 'Scanner',
   group: 'generator',
-  modulationTargetParams: SCANNER_MODULATION_TARGET_PARAMS,
-  numericParamKeys: SCANNER_NUMERIC_PARAM_KEYS,
+  numericParameters: SCANNER_NUMERIC_PARAMETERS,
   createDefaultNode: createDefaultScannerNode,
   hydrateImportedNode: hydrateImportedScannerNode,
 } satisfies RendererDeviceSchema<'scanner'>;

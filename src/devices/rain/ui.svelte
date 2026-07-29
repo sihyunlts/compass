@@ -5,14 +5,7 @@
   import AnglePicker from '../../renderer/components/controls/AnglePicker.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
-  import {
-    RAIN_DENSITY_MAX,
-    RAIN_DENSITY_MIN,
-    RAIN_SEED_MAX,
-    RAIN_SEED_MIN,
-    RAIN_SPEED_MAX,
-    RAIN_SPEED_MIN,
-  } from './schema';
+  import { RAIN_NUMERIC_PARAMETERS } from './schema';
 
   type RainDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'rain' }>;
@@ -23,19 +16,18 @@
 
 <div class="device-controls">
   <AnglePicker
-    label="Direction (0-360)"
+    label="Direction"
     value={device.params.angleDeg}
     dataAction="set-angle-param"
     dataId={device.id}
     dataParam="angleDeg"
+    parameter={RAIN_NUMERIC_PARAMETERS.angleDeg}
     {onControlChange}
   />
   <div class="column-wrapper">
     <NumberField
       label="Seed"
-      step="1"
-      min={RAIN_SEED_MIN}
-      max={RAIN_SEED_MAX}
+      parameter={RAIN_NUMERIC_PARAMETERS.seed}
       value={device.params.seed}
       dataAction="set-rain-param"
       dataId={device.id}
@@ -44,9 +36,7 @@
     />
     <NumberField
       label="Density"
-      step="1"
-      min={RAIN_DENSITY_MIN}
-      max={RAIN_DENSITY_MAX}
+      parameter={RAIN_NUMERIC_PARAMETERS.density}
       value={device.params.density}
       dataAction="set-rain-param"
       dataId={device.id}
@@ -55,9 +45,7 @@
     />
     <NumberField
       label="Speed"
-      step="0.1"
-      min={RAIN_SPEED_MIN}
-      max={RAIN_SPEED_MAX}
+      parameter={RAIN_NUMERIC_PARAMETERS.speed}
       value={device.params.speed}
       dataAction="set-rain-param"
       dataId={device.id}

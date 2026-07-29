@@ -4,18 +4,30 @@ import {
   resolveImportedDeviceEnabled,
   resolveImportedDeviceId,
   resolveImportedParams,
-  toFiniteNumber,
 } from '../import-hydration';
+import {
+  cyclicNumericParameter,
+  defineNumericParameterRules,
+  hydrateImportedNumericParameters,
+} from '../numeric-parameters';
 import type { RendererDeviceSchema } from '../types';
 
 const DEFAULT_MIRROR_PARAMS: MirrorEffectNode['params'] = {
   angleDeg: 90,
 };
 
-const MIRROR_MODULATION_TARGET_PARAMS = [
-  { key: 'angleDeg', label: 'Mirror Axis Angle' },
-] as const;
-export const MIRROR_NUMERIC_PARAM_KEYS = ['angleDeg'] as const;
+export const MIRROR_NUMERIC_PARAMETERS = defineNumericParameterRules<
+  MirrorEffectNode['params']
+>()({
+  angleDeg: cyclicNumericParameter({
+    defaultValue: DEFAULT_MIRROR_PARAMS.angleDeg,
+    min: 0,
+    period: 360,
+    step: 1,
+    display: { unit: '°' },
+    modulationLabel: 'Mirror Axis Angle',
+  }),
+});
 
 const createDefaultMirrorNode = (
   id: string,
@@ -41,7 +53,7 @@ const hydrateImportedMirrorNode = (
     source,
   );
   const params = resolveImportedParams(source);
-  device.params.angleDeg = toFiniteNumber(params.angleDeg, device.params.angleDeg);
+  hydrateImportedNumericParameters(device.params, params, MIRROR_NUMERIC_PARAMETERS);
   return device;
 };
 
@@ -49,8 +61,7 @@ export const mirrorDeviceSchema = {
   kind: 'mirror',
   label: 'Mirror',
   group: 'effect',
-  modulationTargetParams: MIRROR_MODULATION_TARGET_PARAMS,
-  numericParamKeys: MIRROR_NUMERIC_PARAM_KEYS,
+  numericParameters: MIRROR_NUMERIC_PARAMETERS,
   createDefaultNode: createDefaultMirrorNode,
   hydrateImportedNode: hydrateImportedMirrorNode,
 } satisfies RendererDeviceSchema<'mirror'>;

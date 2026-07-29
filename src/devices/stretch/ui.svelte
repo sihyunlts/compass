@@ -4,6 +4,7 @@
   import TimeWindowEditor from '../../renderer/components/controls/TimeWindowEditor.svelte';
   import type { GeneratorDeviceNode } from '../../shared/model';
   import type { RendererDeviceEditorPropsBase } from '../types';
+  import { STRETCH_NUMERIC_PARAMETERS } from './schema';
 
   type StretchDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'stretch' }>;
@@ -19,6 +20,7 @@
     start={device.params.start}
     end={device.params.end}
     mode="stretch"
+    parameter={STRETCH_NUMERIC_PARAMETERS.start}
     {currentProgress01}
     {onControlChange}
   />

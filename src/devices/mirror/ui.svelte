@@ -4,6 +4,7 @@
   import type { GeneratorDeviceNode } from '../../shared/model';
   import AnglePicker from '../../renderer/components/controls/AnglePicker.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
+  import { MIRROR_NUMERIC_PARAMETERS } from './schema';
 
   type MirrorDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'mirror' }>;
@@ -14,11 +15,12 @@
 
 <div class="device-controls">
   <AnglePicker
-    label="Mirror Axis Angle (0-360)"
+    label="Mirror Axis Angle"
     value={device.params.angleDeg}
     dataAction="set-angle-param"
     dataId={device.id}
     dataParam="angleDeg"
+    parameter={MIRROR_NUMERIC_PARAMETERS.angleDeg}
     {onControlChange}
   />
 </div>

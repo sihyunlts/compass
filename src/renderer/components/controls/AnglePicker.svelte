@@ -3,7 +3,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { RendererControlChange } from '../../../devices/control-types';
-  import { clamp } from '../../../shared/math';
+  import {
+    formatNumericParameterDisplayValue,
+    formatNumericParameterValue,
+    normalizeNumericParameterValue,
+    type NumericParameterRule,
+  } from '../../../devices/numeric-parameters';
   import FieldShell from '../fields/FieldShell.svelte';
 
   let {
@@ -12,9 +17,10 @@
     dataAction,
     dataId,
     dataParam,
-    min = 0,
-    max = 360,
-    step = 1,
+    parameter,
+    min,
+    max,
+    step,
     onControlChange,
   } = $props<{
     label: string;
@@ -22,18 +28,31 @@
     dataAction: string;
     dataId: string;
     dataParam: string;
+    parameter?: NumericParameterRule;
     min?: number;
     max?: number;
     step?: number;
     onControlChange: (change: RendererControlChange) => void;
   }>();
 
-  const sliderLabel = $derived(`${label} slider`);
+  const resolvedMin = $derived(min ?? parameter?.input.min);
+  const resolvedMax = $derived(max ?? parameter?.input.max);
+  const resolvedStep = $derived(step ?? parameter?.input.step ?? 1);
+  const resolvedUnit = $derived(parameter?.display.unit);
+  const dialMin = $derived(resolvedMin ?? 0);
+  const dialMax = $derived(resolvedMax ?? 360);
+  const valueSpan = $derived(Math.max(dialMax - dialMin, 0));
+  const hasFiniteRange = $derived(
+    resolvedMin !== undefined
+    && resolvedMax !== undefined
+    && resolvedMax > resolvedMin,
+  );
+
   const numberLabel = $derived(`${label} input`);
   const dialLabel = $derived(`${label} dial`);
 
   let dialEl = $state<HTMLElement | null>(null);
-  let sliderEl = $state<HTMLInputElement | null>(null);
+  let dialInputEl = $state<HTMLInputElement | null>(null);
   let activePointerId = $state<number | null>(null);
   let lastPointerX = $state(0);
   let lastPointerY = $state(0);
@@ -41,7 +60,7 @@
   let isPointerLocked = $state(false);
 
   const stepDecimals = $derived.by(() => {
-    const stepText = String(step);
+    const stepText = String(resolvedStep);
     const dotIndex = stepText.indexOf('.');
     if (dotIndex < 0) {
       return 0;
@@ -49,44 +68,75 @@
     return Math.max(0, stepText.length - dotIndex - 1);
   });
 
-  const normalizedValue = $derived(clamp(value, min, max));
-  const valueSpan = $derived(Math.max(max - min, 0));
-  const ratio = $derived((normalizedValue - min) / Math.max(max - min, 0.000001));
+  const dialValue = $derived.by(() => {
+    if (valueSpan <= 0) {
+      return dialMin;
+    }
+    let wrapped = (value - dialMin) % valueSpan;
+    if (wrapped < 0) {
+      wrapped += valueSpan;
+    }
+    return dialMin + wrapped;
+  });
+  const ratio = $derived(
+    (dialValue - dialMin) / Math.max(valueSpan, 0.000001),
+  );
   const dialDeg = $derived(ratio * 360);
   const valueText = $derived(
-    stepDecimals > 0 ? normalizedValue.toFixed(stepDecimals) : String(Math.round(normalizedValue)),
+    stepDecimals > 0 ? value.toFixed(stepDecimals) : String(Math.round(value)),
   );
-  const dragSensitivity = $derived(Math.max((max - min) / 480, step));
+  const accessibleValueText = $derived(
+    parameter
+      ? formatNumericParameterDisplayValue(parameter, value, valueText)
+      : formatNumericParameterValue(valueText, resolvedUnit),
+  );
+  const dragSensitivity = $derived(
+    hasFiniteRange
+      ? Math.max(((resolvedMax as number) - (resolvedMin as number)) / 480, resolvedStep)
+      : resolvedStep,
+  );
   const canUsePointerLock = $derived(Boolean(dialEl && 'requestPointerLock' in dialEl));
 
   const formatValue = (nextValue: number): string =>
     stepDecimals > 0 ? nextValue.toFixed(stepDecimals) : String(Math.round(nextValue));
 
-  const snapCircularValue = (rawValue: number): number => {
-    if (valueSpan <= 0) {
-      return min;
+  const normalizeDialValue = (rawValue: number): number => {
+    const stepOrigin = resolvedMin ?? 0;
+    const stepped = Math.round((rawValue - stepOrigin) / resolvedStep)
+      * resolvedStep + stepOrigin;
+
+    if (parameter) {
+      return normalizeNumericParameterValue(
+        parameter,
+        stepped,
+        {},
+        { step: resolvedStep },
+      ) ?? value;
     }
 
-    const stepped = Math.round((rawValue - min) / step) * step + min;
-    let wrapped = (stepped - min) % valueSpan;
+    if (valueSpan <= 0) {
+      return Number(stepped.toFixed(stepDecimals));
+    }
+
+    let wrapped = (stepped - dialMin) % valueSpan;
     if (wrapped < 0) {
       wrapped += valueSpan;
     }
-    return Number((min + wrapped).toFixed(stepDecimals));
+    return Number((dialMin + wrapped).toFixed(stepDecimals));
   };
 
   const emitDialInput = (nextValue: number): void => {
-    if (!sliderEl) {
+    if (!dialInputEl) {
       return;
     }
 
     const nextText = formatValue(nextValue);
-    if (sliderEl.value === nextText) {
+    if (dialInputEl.value === nextText) {
       return;
     }
 
-    sliderEl.value = nextText;
-    sliderEl.dispatchEvent(new Event('input', { bubbles: true }));
+    dialInputEl.value = nextText;
+    dialInputEl.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
   const emitControlChange = (event: Event, finalize: boolean): void => {
@@ -110,7 +160,7 @@
       return;
     }
     dragRawValue += (deltaY + deltaX * 0.5) * dragSensitivity;
-    emitDialInput(snapCircularValue(dragRawValue));
+    emitDialInput(normalizeDialValue(dragRawValue));
   };
 
   const requestDialPointerLock = (): void => {
@@ -143,7 +193,7 @@
     activePointerId = event.pointerId;
     lastPointerX = event.clientX;
     lastPointerY = event.clientY;
-    dragRawValue = normalizedValue;
+    dragRawValue = value;
     dialEl.setPointerCapture(event.pointerId);
     if (event.pointerType === 'mouse') {
       requestDialPointerLock();
@@ -232,10 +282,10 @@
       role="slider"
       tabindex="0"
       aria-label={dialLabel}
-      aria-valuemin={min}
-      aria-valuemax={max}
-      aria-valuenow={normalizedValue}
-      aria-valuetext={valueText}
+      aria-valuemin={resolvedMin}
+      aria-valuemax={resolvedMax}
+      aria-valuenow={value}
+      aria-valuetext={accessibleValueText}
       onpointerdown={handleDialPointerDown}
       onpointermove={handleDialPointerMove}
       onpointerup={handleDialPointerUp}
@@ -246,36 +296,48 @@
       <div class="angle-picker-dial-knob"></div>
     </div>
     <input
-      bind:this={sliderEl}
-      class="angle-picker-slider-input"
-      type="range"
-      min={min}
-      max={max}
-      step={step}
+      bind:this={dialInputEl}
+      class="angle-picker-dial-input"
+      type="number"
+      min={resolvedMin}
+      max={resolvedMax}
+      step={resolvedStep}
       value={value}
-      aria-label={sliderLabel}
+      aria-hidden="true"
+      tabindex="-1"
       oninput={(event) => emitControlChange(event, false)}
       onchange={(event) => emitControlChange(event, true)}
     />
     <input
       class="angle-picker-number-input"
+      class:has-display-unit={resolvedUnit !== undefined}
       type="number"
-      min={min}
-      max={max}
-      step={step}
+      min={resolvedMin}
+      max={resolvedMax}
+      step={resolvedStep}
       value={value}
       data-control-action={dataAction}
       data-device-id={dataId}
       data-param={dataParam}
+      data-drag-mode={parameter?.input.dragMode}
       aria-label={numberLabel}
-      oninput={(event) => emitControlChange(event, false)}
-      onchange={(event) => emitControlChange(event, true)}
+      oninput={(event: Event) => emitControlChange(event, false)}
+      onchange={(event: Event) => emitControlChange(event, true)}
     />
+    {#if resolvedUnit}
+      <span
+        class="numeric-value-display angle-picker-display-value"
+        aria-hidden="true"
+      >
+        {accessibleValueText}
+      </span>
+    {/if}
   </div>
 </FieldShell>
 
 <style lang="scss">
   .angle-picker-controls {
+    position: relative;
     display: flex;
     align-items: center;
     gap: var(--gap-8);
@@ -315,7 +377,7 @@
     }
   }
 
-  .angle-picker-slider-input {
+  .angle-picker-dial-input {
     display: none;
   }
 
@@ -323,5 +385,13 @@
     width: 4.8rem;
     height: 1.75rem;
     flex: 0 0 auto;
+  }
+
+  .angle-picker-display-value {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    width: 4.8rem;
+    transform: translateY(-50%);
   }
 </style>

@@ -10,7 +10,7 @@ import {
   isValidModulationTargetSlotIndex,
   sanitizeModulationTarget,
   sanitizeModulationTargetAmount,
-} from '../../core/modulation/routing';
+} from '../../core/modulation/targets';
 import type { CurveModulatorNode, ModulationTarget } from '../../shared/model';
 
 const readTargetId = (change: { paramKey?: string }): string | null => {

@@ -113,7 +113,7 @@ export class NumericInputInteraction {
     const currentValue = Number(input.value);
     const initialValue = Number.isFinite(currentValue) ? currentValue : (min ?? 0);
     const hasFiniteRange = min !== null && max !== null && max > min;
-    const wrapMode = input.dataset.controlAction === 'set-angle-param' && hasFiniteRange;
+    const wrapMode = input.dataset.dragMode === 'circular' && hasFiniteRange;
     const sensitivity = hasFiniteRange ? Math.max((max - min) / 480, step) : step;
 
     this.dragState.pointerId = event.pointerId;

@@ -3,7 +3,7 @@ import { sanitizeModulationCurve } from '../../core/modulation/curve';
 import {
   sanitizeModulationTarget,
   sanitizeModulationTargets,
-} from '../../core/modulation/routing';
+} from '../../core/modulation/targets';
 import {
   applyImportedDeviceMeta,
   isImportRecord,

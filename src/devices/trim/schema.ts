@@ -6,6 +6,7 @@ import {
   resolveImportedDeviceId,
   resolveImportedParams,
 } from '../import-hydration';
+import { createTimeWindowNumericParameters } from '../time-window-parameters';
 import type { RendererDeviceSchema } from '../types';
 
 const DEFAULT_TRIM_PARAMS: TrimEffectNode['params'] = {
@@ -13,11 +14,9 @@ const DEFAULT_TRIM_PARAMS: TrimEffectNode['params'] = {
   end: 1,
 };
 
-const TRIM_MODULATION_TARGET_PARAMS = [
-  { key: 'start', label: 'Start' },
-  { key: 'end', label: 'End' },
-] as const;
-const TRIM_NUMERIC_PARAM_KEYS = ['start', 'end'] as const;
+export const TRIM_NUMERIC_PARAMETERS = createTimeWindowNumericParameters(
+  DEFAULT_TRIM_PARAMS,
+);
 
 const createDefaultTrimNode = (
   id: string,
@@ -56,8 +55,7 @@ export const trimDeviceSchema = {
   kind: 'trim',
   label: 'Trim',
   group: 'effect',
-  modulationTargetParams: TRIM_MODULATION_TARGET_PARAMS,
-  numericParamKeys: TRIM_NUMERIC_PARAM_KEYS,
+  numericParameters: TRIM_NUMERIC_PARAMETERS,
   createDefaultNode: createDefaultTrimNode,
   hydrateImportedNode: hydrateImportedTrimNode,
 } satisfies RendererDeviceSchema<'trim'>;

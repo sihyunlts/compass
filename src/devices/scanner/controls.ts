@@ -1,13 +1,13 @@
 import type { GeneratorDeviceNode } from '../../shared/model';
 import {
-  createDefaultNumericValueResolver,
   createMergeKeyResolver,
-  createNumericParamSetter,
+  createNumericParameterDefaultResolver,
+  createNumericParameterSetter,
   readControlParam,
   resolveNumericControlParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
-import { SCANNER_NUMERIC_PARAM_KEYS } from './schema';
+import { SCANNER_NUMERIC_PARAMETERS } from './schema';
 
 const SCANNER_ANGLE_PARAM_KEYS = ['angleDeg'] as const;
 
@@ -18,33 +18,19 @@ const isScannerDevice = (
 
 export const scannerDeviceControls = {
   descriptors: {
-    'set-scanner-param': {
-      resolveMergeKey: createMergeKeyResolver('set-scanner-param', resolveNumericControlParam),
-      resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readControlParam(input, SCANNER_NUMERIC_PARAM_KEYS),
-      ),
-    },
     'set-angle-param': {
       resolveMergeKey: createMergeKeyResolver('set-angle-param', resolveNumericControlParam),
-      resolveDefaultValue: createDefaultNumericValueResolver(
+      resolveDefaultValue: createNumericParameterDefaultResolver(
+        SCANNER_NUMERIC_PARAMETERS,
         (input) => readControlParam(input, SCANNER_ANGLE_PARAM_KEYS),
       ),
     },
   },
   createHandlers: () => ({
-    'set-scanner-param': createNumericParamSetter({
+    'set-angle-param': createNumericParameterSetter({
       isKind: isScannerDevice,
-      readParam: (input) => readControlParam(input, SCANNER_NUMERIC_PARAM_KEYS),
-      assign: (device, param, value) => {
-        device.params[param] = value;
-      },
-    }),
-    'set-angle-param': createNumericParamSetter({
-      isKind: isScannerDevice,
+      rules: SCANNER_NUMERIC_PARAMETERS,
       readParam: (input) => readControlParam(input, SCANNER_ANGLE_PARAM_KEYS),
-      assign: (device, param, value) => {
-        device.params[param] = value;
-      },
     }),
   }),
 } satisfies RendererKindControlDefinition;

@@ -3,16 +3,15 @@ import type {
   RendererControlChange,
   RendererControlHandler,
 } from './control-types';
+import type { NumericParameterRules } from './numeric-parameters';
+import {
+  parseFiniteNumericParameterValue,
+  readNumericParameterKey,
+  writeNumericParameterValue,
+} from './numeric-parameters';
 
 export const parseFiniteControlNumber = (value: unknown): number | null => {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null;
-  }
-  if (typeof value === 'string') {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
+  return parseFiniteNumericParameterValue(value);
 };
 
 export const readControlParam = <ParamKey extends string>(
@@ -45,40 +44,29 @@ export const resolveNumericControlParam = (
   change: RendererControlChange,
 ): string | null => change.paramKey ?? null;
 
-const readNumericValueFromDeviceParams = (
-  device: GeneratorDeviceNode,
-  paramKey: string,
-): number | null => {
-  if (!('params' in device)) {
-    return null;
-  }
-
-  const value = (device.params as Record<string, unknown>)[paramKey];
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-};
-
-export const createDefaultNumericValueResolver = (
+export const createNumericParameterDefaultResolver = <Params extends object>(
+  rules: NumericParameterRules<Params>,
   resolveParamKey: (change: RendererControlChange) => string | null,
 ) => (
-  defaultDevice: GeneratorDeviceNode,
+  _defaultDevice: GeneratorDeviceNode,
   change: RendererControlChange,
 ): number | null => {
   const paramKey = resolveParamKey(change);
-  if (!paramKey) {
+  const key = readNumericParameterKey(paramKey ?? undefined, rules);
+  if (!key) {
     return null;
   }
 
-  return readNumericValueFromDeviceParams(defaultDevice, paramKey);
+  return rules[key]?.defaultValue ?? null;
 };
 
-export const createNumericParamSetter = <
-  Device extends GeneratorDeviceNode,
-  ParamKey extends string,
+export const createNumericParameterSetter = <
+  Device extends GeneratorDeviceNode & { params: object },
 >(
   options: {
     isKind: (device: GeneratorDeviceNode) => device is Device;
-    readParam: (change: RendererControlChange) => ParamKey | null;
-    assign: (device: Device, param: ParamKey, value: number, change: RendererControlChange) => void;
+    rules: NumericParameterRules<Device['params']>;
+    readParam: (change: RendererControlChange) => string | null;
   },
 ): RendererControlHandler => (device, change) => {
   if (!options.isKind(device)) {
@@ -90,11 +78,11 @@ export const createNumericParamSetter = <
     return false;
   }
 
-  const value = parseFiniteControlNumber(change.value);
-  if (value === null) {
-    return false;
-  }
-
-  options.assign(device, param, value, change);
-  return true;
+  return writeNumericParameterValue(
+    device.params,
+    options.rules,
+    param,
+    change.value,
+    { step: change.step },
+  ) !== null;
 };

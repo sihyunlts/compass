@@ -1,14 +1,15 @@
 import type { GeneratorDeviceNode } from '../../shared/model';
 import {
-  createDefaultNumericValueResolver,
   createMergeKeyResolver,
+  createNumericParameterDefaultResolver,
+  createNumericParameterSetter,
+  readControlParam,
   resolveNumericControlParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
-import {
-  createTimeWindowParamSetter,
-  readTimeWindowParamKey,
-} from '../time-window-controls';
+import { STRETCH_NUMERIC_PARAMETERS } from './schema';
+
+const STRETCH_PARAM_KEYS = ['start', 'end'] as const;
 
 const isStretchDevice = (
   device: GeneratorDeviceNode,
@@ -19,22 +20,17 @@ export const stretchDeviceControls = {
   descriptors: {
     'set-stretch-param': {
       resolveMergeKey: createMergeKeyResolver('set-stretch-param', resolveNumericControlParam),
-      resolveDefaultValue: createDefaultNumericValueResolver(
-        readTimeWindowParamKey,
+      resolveDefaultValue: createNumericParameterDefaultResolver(
+        STRETCH_NUMERIC_PARAMETERS,
+        (input) => readControlParam(input, STRETCH_PARAM_KEYS),
       ),
     },
   },
   createHandlers: () => ({
-    'set-stretch-param': createTimeWindowParamSetter({
+    'set-stretch-param': createNumericParameterSetter({
       isKind: isStretchDevice,
-      readWindow: (device) => ({
-        start: device.params.start,
-        end: device.params.end,
-      }),
-      writeWindow: (device, nextWindow) => {
-        device.params.start = nextWindow.start;
-        device.params.end = nextWindow.end;
-      },
+      rules: STRETCH_NUMERIC_PARAMETERS,
+      readParam: (input) => readControlParam(input, STRETCH_PARAM_KEYS),
     }),
   }),
 } satisfies RendererKindControlDefinition;

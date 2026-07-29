@@ -5,6 +5,11 @@ import {
   compileModulationProgram,
   evaluateModulationProgramReadouts,
 } from '../../../core/modulation/compiled-program';
+import { getNumericParameterRule } from '../../../devices/registry-core';
+import {
+  formatNumericParameterDisplayValue,
+  formatNumericParameterValue,
+} from '../../../devices/numeric-parameters';
 import { clamp } from '../../../shared/math';
 import type { GeneratorChain } from '../../../shared/model';
 import { LatestSourceKeyFamilyCache } from './source-key-cache';
@@ -50,9 +55,25 @@ class ModulationReadoutCache {
       { wrap: isLoopEnabled },
     );
     const readoutSegmentsByModulatorId = new Map<string, string[]>();
+    const targetDeviceKindById = new Map(
+      chain.devices.map((device) => [device.id, device.kind] as const),
+    );
     for (const readout of readouts) {
       const segments = readoutSegmentsByModulatorId.get(readout.modulatorId) ?? [];
-      segments.push(`${readout.targetParamKey} ${readout.modulatedValue.toFixed(3)}`);
+      const targetKind = targetDeviceKindById.get(readout.targetDeviceId);
+      const parameterRule = targetKind
+        ? getNumericParameterRule(targetKind, readout.targetParamKey)
+        : null;
+      const valueText = readout.modulatedValue.toFixed(3);
+      const formattedValue = parameterRule
+        ? formatNumericParameterDisplayValue(
+            parameterRule,
+            readout.modulatedValue,
+            valueText,
+          )
+        : formatNumericParameterValue(valueText, undefined);
+      const parameterLabel = parameterRule?.modulationLabel ?? readout.targetParamKey;
+      segments.push(`${parameterLabel} ${formattedValue}`);
       readoutSegmentsByModulatorId.set(readout.modulatorId, segments);
     }
 

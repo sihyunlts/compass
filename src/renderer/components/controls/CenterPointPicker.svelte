@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import type { RendererControlChange } from '../../../devices/control-types';
+  import type { NumericParameterRule } from '../../../devices/numeric-parameters';
   import { clamp } from '../../../shared/math';
   import FieldShell from '../fields/FieldShell.svelte';
   import NumberField from '../fields/NumberField.svelte';
@@ -10,28 +11,44 @@
     deviceId,
     centerX,
     centerY,
+    parameter,
     onControlChange,
   } = $props<{
     deviceId: string;
     centerX: number;
     centerY: number;
+    parameter?: NumericParameterRule;
     onControlChange: (change: RendererControlChange) => void;
   }>();
 
-  const MIN = 0;
-  const MAX = 9;
-  const STEP = 0.5;
-  const RANGE = MAX - MIN;
-  const MIDPOINT = (MIN + MAX) / 2;
+  const resolvedMin = $derived(parameter?.input.min ?? 0);
+  const resolvedMax = $derived(parameter?.input.max ?? 9);
+  const resolvedStep = $derived(parameter?.input.step ?? 0.5);
+  const range = $derived(resolvedMax - resolvedMin);
+  const midpoint = $derived((resolvedMin + resolvedMax) / 2);
 
-  const resolvedCenterX = $derived(clamp(Math.round(centerX / STEP) * STEP, MIN, MAX));
-  const resolvedCenterY = $derived(clamp(Math.round(centerY / STEP) * STEP, MIN, MAX));
-  const xPercent = $derived((((resolvedCenterX - MIN) / RANGE) * 100).toFixed(3));
-  const yPercent = $derived(((1 - (resolvedCenterY - MIN) / RANGE) * 100).toFixed(3));
-  const isCenterX = $derived(Math.abs(resolvedCenterX - MIDPOINT) < 0.0001);
-  const isCenterY = $derived(Math.abs(resolvedCenterY - MIDPOINT) < 0.0001);
-  const gridLineOffsets = Array.from({ length: RANGE - 1 }, (_, index) =>
-    (((index + 1) / RANGE) * 100).toFixed(3));
+  const resolvedCenterX = $derived(clamp(
+    Math.round((centerX - resolvedMin) / resolvedStep) * resolvedStep + resolvedMin,
+    resolvedMin,
+    resolvedMax,
+  ));
+  const resolvedCenterY = $derived(clamp(
+    Math.round((centerY - resolvedMin) / resolvedStep) * resolvedStep + resolvedMin,
+    resolvedMin,
+    resolvedMax,
+  ));
+  const xPercent = $derived(
+    (((resolvedCenterX - resolvedMin) / range) * 100).toFixed(3),
+  );
+  const yPercent = $derived(
+    ((1 - (resolvedCenterY - resolvedMin) / range) * 100).toFixed(3),
+  );
+  const isCenterX = $derived(Math.abs(resolvedCenterX - midpoint) < 0.0001);
+  const isCenterY = $derived(Math.abs(resolvedCenterY - midpoint) < 0.0001);
+  const gridLineOffsets = $derived.by(() => Array.from(
+    { length: Math.max(0, Math.round(range) - 1) },
+    (_, index) => (((index + 1) / range) * 100).toFixed(3),
+  ));
   let surfaceHeight = $state(0);
 </script>
 
@@ -46,9 +63,9 @@
     bind:clientHeight={surfaceHeight}
     data-center-picker-surface="true"
     data-device-id={deviceId}
-    data-min={MIN}
-    data-max={MAX}
-    data-step={STEP}
+    data-min={resolvedMin}
+    data-max={resolvedMax}
+    data-step={resolvedStep}
     data-center-x-state={isCenterX ? 'center' : 'off-center'}
     data-center-y-state={isCenterY ? 'center' : 'off-center'}
     aria-label="Center point area"
@@ -67,9 +84,7 @@
       layout="inline"
       size="compact"
       fill={true}
-      step={STEP}
-      min={MIN}
-      max={MAX}
+      {parameter}
       value={resolvedCenterX}
       dataAction="set-center-picker-param"
       dataId={deviceId}
@@ -81,9 +96,7 @@
       layout="inline"
       size="compact"
       fill={true}
-      step={STEP}
-      min={MIN}
-      max={MAX}
+      {parameter}
       value={resolvedCenterY}
       dataAction="set-center-picker-param"
       dataId={deviceId}

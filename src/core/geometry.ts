@@ -113,7 +113,7 @@ export const toAxisMirrorTransformAt = (
 };
 
 export const toRotateTransformAt = (angleDeg: number, center: Vec2): AffineTransform => {
-  const rad = (angleDeg * Math.PI) / 180;
+  const rad = ((angleDeg % 360) * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
   return {

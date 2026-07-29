@@ -5,6 +5,7 @@
   import CenterPointPicker from '../../renderer/components/controls/CenterPointPicker.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
+  import { WATERDROP_NUMERIC_PARAMETERS } from './schema';
 
   type WaterdropDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'waterdrop' }>;
@@ -18,11 +19,12 @@
     deviceId={device.id}
     centerX={device.params.centerX}
     centerY={device.params.centerY}
+    parameter={WATERDROP_NUMERIC_PARAMETERS.centerX}
     {onControlChange}
   />
   <NumberField
     label="Curvature"
-    step="0.1"
+    parameter={WATERDROP_NUMERIC_PARAMETERS.curvature}
     value={device.params.curvature}
     dataAction="set-waterdrop-param"
     dataId={device.id}

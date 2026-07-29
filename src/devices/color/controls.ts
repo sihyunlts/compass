@@ -1,12 +1,20 @@
+import type { GeneratorDeviceNode } from '../../shared/model';
 import {
   createMergeKeyResolver,
+  createNumericParameterDefaultResolver,
+  createNumericParameterSetter,
   parseFiniteControlNumber,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
-import { DEFAULT_COLOR_PARAMS, sanitizeColorGapPercent } from './schema';
+import { COLOR_NUMERIC_PARAMETERS, DEFAULT_COLOR_PARAMS } from './schema';
 
 const DEFAULT_COLOR_SLOT_VELOCITY = DEFAULT_COLOR_PARAMS.velocities[0];
 const MIN_COLOR_SLOT_COUNT = 1;
+
+const isColorDevice = (
+  device: GeneratorDeviceNode,
+): device is Extract<GeneratorDeviceNode, { kind: 'color' }> =>
+  device.kind === 'color';
 
 const resolveColorSlotIndex = (raw: string | undefined): number | null => {
   const value = raw?.trim();
@@ -28,17 +36,17 @@ export const colorDeviceControls = {
     },
     'set-color-note-length-percent': {
       resolveMergeKey: createMergeKeyResolver('set-color-note-length-percent'),
-      resolveDefaultValue: (defaultDevice) =>
-        defaultDevice.kind === 'color'
-          ? defaultDevice.params.noteLengthPercent
-          : null,
+      resolveDefaultValue: createNumericParameterDefaultResolver(
+        COLOR_NUMERIC_PARAMETERS,
+        () => 'noteLengthPercent',
+      ),
     },
     'set-color-gap-percent': {
       resolveMergeKey: createMergeKeyResolver('set-color-gap-percent'),
-      resolveDefaultValue: (defaultDevice) =>
-        defaultDevice.kind === 'color'
-          ? defaultDevice.params.gapPercent
-          : null,
+      resolveDefaultValue: createNumericParameterDefaultResolver(
+        COLOR_NUMERIC_PARAMETERS,
+        () => 'gapPercent',
+      ),
     },
     'set-color-slot-count': {
       resolveMergeKey: createMergeKeyResolver('set-color-slot-count'),
@@ -69,32 +77,16 @@ export const colorDeviceControls = {
       device.params.velocities[slotIndex] = paletteIndex;
       return true;
     },
-    'set-color-note-length-percent': (device, change) => {
-      if (device.kind !== 'color') {
-        return false;
-      }
-
-      const value = parseFiniteControlNumber(change.value);
-      if (value === null) {
-        return false;
-      }
-
-      device.params.noteLengthPercent = Math.min(400, Math.max(1, value));
-      return true;
-    },
-    'set-color-gap-percent': (device, change) => {
-      if (device.kind !== 'color') {
-        return false;
-      }
-
-      const value = parseFiniteControlNumber(change.value);
-      if (value === null) {
-        return false;
-      }
-
-      device.params.gapPercent = sanitizeColorGapPercent(value);
-      return true;
-    },
+    'set-color-note-length-percent': createNumericParameterSetter({
+      isKind: isColorDevice,
+      rules: COLOR_NUMERIC_PARAMETERS,
+      readParam: () => 'noteLengthPercent',
+    }),
+    'set-color-gap-percent': createNumericParameterSetter({
+      isKind: isColorDevice,
+      rules: COLOR_NUMERIC_PARAMETERS,
+      readParam: () => 'gapPercent',
+    }),
     'set-color-slot-count': (device, change) => {
       if (device.kind !== 'color') {
         return false;

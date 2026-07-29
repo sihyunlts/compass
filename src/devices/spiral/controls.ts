@@ -1,15 +1,16 @@
 import type { GeneratorDeviceNode } from '../../shared/model';
 import {
-  createDefaultNumericValueResolver,
   createMergeKeyResolver,
-  createNumericParamSetter,
+  createNumericParameterDefaultResolver,
+  createNumericParameterSetter,
   readControlParam,
   resolveNumericControlParam,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
-import { SPIRAL_NUMERIC_PARAM_KEYS } from './schema';
+import { SPIRAL_NUMERIC_PARAMETERS } from './schema';
 
 const SPIRAL_CENTER_PICKER_PARAM_KEYS = ['centerX', 'centerY'] as const;
+const SPIRAL_TURNS_PARAM_KEYS = ['turns'] as const;
 
 const isSpiralDevice = (
   device: GeneratorDeviceNode,
@@ -20,31 +21,29 @@ export const spiralDeviceControls = {
   descriptors: {
     'set-spiral-param': {
       resolveMergeKey: createMergeKeyResolver('set-spiral-param', resolveNumericControlParam),
-      resolveDefaultValue: createDefaultNumericValueResolver(
-        (input) => readControlParam(input, SPIRAL_NUMERIC_PARAM_KEYS),
+      resolveDefaultValue: createNumericParameterDefaultResolver(
+        SPIRAL_NUMERIC_PARAMETERS,
+        (input) => readControlParam(input, SPIRAL_TURNS_PARAM_KEYS),
       ),
     },
     'set-center-picker-param': {
       resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericControlParam),
-      resolveDefaultValue: createDefaultNumericValueResolver(
+      resolveDefaultValue: createNumericParameterDefaultResolver(
+        SPIRAL_NUMERIC_PARAMETERS,
         (input) => readControlParam(input, SPIRAL_CENTER_PICKER_PARAM_KEYS),
       ),
     },
   },
   createHandlers: () => ({
-    'set-spiral-param': createNumericParamSetter({
+    'set-spiral-param': createNumericParameterSetter({
       isKind: isSpiralDevice,
-      readParam: (input) => readControlParam(input, SPIRAL_NUMERIC_PARAM_KEYS),
-      assign: (device, param, value) => {
-        device.params[param] = value;
-      },
+      rules: SPIRAL_NUMERIC_PARAMETERS,
+      readParam: (input) => readControlParam(input, SPIRAL_TURNS_PARAM_KEYS),
     }),
-    'set-center-picker-param': createNumericParamSetter({
+    'set-center-picker-param': createNumericParameterSetter({
       isKind: isSpiralDevice,
+      rules: SPIRAL_NUMERIC_PARAMETERS,
       readParam: (input) => readControlParam(input, SPIRAL_CENTER_PICKER_PARAM_KEYS),
-      assign: (device, param, value) => {
-        device.params[param] = value;
-      },
     }),
   }),
 } satisfies RendererKindControlDefinition;

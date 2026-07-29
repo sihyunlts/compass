@@ -5,6 +5,7 @@
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import { resolveLedSurfaceRgb } from '../../renderer/app/led-surface-color';
   import type { RendererDeviceEditorPropsBase } from '../types';
+  import { COLOR_NUMERIC_PARAMETERS } from './schema';
 
   const BLACK_RGB = '0 0 0';
 
@@ -141,8 +142,7 @@
   <div class="column-wrapper">
     <NumberField
       label="Note Length"
-      step="1"
-      min="1"
+      parameter={COLOR_NUMERIC_PARAMETERS.noteLengthPercent}
       value={device.params.noteLengthPercent}
       dataAction="set-color-note-length-percent"
       dataId={device.id}
@@ -151,9 +151,7 @@
 
     <NumberField
       label="Gap"
-      step="1"
-      min="0"
-      max="400"
+      parameter={COLOR_NUMERIC_PARAMETERS.gapPercent}
       value={device.params.gapPercent}
       dataAction="set-color-gap-percent"
       dataId={device.id}

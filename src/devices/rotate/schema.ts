@@ -4,18 +4,31 @@ import {
   resolveImportedDeviceEnabled,
   resolveImportedDeviceId,
   resolveImportedParams,
-  toFiniteNumber,
 } from '../import-hydration';
+import {
+  defineNumericParameterRules,
+  finiteNumericParameter,
+  hydrateImportedNumericParameters,
+} from '../numeric-parameters';
 import type { RendererDeviceSchema } from '../types';
 
 const DEFAULT_ROTATE_PARAMS: RotateEffectNode['params'] = {
-  angleDeg: 90,
+  angleDeg: 0,
 };
 
-const ROTATE_MODULATION_TARGET_PARAMS = [
-  { key: 'angleDeg', label: 'Angle' },
-] as const;
-export const ROTATE_NUMERIC_PARAM_KEYS = ['angleDeg'] as const;
+export const ROTATE_NUMERIC_PARAMETERS = defineNumericParameterRules<
+  RotateEffectNode['params']
+>()({
+  angleDeg: finiteNumericParameter({
+    defaultValue: DEFAULT_ROTATE_PARAMS.angleDeg,
+    step: 1,
+    display: {
+      unit: '°',
+      format: 'rotation',
+    },
+    modulationLabel: 'Rotation',
+  }),
+});
 
 const createDefaultRotateNode = (
   id: string,
@@ -41,7 +54,7 @@ const hydrateImportedRotateNode = (
     source,
   );
   const params = resolveImportedParams(source);
-  device.params.angleDeg = toFiniteNumber(params.angleDeg, device.params.angleDeg);
+  hydrateImportedNumericParameters(device.params, params, ROTATE_NUMERIC_PARAMETERS);
   return device;
 };
 
@@ -49,8 +62,7 @@ export const rotateDeviceSchema = {
   kind: 'rotate',
   label: 'Rotate',
   group: 'effect',
-  modulationTargetParams: ROTATE_MODULATION_TARGET_PARAMS,
-  numericParamKeys: ROTATE_NUMERIC_PARAM_KEYS,
+  numericParameters: ROTATE_NUMERIC_PARAMETERS,
   createDefaultNode: createDefaultRotateNode,
   hydrateImportedNode: hydrateImportedRotateNode,
 } satisfies RendererDeviceSchema<'rotate'>;
