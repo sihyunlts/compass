@@ -13,9 +13,8 @@
     sanitizeSidebarWidth,
     saveMainWindowAlwaysOnTop,
   } from './features/editor/persistence-storage';
-  import BrowserPanel, {
-    type BrowserPanelPage,
-  } from './components/browser/BrowserPanel.svelte';
+  import BrowserPanel from './components/browser/BrowserPanel.svelte';
+  import type { BrowserPage } from './features/browser/types';
   import {
     isPresetDeleteContextTarget,
     type ContextMenuTarget,
@@ -75,8 +74,6 @@
   let rackViewApi: RackViewApi | null = $state(null);
   let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
   let mainWindowAlwaysOnTop = $state(loadMainWindowAlwaysOnTop());
-  let pendingSidebarPage: BrowserPanelPage | null = null;
-  let sidebarPageSelectionToken = 0;
 
   const closeContextMenu = (): void => {
     contextMenuComponent?.close();
@@ -289,30 +286,7 @@
     headerIndicator.syncFromSource();
   });
 
-  const handleSidebarPageSelect = async (
-    nextPage: BrowserPanelPage,
-  ): Promise<void> => {
-    if (nextPage === pendingSidebarPage) {
-      return;
-    }
-    if (nextPage === uiState.sidebarPage) {
-      if (pendingSidebarPage !== null) {
-        sidebarPageSelectionToken += 1;
-        pendingSidebarPage = null;
-      }
-      return;
-    }
-
-    const selectionToken = ++sidebarPageSelectionToken;
-    pendingSidebarPage = nextPage;
-    if (nextPage === 'presets') {
-      await presetController.loadTree();
-      if (selectionToken !== sidebarPageSelectionToken) {
-        return;
-      }
-    }
-
-    pendingSidebarPage = null;
+  const handleSidebarPageSelect = (nextPage: BrowserPage): void => {
     uiState.sidebarPage = nextPage;
   };
 
@@ -457,6 +431,7 @@
     });
     editorSession.initialize();
     playbackSession.initialize();
+    void presetController.loadTree();
     if (uiState.headerIndicatorText.trim()) {
       headerIndicator.show(uiState.headerIndicatorText);
     }
@@ -482,6 +457,10 @@
     const disposeMainWindowCloseRequest = bridgeClient.subscribeMainWindowCloseRequest(() => {
       void presetController.handleMainWindowCloseRequest();
     });
+    const disposePresetBrowserTreeChanged =
+      bridgeClient.subscribePresetBrowserTreeChanged(() => {
+        void presetController.loadTree();
+      });
     const disposeMainWindowRackFileMenuRequest = bridgeClient.subscribeMainWindowRackFileMenuRequest(
       (action) => {
         if (action === 'new') {
@@ -521,6 +500,7 @@
 
     return () => {
       disposePreviewWindowControlRequest();
+      disposePresetBrowserTreeChanged();
       disposeMainWindowRackFileMenuRequest();
       disposeMainWindowCloseRequest();
       disposeKeyboardShortcuts();

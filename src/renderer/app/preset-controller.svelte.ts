@@ -3,7 +3,6 @@ import type { MessageKey } from '../../shared/i18n';
 import { normalizePresetEntrySelection } from '../../shared/preset-entry-selection';
 import {
   getDeviceMessageKey,
-  getPresetSystemFolderMessageKey,
 } from '../device-i18n';
 import { i18n } from '../i18n.svelte';
 import type {
@@ -29,7 +28,6 @@ import type {
   ContextMenuTarget,
   PresetDeleteContextTarget,
   PresetEntryContextTarget,
-  PresetsRootContextTarget,
 } from '../features/context-menu/types';
 import type {
   BrowserInsertSource,
@@ -99,8 +97,6 @@ const resolvePresetDraftErrorMessageKey = (
 
 type PresetEntryTarget = PresetEntryContextTarget;
 type PresetDeleteTarget = PresetDeleteContextTarget;
-type PresetsRootTarget = PresetsRootContextTarget;
-type ShowInFolderTarget = PresetEntryTarget | PresetsRootTarget;
 type PendingRackPresetLoadTarget = {
   label: string;
   description?: string;
@@ -684,7 +680,11 @@ class PresetController {
     }
 
     await this.loadTree();
-    if (draft.entryKind === 'file' && draft.presetType === 'rack') {
+    if (
+      draft.entryKind === 'file'
+      && draft.presetType === 'rack'
+      && response.status === 'renamed'
+    ) {
       this.syncCurrentRackAfterPresetFileRename(draft.relativePath, response);
     }
     this.state.presetFolderSelectionTarget = {
@@ -766,26 +766,13 @@ class PresetController {
       });
     }
 
-    const systemFolderMessageKey = target.entryKind === 'directory'
-      ? getPresetSystemFolderMessageKey(target.presetType, target.relativePath)
-      : null;
-    const label = systemFolderMessageKey
-      ? i18n.t(systemFolderMessageKey)
-      : target.relativePath[target.relativePath.length - 1] ?? '';
+    const label = target.relativePath[target.relativePath.length - 1] ?? '';
     return target.entryKind === 'directory'
       ? i18n.t('preset.moveFolderDescription', { label })
       : i18n.t('preset.moveItemDescription', { label });
   }
 
-  public async handleShowPresetEntryInFolder(target: ShowInFolderTarget): Promise<void> {
-    if (target.kind === 'presets-root') {
-      const response = await this.options.bridgeClient.showPresetsRootInFolder();
-      if (response.status === 'error') {
-        this.showError('status.showInFolderFailed', response.message);
-      }
-      return;
-    }
-
+  public async handleShowPresetEntryInFolder(target: PresetEntryTarget): Promise<void> {
     const response = await this.options.bridgeClient.showPresetEntryInFolder({
       presetType: target.presetType,
       relativePath: [...target.relativePath],
@@ -1159,6 +1146,7 @@ class PresetController {
 
       const response = await this.options.bridgeClient.savePresetFile(request);
       if (response.status === 'saved') {
+        await this.loadTree();
         this.showMessage(i18n.t(options.successMessage));
         return;
       }

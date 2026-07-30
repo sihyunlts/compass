@@ -4,7 +4,6 @@
     isPresetBrowserContextTarget,
     type ContextMenuTarget,
     type PresetEntryContextTarget,
-    type PresetsRootContextTarget,
   } from '../../features/context-menu/types';
   import {
     attachFloatingLayerDismissHandlers,
@@ -35,9 +34,7 @@
     onRename: (target: ContextMenuTarget) => void;
     onDelete: (target: ContextMenuTarget) => void;
     onCreatePresetFolder: (target: PresetEntryContextTarget) => void;
-    onShowInFolder: (
-      target: PresetEntryContextTarget | PresetsRootContextTarget,
-    ) => void;
+    onShowInFolder: (target: PresetEntryContextTarget) => void;
     onGroup: (ids: string[]) => void;
     onUngroupGroup: (groupId: string) => void;
     clipboardAvailable?: boolean;
@@ -55,16 +52,22 @@
   const isPresetBrowserTarget = $derived.by(() =>
     isPresetBrowserContextTarget(target));
   const isDeletablePresetTarget = $derived.by(() =>
-    (target?.kind === 'preset-entry' && target.relativePath.length > 0)
+    (
+      target?.kind === 'preset-entry'
+      && target.relativePath.length > 0
+      && !target.isSystemFolder
+    )
     || (
       target?.kind === 'preset-entries'
       && target.entries.length > 0
-      && target.entries.every((entry) => entry.relativePath.length > 0)
+      && target.entries.every(
+        (entry) => entry.relativePath.length > 0 && !entry.isSystemFolder,
+      )
     ));
   const canCreatePresetFolder = $derived.by(() =>
     target?.kind === 'preset-entry' && target.entryKind === 'directory');
   const canShowInFolder = $derived.by(() =>
-    target?.kind === 'preset-entry' || target?.kind === 'presets-root');
+    target?.kind === 'preset-entry');
   const canPasteForTarget = $derived.by(() =>
     target !== null
     && !isPresetBrowserContextTarget(target)
@@ -88,7 +91,8 @@
       : CLIPBOARD_ACTIONS.filter((action) => !action.requiresClipboard || canPasteForTarget));
   const canRenameTarget = $derived.by(() => {
     if (target?.kind === 'preset-entry') {
-      return target.entryKind === 'file' || target.relativePath.length > 0;
+      return !target.isSystemFolder
+        && (target.entryKind === 'file' || target.relativePath.length > 0);
     }
     if (!target || isPresetBrowserContextTarget(target)) {
       return false;
@@ -186,7 +190,7 @@
   }
 
   function handleShowInFolderClick() {
-    if (target?.kind !== 'preset-entry' && target?.kind !== 'presets-root') {
+    if (target?.kind !== 'preset-entry') {
       return;
     }
 

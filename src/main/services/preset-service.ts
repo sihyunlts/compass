@@ -1,5 +1,7 @@
 import { shell, type BaseWindow } from 'electron';
+import { watch, type FSWatcher } from 'node:fs';
 
+import { isDeviceBrowserSystemDirectoryPath } from '../../devices/browser-categories';
 import type {
   CreatePresetFolderResponse,
   DeletePresetEntriesResponse,
@@ -11,7 +13,6 @@ import type {
   SaveRackFileResponse,
   SavePresetFileResponse,
   ShowPresetEntryInFolderResponse,
-  ShowPresetsRootInFolderResponse,
 } from '../../shared/contracts/ipc/presets';
 import { normalizePresetEntrySelection } from '../../shared/preset-entry-selection';
 import { PRESET_FILE_SPECS } from './presets/preset-config';
@@ -49,6 +50,47 @@ export class PresetService {
   private readonly dialogs = new PresetDialogs();
 
   private readonly browserTreeBuilder = new PresetBrowserTreeBuilder(this.storage);
+
+  private browserTreeWatcher: FSWatcher | null = null;
+
+  private browserTreeChangeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  public async startWatchingBrowserTree(onChange: () => void): Promise<void> {
+    this.stopWatchingBrowserTree();
+
+    try {
+      const presetsRootDirectory = await this.storage.resolvePresetsRootDirectory();
+      this.browserTreeWatcher = watch(
+        presetsRootDirectory,
+        { recursive: true, persistent: false },
+        () => {
+          if (this.browserTreeChangeTimer) {
+            clearTimeout(this.browserTreeChangeTimer);
+          }
+          this.browserTreeChangeTimer = setTimeout(() => {
+            this.browserTreeChangeTimer = null;
+            onChange();
+          }, 75);
+        },
+      );
+      this.browserTreeWatcher.on('error', (error) => {
+        console.error('Preset browser file watcher failed.', error);
+        this.stopWatchingBrowserTree();
+      });
+    } catch (error) {
+      console.error('Failed to start preset browser file watcher.', error);
+      this.stopWatchingBrowserTree();
+    }
+  }
+
+  public stopWatchingBrowserTree(): void {
+    if (this.browserTreeChangeTimer) {
+      clearTimeout(this.browserTreeChangeTimer);
+      this.browserTreeChangeTimer = null;
+    }
+    this.browserTreeWatcher?.close();
+    this.browserTreeWatcher = null;
+  }
 
   public async savePresetFile(
     request: unknown,
@@ -262,6 +304,15 @@ export class PresetService {
         message: 'Invalid folder request.',
       };
     }
+    if (
+      parsedRequest.presetType === 'device'
+      && isDeviceBrowserSystemDirectoryPath(parsedRequest.relativePath)
+    ) {
+      return {
+        status: 'error',
+        message: 'Built-in device folders cannot be renamed.',
+      };
+    }
 
     try {
       return {
@@ -364,26 +415,6 @@ export class PresetService {
     }
   }
 
-  public async showPresetsRootInFolder(): Promise<ShowPresetsRootInFolderResponse> {
-    try {
-      const directory = await this.storage.resolvePresetsRootDirectory();
-      const openError = await shell.openPath(directory);
-      if (openError) {
-        return {
-          status: 'error',
-          message: openError,
-        };
-      }
-
-      return { status: 'ok' };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: toErrorMessage(error, 'Failed to reveal presets folder.'),
-      };
-    }
-  }
-
   public async deletePresetEntries(
     request: unknown,
   ): Promise<DeletePresetEntriesResponse> {
@@ -403,6 +434,19 @@ export class PresetService {
 
     try {
       const normalizedEntries = normalizePresetEntrySelection(parsedRequest.entries);
+      if (
+        normalizedEntries.some(
+          (entry) =>
+            entry.entryKind === 'directory'
+            && entry.presetType === 'device'
+            && isDeviceBrowserSystemDirectoryPath(entry.relativePath),
+        )
+      ) {
+        return {
+          status: 'error',
+          message: 'Built-in device folders cannot be deleted.',
+        };
+      }
 
       const filePaths: string[] = [];
       for (const entry of normalizedEntries) {

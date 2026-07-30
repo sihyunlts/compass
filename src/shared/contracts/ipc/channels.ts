@@ -27,8 +27,8 @@ export const IPC_CHANNELS = {
   createPresetFolder: 'preset:create-folder',
   renamePresetFolder: 'preset:rename-folder',
   listPresetBrowserTree: 'preset:list-browser-tree',
+  presetBrowserTreeChanged: 'preset:browser-tree-changed',
   showPresetEntryInFolder: 'preset:show-entry-in-folder',
-  showPresetsRootInFolder: 'preset:show-root-in-folder',
   deletePresetEntries: 'preset:delete-entries',
   readPresetEntry: 'preset:read-entry',
 } as const;

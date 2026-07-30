@@ -82,6 +82,9 @@ if (!handleSquirrelStartupEvent()) {
     liveTempoListener.start((update) => {
       sendToAllWindows(IPC_CHANNELS.liveTempoUpdate, update);
     });
+    void presetService.startWatchingBrowserTree(() => {
+      sendToAllWindows(IPC_CHANNELS.presetBrowserTreeChanged, undefined);
+    });
 
     createMainWindow();
 
@@ -97,6 +100,7 @@ if (!handleSquirrelStartupEvent()) {
   });
 
   app.on('will-quit', () => {
+    presetService.stopWatchingBrowserTree();
     liveTempoListener.stop();
   });
 }

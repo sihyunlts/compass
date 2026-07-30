@@ -18,7 +18,6 @@ import type {
   RenamePresetFolderResponse,
   ShowPresetEntryInFolderRequest,
   ShowPresetEntryInFolderResponse,
-  ShowPresetsRootInFolderResponse,
 } from './shared/contracts/ipc/presets';
 import type { PreviewWindowState } from './shared/contracts/preview/window-state';
 import {
@@ -63,6 +62,7 @@ const previewWindowVisibilityListeners = createListenerSet<boolean>();
 const previewWindowControlRequestListeners = createListenerSet<PreviewWindowControlRequest>();
 const mainWindowCloseRequestListeners = createListenerSet<void>();
 const mainWindowRackFileMenuRequestListeners = createListenerSet<RackFileMenuAction>();
+const presetBrowserTreeChangedListeners = createListenerSet<void>();
 
 ipcRenderer.on(IPC_CHANNELS.liveTempoUpdate, (_event, payload: LiveTempoUpdate) => {
   liveTempoListeners.emit(payload);
@@ -104,6 +104,10 @@ ipcRenderer.on(
     }
   },
 );
+
+ipcRenderer.on(IPC_CHANNELS.presetBrowserTreeChanged, () => {
+  presetBrowserTreeChangedListeners.emit();
+});
 
 const api: CompassApi = {
   sendGeneratedPreview: (request) =>
@@ -168,10 +172,10 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.renamePresetFolder, request) as Promise<RenamePresetFolderResponse>,
   listPresetBrowserTree: () =>
     ipcRenderer.invoke(IPC_CHANNELS.listPresetBrowserTree) as Promise<ListPresetBrowserTreeResponse>,
+  subscribePresetBrowserTreeChanged: (listener) =>
+    presetBrowserTreeChangedListeners.subscribe(listener),
   showPresetEntryInFolder: (request: ShowPresetEntryInFolderRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.showPresetEntryInFolder, request) as Promise<ShowPresetEntryInFolderResponse>,
-  showPresetsRootInFolder: () =>
-    ipcRenderer.invoke(IPC_CHANNELS.showPresetsRootInFolder) as Promise<ShowPresetsRootInFolderResponse>,
   deletePresetEntries: (request: DeletePresetEntriesRequest) =>
     ipcRenderer.invoke(
       IPC_CHANNELS.deletePresetEntries,

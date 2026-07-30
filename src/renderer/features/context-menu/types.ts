@@ -5,6 +5,7 @@ export interface PresetEntryContextTarget {
   presetType: PresetFileKind;
   relativePath: readonly string[];
   entryKind: 'file' | 'directory';
+  isSystemFolder?: boolean;
 }
 
 export interface PresetEntriesContextTarget {
@@ -12,14 +13,9 @@ export interface PresetEntriesContextTarget {
   entries: readonly PresetEntryContextTarget[];
 }
 
-export interface PresetsRootContextTarget {
-  kind: 'presets-root';
-}
-
 export type PresetBrowserContextTarget =
   | PresetEntryContextTarget
-  | PresetEntriesContextTarget
-  | PresetsRootContextTarget;
+  | PresetEntriesContextTarget;
 
 export type PresetDeleteContextTarget =
   | PresetEntryContextTarget
@@ -42,8 +38,7 @@ export const isPresetBrowserContextTarget = (
   target: ContextMenuTarget | null | undefined,
 ): target is PresetBrowserContextTarget =>
   target?.kind === 'preset-entry'
-  || target?.kind === 'preset-entries'
-  || target?.kind === 'presets-root';
+  || target?.kind === 'preset-entries';
 
 export const isPresetDeleteContextTarget = (
   target: ContextMenuTarget,

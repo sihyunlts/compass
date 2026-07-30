@@ -12,6 +12,8 @@ interface BrowserTreeBaseFolderNode {
 export interface BrowserTreeDeviceFolderNode extends BrowserTreeBaseFolderNode {
   treeKind: 'device';
   categoryId: DeviceBrowserCategoryId;
+  presetRelativePath: string[];
+  presetDirectoryExists: boolean;
 }
 
 export interface BrowserTreePresetFolderNode extends BrowserTreeBaseFolderNode {
@@ -20,11 +22,14 @@ export interface BrowserTreePresetFolderNode extends BrowserTreeBaseFolderNode {
   relativePath: string[];
 }
 
-export interface BrowserTreeDeviceLeafNode {
+export interface BrowserTreeDeviceNode {
   kind: 'device';
   id: string;
   label: string;
   deviceKind: RendererDeviceKind;
+  presetRelativePath: string[];
+  presetDirectoryExists: boolean;
+  children: BrowserTreeNode[];
 }
 
 export interface BrowserTreePresetLeafNode {
@@ -56,5 +61,7 @@ export interface PresetFolderSelectionTarget {
 export type BrowserTreeNode =
   | BrowserTreeDeviceFolderNode
   | BrowserTreePresetFolderNode
-  | BrowserTreeDeviceLeafNode
+  | BrowserTreeDeviceNode
   | BrowserTreePresetLeafNode;
+
+export type BrowserPage = 'devices' | 'groups' | 'racks' | 'settings';

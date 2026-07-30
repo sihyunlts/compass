@@ -238,12 +238,6 @@ export const registerIpcHandlers = (
   );
 
   ipcMain.handle(
-    IPC_CHANNELS.showPresetsRootInFolder,
-    () =>
-      presetService.showPresetsRootInFolder(),
-  );
-
-  ipcMain.handle(
     IPC_CHANNELS.deletePresetEntries,
     (_event, request) =>
       presetService.deletePresetEntries(request),

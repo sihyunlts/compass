@@ -168,15 +168,6 @@ export type ShowPresetEntryInFolderResponse =
       message: string;
     };
 
-export type ShowPresetsRootInFolderResponse =
-  | {
-      status: 'ok';
-    }
-  | {
-      status: 'error';
-      message: string;
-    };
-
 export type DeletePresetEntriesResponse =
   | {
       status: 'ok';

@@ -1,4 +1,5 @@
 import { LIVE_BRIDGE_TARGET } from '../../shared/bridge/protocol';
+import { isDeviceBrowserSystemDirectoryPath } from '../../devices/browser-categories';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import { normalizePresetEntrySelection } from '../../shared/preset-entry-selection';
 import type {
@@ -27,6 +28,17 @@ const ROOT_LABELS: Record<PresetFileKind, string> = {
   group: 'Groups',
   rack: 'Racks',
 };
+const presetBrowserTreeChangedListeners = new Set<() => void>();
+
+window.addEventListener('storage', (event) => {
+  if (event.key !== STORAGE_KEY) {
+    return;
+  }
+
+  for (const listener of presetBrowserTreeChangedListeners) {
+    listener();
+  }
+});
 
 interface BrowserPresetEntry {
   presetType: PresetFileKind;
@@ -476,6 +488,12 @@ export const createBrowserCompassBridge = (): CompassApi => ({
     if (request.relativePath.length === 0) {
       return { status: 'error', message: 'Preset root folders cannot be renamed.' };
     }
+    if (
+      request.presetType === 'device'
+      && isDeviceBrowserSystemDirectoryPath(request.relativePath)
+    ) {
+      return { status: 'error', message: 'Built-in device folders cannot be renamed.' };
+    }
 
     const folderName = normalizePathSegment(request.folderName);
     if (!isValidPathSegment(folderName)) {
@@ -526,8 +544,13 @@ export const createBrowserCompassBridge = (): CompassApi => ({
       })),
     };
   },
+  subscribePresetBrowserTreeChanged: (listener) => {
+    presetBrowserTreeChangedListeners.add(listener);
+    return () => {
+      presetBrowserTreeChangedListeners.delete(listener);
+    };
+  },
   showPresetEntryInFolder: async () => ({ status: 'ok' }),
-  showPresetsRootInFolder: async () => ({ status: 'ok' }),
   deletePresetEntries: async (request) => {
     if (
       request.entries.length === 0
@@ -540,6 +563,19 @@ export const createBrowserCompassBridge = (): CompassApi => ({
     }
 
     const normalizedEntries = normalizePresetEntrySelection(request.entries);
+    if (
+      normalizedEntries.some(
+        (entry) =>
+          entry.entryKind === 'directory'
+          && entry.presetType === 'device'
+          && isDeviceBrowserSystemDirectoryPath(entry.relativePath),
+      )
+    ) {
+      return {
+        status: 'error',
+        message: 'Built-in device folders cannot be deleted.',
+      };
+    }
     const store = readStore();
     const hasMatchingEntry = normalizedEntries.every((entry) =>
       entry.entryKind === 'file'

@@ -6,6 +6,7 @@ import type {
   RackPresetFile,
 } from '../../../shared/presets';
 import type { RendererDeviceKind } from '../../../devices';
+import type { BrowserPage } from '../browser/types';
 import { isRendererDeviceKind } from '../../../devices';
 import {
   isPresetBrowserContextTarget,
@@ -99,7 +100,7 @@ const DEFAULT_AUTO_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_HISTORY_MAX_ENTRIES = 100;
 
 export interface EditorSessionState {
-  sidebarPage: 'devices' | 'presets' | 'settings';
+  sidebarPage: BrowserPage;
   chainState: GeneratorChain;
   chainRevision: number;
   launchpadModel: LaunchpadModel;

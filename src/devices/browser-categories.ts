@@ -7,6 +7,7 @@ export interface DeviceBrowserCategoryDefinition {
   categoryId: DeviceBrowserCategoryId;
   label: string;
   directoryName: string;
+  icon: string;
   accentColorVar: `--${string}`;
   deviceKinds: readonly RendererDeviceKind[];
 }
@@ -18,6 +19,7 @@ export const DEVICE_BROWSER_CATEGORY_DEFINITIONS = [
     categoryId: 'generate',
     label: 'Generate',
     directoryName: GENERATE_DEVICE_CATEGORY_DIRECTORY_NAME,
+    icon: 'auto_awesome',
     accentColorVar: '--color-category-generate',
     deviceKinds: ['ripple', 'scanner', 'rain', 'spiral', 'path'],
   },
@@ -25,6 +27,7 @@ export const DEVICE_BROWSER_CATEGORY_DEFINITIONS = [
     categoryId: 'transform',
     label: 'Transform',
     directoryName: 'Transform',
+    icon: 'transform',
     accentColorVar: '--color-category-transform',
     deviceKinds: ['mirror', 'symmetry', 'rotate', 'scale', 'translate'],
   },
@@ -32,6 +35,7 @@ export const DEVICE_BROWSER_CATEGORY_DEFINITIONS = [
     categoryId: 'time',
     label: 'Time',
     directoryName: 'Time',
+    icon: 'schedule',
     accentColorVar: '--color-category-time',
     deviceKinds: ['trim', 'stretch', 'timewarp', 'reverse'],
   },
@@ -39,6 +43,7 @@ export const DEVICE_BROWSER_CATEGORY_DEFINITIONS = [
     categoryId: 'utility',
     label: 'Utility',
     directoryName: 'Utility',
+    icon: 'build',
     accentColorVar: '--color-category-utility',
     deviceKinds: ['mask', 'color', 'modulator'],
   },
@@ -71,20 +76,32 @@ const validateDeviceBrowserCategories = (
 validateDeviceBrowserCategories(DEVICE_BROWSER_CATEGORY_DEFINITIONS);
 
 const DEVICE_BROWSER_CATEGORY_BY_KIND = new Map<RendererDeviceKind, DeviceBrowserCategoryDefinition>();
+const DEVICE_BROWSER_CATEGORY_BY_ID = new Map<
+  DeviceBrowserCategoryId,
+  DeviceBrowserCategoryDefinition
+>();
 const DEVICE_BROWSER_CATEGORY_BY_DIRECTORY_NAME = new Map<
   string,
   DeviceBrowserCategoryDefinition
 >();
 const DEVICE_BROWSER_KIND_BY_DIRECTORY_PATH = new Map<string, RendererDeviceKind>();
 const DEVICE_BROWSER_CATEGORY_ORDER = new Map<string, number>();
+const normalizeDirectoryLookupKey = (value: string): string =>
+  value.toLocaleLowerCase('en-US');
 
 for (const [index, definition] of DEVICE_BROWSER_CATEGORY_DEFINITIONS.entries()) {
-  DEVICE_BROWSER_CATEGORY_BY_DIRECTORY_NAME.set(definition.directoryName, definition);
+  DEVICE_BROWSER_CATEGORY_BY_ID.set(definition.categoryId, definition);
+  DEVICE_BROWSER_CATEGORY_BY_DIRECTORY_NAME.set(
+    normalizeDirectoryLookupKey(definition.directoryName),
+    definition,
+  );
   DEVICE_BROWSER_CATEGORY_ORDER.set(definition.directoryName, index);
   for (const kind of definition.deviceKinds) {
     DEVICE_BROWSER_CATEGORY_BY_KIND.set(kind, definition);
     DEVICE_BROWSER_KIND_BY_DIRECTORY_PATH.set(
-      `${definition.directoryName}\0${getRendererDeviceLabel(kind)}`,
+      normalizeDirectoryLookupKey(
+        `${definition.directoryName}\0${getRendererDeviceLabel(kind)}`,
+      ),
       kind,
     );
   }
@@ -121,22 +138,54 @@ export const getDeviceBrowserCategory = (
   return category;
 };
 
+export const getDeviceBrowserCategoryById = (
+  categoryId: DeviceBrowserCategoryId,
+): DeviceBrowserCategoryDefinition => {
+  const category = DEVICE_BROWSER_CATEGORY_BY_ID.get(categoryId);
+  if (!category) {
+    throw new Error(`Missing device browser category: ${categoryId}`);
+  }
+
+  return category;
+};
+
 export const getDeviceBrowserCategoryDirectoryName = (
   kind: RendererDeviceKind,
 ): string => getDeviceBrowserCategory(kind).directoryName;
 
-export const getDeviceBrowserCategoryByDirectoryName = (
+const getDeviceBrowserCategoryByDirectoryName = (
   directoryName: string,
 ): DeviceBrowserCategoryDefinition | null =>
-  DEVICE_BROWSER_CATEGORY_BY_DIRECTORY_NAME.get(directoryName) ?? null;
+  DEVICE_BROWSER_CATEGORY_BY_DIRECTORY_NAME.get(
+    normalizeDirectoryLookupKey(directoryName),
+  ) ?? null;
 
-export const getDeviceBrowserKindByDirectoryPath = (
+const getDeviceBrowserKindByDirectoryPath = (
   categoryDirectoryName: string,
   deviceDirectoryName: string,
 ): RendererDeviceKind | null =>
   DEVICE_BROWSER_KIND_BY_DIRECTORY_PATH.get(
-    `${categoryDirectoryName}\0${deviceDirectoryName}`,
+    normalizeDirectoryLookupKey(
+      `${categoryDirectoryName}\0${deviceDirectoryName}`,
+    ),
   ) ?? null;
+
+export const isDeviceBrowserSystemDirectoryPath = (
+  relativePath: readonly string[],
+): boolean => {
+  if (relativePath.length === 1) {
+    return getDeviceBrowserCategoryByDirectoryName(relativePath[0]) !== null;
+  }
+
+  if (relativePath.length === 2) {
+    return getDeviceBrowserKindByDirectoryPath(
+      relativePath[0],
+      relativePath[1],
+    ) !== null;
+  }
+
+  return false;
+};
 
 export const compareDeviceBrowserCategoryDirectoryNames = (
   left: string,

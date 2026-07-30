@@ -21,7 +21,6 @@ import type {
   SavePresetFileResponse,
   ShowPresetEntryInFolderRequest,
   ShowPresetEntryInFolderResponse,
-  ShowPresetsRootInFolderResponse,
 } from './presets';
 import type { PreviewWindowState } from '../preview/window-state';
 import type {
@@ -120,10 +119,12 @@ export interface CompassApi {
     request: RenamePresetFolderRequest,
   ) => Promise<RenamePresetFolderResponse>;
   listPresetBrowserTree: () => Promise<ListPresetBrowserTreeResponse>;
+  subscribePresetBrowserTreeChanged: (
+    listener: () => void,
+  ) => () => void;
   showPresetEntryInFolder: (
     request: ShowPresetEntryInFolderRequest,
   ) => Promise<ShowPresetEntryInFolderResponse>;
-  showPresetsRootInFolder: () => Promise<ShowPresetsRootInFolderResponse>;
   deletePresetEntries: (
     request: DeletePresetEntriesRequest,
   ) => Promise<DeletePresetEntriesResponse>;
