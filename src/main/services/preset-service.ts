@@ -2,7 +2,7 @@ import { shell, type BaseWindow } from 'electron';
 
 import type {
   CreatePresetFolderResponse,
-  DeletePresetEntryResponse,
+  DeletePresetEntriesResponse,
   ListPresetBrowserTreeResponse,
   ReadPresetEntryResponse,
   RenameRackFileResponse,
@@ -13,6 +13,7 @@ import type {
   ShowPresetEntryInFolderResponse,
   ShowPresetsRootInFolderResponse,
 } from '../../shared/contracts/ipc/presets';
+import { normalizePresetEntrySelection } from '../../shared/preset-entry-selection';
 import { PRESET_FILE_SPECS } from './presets/preset-config';
 import { PresetBrowserTreeBuilder } from './presets/preset-browser-tree';
 import { PresetDialogs } from './presets/preset-dialogs';
@@ -22,6 +23,7 @@ import {
 } from './presets/preset-paths';
 import {
   parseCreatePresetFolderRequest,
+  parseDeletePresetEntriesRequest,
   parsePresetEntryRequest,
   parseReadPresetEntryRequest,
   parseSaveRackFileRequest,
@@ -382,39 +384,54 @@ export class PresetService {
     }
   }
 
-  public async deletePresetEntry(
+  public async deletePresetEntries(
     request: unknown,
-  ): Promise<DeletePresetEntryResponse> {
-    const parsedRequest = parsePresetEntryRequest(request);
+  ): Promise<DeletePresetEntriesResponse> {
+    const parsedRequest = parseDeletePresetEntriesRequest(request);
     if (!parsedRequest) {
       return {
         status: 'error',
-        message: 'Invalid preset item request.',
+        message: 'Invalid preset items request.',
+      };
+    }
+    if (parsedRequest.entries.some((entry) => entry.relativePath.length === 0)) {
+      return {
+        status: 'error',
+        message: 'Preset root folders cannot be deleted.',
       };
     }
 
     try {
-      const rootDirectory = await this.storage.resolvePresetDirectory(parsedRequest.presetType);
-      const filePath = resolvePresetPath(rootDirectory, parsedRequest.relativePath);
-      if (!filePath) {
-        return {
-          status: 'error',
-          message: 'Invalid file path.',
-        };
+      const normalizedEntries = normalizePresetEntrySelection(parsedRequest.entries);
+
+      const filePaths: string[] = [];
+      for (const entry of normalizedEntries) {
+        const rootDirectory = await this.storage.resolvePresetDirectory(entry.presetType);
+        const filePath = resolvePresetPath(rootDirectory, entry.relativePath);
+        if (!filePath) {
+          return {
+            status: 'error',
+            message: 'Invalid file path.',
+          };
+        }
+
+        if (
+          entry.entryKind === 'file'
+          && !hasPresetExtension(filePath, PRESET_FILE_SPECS[entry.presetType].extension)
+        ) {
+          return {
+            status: 'error',
+            message: 'Invalid file type.',
+          };
+        }
+
+        await this.storage.ensurePresetEntryKind(filePath, entry.entryKind);
+        filePaths.push(filePath);
       }
 
-      if (
-        parsedRequest.entryKind === 'file'
-        && !hasPresetExtension(filePath, PRESET_FILE_SPECS[parsedRequest.presetType].extension)
-      ) {
-        return {
-          status: 'error',
-          message: 'Invalid file type.',
-        };
+      for (const filePath of filePaths) {
+        await shell.trashItem(filePath);
       }
-
-      await this.storage.ensureAccessible(filePath);
-      await shell.trashItem(filePath);
       return { status: 'ok' };
     } catch (error) {
       return {

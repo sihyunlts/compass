@@ -1,27 +1,21 @@
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import type { GeneratorDeviceNode } from '../../../shared/model';
+import {
+  applyOrderedRangeSelection,
+  getOrderedSelectedIds,
+  haveSameSelectedIds,
+  reconcileOrderedSelection,
+  selectSingleOrderedItem,
+  toggleOrderedSelection,
+  updateOrderedSelection,
+  type OrderedSelectionUpdate,
+} from '../selection/ordered-selection';
 
 /** Selected group metadata used by group-level actions. */
 export interface GroupSelectionContext {
   groupId: string;
   memberDeviceIds: string[];
 }
-
-const buildSelectionRange = (
-  orderedIds: readonly string[],
-  fromId: string,
-  toId: string,
-): string[] => {
-  const fromIndex = orderedIds.indexOf(fromId);
-  const toIndex = orderedIds.indexOf(toId);
-  if (fromIndex < 0 || toIndex < 0) {
-    return [toId];
-  }
-
-  const start = Math.min(fromIndex, toIndex);
-  const end = Math.max(fromIndex, toIndex);
-  return orderedIds.slice(start, end + 1);
-};
 
 const resolveOrderedGroupIds = (devices: readonly GeneratorDeviceNode[]): string[] => {
   const groupIds: string[] = [];
@@ -45,19 +39,6 @@ const resolveGroupMemberIds = (
   .filter((device) => normalizeOptionalId(device.groupId) === groupId)
   .map((device) => device.id);
 
-const dedupeIds = (ids: Iterable<string>): string[] => {
-  const nextIds: string[] = [];
-
-  for (const id of ids) {
-    if (nextIds.includes(id)) {
-      continue;
-    }
-    nextIds.push(id);
-  }
-
-  return nextIds;
-};
-
 interface RackSelectionState {
   selectedDeviceIds: string[];
   lastSelectedDeviceId: string | null;
@@ -74,7 +55,7 @@ export class RackSelection {
   });
 
   getOrderedSelectedDeviceIds(orderedIds: readonly string[]): string[] {
-    return orderedIds.filter((id) => this.state.selectedDeviceIds.includes(id));
+    return getOrderedSelectedIds(this.state.selectedDeviceIds, orderedIds);
   }
 
   getSelectedGroupIds(): string[] {
@@ -107,21 +88,27 @@ export class RackSelection {
     anchorId: string | null,
     orderedDeviceIds: readonly string[],
   ): void {
-    this.state.selectedDeviceIds = dedupeIds(ids)
-      .filter((id) => orderedDeviceIds.includes(id));
-
-    if (anchorId && orderedDeviceIds.includes(anchorId)) {
-      this.state.lastSelectedDeviceId = anchorId;
-    } else if (this.state.selectedDeviceIds.length === 0) {
-      this.state.lastSelectedDeviceId = null;
-    }
+    this.applyDeviceSelection(updateOrderedSelection(
+      this.deviceSelectionSnapshot(),
+      ids,
+      anchorId,
+      orderedDeviceIds,
+    ));
   }
 
   setSelectedGroupIds(
     ids: Iterable<string>,
     orderedGroupIds: readonly string[],
   ): void {
-    const nextSelection = dedupeIds(ids).filter((id) => orderedGroupIds.includes(id));
+    const nextSelection = updateOrderedSelection(
+      {
+        selectedIds: this.state.selectedGroupIds,
+        anchorId: this.state.lastSelectedGroupId,
+      },
+      ids,
+      null,
+      orderedGroupIds,
+    ).selectedIds;
 
     this.state.selectedGroupIds = nextSelection;
     if (
@@ -156,18 +143,10 @@ export class RackSelection {
 
   reconcileWithDevices(devices: readonly GeneratorDeviceNode[]): void {
     const validDeviceIds = devices.map((device) => device.id);
-    const nextSelectedDeviceIds = this.state.selectedDeviceIds
-      .filter((id) => validDeviceIds.includes(id));
-    if (nextSelectedDeviceIds.length !== this.state.selectedDeviceIds.length) {
-      this.state.selectedDeviceIds = nextSelectedDeviceIds;
-    }
-
-    if (
-      this.state.lastSelectedDeviceId
-      && !validDeviceIds.includes(this.state.lastSelectedDeviceId)
-    ) {
-      this.state.lastSelectedDeviceId = null;
-    }
+    this.applyDeviceSelection(reconcileOrderedSelection(
+      this.deviceSelectionSnapshot(),
+      validDeviceIds,
+    ));
 
     const validGroupIds = resolveOrderedGroupIds(devices);
     const nextSelectedGroupIds = this.state.selectedGroupIds
@@ -189,41 +168,33 @@ export class RackSelection {
     additiveSelection: boolean,
     orderedDeviceIds: readonly string[],
   ): void {
-    const anchorId =
-      this.state.lastSelectedDeviceId
-      && orderedDeviceIds.includes(this.state.lastSelectedDeviceId)
-        ? this.state.lastSelectedDeviceId
-        : deviceId;
-    const rangeIds = buildSelectionRange(orderedDeviceIds, anchorId, deviceId);
-
-    if (additiveSelection) {
-      this.selectDeviceIds(
-        [...this.getOrderedSelectedDeviceIds(orderedDeviceIds), ...rangeIds],
-        anchorId,
-        orderedDeviceIds,
-      );
-      return;
+    const currentSelection = this.deviceSelectionSnapshot();
+    if (!additiveSelection) {
+      this.clear();
     }
-
-    this.clear();
-    this.selectDeviceIds(rangeIds, anchorId, orderedDeviceIds);
+    this.applyDeviceSelection(applyOrderedRangeSelection(
+      currentSelection,
+      deviceId,
+      additiveSelection,
+      orderedDeviceIds,
+    ));
   }
 
   toggleDeviceSelection(deviceId: string, orderedDeviceIds: readonly string[]): void {
-    const nextSelection = this.getOrderedSelectedDeviceIds(orderedDeviceIds);
-    const selectedIndex = nextSelection.indexOf(deviceId);
-    if (selectedIndex >= 0) {
-      nextSelection.splice(selectedIndex, 1);
-    } else {
-      nextSelection.push(deviceId);
-    }
-
-    this.selectDeviceIds(nextSelection, deviceId, orderedDeviceIds);
+    this.applyDeviceSelection(toggleOrderedSelection(
+      this.deviceSelectionSnapshot(),
+      deviceId,
+      orderedDeviceIds,
+    ));
   }
 
   selectSingleDevice(deviceId: string, orderedDeviceIds: readonly string[]): void {
     this.clear();
-    this.selectDeviceIds([deviceId], deviceId, orderedDeviceIds);
+    this.applyDeviceSelection(selectSingleOrderedItem(
+      this.deviceSelectionSnapshot(),
+      deviceId,
+      orderedDeviceIds,
+    ));
   }
 
   applyNextSelectionAfterDelete(
@@ -265,6 +236,23 @@ export class RackSelection {
     }
 
     this.clear();
+  }
+
+  private deviceSelectionSnapshot() {
+    return {
+      selectedIds: this.state.selectedDeviceIds,
+      anchorId: this.state.lastSelectedDeviceId,
+    };
+  }
+
+  private applyDeviceSelection(update: OrderedSelectionUpdate): void {
+    if (!haveSameSelectedIds(update.selectedIds, this.state.selectedDeviceIds)) {
+      this.state.selectedDeviceIds = update.selectedIds;
+    }
+
+    if (update.anchorId !== this.state.lastSelectedDeviceId) {
+      this.state.lastSelectedDeviceId = update.anchorId;
+    }
   }
 }
 

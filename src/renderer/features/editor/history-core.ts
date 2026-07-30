@@ -7,6 +7,7 @@ export type ChainHistoryKind =
   | 'initial'
   | 'add-device'
   | 'insert-device'
+  | 'insert-devices'
   | 'move-devices'
   | 'delete-devices'
   | 'group-create'

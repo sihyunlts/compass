@@ -28,6 +28,10 @@ export type BrowserInsertSource =
       deviceKind: RendererDeviceKind;
     }
   | {
+      kind: 'device-kinds';
+      deviceKinds: RendererDeviceKind[];
+    }
+  | {
       kind: 'device-preset';
       preset: DevicePresetFile;
     }
@@ -43,7 +47,10 @@ export type BrowserInsertSource =
       needsSave?: boolean;
     };
 
-export type BrowserPresetInsertSource = Exclude<BrowserInsertSource, { kind: 'device-kind' }>;
+export type BrowserPresetInsertSource = Exclude<
+  BrowserInsertSource,
+  { kind: 'device-kind' | 'device-kinds' }
+>;
 export type BrowserNonRackPresetInsertSource = Exclude<
   BrowserPresetInsertSource,
   { kind: 'rack-preset' }
@@ -59,5 +66,10 @@ export type RackInteractionCommit =
   | {
       kind: 'insert-device';
       deviceKind: RendererDeviceKind;
+      dropZone: RackDropZone;
+    }
+  | {
+      kind: 'insert-devices';
+      deviceKinds: RendererDeviceKind[];
       dropZone: RackDropZone;
     };

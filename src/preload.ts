@@ -5,8 +5,8 @@ import type { PresetFileKind } from './shared/presets';
 import type {
   CreatePresetFolderRequest,
   CreatePresetFolderResponse,
-  DeletePresetEntryRequest,
-  DeletePresetEntryResponse,
+  DeletePresetEntriesRequest,
+  DeletePresetEntriesResponse,
   ListPresetBrowserTreeResponse,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
@@ -172,8 +172,11 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.showPresetEntryInFolder, request) as Promise<ShowPresetEntryInFolderResponse>,
   showPresetsRootInFolder: () =>
     ipcRenderer.invoke(IPC_CHANNELS.showPresetsRootInFolder) as Promise<ShowPresetsRootInFolderResponse>,
-  deletePresetEntry: (request: DeletePresetEntryRequest) =>
-    ipcRenderer.invoke(IPC_CHANNELS.deletePresetEntry, request) as Promise<DeletePresetEntryResponse>,
+  deletePresetEntries: (request: DeletePresetEntriesRequest) =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.deletePresetEntries,
+      request,
+    ) as Promise<DeletePresetEntriesResponse>,
   readPresetEntry: <K extends PresetFileKind>(request: ReadPresetEntryRequest<K>) =>
     ipcRenderer.invoke(IPC_CHANNELS.readPresetEntry, request) as Promise<ReadPresetEntryResponse<K>>,
 };

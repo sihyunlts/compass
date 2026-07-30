@@ -1,6 +1,11 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import type { ContextMenuTarget } from '../../features/context-menu/types';
+  import {
+    isPresetBrowserContextTarget,
+    type ContextMenuTarget,
+    type PresetEntryContextTarget,
+    type PresetsRootContextTarget,
+  } from '../../features/context-menu/types';
   import {
     attachFloatingLayerDismissHandlers,
     isEventTargetWithinFloatingLayer,
@@ -29,9 +34,9 @@
     onDuplicate: (target: ContextMenuTarget) => void;
     onRename: (target: ContextMenuTarget) => void;
     onDelete: (target: ContextMenuTarget) => void;
-    onCreatePresetFolder: (target: Extract<ContextMenuTarget, { kind: 'preset-entry' }>) => void;
+    onCreatePresetFolder: (target: PresetEntryContextTarget) => void;
     onShowInFolder: (
-      target: Extract<ContextMenuTarget, { kind: 'preset-entry' | 'presets-root' }>,
+      target: PresetEntryContextTarget | PresetsRootContextTarget,
     ) => void;
     onGroup: (ids: string[]) => void;
     onUngroupGroup: (groupId: string) => void;
@@ -48,15 +53,21 @@
   const presence = new FloatingLayerPresence();
 
   const isPresetBrowserTarget = $derived.by(() =>
-    target?.kind === 'preset-entry' || target?.kind === 'presets-root');
+    isPresetBrowserContextTarget(target));
   const isDeletablePresetTarget = $derived.by(() =>
-    target?.kind === 'preset-entry');
+    (target?.kind === 'preset-entry' && target.relativePath.length > 0)
+    || (
+      target?.kind === 'preset-entries'
+      && target.entries.length > 0
+      && target.entries.every((entry) => entry.relativePath.length > 0)
+    ));
   const canCreatePresetFolder = $derived.by(() =>
     target?.kind === 'preset-entry' && target.entryKind === 'directory');
+  const canShowInFolder = $derived.by(() =>
+    target?.kind === 'preset-entry' || target?.kind === 'presets-root');
   const canPasteForTarget = $derived.by(() =>
     target !== null
-    && target.kind !== 'preset-entry'
-    && target.kind !== 'presets-root'
+    && !isPresetBrowserContextTarget(target)
     && clipboardAvailable);
   type ClipboardActionKind = 'copy' | 'cut' | 'paste' | 'duplicate';
   type ClipboardActionMeta = {
@@ -72,18 +83,18 @@
     { id: 'context-duplicate', kind: 'duplicate', labelKey: 'context.duplicate' },
   ];
   const visibleClipboardActions = $derived.by(() =>
-    target?.kind === 'preset-entry' || target?.kind === 'presets-root'
+    isPresetBrowserContextTarget(target)
       ? []
       : CLIPBOARD_ACTIONS.filter((action) => !action.requiresClipboard || canPasteForTarget));
-  const canRenameTarget = $derived.by(() =>
-    target !== null
-    && (
-      (target.kind === 'preset-entry' && target.entryKind === 'directory' && target.relativePath.length > 0)
-      || (target.kind === 'preset-entry' && target.entryKind === 'file')
-      || (target.kind !== 'preset-entry'
-        && target.kind !== 'presets-root'
-        && (target.kind === 'group' || target.deviceIds.length === 1))
-    ));
+  const canRenameTarget = $derived.by(() => {
+    if (target?.kind === 'preset-entry') {
+      return target.entryKind === 'file' || target.relativePath.length > 0;
+    }
+    if (!target || isPresetBrowserContextTarget(target)) {
+      return false;
+    }
+    return target.kind === 'group' || target.deviceIds.length === 1;
+  });
   export async function open(clientX: number, clientY: number, nextTarget: ContextMenuTarget) {
     if (
       (nextTarget.kind === 'devices' && nextTarget.deviceIds.length === 0)
@@ -259,9 +270,13 @@
           <hr class="context-menu-separator floating-menu-separator" />
         {/if}
         {@render menuItem('context-delete', i18n.t('context.delete'), handleDeleteClick)}
-        <hr class="context-menu-separator floating-menu-separator" />
+        {#if canShowInFolder}
+          <hr class="context-menu-separator floating-menu-separator" />
+        {/if}
       {/if}
-      {@render menuItem('context-show-in-folder', i18n.t('context.showInFolder'), handleShowInFolderClick)}
+      {#if canShowInFolder}
+        {@render menuItem('context-show-in-folder', i18n.t('context.showInFolder'), handleShowInFolderClick)}
+      {/if}
     {:else}
       {#each visibleClipboardActions as action (action.id)}
         {@render menuItem(action.id, i18n.t(action.labelKey), () => handleClipboardAction(action.kind))}

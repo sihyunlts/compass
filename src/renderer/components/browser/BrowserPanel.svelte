@@ -19,7 +19,11 @@
     BrowserTreePresetLeafNode,
     BrowserTreePresetFolderNode,
   } from '../../features/browser/types';
-  import type { ContextMenuTarget } from '../../features/context-menu/types';
+  import type {
+    ContextMenuTarget,
+    PresetBrowserContextTarget,
+    PresetEntryContextTarget,
+  } from '../../features/context-menu/types';
   import type { BrowserInsertSource } from '../../features/rack/types';
   import type {
     ThemePresetId,
@@ -31,6 +35,8 @@
     getDeviceMessageKey,
     getPresetSystemFolderMessageKey,
   } from '../../device-i18n';
+  import { createBrowserSelection } from '../../features/browser/selection.svelte';
+  import { hasAdditiveSelectionModifier } from '../../features/selection/ordered-selection';
 
   export type BrowserPanelPage = 'devices' | 'presets' | 'settings';
 
@@ -62,11 +68,6 @@
     sourceEvent: PointerEvent;
     itemEl: HTMLElement;
   };
-
-  type PresetContextMenuTarget = Extract<
-    ContextMenuTarget,
-    { kind: 'preset-entry' | 'presets-root' }
-  >;
 
   const areEqualRelativePaths = (
     left: readonly string[],
@@ -334,7 +335,9 @@
 
   let expandedFolderIds = $state<string[]>([]);
   let initializedRootFolderIds = $state<string[]>([]);
-  let selectedRowId = $state<string | null>(null);
+  const browserSelection = createBrowserSelection();
+  let focusedRowId = $state<string | null>(null);
+  let detachedKeyboardFocusRowId = $state<string | null>(null);
   let pendingPresetFolderInputEl = $state<HTMLInputElement | null>(null);
   let skipPendingPresetFolderBlurId = $state<string | null>(null);
   let focusedPresetDraftKey = $state<string | null>(null);
@@ -384,6 +387,13 @@
   const expandedFolderIdSet = $derived.by(() => new Set(expandedFolderIds));
   const visibleRows = $derived.by(() =>
     collectVisibleRows(activeTreeRoots, expandedFolderIdSet));
+  const visibleTreeNodeById = $derived.by(
+    () => new Map(visibleRows.map((row) => [row.node.id, row.node])),
+  );
+  const visibleRowIds = $derived(visibleRows.map((row) => row.node.id));
+  const selectedRowIdSet = $derived.by(
+    () => new Set(browserSelection.state.selectedRowIds),
+  );
   const pendingPresetDraftKey = $derived(
     pendingPresetFolderDraft
       ? [
@@ -399,14 +409,40 @@
   const isFolderExpanded = (folderId: string): boolean =>
     expandedFolderIdSet.has(folderId);
 
-  const selectRow = (rowId: string): void => {
-    selectedRowId = rowId;
+  const selectSingleRow = (rowId: string): void => {
+    detachedKeyboardFocusRowId = null;
+    browserSelection.selectSingle(rowId, visibleRowIds);
   };
 
   const focusRow = async (rowId: string): Promise<void> => {
-    selectedRowId = rowId;
+    focusedRowId = rowId;
     await tick();
     treeItemRefs[rowId]?.focus();
+  };
+
+  const focusAndSelectSingleRow = async (rowId: string): Promise<void> => {
+    selectSingleRow(rowId);
+    await focusRow(rowId);
+  };
+
+  const focusRowFromKeyboard = async (
+    rowId: string,
+    event: KeyboardEvent,
+  ): Promise<void> => {
+    if (event.shiftKey) {
+      detachedKeyboardFocusRowId = null;
+      browserSelection.selectRange(
+        rowId,
+        hasAdditiveSelectionModifier(event),
+        visibleRowIds,
+      );
+    } else if (!hasAdditiveSelectionModifier(event)) {
+      selectSingleRow(rowId);
+    } else {
+      detachedKeyboardFocusRowId = rowId;
+    }
+
+    await focusRow(rowId);
   };
 
   const toggleFolder = (folderId: string): void => {
@@ -462,12 +498,31 @@
     }
 
     if (node.kind === 'device') {
+      const selectedDeviceKinds = browserSelection.includes(node.id)
+        ? browserSelection
+          .getOrderedSelectedRowIds(visibleRowIds)
+          .map((rowId) => visibleTreeNodeById.get(rowId))
+          .filter(
+            (selectedNode): selectedNode is BrowserTreeDeviceLeafNode =>
+              selectedNode?.kind === 'device',
+          )
+          .map((selectedNode) => selectedNode.deviceKind)
+        : [node.deviceKind];
       onBrowserPointerDown({
-        source: {
-          kind: 'device-kind',
-          deviceKind: node.deviceKind,
-        },
-        badgeLabel: `+ ${resolveTreeNodeLabel(node)}`,
+        source: selectedDeviceKinds.length > 1
+          ? {
+              kind: 'device-kinds',
+              deviceKinds: selectedDeviceKinds,
+            }
+          : {
+              kind: 'device-kind',
+              deviceKind: selectedDeviceKinds[0] ?? node.deviceKind,
+            },
+        badgeLabel: selectedDeviceKinds.length > 1
+          ? `+ ${i18n.t('browser.selectedDevices', {
+              count: selectedDeviceKinds.length,
+            })}`
+          : `+ ${resolveTreeNodeLabel(node)}`,
         sourceEvent: event,
         itemEl,
       });
@@ -490,7 +545,7 @@
 
   const resolvePresetContextMenuTarget = (
     node: VisibleBrowserTreeNode,
-  ): PresetContextMenuTarget | null => {
+  ): PresetEntryContextTarget | null => {
     if (node.kind === 'folder' && 'isPending' in node && node.isPending) {
       return null;
     }
@@ -516,18 +571,105 @@
     return null;
   };
 
+  const resolveSelectedPresetContextMenuTarget = (
+    clickedTarget: PresetEntryContextTarget,
+  ): PresetBrowserContextTarget => {
+    const selectedTargets = browserSelection
+      .getOrderedSelectedRowIds(visibleRowIds)
+      .map((rowId) => visibleTreeNodeById.get(rowId))
+      .filter((node): node is VisibleBrowserTreeNode => node !== undefined)
+      .map((node) => resolvePresetContextMenuTarget(node))
+      .filter((target): target is PresetEntryContextTarget => target !== null);
+
+    if (selectedTargets.length <= 1) {
+      return clickedTarget;
+    }
+
+    return {
+      kind: 'preset-entries',
+      entries: selectedTargets,
+    };
+  };
+
   const handleTreeItemContextMenu = (
     node: VisibleBrowserTreeNode,
     event: MouseEvent,
   ): void => {
-    const target = resolvePresetContextMenuTarget(node);
-    if (!target) {
+    const clickedTarget = resolvePresetContextMenuTarget(node);
+    if (!clickedTarget) {
       return;
     }
 
     event.preventDefault();
-    selectRow(node.id);
-    onOpenContextMenu(event.clientX, event.clientY, target);
+    detachedKeyboardFocusRowId = null;
+    if (!browserSelection.includes(node.id)) {
+      selectSingleRow(node.id);
+    }
+    focusedRowId = node.id;
+    const selectionTarget = resolveSelectedPresetContextMenuTarget(clickedTarget);
+    if (
+      selectionTarget.kind === 'preset-entries'
+      && selectionTarget.entries.some((entry) => entry.relativePath.length === 0)
+    ) {
+      selectSingleRow(node.id);
+      onOpenContextMenu(event.clientX, event.clientY, clickedTarget);
+      return;
+    }
+
+    onOpenContextMenu(
+      event.clientX,
+      event.clientY,
+      selectionTarget,
+    );
+  };
+
+  const handleTreeItemClick = (
+    row: VisibleTreeRow,
+    event: MouseEvent,
+  ): void => {
+    focusedRowId = row.node.id;
+    if (event.shiftKey) {
+      browserSelection.selectRange(
+        row.node.id,
+        hasAdditiveSelectionModifier(event),
+        visibleRowIds,
+      );
+      return;
+    }
+
+    if (hasAdditiveSelectionModifier(event)) {
+      browserSelection.toggle(row.node.id, visibleRowIds);
+      return;
+    }
+
+    selectSingleRow(row.node.id);
+  };
+
+  const handleTreeItemPointerDown = (
+    row: VisibleTreeRow,
+    event: PointerEvent,
+  ): void => {
+    if (event.button !== 0 || !event.isPrimary) {
+      return;
+    }
+
+    detachedKeyboardFocusRowId = null;
+    const itemEl = event.currentTarget;
+    if (itemEl instanceof HTMLElement) {
+      itemEl.focus({ preventScroll: true });
+    }
+    focusedRowId = row.node.id;
+    if (
+      !event.shiftKey
+      && !hasAdditiveSelectionModifier(event)
+      && !browserSelection.includes(row.node.id)
+    ) {
+      selectSingleRow(row.node.id);
+    }
+
+    if (row.node.kind !== 'folder') {
+      handleLeafPointerDown(row.node, event);
+    }
   };
 
   const handleTreeItemKeyDown = async (
@@ -539,11 +681,34 @@
       return;
     }
 
+    if (event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault();
+      if (event.repeat) {
+        return;
+      }
+
+      if (event.shiftKey) {
+        detachedKeyboardFocusRowId = null;
+        browserSelection.selectRange(
+          row.node.id,
+          hasAdditiveSelectionModifier(event),
+          visibleRowIds,
+        );
+      } else {
+        browserSelection.toggle(row.node.id, visibleRowIds);
+        detachedKeyboardFocusRowId = browserSelection.includes(row.node.id)
+          ? null
+          : row.node.id;
+      }
+      focusedRowId = row.node.id;
+      return;
+    }
+
     if (event.key === 'ArrowDown') {
       const nextRow = visibleRows[rowIndex + 1];
       if (nextRow) {
         event.preventDefault();
-        await focusRow(nextRow.node.id);
+        await focusRowFromKeyboard(nextRow.node.id, event);
       }
       return;
     }
@@ -552,7 +717,7 @@
       const prevRow = visibleRows[rowIndex - 1];
       if (prevRow) {
         event.preventDefault();
-        await focusRow(prevRow.node.id);
+        await focusRowFromKeyboard(prevRow.node.id, event);
       }
       return;
     }
@@ -570,7 +735,7 @@
 
       const nextRow = visibleRows[rowIndex + 1];
       if (nextRow && nextRow.parentId === row.node.id) {
-        await focusRow(nextRow.node.id);
+        await focusRowFromKeyboard(nextRow.node.id, event);
       }
       return;
     }
@@ -584,7 +749,7 @@
 
       if (row.parentId) {
         event.preventDefault();
-        await focusRow(row.parentId);
+        await focusRowFromKeyboard(row.parentId, event);
       }
       return;
     }
@@ -637,12 +802,31 @@
   $effect(() => {
     const firstVisibleRowId = visibleRows[0]?.node.id ?? null;
     if (!firstVisibleRowId) {
-      selectedRowId = null;
+      browserSelection.clear();
+      focusedRowId = null;
+      detachedKeyboardFocusRowId = null;
       return;
     }
 
-    if (!selectedRowId || resolveRowIndex(selectedRowId) === -1) {
-      selectedRowId = firstVisibleRowId;
+    browserSelection.reconcile(visibleRowIds);
+    if (
+      detachedKeyboardFocusRowId !== null
+      && !visibleRowIds.includes(detachedKeyboardFocusRowId)
+    ) {
+      detachedKeyboardFocusRowId = null;
+    }
+    const focusedRowIsVisible =
+      focusedRowId !== null && visibleRowIds.includes(focusedRowId);
+    if (
+      browserSelection.state.selectedRowIds.length === 0
+      && !focusedRowIsVisible
+    ) {
+      selectSingleRow(firstVisibleRowId);
+    }
+    if (!focusedRowIsVisible) {
+      focusedRowId = browserSelection.state.selectedRowIds.find(
+        (rowId) => visibleRowIds.includes(rowId),
+      ) ?? firstVisibleRowId;
     }
   });
 
@@ -670,10 +854,13 @@
     const targetRowId = draft.mode === 'create'
       ? draft.temporaryId ?? ''
       : resolvePresetNodeId(draft.presetType, draft.relativePath);
-    const didSelectPendingRow = selectedRowId !== targetRowId;
+    const didSelectPendingRow =
+      browserSelection.state.selectedRowIds.length !== 1
+      || !browserSelection.includes(targetRowId);
     if (didSelectPendingRow) {
-      selectedRowId = targetRowId;
+      selectSingleRow(targetRowId);
     }
+    focusedRowId = targetRowId;
 
     if (focusedPresetDraftKey !== pendingPresetDraftKey) {
       focusedPresetDraftKey = pendingPresetDraftKey;
@@ -700,7 +887,7 @@
       return;
     }
 
-    void focusRow(match.node.id).then(() => {
+    void focusAndSelectSingleRow(match.node.id).then(() => {
       onPresetFolderSelectionHandled(selectionTarget.token);
     });
   });
@@ -792,27 +979,40 @@
         <ul
           class="browser-tree-list browser-tree-root"
           role="tree"
+          aria-multiselectable="true"
           aria-label={activePage === 'devices'
             ? i18n.t('browser.devicesAria')
             : i18n.t('browser.presetsAria')}
         >
-          {#each visibleRows as row (row.node.id)}
-            <li role="none" class:is-selected={selectedRowId === row.node.id}>
+          {#each visibleRows as row, rowIndex (row.node.id)}
+            {@const isSelected = selectedRowIdSet.has(row.node.id)}
+            <li
+              role="none"
+              class:is-selected={isSelected}
+              class:has-selected-previous={isSelected
+                && rowIndex > 0
+                && selectedRowIdSet.has(visibleRows[rowIndex - 1].node.id)}
+              class:has-selected-next={isSelected
+                && rowIndex < visibleRows.length - 1
+                && selectedRowIdSet.has(visibleRows[rowIndex + 1].node.id)}
+            >
               <div
                 use:registerTreeItem={row.node.id}
                 class="browser-tree-item"
+                class:has-detached-keyboard-focus={
+                  detachedKeyboardFocusRowId === row.node.id
+                }
                 style={`--browser-tree-level:${row.level};`}
                 role="treeitem"
                 aria-level={row.level}
                 aria-posinset={row.posInSet}
                 aria-setsize={row.setSize}
-                aria-selected={selectedRowId === row.node.id}
+                aria-selected={isSelected}
                 aria-expanded={row.node.kind === 'folder' ? isFolderExpanded(row.node.id) : undefined}
-                tabindex={selectedRowId === row.node.id ? 0 : -1}
+                tabindex={focusedRowId === row.node.id ? 0 : -1}
                 ondragstart={handleDragStart}
-                onclick={() => selectRow(row.node.id)}
+                onclick={(event) => handleTreeItemClick(row, event)}
                 ondblclick={() => {
-                  selectRow(row.node.id);
                   if (row.node.kind === 'folder') {
                     toggleFolder(row.node.id);
                     return;
@@ -821,14 +1021,10 @@
                   handleLeafDoubleClick(row.node);
                 }}
                 onkeydown={(event) => void handleTreeItemKeyDown(row, event)}
-                onpointerdown={(event) => {
-                  selectRow(row.node.id);
-                  if (row.node.kind === 'folder') {
-                    return;
-                  }
-
-                  handleLeafPointerDown(row.node, event);
+                onfocus={() => {
+                  focusedRowId = row.node.id;
                 }}
+                onpointerdown={(event) => handleTreeItemPointerDown(row, event)}
                 oncontextmenu={(event) => handleTreeItemContextMenu(row.node, event)}
               >
                 {#if row.node.kind === 'folder'}
@@ -842,7 +1038,10 @@
                     tabindex="-1"
                     onclick={(event) => {
                       event.stopPropagation();
-                      selectRow(row.node.id);
+                      if (!browserSelection.includes(row.node.id)) {
+                        selectSingleRow(row.node.id);
+                      }
+                      focusedRowId = row.node.id;
                       toggleFolder(row.node.id);
                     }}
                   >
@@ -999,6 +1198,16 @@
     li.is-selected {
       background: var(--color-surface-interactive);
       border-radius: var(--radius-4);
+
+      &.has-selected-previous {
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+      }
+
+      &.has-selected-next {
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+      }
     }
   }
 
@@ -1040,6 +1249,11 @@
 
     &:focus-visible {
       outline: none;
+    }
+
+    &.has-detached-keyboard-focus:focus {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: -2px;
     }
 
     &:global(.is-dragging) {

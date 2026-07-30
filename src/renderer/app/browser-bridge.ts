@@ -1,5 +1,6 @@
 import { LIVE_BRIDGE_TARGET } from '../../shared/bridge/protocol';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
+import { normalizePresetEntrySelection } from '../../shared/preset-entry-selection';
 import type {
   PresetBrowserTreeFolderNode,
   PresetBrowserTreeNode,
@@ -527,18 +528,52 @@ export const createBrowserCompassBridge = (): CompassApi => ({
   },
   showPresetEntryInFolder: async () => ({ status: 'ok' }),
   showPresetsRootInFolder: async () => ({ status: 'ok' }),
-  deletePresetEntry: async (request) => {
+  deletePresetEntries: async (request) => {
+    if (
+      request.entries.length === 0
+      || request.entries.some((entry) => entry.relativePath.length === 0)
+    ) {
+      return {
+        status: 'error',
+        message: 'Preset root folders cannot be deleted.',
+      };
+    }
+
+    const normalizedEntries = normalizePresetEntrySelection(request.entries);
     const store = readStore();
-    if (request.entryKind === 'file') {
-      store.files = store.files.filter((file) =>
-        file.presetType !== request.presetType || !relativePathEquals(file.relativePath, request.relativePath));
-    } else {
-      store.folders[request.presetType] = store.folders[request.presetType].filter((path) =>
-        !relativePathEquals(path, request.relativePath)
-        && !relativePathEquals(path.slice(0, request.relativePath.length), request.relativePath));
-      store.files = store.files.filter((file) =>
-        file.presetType !== request.presetType
-        || !relativePathEquals(file.relativePath.slice(0, request.relativePath.length), request.relativePath));
+    const hasMatchingEntry = normalizedEntries.every((entry) =>
+      entry.entryKind === 'file'
+        ? store.files.some((file) =>
+            file.presetType === entry.presetType
+            && relativePathEquals(file.relativePath, entry.relativePath))
+        : store.folders[entry.presetType].some((path) =>
+            relativePathEquals(path, entry.relativePath)));
+    if (!hasMatchingEntry) {
+      return {
+        status: 'error',
+        message: 'Preset item type does not match the request.',
+      };
+    }
+
+    for (const entry of normalizedEntries) {
+      if (entry.entryKind === 'file') {
+        store.files = store.files.filter((file) =>
+          file.presetType !== entry.presetType
+          || !relativePathEquals(file.relativePath, entry.relativePath));
+      } else {
+        store.folders[entry.presetType] = store.folders[entry.presetType].filter((path) =>
+          !relativePathEquals(path, entry.relativePath)
+          && !relativePathEquals(
+            path.slice(0, entry.relativePath.length),
+            entry.relativePath,
+          ));
+        store.files = store.files.filter((file) =>
+          file.presetType !== entry.presetType
+          || !relativePathEquals(
+            file.relativePath.slice(0, entry.relativePath.length),
+            entry.relativePath,
+          ));
+      }
     }
     writeStore(store);
     return { status: 'ok' };

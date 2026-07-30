@@ -1,5 +1,6 @@
 import type {
   CreatePresetFolderRequest,
+  DeletePresetEntriesRequest,
   ReadPresetEntryRequest,
   RenameRackFileRequest,
   RenamePresetFileRequest,
@@ -131,6 +132,36 @@ export const parsePresetEntryRequest = (
     presetType: (value as { presetType: PresetFileKind }).presetType,
     relativePath,
     entryKind,
+  };
+};
+
+export const parseDeletePresetEntriesRequest = (
+  value: unknown,
+): DeletePresetEntriesRequest | null => {
+  if (
+    typeof value !== 'object'
+    || value === null
+    || !Array.isArray((value as { entries?: unknown }).entries)
+  ) {
+    return null;
+  }
+
+  const entries = (value as { entries: unknown[] }).entries;
+  if (entries.length === 0 || entries.length > 1000) {
+    return null;
+  }
+
+  const parsedEntries: DeletePresetEntriesRequest['entries'] = [];
+  for (const entry of entries) {
+    const parsedEntry = parsePresetEntryRequest(entry);
+    if (!parsedEntry) {
+      return null;
+    }
+    parsedEntries.push(parsedEntry);
+  }
+
+  return {
+    entries: parsedEntries,
   };
 };
 

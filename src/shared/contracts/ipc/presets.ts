@@ -155,6 +155,10 @@ export interface ShowPresetEntryInFolderRequest<K extends PresetFileKind = Prese
 export type DeletePresetEntryRequest<K extends PresetFileKind = PresetFileKind> =
   ShowPresetEntryInFolderRequest<K>;
 
+export interface DeletePresetEntriesRequest {
+  entries: DeletePresetEntryRequest[];
+}
+
 export type ShowPresetEntryInFolderResponse =
   | {
       status: 'ok';
@@ -173,7 +177,7 @@ export type ShowPresetsRootInFolderResponse =
       message: string;
     };
 
-export type DeletePresetEntryResponse =
+export type DeletePresetEntriesResponse =
   | {
       status: 'ok';
     }

@@ -16,7 +16,10 @@
   import BrowserPanel, {
     type BrowserPanelPage,
   } from './components/browser/BrowserPanel.svelte';
-  import type { ContextMenuTarget } from './features/context-menu/types';
+  import {
+    isPresetDeleteContextTarget,
+    type ContextMenuTarget,
+  } from './features/context-menu/types';
   import TextField from './components/fields/TextField.svelte';
   import Button from './components/primitives/Button.svelte';
   import DropdownSelect from './components/primitives/DropdownSelect.svelte';
@@ -394,7 +397,7 @@
   const handleContextMenuDelete = (
     target: ContextMenuTarget,
   ): void => {
-    if (target.kind === 'preset-entry') {
+    if (isPresetDeleteContextTarget(target)) {
       presetController.openPresetDeleteDialog(target);
       closeContextMenu();
       return;

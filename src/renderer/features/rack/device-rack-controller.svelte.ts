@@ -17,6 +17,7 @@ import type { RackDropZone } from './drop-ops';
 import { createExternalFileDropController } from './external-file-drop-controller';
 import { createRackRenameController } from './rename-controller.svelte';
 import { createRackSurfaceController } from './surface-controller.svelte';
+import { hasAdditiveSelectionModifier } from '../selection/ordered-selection';
 
 interface DeviceRackControllerOptions {
   getDevices: () => GeneratorDeviceNode[];
@@ -51,9 +52,6 @@ interface DeviceRackControllerOptions {
   renameDevice: (deviceId: string, rawName: string) => boolean;
   renameGroup: (groupId: string, rawName: string) => boolean;
 }
-
-const isAdditiveSelection = (event: { metaKey: boolean; ctrlKey: boolean }): boolean =>
-  event.metaKey || event.ctrlKey;
 
 /** Coordinates DeviceRack selection, context-menu, header interactions, and subcontrollers. */
 class DeviceRackController {
@@ -139,7 +137,7 @@ class DeviceRackController {
     }
 
     this.blurActiveTextEditingElement();
-    const additiveSelection = isAdditiveSelection(event);
+    const additiveSelection = hasAdditiveSelectionModifier(event);
     if (
       !event.shiftKey
       && !additiveSelection
@@ -165,7 +163,7 @@ class DeviceRackController {
     }
 
     this.options.closeContextMenu();
-    const additiveSelection = isAdditiveSelection(event);
+    const additiveSelection = hasAdditiveSelectionModifier(event);
     if (event.shiftKey) {
       this.rackSelection.applyRangeSelection(
         deviceId,
@@ -251,7 +249,7 @@ class DeviceRackController {
     this.blurActiveTextEditingElement();
     this.options.closeContextMenu();
 
-    if (isAdditiveSelection(event)) {
+    if (hasAdditiveSelectionModifier(event)) {
       this.rackSelection.toggleSelectedGroupId(groupId, this.options.getOrderedGroupIds());
     } else {
       this.rackSelection.clear();

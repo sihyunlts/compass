@@ -1,4 +1,7 @@
-import type { ContextMenuTarget } from '../context-menu/types';
+import {
+  isPresetBrowserContextTarget,
+  type ContextMenuTarget,
+} from '../context-menu/types';
 import type { GroupSelectionContext } from '../rack/selection.svelte';
 import type { GeneratorChain } from '../../../shared/model';
 import { resolveExistingOrderedDeviceIds } from './chain-ops';
@@ -99,7 +102,7 @@ export const resolveSelectionSnapshotFromContextTarget = (
   chain: GeneratorChain,
   target: ContextMenuTarget,
 ): RackSelectionSnapshot | null => {
-  if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+  if (isPresetBrowserContextTarget(target)) {
     return null;
   }
 

@@ -244,9 +244,9 @@ export const registerIpcHandlers = (
   );
 
   ipcMain.handle(
-    IPC_CHANNELS.deletePresetEntry,
+    IPC_CHANNELS.deletePresetEntries,
     (_event, request) =>
-      presetService.deletePresetEntry(request),
+      presetService.deletePresetEntries(request),
   );
 
   ipcMain.handle(

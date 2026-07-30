@@ -393,6 +393,15 @@ class RackSurfaceController {
       return;
     }
 
+    if (pointerResult.source.kind === 'device-kinds') {
+      this.options.commitRackInteraction({
+        kind: 'insert-devices',
+        deviceKinds: [...pointerResult.source.deviceKinds],
+        dropZone: pointerResult.dropZone,
+      });
+      return;
+    }
+
     if (pointerResult.source.kind === 'rack-preset') {
       this.options.commitRackPresetDrop(pointerResult.source);
       return;

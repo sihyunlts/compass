@@ -1,5 +1,6 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { MessageKey } from '../../shared/i18n';
+import { normalizePresetEntrySelection } from '../../shared/preset-entry-selection';
 import {
   getDeviceMessageKey,
   getPresetSystemFolderMessageKey,
@@ -24,7 +25,12 @@ import type {
   PendingPresetFolderDraft,
   PresetFolderSelectionTarget,
 } from '../features/browser/types';
-import type { ContextMenuTarget } from '../features/context-menu/types';
+import type {
+  ContextMenuTarget,
+  PresetDeleteContextTarget,
+  PresetEntryContextTarget,
+  PresetsRootContextTarget,
+} from '../features/context-menu/types';
 import type {
   BrowserInsertSource,
   BrowserPresetInsertSource,
@@ -91,8 +97,9 @@ const resolvePresetDraftErrorMessageKey = (
     : 'status.presetFolderRenameFailed';
 };
 
-type PresetEntryTarget = Extract<ContextMenuTarget, { kind: 'preset-entry' }>;
-type PresetsRootTarget = Extract<ContextMenuTarget, { kind: 'presets-root' }>;
+type PresetEntryTarget = PresetEntryContextTarget;
+type PresetDeleteTarget = PresetDeleteContextTarget;
+type PresetsRootTarget = PresetsRootContextTarget;
 type ShowInFolderTarget = PresetEntryTarget | PresetsRootTarget;
 type PendingRackPresetLoadTarget = {
   label: string;
@@ -112,7 +119,7 @@ interface PresetControllerState {
   presetErrorText: string | null;
   pendingPresetFolderDraft: PendingPresetFolderDraft | null;
   presetFolderSelectionTarget: PresetFolderSelectionTarget | null;
-  pendingPresetDeleteTarget: PresetEntryTarget | null;
+  pendingPresetDeleteTarget: PresetDeleteTarget | null;
   isPresetDeletePending: boolean;
   pendingRackPresetLoadTarget: PendingRackPresetLoadTarget | null;
   isRackPresetLoadPending: boolean;
@@ -531,13 +538,33 @@ class PresetController {
     );
   }
 
-  public openPresetDeleteDialog(target: PresetEntryTarget): void {
-    this.state.pendingPresetDeleteTarget = {
-      kind: 'preset-entry',
-      presetType: target.presetType,
-      relativePath: [...target.relativePath],
-      entryKind: target.entryKind,
-    };
+  public openPresetDeleteDialog(target: PresetDeleteTarget): void {
+    if (target.kind === 'preset-entry') {
+      this.state.pendingPresetDeleteTarget = {
+        kind: 'preset-entry',
+        presetType: target.presetType,
+        relativePath: [...target.relativePath],
+        entryKind: target.entryKind,
+      };
+    } else {
+      const normalizedEntries = normalizePresetEntrySelection(target.entries);
+      this.state.pendingPresetDeleteTarget = normalizedEntries.length === 1
+        ? {
+            kind: 'preset-entry',
+            presetType: normalizedEntries[0].presetType,
+            relativePath: [...normalizedEntries[0].relativePath],
+            entryKind: normalizedEntries[0].entryKind,
+          }
+        : {
+          kind: 'preset-entries',
+          entries: normalizedEntries.map((entry) => ({
+            kind: 'preset-entry',
+            presetType: entry.presetType,
+            relativePath: [...entry.relativePath],
+            entryKind: entry.entryKind,
+          })),
+        };
+    }
     this.state.isPresetDeletePending = false;
   }
 
@@ -693,12 +720,18 @@ class PresetController {
 
     this.state.isPresetDeletePending = true;
     try {
-      const response = await this.options.bridgeClient.deletePresetEntry({
-        presetType: target.presetType,
-        relativePath: [...target.relativePath],
-        entryKind: target.entryKind,
+      const entries = target.kind === 'preset-entry'
+        ? [target]
+        : target.entries;
+      const response = await this.options.bridgeClient.deletePresetEntries({
+        entries: entries.map((entry) => ({
+          presetType: entry.presetType,
+          relativePath: [...entry.relativePath],
+          entryKind: entry.entryKind,
+        })),
       });
       if (response.status === 'error') {
+        await this.loadTree();
         this.state.pendingPresetDeleteTarget = null;
         this.showError('status.moveToTrashFailed', response.message);
         return;
@@ -716,13 +749,23 @@ class PresetController {
     }
   }
 
-  public getPresetDeleteTitle(target: PresetEntryTarget): string {
+  public getPresetDeleteTitle(target: PresetDeleteTarget): string {
+    if (target.kind === 'preset-entries') {
+      return i18n.t('preset.moveItemsPrompt');
+    }
+
     return target.entryKind === 'directory'
       ? i18n.t('preset.moveFolderPrompt')
       : i18n.t('preset.moveItemPrompt');
   }
 
-  public getPresetDeleteDescription(target: PresetEntryTarget): string {
+  public getPresetDeleteDescription(target: PresetDeleteTarget): string {
+    if (target.kind === 'preset-entries') {
+      return i18n.t('preset.moveItemsDescription', {
+        count: target.entries.length,
+      });
+    }
+
     const systemFolderMessageKey = target.entryKind === 'directory'
       ? getPresetSystemFolderMessageKey(target.presetType, target.relativePath)
       : null;

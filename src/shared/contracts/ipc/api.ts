@@ -4,8 +4,8 @@ import type { PresetFileKind } from '../../presets';
 import type {
   CreatePresetFolderRequest,
   CreatePresetFolderResponse,
-  DeletePresetEntryRequest,
-  DeletePresetEntryResponse,
+  DeletePresetEntriesRequest,
+  DeletePresetEntriesResponse,
   ListPresetBrowserTreeResponse,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
@@ -124,9 +124,9 @@ export interface CompassApi {
     request: ShowPresetEntryInFolderRequest,
   ) => Promise<ShowPresetEntryInFolderResponse>;
   showPresetsRootInFolder: () => Promise<ShowPresetsRootInFolderResponse>;
-  deletePresetEntry: (
-    request: DeletePresetEntryRequest,
-  ) => Promise<DeletePresetEntryResponse>;
+  deletePresetEntries: (
+    request: DeletePresetEntriesRequest,
+  ) => Promise<DeletePresetEntriesResponse>;
   readPresetEntry: <K extends PresetFileKind>(
     request: ReadPresetEntryRequest<K>,
   ) => Promise<ReadPresetEntryResponse<K>>;

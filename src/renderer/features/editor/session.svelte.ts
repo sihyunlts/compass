@@ -7,7 +7,10 @@ import type {
 } from '../../../shared/presets';
 import type { RendererDeviceKind } from '../../../devices';
 import { isRendererDeviceKind } from '../../../devices';
-import type { ContextMenuTarget } from '../context-menu/types';
+import {
+  isPresetBrowserContextTarget,
+  type ContextMenuTarget,
+} from '../context-menu/types';
 import type {
   BrowserNonRackPresetInsertSource,
   BrowserInsertSource,
@@ -254,9 +257,11 @@ export class EditorSession {
         nextChain,
         commit.kind === 'move'
           ? EDITOR_HISTORY_META.moveDevices
-          : EDITOR_HISTORY_META.insertDevice,
+          : commit.kind === 'insert-devices'
+            ? EDITOR_HISTORY_META.insertDevices
+            : EDITOR_HISTORY_META.insertDevice,
       );
-      if (commit.kind === 'insert-device') {
+      if (commit.kind === 'insert-device' || commit.kind === 'insert-devices') {
         this.selectInsertedDevices(previousChain, nextChain);
       }
     },
@@ -289,7 +294,7 @@ export class EditorSession {
     ungroupSelectedGroups: (): boolean => this.ungroupSelectedGroups(),
     beginRenameSelection: (): boolean => this.beginRenameSelection(),
     deleteFromContextTarget: (target: ContextMenuTarget): void => {
-      if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+      if (isPresetBrowserContextTarget(target)) {
         return;
       }
 
@@ -304,28 +309,28 @@ export class EditorSession {
       this.deleteDevicesById(target.deviceIds);
     },
     copyFromContextTarget: (target: ContextMenuTarget): void => {
-      if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+      if (isPresetBrowserContextTarget(target)) {
         return;
       }
 
       this.copySelectionToClipboard(this.resolveContextSelection(target));
     },
     cutFromContextTarget: (target: ContextMenuTarget): void => {
-      if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+      if (isPresetBrowserContextTarget(target)) {
         return;
       }
 
       this.cutSelection(this.resolveContextSelection(target));
     },
     pasteFromContextTarget: (target: ContextMenuTarget): void => {
-      if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+      if (isPresetBrowserContextTarget(target)) {
         return;
       }
 
       this.pasteClipboard(undefined, this.resolveContextSelection(target));
     },
     duplicateFromContextTarget: (target: ContextMenuTarget): void => {
-      if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+      if (isPresetBrowserContextTarget(target)) {
         return;
       }
 
@@ -575,7 +580,7 @@ export class EditorSession {
       return false;
     }
 
-    if (target.kind === 'preset-entry' || target.kind === 'presets-root') {
+    if (isPresetBrowserContextTarget(target)) {
       return false;
     }
 

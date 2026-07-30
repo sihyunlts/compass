@@ -29,6 +29,7 @@ import type { RackSelectionSnapshot } from './selectors';
 export const EDITOR_HISTORY_META = {
   addDevice: { kind: 'add-device' },
   insertDevice: { kind: 'insert-device' },
+  insertDevices: { kind: 'insert-devices' },
   moveDevices: { kind: 'move-devices' },
   deleteDevices: { kind: 'delete-devices' },
   groupCreate: { kind: 'group-create' },
@@ -173,11 +174,22 @@ export const applyRackCommit = (
     return nextDevices ? withDevices(chain, nextDevices) : null;
   }
 
+  if (commit.kind === 'insert-device') {
+    return withDevices(
+      chain,
+      applyInsertDeviceByDropZone(
+        chain.devices,
+        createDeviceNodeByKind(commit.deviceKind),
+        commit.dropZone,
+      ),
+    );
+  }
+
   return withDevices(
     chain,
-    applyInsertDeviceByDropZone(
+    applyInsertDevicesByDropZone(
       chain.devices,
-      createDeviceNodeByKind(commit.deviceKind),
+      commit.deviceKinds.map((kind) => createDeviceNodeByKind(kind)),
       commit.dropZone,
     ),
   );

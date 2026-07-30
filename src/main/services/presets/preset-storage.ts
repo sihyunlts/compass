@@ -1,6 +1,14 @@
 import { app } from 'electron';
 import type { Dirent } from 'node:fs';
-import { access, mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
+import {
+  access,
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  writeFile,
+} from 'node:fs/promises';
 import path from 'node:path';
 
 import {
@@ -255,6 +263,19 @@ export class PresetStorage {
 
   public async ensureAccessible(filePath: string): Promise<void> {
     await access(filePath);
+  }
+
+  public async ensurePresetEntryKind(
+    filePath: string,
+    entryKind: 'file' | 'directory',
+  ): Promise<void> {
+    const stats = await lstat(filePath);
+    const matchesEntryKind = entryKind === 'file'
+      ? stats.isFile()
+      : stats.isDirectory();
+    if (!matchesEntryKind) {
+      throw new Error('Preset item type does not match the request.');
+    }
   }
 
   public async readDirectoryEntries(
