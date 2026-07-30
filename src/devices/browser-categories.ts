@@ -170,22 +170,33 @@ const getDeviceBrowserKindByDirectoryPath = (
     ),
   ) ?? null;
 
-export const isDeviceBrowserSystemDirectoryPath = (
+export const resolveDeviceBrowserSystemDirectoryPath = (
   relativePath: readonly string[],
-): boolean => {
+): string[] | null => {
   if (relativePath.length === 1) {
-    return getDeviceBrowserCategoryByDirectoryName(relativePath[0]) !== null;
+    const category = getDeviceBrowserCategoryByDirectoryName(relativePath[0]);
+    return category ? [category.directoryName] : null;
   }
 
   if (relativePath.length === 2) {
-    return getDeviceBrowserKindByDirectoryPath(
+    const kind = getDeviceBrowserKindByDirectoryPath(
       relativePath[0],
       relativePath[1],
-    ) !== null;
+    );
+    return kind
+      ? [
+          getDeviceBrowserCategory(kind).directoryName,
+          getRendererDeviceLabel(kind),
+        ]
+      : null;
   }
 
-  return false;
+  return null;
 };
+
+export const isDeviceBrowserSystemDirectoryPath = (
+  relativePath: readonly string[],
+): boolean => resolveDeviceBrowserSystemDirectoryPath(relativePath) !== null;
 
 export const compareDeviceBrowserCategoryDirectoryNames = (
   left: string,

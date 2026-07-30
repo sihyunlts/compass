@@ -1,4 +1,13 @@
-import { clamp } from '../../../shared/math';
+import {
+  getDeviceBrowserCategory,
+  getDeviceBrowserIcon,
+} from '../../../devices/browser-categories';
+import { DragAutoScroller } from '../drag-auto-scroll';
+import {
+  hideBrowserDragBadge,
+  showBrowserDragBadge,
+  type BrowserDragBadgeContent,
+} from '../browser/drag-badge';
 import type { BrowserInsertSource } from './types';
 import type {
   ChainDragSourceKind,
@@ -55,11 +64,6 @@ const DRAG_START_THRESHOLD_PX = 4;
 const DRAG_AUTO_SCROLL_EDGE_PX = 56;
 const DRAG_AUTO_SCROLL_MAX_STEP_PX = 8;
 
-// Badge offset and viewport margin for browser-item drags.
-const BROWSER_DRAG_BADGE_OFFSET_X = 16;
-const BROWSER_DRAG_BADGE_OFFSET_Y = 16;
-const BROWSER_DRAG_BADGE_MARGIN_PX = 8;
-
 type ChainDragState = {
   kind: 'chain';
   pointerId: number;
@@ -76,7 +80,7 @@ type BrowserDragState = {
   pointerId: number;
   source: BrowserInsertSource;
   itemEl: HTMLElement;
-  badgeLabel: string;
+  badge: BrowserDragBadgeContent;
   startX: number;
   startY: number;
   didMove: boolean;
@@ -106,6 +110,30 @@ const snapshotDropZone = (dropZone: RackDropZone | null): RackDropZone | null =>
   };
 };
 
+const resolveBrowserDragBadgeContent = (
+  source: BrowserInsertSource,
+  label: string,
+): BrowserDragBadgeContent => {
+  if (source.kind === 'device-kinds') {
+    return { icon: 'select_all', iconStyle: '', label };
+  }
+  if (source.kind === 'group-preset') {
+    return { icon: 'combine_columns', iconStyle: '', label };
+  }
+  if (source.kind === 'rack-preset') {
+    return { icon: 'view_week', iconStyle: '', label };
+  }
+  const deviceKind = source.kind === 'device-kind'
+    ? source.deviceKind
+    : source.preset.device.kind;
+  return {
+    icon: getDeviceBrowserIcon(deviceKind),
+    iconStyle:
+      `--browser-icon-accent:var(${getDeviceBrowserCategory(deviceKind).accentColorVar});`,
+    label,
+  };
+};
+
 /** Handles drag/drop interactions for device reorder and browser insert actions. */
 export class RackDragController {
   private readonly chainDevices: HTMLElement;
@@ -114,11 +142,9 @@ export class RackDragController {
   private readonly closeContextMenu: () => void;
   private readonly onDragUpdate?: (info: ActiveDragInfo | null) => void;
   private readonly dropTargetResolver: RackDropTargetResolver;
+  private readonly autoScroller: DragAutoScroller;
 
   private activeDrag: ActiveDrag | null = null;
-  private lastPointerClientX = 0;
-  private lastPointerClientY = 0;
-  private autoScrollRafId: number | null = null;
 
   constructor(options: RackDragControllerOptions) {
     this.chainDevices = options.chainDevices;
@@ -127,6 +153,20 @@ export class RackDragController {
     this.closeContextMenu = options.closeContextMenu;
     this.onDragUpdate = options.onDragUpdate;
     this.dropTargetResolver = new RackDropTargetResolver(options.chainDevices);
+    this.autoScroller = new DragAutoScroller({
+      getContainer: () => this.chainDevices,
+      edgePx: DRAG_AUTO_SCROLL_EDGE_PX,
+      maxStepPx: DRAG_AUTO_SCROLL_MAX_STEP_PX,
+      axes: 'both',
+      onScroll: (clientX, clientY) => {
+        const drag = this.activeDrag;
+        if (drag?.kind === 'chain') {
+          this.updateChainDragPreview(drag, clientX, clientY);
+        } else if (drag?.kind === 'browser') {
+          this.updateBrowserDragPreview(drag, clientX, clientY);
+        }
+      },
+    });
   }
 
   hasActivePointer(): boolean {
@@ -188,8 +228,6 @@ export class RackDragController {
       didMove: false,
       dropZone: null,
     };
-    this.lastPointerClientX = event.clientX;
-    this.lastPointerClientY = event.clientY;
     this.notifyDragUpdate();
     return true;
   }
@@ -209,14 +247,12 @@ export class RackDragController {
       pointerId: event.pointerId,
       source,
       itemEl,
-      badgeLabel,
+      badge: resolveBrowserDragBadgeContent(source, badgeLabel),
       startX: event.clientX,
       startY: event.clientY,
       didMove: false,
       dropZone: null,
     };
-    this.lastPointerClientX = event.clientX;
-    this.lastPointerClientY = event.clientY;
     this.notifyDragUpdate();
     return true;
   }
@@ -227,9 +263,6 @@ export class RackDragController {
       return false;
     }
 
-    this.lastPointerClientX = event.clientX;
-    this.lastPointerClientY = event.clientY;
-
     if (!drag.didMove) {
       const dx = Math.abs(event.clientX - drag.startX);
       const dy = Math.abs(event.clientY - drag.startY);
@@ -237,7 +270,6 @@ export class RackDragController {
         return false;
       }
       this.markDragStarted(drag);
-      this.ensureAutoScrollLoop();
     }
 
     if (drag.kind === 'chain') {
@@ -246,6 +278,7 @@ export class RackDragController {
       this.updateBrowserDragBadge(drag, event.clientX, event.clientY);
       this.updateBrowserDragPreview(drag, event.clientX, event.clientY);
     }
+    this.autoScroller.updatePointer(event.clientX, event.clientY);
 
     return true;
   }
@@ -269,6 +302,12 @@ export class RackDragController {
 
     this.clearDraggingState(drag);
     return true;
+  }
+
+  cancel(): void {
+    if (this.activeDrag) {
+      this.clearDraggingState(this.activeDrag);
+    }
   }
 
   private canStartDrag(event: PointerEvent): boolean {
@@ -310,113 +349,16 @@ export class RackDragController {
   }
 
   private clearDraggingState(drag: ActiveDrag): void {
-    this.stopAutoScrollLoop();
+    this.autoScroller.stop();
 
     if (drag.kind === 'browser') {
       drag.itemEl.classList.remove('is-dragging');
-      this.browserDragBadge.classList.remove('is-visible');
-      this.browserDragBadge.hidden = true;
-      this.browserDragBadge.textContent = '';
-      this.browserDragBadge.style.removeProperty('transform');
+      hideBrowserDragBadge(this.browserDragBadge);
     }
 
     this.activeDrag = null;
     this.closeContextMenu();
     this.notifyDragUpdate();
-  }
-
-  private ensureAutoScrollLoop(): void {
-    if (this.autoScrollRafId !== null) {
-      return;
-    }
-
-    const tick = (): void => {
-      this.autoScrollRafId = null;
-      const drag = this.activeDrag;
-      if (!drag || !drag.didMove) {
-        return;
-      }
-
-      const didScroll = this.autoScrollChainDevices(
-        this.lastPointerClientX,
-        this.lastPointerClientY,
-      );
-      if (didScroll) {
-        if (drag.kind === 'chain') {
-          this.updateChainDragPreview(drag, this.lastPointerClientX, this.lastPointerClientY);
-        } else {
-          this.updateBrowserDragPreview(drag, this.lastPointerClientX, this.lastPointerClientY);
-        }
-      }
-
-      this.autoScrollRafId = window.requestAnimationFrame(tick);
-    };
-
-    this.autoScrollRafId = window.requestAnimationFrame(tick);
-  }
-
-  private stopAutoScrollLoop(): void {
-    if (this.autoScrollRafId === null) {
-      return;
-    }
-    window.cancelAnimationFrame(this.autoScrollRafId);
-    this.autoScrollRafId = null;
-  }
-
-  private autoScrollChainDevices(clientX: number, clientY: number): boolean {
-    const rect = this.chainDevices.getBoundingClientRect();
-    const deltaX = this.resolveAutoScrollStep(clientX, rect.left, rect.right);
-    const deltaY = this.resolveAutoScrollStep(clientY, rect.top, rect.bottom);
-
-    let didScroll = false;
-
-    if (deltaX !== 0) {
-      const maxScrollLeft = Math.max(0, this.chainDevices.scrollWidth - this.chainDevices.clientWidth);
-      if (maxScrollLeft > 0) {
-        const nextLeft = clamp(this.chainDevices.scrollLeft + deltaX, 0, maxScrollLeft);
-        if (Math.abs(nextLeft - this.chainDevices.scrollLeft) > 0.001) {
-          this.chainDevices.scrollLeft = nextLeft;
-          didScroll = true;
-        }
-      }
-    }
-
-    if (deltaY !== 0) {
-      const maxScrollTop = Math.max(0, this.chainDevices.scrollHeight - this.chainDevices.clientHeight);
-      if (maxScrollTop > 0) {
-        const nextTop = clamp(this.chainDevices.scrollTop + deltaY, 0, maxScrollTop);
-        if (Math.abs(nextTop - this.chainDevices.scrollTop) > 0.001) {
-          this.chainDevices.scrollTop = nextTop;
-          didScroll = true;
-        }
-      }
-    }
-
-    return didScroll;
-  }
-
-  private resolveAutoScrollStep(pointer: number, start: number, end: number): number {
-    const startDistance = pointer - start;
-    if (startDistance < DRAG_AUTO_SCROLL_EDGE_PX) {
-      const ratio = clamp(
-        (DRAG_AUTO_SCROLL_EDGE_PX - startDistance) / DRAG_AUTO_SCROLL_EDGE_PX,
-        0,
-        1,
-      );
-      return -Math.max(1, Math.round(ratio * DRAG_AUTO_SCROLL_MAX_STEP_PX));
-    }
-
-    const endDistance = end - pointer;
-    if (endDistance < DRAG_AUTO_SCROLL_EDGE_PX) {
-      const ratio = clamp(
-        (DRAG_AUTO_SCROLL_EDGE_PX - endDistance) / DRAG_AUTO_SCROLL_EDGE_PX,
-        0,
-        1,
-      );
-      return Math.max(1, Math.round(ratio * DRAG_AUTO_SCROLL_MAX_STEP_PX));
-    }
-
-    return 0;
   }
 
   private updateChainDragPreview(drag: ChainDragState, clientX: number, clientY: number): void {
@@ -442,34 +384,20 @@ export class RackDragController {
   }
 
   private updateBrowserDragBadge(drag: BrowserDragState, clientX: number, clientY: number): void {
-    if (!drag.didMove || !drag.badgeLabel) {
+    if (
+      !drag.didMove
+      || document.documentElement.classList.contains(
+        'is-browser-preset-moving',
+      )
+    ) {
       return;
     }
 
-    this.browserDragBadge.textContent = drag.badgeLabel;
-    this.browserDragBadge.hidden = false;
-    this.browserDragBadge.classList.add('is-visible');
-
-    const badgeWidth = this.browserDragBadge.offsetWidth;
-    const badgeHeight = this.browserDragBadge.offsetHeight;
-    const maxX = Math.max(
-      BROWSER_DRAG_BADGE_MARGIN_PX,
-      window.innerWidth - badgeWidth - BROWSER_DRAG_BADGE_MARGIN_PX,
+    showBrowserDragBadge(
+      this.browserDragBadge,
+      drag.badge,
+      clientX,
+      clientY,
     );
-    const maxY = Math.max(
-      BROWSER_DRAG_BADGE_MARGIN_PX,
-      window.innerHeight - badgeHeight - BROWSER_DRAG_BADGE_MARGIN_PX,
-    );
-    const x = clamp(
-      clientX + BROWSER_DRAG_BADGE_OFFSET_X,
-      BROWSER_DRAG_BADGE_MARGIN_PX,
-      maxX,
-    );
-    const y = clamp(
-      clientY + BROWSER_DRAG_BADGE_OFFSET_Y,
-      BROWSER_DRAG_BADGE_MARGIN_PX,
-      maxY,
-    );
-    this.browserDragBadge.style.transform = `translate3d(${x}px, ${y}px, 0)`;
   }
 }

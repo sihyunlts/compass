@@ -7,6 +7,8 @@ import type {
   DeletePresetEntriesRequest,
   DeletePresetEntriesResponse,
   ListPresetBrowserTreeResponse,
+  MovePresetEntriesRequest,
+  MovePresetEntriesResponse,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
   RenameRackFileRequest,
@@ -128,6 +130,9 @@ export interface CompassApi {
   deletePresetEntries: (
     request: DeletePresetEntriesRequest,
   ) => Promise<DeletePresetEntriesResponse>;
+  movePresetEntries: (
+    request: MovePresetEntriesRequest,
+  ) => Promise<MovePresetEntriesResponse>;
   readPresetEntry: <K extends PresetFileKind>(
     request: ReadPresetEntryRequest<K>,
   ) => Promise<ReadPresetEntryResponse<K>>;

@@ -137,6 +137,7 @@ class RackSurfaceController {
 
     return () => {
       document.removeEventListener('pointerlockchange', this.handlePointerLockChange);
+      this.dragController?.cancel();
       this.clearDropIndicator();
       if (this.resizeSyncFrameId !== null) {
         window.cancelAnimationFrame(this.resizeSyncFrameId);
@@ -419,6 +420,7 @@ class RackSurfaceController {
 
   public handleWindowBlur(): void {
     this.interactionManager?.handleWindowBlur();
+    this.dragController?.cancel();
   }
 
   private shouldClearRackSelectionForLocalTarget(target: Element): boolean {

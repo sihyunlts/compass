@@ -30,5 +30,6 @@ export const IPC_CHANNELS = {
   presetBrowserTreeChanged: 'preset:browser-tree-changed',
   showPresetEntryInFolder: 'preset:show-entry-in-folder',
   deletePresetEntries: 'preset:delete-entries',
+  movePresetEntries: 'preset:move-entries',
   readPresetEntry: 'preset:read-entry',
 } as const;

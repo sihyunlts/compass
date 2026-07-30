@@ -1,4 +1,8 @@
 import type { GeneratorDeviceNode } from '../../model';
+import type {
+  PresetEntryPath,
+  PresetEntrySelectionItem,
+} from '../../preset-entry-selection';
 import type { PresetFile, PresetFileKind, RackPresetFile } from '../../presets';
 
 type RendererDeviceKind = GeneratorDeviceNode['kind'];
@@ -69,6 +73,7 @@ export type RenamePresetFileResponse =
   | {
       status: 'renamed';
       relativePath: string[];
+      sourcePath: string;
       filePath: string;
     }
   | {
@@ -102,6 +107,8 @@ export type RenamePresetFolderResponse =
   | {
       status: 'ok';
       relativePath: string[];
+      sourcePath: string;
+      filePath: string;
     }
   | {
       status: 'error';
@@ -135,6 +142,7 @@ export type ListPresetBrowserTreeResponse =
   | {
       status: 'ok';
       tree: PresetBrowserTreeFolderNode[];
+      occupiedPaths: PresetEntryPath[];
     }
   | {
       status: 'error';
@@ -146,10 +154,10 @@ export interface ReadPresetEntryRequest<K extends PresetFileKind = PresetFileKin
   relativePath: string[];
 }
 
-export interface ShowPresetEntryInFolderRequest<K extends PresetFileKind = PresetFileKind> {
+export interface ShowPresetEntryInFolderRequest<K extends PresetFileKind = PresetFileKind>
+  extends PresetEntrySelectionItem {
   presetType: K;
   relativePath: string[];
-  entryKind: 'file' | 'directory';
 }
 
 export type DeletePresetEntryRequest<K extends PresetFileKind = PresetFileKind> =
@@ -157,6 +165,20 @@ export type DeletePresetEntryRequest<K extends PresetFileKind = PresetFileKind> 
 
 export interface DeletePresetEntriesRequest {
   entries: DeletePresetEntryRequest[];
+}
+
+export interface DeletedPresetEntry extends DeletePresetEntryRequest {
+  filePath: string;
+}
+
+export interface MovePresetEntriesRequest {
+  entries: DeletePresetEntryRequest[];
+  destination: ReadPresetEntryRequest;
+}
+
+export interface MovedPresetEntry extends DeletePresetEntryRequest {
+  sourcePath: string;
+  filePath: string;
 }
 
 export type ShowPresetEntryInFolderResponse =
@@ -171,6 +193,17 @@ export type ShowPresetEntryInFolderResponse =
 export type DeletePresetEntriesResponse =
   | {
       status: 'ok';
+      entries: DeletedPresetEntry[];
+    }
+  | {
+      status: 'error';
+      message: string;
+    };
+
+export type MovePresetEntriesResponse =
+  | {
+      status: 'ok';
+      entries: MovedPresetEntry[];
     }
   | {
       status: 'error';

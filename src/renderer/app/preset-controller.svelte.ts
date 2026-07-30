@@ -1,12 +1,18 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { MessageKey } from '../../shared/i18n';
-import { normalizePresetEntrySelection } from '../../shared/preset-entry-selection';
+import {
+  normalizePresetEntrySelection,
+  type PresetEntryPath,
+  type PresetEntrySelectionItem,
+} from '../../shared/preset-entry-selection';
 import {
   getDeviceMessageKey,
 } from '../device-i18n';
 import { i18n } from '../i18n.svelte';
 import type {
   CreatePresetFolderRequest,
+  DeletedPresetEntry,
+  MovedPresetEntry,
   PresetBrowserTreeNode,
   ReadPresetEntryResponse,
   RenamePresetFileRequest,
@@ -14,15 +20,15 @@ import type {
   SavePresetFileRequest,
 } from '../../shared/contracts/ipc/presets';
 import {
-  PRESET_FILE_EXTENSIONS,
   parsePresetFileText,
+  resolvePresetNameFromFileName,
   type RackPresetFile,
 } from '../../shared/presets';
 import type {
   BrowserTreePresetFolderNode,
   BrowserTreePresetLeafNode,
   PendingPresetFolderDraft,
-  PresetFolderSelectionTarget,
+  PresetEntrySelectionTarget,
 } from '../features/browser/types';
 import type {
   ContextMenuTarget,
@@ -112,9 +118,10 @@ type RackOpenTarget = {
 
 interface PresetControllerState {
   presetTree: BrowserTreePresetFolderNode[];
+  presetOccupiedPaths: PresetEntryPath[];
   presetErrorText: string | null;
   pendingPresetFolderDraft: PendingPresetFolderDraft | null;
-  presetFolderSelectionTarget: PresetFolderSelectionTarget | null;
+  presetEntrySelectionTarget: PresetEntrySelectionTarget | null;
   pendingPresetDeleteTarget: PresetDeleteTarget | null;
   isPresetDeletePending: boolean;
   pendingRackPresetLoadTarget: PendingRackPresetLoadTarget | null;
@@ -185,15 +192,30 @@ const resolveRackDisplayNameFromFileName = (fileName: string): string => {
 const toCollapsedDeviceIdsKey = (ids: readonly string[]): string =>
   [...ids].sort().join('\u0000');
 
+const replaceMovedPathPrefix = (
+  currentPath: string,
+  sourcePath: string,
+  targetPath: string,
+): string | null => {
+  const currentKey = currentPath.toLocaleLowerCase('en-US');
+  const sourceKey = sourcePath.toLocaleLowerCase('en-US');
+  const separator = sourcePath.includes('\\') ? '\\' : '/';
+  return currentKey === sourceKey
+    || currentKey.startsWith(`${sourceKey}${separator}`)
+    ? `${targetPath}${currentPath.slice(sourcePath.length)}`
+    : null;
+};
+
 /** Owns renderer-side preset browser state and preset IPC workflows. */
 class PresetController {
   private defaultRackFileDisplayName = resolveDefaultRackFileDisplayName();
 
   public readonly state: PresetControllerState = $state({
     presetTree: [],
+    presetOccupiedPaths: [],
     presetErrorText: null,
     pendingPresetFolderDraft: null,
-    presetFolderSelectionTarget: null,
+    presetEntrySelectionTarget: null,
     pendingPresetDeleteTarget: null,
     isPresetDeletePending: false,
     pendingRackPresetLoadTarget: null,
@@ -208,7 +230,7 @@ class PresetController {
 
   private nextPendingPresetFolderId = 1;
 
-  private nextPresetFolderSelectionToken = 1;
+  private nextPresetEntrySelectionToken = 1;
 
   private cleanRackRevision = 0;
 
@@ -366,27 +388,58 @@ class PresetController {
       || resolveDefaultRackFileDisplayName();
   }
 
-  private syncCurrentRackAfterPresetFileRename(
-    originalRelativePath: readonly string[],
-    response: { filePath: string },
+  private syncCurrentRackAfterPresetEntriesMove(
+    entries: readonly MovedPresetEntry[],
   ): void {
     const currentFilePath = this.state.currentRackFilePath;
-    if (!currentFilePath || originalRelativePath.length === 0) {
+    if (!currentFilePath) {
       return;
     }
 
-    const normalizedCurrentPath = currentFilePath.replaceAll('\\', '/');
-    const normalizedOriginalPath = originalRelativePath.join('/');
-    if (
-      normalizedCurrentPath !== response.filePath.replaceAll('\\', '/')
-      && !normalizedCurrentPath.endsWith(`/${normalizedOriginalPath}`)
-    ) {
+    for (const entry of entries) {
+      if (entry.presetType !== 'rack') {
+        continue;
+      }
+      const nextFilePath = replaceMovedPathPrefix(
+        currentFilePath,
+        entry.sourcePath,
+        entry.filePath,
+      );
+      if (!nextFilePath || nextFilePath === currentFilePath) {
+        continue;
+      }
+
+      this.setCurrentRackFile(
+        nextFilePath,
+        entry.entryKind === 'file'
+          ? resolveRackDisplayNameFromPath(nextFilePath)
+          : this.state.currentRackDisplayName,
+      );
+      if (entry.entryKind === 'file') {
+        this.cleanRackDisplayName = this.state.currentRackDisplayName;
+        this.syncRackDirtyState();
+      }
       return;
     }
+  }
 
-    this.setCurrentRackFile(response.filePath, resolveRackDisplayNameFromPath(response.filePath));
-    this.cleanRackDisplayName = this.state.currentRackDisplayName;
-    this.syncRackDirtyState();
+  private syncCurrentRackAfterPresetEntriesDelete(
+    entries: readonly DeletedPresetEntry[],
+  ): void {
+    const currentFilePath = this.state.currentRackFilePath;
+    const containsCurrentRack = currentFilePath
+      && entries.some(
+        (entry) =>
+          entry.presetType === 'rack'
+          && replaceMovedPathPrefix(
+            currentFilePath,
+            entry.filePath,
+            entry.filePath,
+          ) !== null,
+      );
+    if (containsCurrentRack) {
+      this.setCurrentRackFile(null, this.state.currentRackDisplayName);
+    }
   }
 
   private buildCurrentRackFile(): RackPresetFile {
@@ -466,6 +519,10 @@ class PresetController {
       this.state.presetTree = response.tree.map(
         (node) => mapPresetTreeNode(node) as BrowserTreePresetFolderNode,
       );
+      this.state.presetOccupiedPaths = response.occupiedPaths.map((path) => ({
+        ...path,
+        relativePath: [...path.relativePath],
+      }));
       this.state.presetErrorText = null;
     } catch (error) {
       if (requestToken !== this.presetListRequestToken) {
@@ -473,6 +530,7 @@ class PresetController {
       }
 
       this.state.presetTree = [];
+      this.state.presetOccupiedPaths = [];
       this.state.presetErrorText = formatErrorMessage(
         'status.presetsLoadFailed',
         error instanceof Error ? error.message : null,
@@ -490,6 +548,7 @@ class PresetController {
     entry: BrowserTreePresetLeafNode,
     sourceEvent: PointerEvent,
     itemEl: HTMLElement,
+    dragSignal: AbortSignal,
   ): Promise<void> {
     if (sourceEvent.button !== 0 || !sourceEvent.isPrimary) {
       return;
@@ -499,6 +558,9 @@ class PresetController {
       const response = await this.options.bridgeClient.readPresetEntry(
         this.toReadPresetEntryRequest(entry),
       );
+      if (dragSignal.aborted) {
+        return;
+      }
       if (response.status === 'error') {
         this.showError('status.presetLoadFailed', response.message);
         return;
@@ -511,7 +573,7 @@ class PresetController {
 
       this.options.editorSession.commands.handleBrowserPointerDown({
         source,
-        badgeLabel: `+ ${entry.label}`,
+        badgeLabel: entry.label,
         sourceEvent,
         itemEl,
       });
@@ -578,7 +640,7 @@ class PresetController {
       temporaryId: `pending-preset-folder:${this.nextPendingPresetFolderId}`,
     };
     this.nextPendingPresetFolderId += 1;
-    this.state.presetFolderSelectionTarget = null;
+    this.state.presetEntrySelectionTarget = null;
   }
 
   public beginPresetEntryRename(target: ContextMenuTarget): void {
@@ -598,15 +660,12 @@ class PresetController {
         ? this.resolvePresetFileDraftName(target)
         : target.relativePath[target.relativePath.length - 1] ?? '',
     };
-    this.state.presetFolderSelectionTarget = null;
+    this.state.presetEntrySelectionTarget = null;
   }
 
   private resolvePresetFileDraftName(target: PresetEntryTarget): string {
     const fileName = target.relativePath[target.relativePath.length - 1] ?? '';
-    const extension = PRESET_FILE_EXTENSIONS[target.presetType];
-    return fileName.toLowerCase().endsWith(extension)
-      ? fileName.slice(0, -extension.length)
-      : fileName;
+    return resolvePresetNameFromFileName(fileName, target.presetType) ?? fileName;
   }
 
   public updatePendingPresetFolderDraftName(nextName: string): void {
@@ -680,28 +739,72 @@ class PresetController {
     }
 
     await this.loadTree();
-    if (
-      draft.entryKind === 'file'
-      && draft.presetType === 'rack'
-      && response.status === 'renamed'
-    ) {
-      this.syncCurrentRackAfterPresetFileRename(draft.relativePath, response);
+    if (draft.presetType === 'rack' && 'sourcePath' in response) {
+      this.syncCurrentRackAfterPresetEntriesMove([{
+        presetType: 'rack',
+        entryKind: draft.entryKind,
+        relativePath: response.relativePath,
+        sourcePath: response.sourcePath,
+        filePath: response.filePath,
+      }]);
     }
-    this.state.presetFolderSelectionTarget = {
-      token: this.nextPresetFolderSelectionToken,
+    this.setPresetEntrySelectionTarget([{
       presetType: draft.presetType,
-      relativePath: [...response.relativePath],
+      relativePath: response.relativePath,
       entryKind: draft.entryKind,
-    };
-    this.nextPresetFolderSelectionToken += 1;
+    }]);
   }
 
-  public clearPresetFolderSelectionTarget(token: number): void {
-    if (this.state.presetFolderSelectionTarget?.token !== token) {
+  public clearPresetEntrySelectionTarget(token: number): void {
+    if (this.state.presetEntrySelectionTarget?.token !== token) {
       return;
     }
 
-    this.state.presetFolderSelectionTarget = null;
+    this.state.presetEntrySelectionTarget = null;
+  }
+
+  private setPresetEntrySelectionTarget(
+    entries: readonly PresetEntrySelectionItem[],
+  ): void {
+    this.state.presetEntrySelectionTarget = {
+      token: this.nextPresetEntrySelectionToken,
+      entries: entries.map((entry) => ({
+        ...entry,
+        relativePath: [...entry.relativePath],
+      })),
+    };
+    this.nextPresetEntrySelectionToken += 1;
+  }
+
+  public async movePresetEntries(
+    entries: readonly PresetEntryContextTarget[],
+    destination: {
+      presetType: PresetEntryContextTarget['presetType'];
+      relativePath: readonly string[];
+    },
+  ): Promise<void> {
+    await this.runPresetAction(async () => {
+      const response = await this.options.bridgeClient.movePresetEntries({
+        entries: entries.map((entry) => ({
+          presetType: entry.presetType,
+          relativePath: [...entry.relativePath],
+          entryKind: entry.entryKind,
+        })),
+        destination: {
+          presetType: destination.presetType,
+          relativePath: [...destination.relativePath],
+        },
+      });
+      if (response.status === 'error') {
+        await this.loadTree();
+        this.showError('status.presetMoveFailed', response.message);
+        return;
+      }
+
+      this.syncCurrentRackAfterPresetEntriesMove(response.entries);
+      await this.loadTree();
+      this.setPresetEntrySelectionTarget(response.entries);
+    }, 'status.presetMoveFailed');
   }
 
   public closePresetDeleteDialog(): void {
@@ -737,6 +840,7 @@ class PresetController {
         return;
       }
 
+      this.syncCurrentRackAfterPresetEntriesDelete(response.entries);
       await this.loadTree();
       this.state.pendingPresetDeleteTarget = null;
     } catch (error) {

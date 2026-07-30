@@ -303,6 +303,13 @@ html.reduce-animation {
   }
 }
 
+.browser-entry-icon {
+  font-size: var(--text-14);
+  line-height: 1;
+  color: var(--browser-icon-accent, var(--color-text-secondary));
+  font-variation-settings: 'FILL' 1, 'wght' 400;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app-hint {
     animation: none;

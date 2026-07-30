@@ -549,9 +549,10 @@
       activePage={uiState.sidebarPage}
       deviceTree={DEVICE_BROWSER_TREE}
       presetTree={presetState.presetTree}
+      presetOccupiedPaths={presetState.presetOccupiedPaths}
       presetErrorText={presetState.presetErrorText}
       pendingPresetFolderDraft={presetState.pendingPresetFolderDraft}
-      presetFolderSelectionTarget={presetState.presetFolderSelectionTarget}
+      presetEntrySelectionTarget={presetState.presetEntrySelectionTarget}
       launchpadMk2Enabled={uiState.launchpadModel === 'mk2'}
       {paletteDescription}
       paletteDescriptionTone={settingsState.paletteDescriptionTone}
@@ -588,14 +589,21 @@
       onOpenGitHub={() => settingsController.openGitHub()}
       onOpenLatestReleasePage={() => settingsController.openLatestReleasePage()}
       onPresetEntryOpen={(entry) => presetController.handlePresetEntryOpen(entry)}
-      onPresetFilePointerDown={(entry, sourceEvent, itemEl) =>
-        presetController.handlePresetFilePointerDown(entry, sourceEvent, itemEl)}
+      onPresetFilePointerDown={(entry, sourceEvent, itemEl, dragSignal) =>
+        presetController.handlePresetFilePointerDown(
+          entry,
+          sourceEvent,
+          itemEl,
+          dragSignal,
+        )}
       onPendingPresetFolderDraftNameChange={(nextName) =>
         presetController.updatePendingPresetFolderDraftName(nextName)}
       onPendingPresetFolderDraftCommit={() => presetController.commitPendingPresetFolderDraft()}
       onPendingPresetFolderDraftCancel={() => presetController.cancelPendingPresetFolderDraft()}
-      onPresetFolderSelectionHandled={(token) =>
-        presetController.clearPresetFolderSelectionTarget(token)}
+      onPresetEntriesMove={(entries, destination) =>
+        presetController.movePresetEntries(entries, destination)}
+      onPresetEntrySelectionHandled={(token) =>
+        presetController.clearPresetEntrySelectionTarget(token)}
     />
 
     {#if uiState.sidebarPage !== 'settings'}

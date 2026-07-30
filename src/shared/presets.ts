@@ -382,7 +382,7 @@ const resolvePresetFileKindFromName = (
   return null;
 };
 
-const resolvePresetNameFromFileName = (
+export const resolvePresetNameFromFileName = (
   fileName: string,
   presetType: PresetFileKind,
 ): string | null => {

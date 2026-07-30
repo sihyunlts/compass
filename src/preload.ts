@@ -8,6 +8,8 @@ import type {
   DeletePresetEntriesRequest,
   DeletePresetEntriesResponse,
   ListPresetBrowserTreeResponse,
+  MovePresetEntriesRequest,
+  MovePresetEntriesResponse,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
   RenameRackFileRequest,
@@ -181,6 +183,11 @@ const api: CompassApi = {
       IPC_CHANNELS.deletePresetEntries,
       request,
     ) as Promise<DeletePresetEntriesResponse>,
+  movePresetEntries: (request: MovePresetEntriesRequest) =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.movePresetEntries,
+      request,
+    ) as Promise<MovePresetEntriesResponse>,
   readPresetEntry: <K extends PresetFileKind>(request: ReadPresetEntryRequest<K>) =>
     ipcRenderer.invoke(IPC_CHANNELS.readPresetEntry, request) as Promise<ReadPresetEntryResponse<K>>,
 };

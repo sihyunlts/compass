@@ -1,10 +1,7 @@
-import type { PresetFileKind } from '../../../shared/presets';
+import type { PresetEntrySelectionItem } from '../../../shared/preset-entry-selection';
 
-export interface PresetEntryContextTarget {
+export interface PresetEntryContextTarget extends PresetEntrySelectionItem {
   kind: 'preset-entry';
-  presetType: PresetFileKind;
-  relativePath: readonly string[];
-  entryKind: 'file' | 'directory';
   isSystemFolder?: boolean;
 }
 

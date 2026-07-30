@@ -1,7 +1,20 @@
 import { LIVE_BRIDGE_TARGET } from '../../shared/bridge/protocol';
-import { isDeviceBrowserSystemDirectoryPath } from '../../devices/browser-categories';
+import {
+  isDeviceBrowserSystemDirectoryPath,
+} from '../../devices/browser-categories';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
-import { normalizePresetEntrySelection } from '../../shared/preset-entry-selection';
+import {
+  preparePresetEntryMove,
+  type PresetEntryMovePlan,
+} from '../../shared/preset-entry-move';
+import {
+  arePresetPathsEqual as relativePathEquals,
+  doPresetPathsCollide as relativePathCollides,
+  isPresetPathInside as relativePathContains,
+  normalizePresetEntrySelection,
+  type PresetEntryPath,
+  type PresetEntrySelectionItem,
+} from '../../shared/preset-entry-selection';
 import type {
   PresetBrowserTreeFolderNode,
   PresetBrowserTreeNode,
@@ -10,6 +23,8 @@ import type {
 } from '../../shared/contracts/ipc/presets';
 import {
   PRESET_FILE_EXTENSIONS,
+  isPresetFileKind,
+  resolvePresetNameFromFileName,
   type PresetFile,
   type PresetFileKind,
 } from '../../shared/presets';
@@ -74,9 +89,6 @@ const createEmptyStore = (): BrowserPresetStore => ({
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-const isPresetFileKind = (value: unknown): value is PresetFileKind =>
-  value === 'device' || value === 'group' || value === 'rack';
-
 const clonePreset = <K extends PresetFileKind>(
   preset: Extract<PresetFile, { presetType: K }>,
 ): Extract<PresetFile, { presetType: K }> =>
@@ -110,13 +122,6 @@ const ensurePresetExtension = (
     : `${name}${extension}`;
 };
 
-const relativePathEquals = (
-  left: readonly string[],
-  right: readonly string[],
-): boolean =>
-  left.length === right.length
-  && left.every((segment, index) => segment === right[index]);
-
 const parseVirtualPresetPath = (
   filePath: string,
 ): { presetType: PresetFileKind; relativePath: string[] } | null => {
@@ -139,10 +144,7 @@ const toVirtualPresetPath = (
   `${VIRTUAL_PRESET_ROOT}/${presetType}/${relativePath.join('/')}`;
 
 const getFileStem = (fileName: string, presetType: PresetFileKind): string => {
-  const extension = PRESET_FILE_EXTENSIONS[presetType];
-  return fileName.toLowerCase().endsWith(extension)
-    ? fileName.slice(0, -extension.length)
-    : fileName;
+  return resolvePresetNameFromFileName(fileName, presetType) ?? fileName;
 };
 
 const readStore = (): BrowserPresetStore => {
@@ -193,6 +195,67 @@ const readStore = (): BrowserPresetStore => {
 
 const writeStore = (store: BrowserPresetStore): void => {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+};
+
+const collectStorePaths = (
+  store: BrowserPresetStore,
+): PresetEntryPath[] => [
+  ...(['device', 'group', 'rack'] as const).flatMap((presetType) =>
+    store.folders[presetType].map((relativePath) => ({
+      presetType,
+      relativePath,
+    }))),
+  ...store.files.map((file) => ({
+    presetType: file.presetType,
+    relativePath: file.relativePath,
+  })),
+];
+
+const hasStoreEntry = (
+  store: BrowserPresetStore,
+  entry: PresetEntrySelectionItem,
+): boolean =>
+  entry.entryKind === 'file'
+    ? store.files.some(
+        (file) =>
+          file.presetType === entry.presetType
+          && relativePathEquals(file.relativePath, entry.relativePath),
+      )
+    : store.folders[entry.presetType].some((path) =>
+        relativePathEquals(path, entry.relativePath));
+
+const mapStoreEntryPaths = (
+  store: BrowserPresetStore,
+  presetType: PresetFileKind,
+  mapPath: (
+    relativePath: string[],
+    entryKind: PresetEntrySelectionItem['entryKind'],
+  ) => string[],
+): void => {
+  store.folders[presetType] = store.folders[presetType].map((path) =>
+    mapPath(path, 'directory'));
+  store.files = store.files.map((file) =>
+    file.presetType === presetType
+      ? { ...file, relativePath: mapPath(file.relativePath, 'file') }
+      : file);
+};
+
+const applyMovePlansToPath = (
+  relativePath: string[],
+  entryKind: PresetEntrySelectionItem['entryKind'],
+  plans: readonly PresetEntryMovePlan[],
+): string[] => {
+  const plan = plans.find(({ entry, isNoop }) =>
+    !isNoop
+    && (
+      entry.entryKind === 'directory'
+        ? relativePathContains(entry.relativePath, relativePath)
+        : entryKind === 'file'
+          && relativePathEquals(entry.relativePath, relativePath)
+    ));
+  return plan
+    ? [...plan.relativePath, ...relativePath.slice(plan.entry.relativePath.length)]
+    : relativePath;
 };
 
 const sortByLabel = <T extends { label: string }>(entries: T[]): T[] =>
@@ -250,9 +313,17 @@ const upsertPresetFile = <K extends PresetFileKind>(
   presetType: K,
   relativePath: string[],
   payload: Extract<PresetFile, { presetType: K }>,
-): void => {
+): boolean => {
+  if (
+    store.folders[presetType].some((path) =>
+      relativePathCollides(path, relativePath))
+  ) {
+    return false;
+  }
+
   const existingIndex = store.files.findIndex((file) =>
-    file.presetType === presetType && relativePathEquals(file.relativePath, relativePath));
+    file.presetType === presetType
+    && relativePathCollides(file.relativePath, relativePath));
   const entry: BrowserPresetEntry = {
     presetType,
     relativePath,
@@ -261,10 +332,11 @@ const upsertPresetFile = <K extends PresetFileKind>(
 
   if (existingIndex === -1) {
     store.files.push(entry);
-    return;
+  } else {
+    store.files[existingIndex] = entry;
   }
 
-  store.files[existingIndex] = entry;
+  return true;
 };
 
 const createNoopSubscription = (): (() => void) => () => {};
@@ -346,7 +418,12 @@ export const createBrowserCompassBridge = (): CompassApi => ({
     );
     const relativePath = [fileName];
     const store = readStore();
-    upsertPresetFile(store, presetType, relativePath, request.payload);
+    if (!upsertPresetFile(store, presetType, relativePath, request.payload)) {
+      return {
+        status: 'error',
+        message: 'A folder with that name already exists.',
+      };
+    }
     writeStore(store);
 
     return {
@@ -365,7 +442,13 @@ export const createBrowserCompassBridge = (): CompassApi => ({
     }
 
     const store = readStore();
-    upsertPresetFile(store, 'rack', parsed.relativePath, request.payload);
+    if (!upsertPresetFile(store, 'rack', parsed.relativePath, request.payload)) {
+      return {
+        status: 'error',
+        message: 'A folder with that name already exists.',
+        filePath: request.filePath,
+      };
+    }
     writeStore(store);
     return {
       status: 'saved',
@@ -400,9 +483,12 @@ export const createBrowserCompassBridge = (): CompassApi => ({
       return { status: 'renamed', filePath: request.filePath };
     }
     if (
-      store.files.some((file) =>
-        file.presetType === 'rack' && relativePathEquals(file.relativePath, nextRelativePath))
-      || store.folders.rack.some((path) => relativePathEquals(path, nextRelativePath))
+      store.files.some((file, index) =>
+        index !== fileIndex
+        && file.presetType === 'rack'
+        && relativePathCollides(file.relativePath, nextRelativePath))
+      || store.folders.rack.some((path) =>
+        relativePathCollides(path, nextRelativePath))
     ) {
       return {
         status: 'error',
@@ -441,14 +527,17 @@ export const createBrowserCompassBridge = (): CompassApi => ({
       return {
         status: 'renamed',
         relativePath: request.relativePath,
+        sourcePath: toVirtualPresetPath(request.presetType, request.relativePath),
         filePath: toVirtualPresetPath(request.presetType, request.relativePath),
       };
     }
     if (
-      store.files.some((file) =>
-        file.presetType === request.presetType
-        && relativePathEquals(file.relativePath, nextRelativePath))
-      || store.folders[request.presetType].some((path) => relativePathEquals(path, nextRelativePath))
+      store.files.some((file, index) =>
+        index !== fileIndex
+        && file.presetType === request.presetType
+        && relativePathCollides(file.relativePath, nextRelativePath))
+      || store.folders[request.presetType].some((path) =>
+        relativePathCollides(path, nextRelativePath))
     ) {
       return { status: 'error', message: 'An item or folder with that name already exists.' };
     }
@@ -461,6 +550,7 @@ export const createBrowserCompassBridge = (): CompassApi => ({
     return {
       status: 'renamed',
       relativePath: nextRelativePath,
+      sourcePath: toVirtualPresetPath(request.presetType, request.relativePath),
       filePath: toVirtualPresetPath(request.presetType, nextRelativePath),
     };
   },
@@ -471,11 +561,22 @@ export const createBrowserCompassBridge = (): CompassApi => ({
     }
 
     const relativePath = [...request.relativePath, folderName];
+    if (
+      request.presetType === 'device'
+      && isDeviceBrowserSystemDirectoryPath(relativePath)
+    ) {
+      return {
+        status: 'error',
+        message: 'Built-in device folder names are reserved.',
+      };
+    }
     const store = readStore();
     if (
-      store.folders[request.presetType].some((path) => relativePathEquals(path, relativePath))
+      store.folders[request.presetType].some((path) =>
+        relativePathCollides(path, relativePath))
       || store.files.some((file) =>
-        file.presetType === request.presetType && relativePathEquals(file.relativePath, relativePath))
+        file.presetType === request.presetType
+        && relativePathCollides(file.relativePath, relativePath))
     ) {
       return { status: 'error', message: 'An item or folder with that name already exists.' };
     }
@@ -501,34 +602,57 @@ export const createBrowserCompassBridge = (): CompassApi => ({
     }
 
     const nextRelativePath = [...request.relativePath.slice(0, -1), folderName];
+    if (
+      request.presetType === 'device'
+      && isDeviceBrowserSystemDirectoryPath(nextRelativePath)
+    ) {
+      return {
+        status: 'error',
+        message: 'Built-in device folder names are reserved.',
+      };
+    }
     const store = readStore();
     const folderIndex = store.folders[request.presetType].findIndex((path) =>
       relativePathEquals(path, request.relativePath));
     if (folderIndex === -1) {
       return { status: 'error', message: 'Folder does not exist.' };
     }
-    if (store.folders[request.presetType].some((path) => relativePathEquals(path, nextRelativePath))) {
+    if (
+      store.folders[request.presetType].some(
+        (path, index) =>
+          index !== folderIndex
+          && relativePathCollides(path, nextRelativePath),
+      )
+      || store.files.some(
+        (file) =>
+          file.presetType === request.presetType
+          && relativePathCollides(file.relativePath, nextRelativePath),
+      )
+    ) {
       return { status: 'error', message: 'An item or folder with that name already exists.' };
     }
 
-    store.folders[request.presetType] = store.folders[request.presetType].map((path) =>
-      relativePathEquals(path, request.relativePath)
-        ? nextRelativePath
-        : path.length > request.relativePath.length
-          && relativePathEquals(path.slice(0, request.relativePath.length), request.relativePath)
-            ? [...nextRelativePath, ...path.slice(request.relativePath.length)]
-            : path);
-    store.files = store.files.map((file) =>
-      file.presetType === request.presetType
-      && file.relativePath.length > request.relativePath.length
-      && relativePathEquals(file.relativePath.slice(0, request.relativePath.length), request.relativePath)
-        ? {
-            ...file,
-            relativePath: [...nextRelativePath, ...file.relativePath.slice(request.relativePath.length)],
-          }
-        : file);
+    const renamePlan: PresetEntryMovePlan = {
+      entry: {
+        presetType: request.presetType,
+        entryKind: 'directory',
+        relativePath: request.relativePath,
+      },
+      relativePath: nextRelativePath,
+      isNoop: false,
+    };
+    mapStoreEntryPaths(store, request.presetType, (path, entryKind) =>
+      applyMovePlansToPath(path, entryKind, [renamePlan]));
     writeStore(store);
-    return { status: 'ok', relativePath: nextRelativePath };
+    return {
+      status: 'ok',
+      relativePath: nextRelativePath,
+      sourcePath: toVirtualPresetPath(
+        request.presetType,
+        request.relativePath,
+      ),
+      filePath: toVirtualPresetPath(request.presetType, nextRelativePath),
+    };
   },
   listPresetBrowserTree: async () => {
     const store = readStore();
@@ -542,6 +666,7 @@ export const createBrowserCompassBridge = (): CompassApi => ({
         relativePath: [] as string[],
         children: buildChildren(store, presetType, []),
       })),
+      occupiedPaths: collectStorePaths(store),
     };
   },
   subscribePresetBrowserTreeChanged: (listener) => {
@@ -578,12 +703,7 @@ export const createBrowserCompassBridge = (): CompassApi => ({
     }
     const store = readStore();
     const hasMatchingEntry = normalizedEntries.every((entry) =>
-      entry.entryKind === 'file'
-        ? store.files.some((file) =>
-            file.presetType === entry.presetType
-            && relativePathEquals(file.relativePath, entry.relativePath))
-        : store.folders[entry.presetType].some((path) =>
-            relativePathEquals(path, entry.relativePath)));
+      hasStoreEntry(store, entry));
     if (!hasMatchingEntry) {
       return {
         status: 'error',
@@ -591,6 +711,11 @@ export const createBrowserCompassBridge = (): CompassApi => ({
       };
     }
 
+    const deletedEntries = normalizedEntries.map((entry) => ({
+      ...entry,
+      relativePath: [...entry.relativePath],
+      filePath: toVirtualPresetPath(entry.presetType, entry.relativePath),
+    }));
     for (const entry of normalizedEntries) {
       if (entry.entryKind === 'file') {
         store.files = store.files.filter((file) =>
@@ -598,21 +723,82 @@ export const createBrowserCompassBridge = (): CompassApi => ({
           || !relativePathEquals(file.relativePath, entry.relativePath));
       } else {
         store.folders[entry.presetType] = store.folders[entry.presetType].filter((path) =>
-          !relativePathEquals(path, entry.relativePath)
-          && !relativePathEquals(
-            path.slice(0, entry.relativePath.length),
-            entry.relativePath,
-          ));
+          !relativePathContains(entry.relativePath, path));
         store.files = store.files.filter((file) =>
           file.presetType !== entry.presetType
-          || !relativePathEquals(
-            file.relativePath.slice(0, entry.relativePath.length),
-            entry.relativePath,
-          ));
+          || !relativePathContains(entry.relativePath, file.relativePath));
       }
     }
     writeStore(store);
-    return { status: 'ok' };
+    return { status: 'ok', entries: deletedEntries };
+  },
+  movePresetEntries: async (request) => {
+    const store = readStore();
+    const movePlan = preparePresetEntryMove(
+      request.entries,
+      request.destination,
+      collectStorePaths(store),
+    );
+    if (movePlan.status === 'error') {
+      return movePlan;
+    }
+    const { presetType, destinationRelativePath } = movePlan;
+
+    const destinationExists =
+      destinationRelativePath.length === 0
+      || store.folders[presetType].some((path) =>
+        relativePathCollides(path, destinationRelativePath));
+    const canCreateDestination = movePlan.createDestination;
+    if (!destinationExists && !canCreateDestination) {
+      return { status: 'error', message: 'Destination folder does not exist.' };
+    }
+    if (
+      store.files.some(
+        (file) =>
+          file.presetType === presetType
+          && relativePathCollides(file.relativePath, destinationRelativePath),
+      )
+    ) {
+      return { status: 'error', message: 'Destination is not a folder.' };
+    }
+
+    if (!movePlan.plans.every(({ entry }) => hasStoreEntry(store, entry))) {
+      return {
+        status: 'error',
+        message: 'Preset item type does not match the request.',
+      };
+    }
+
+    if (canCreateDestination && !destinationExists) {
+      for (let index = 0; index < destinationRelativePath.length; index += 1) {
+        const folderPath = destinationRelativePath.slice(0, index + 1);
+        if (
+          !store.folders[presetType].some((path) =>
+            relativePathCollides(path, folderPath))
+        ) {
+          store.folders[presetType].push(folderPath);
+        }
+      }
+    }
+
+    mapStoreEntryPaths(
+      store,
+      presetType,
+      (path, entryKind) =>
+        applyMovePlansToPath(path, entryKind, movePlan.plans),
+    );
+
+    writeStore(store);
+    return {
+      status: 'ok',
+      entries: movePlan.plans.map((plan) => ({
+        presetType,
+        entryKind: plan.entry.entryKind,
+        relativePath: [...plan.relativePath],
+        sourcePath: toVirtualPresetPath(presetType, plan.entry.relativePath),
+        filePath: toVirtualPresetPath(presetType, plan.relativePath),
+      })),
+    };
   },
   readPresetEntry: async <K extends PresetFileKind>(request: {
     presetType: K;

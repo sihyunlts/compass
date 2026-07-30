@@ -5,6 +5,7 @@ import type {
   PresetBrowserTreeFolderNode,
   PresetBrowserTreeNode,
 } from '../../../shared/contracts/ipc/presets';
+import type { PresetEntryPath } from '../../../shared/preset-entry-selection';
 import type { PresetFileKind } from '../../../shared/presets';
 import { PRESET_FILE_SPECS, PRESET_ROOT_SECTION_LABELS } from './preset-config';
 import { hasPresetExtension, resolvePresetPath } from './preset-paths';
@@ -37,16 +38,31 @@ export class PresetBrowserTreeBuilder {
     this.storage = storage;
   }
 
-  public async listTree(): Promise<PresetBrowserTreeFolderNode[]> {
-    return Promise.all(
+  public async listTree(): Promise<{
+    tree: PresetBrowserTreeFolderNode[];
+    occupiedPaths: PresetEntryPath[];
+  }> {
+    const occupiedPaths: PresetEntryPath[] = [];
+    const tree = await Promise.all(
       (['device', 'group', 'rack'] as const).map((presetType) =>
-        this.buildRootNode(presetType)
+        this.buildRootNode(presetType, occupiedPaths)
       ),
     );
+    return { tree, occupiedPaths };
+  }
+
+  public async listOccupiedPaths(
+    presetType: PresetFileKind,
+  ): Promise<PresetEntryPath[]> {
+    const occupiedPaths: PresetEntryPath[] = [];
+    await this.buildRootNode(presetType, occupiedPaths, false);
+    return occupiedPaths;
   }
 
   private async buildRootNode(
     presetType: PresetFileKind,
+    occupiedPaths: PresetEntryPath[],
+    includeTree = true,
   ): Promise<PresetBrowserTreeFolderNode> {
     const rootDirectory = await this.storage.resolvePresetDirectory(presetType);
     return {
@@ -55,7 +71,13 @@ export class PresetBrowserTreeBuilder {
       label: PRESET_ROOT_SECTION_LABELS[presetType],
       presetType,
       relativePath: [],
-      children: await this.buildChildren(presetType, rootDirectory, []),
+      children: await this.buildChildren(
+        presetType,
+        rootDirectory,
+        [],
+        occupiedPaths,
+        includeTree,
+      ),
     };
   }
 
@@ -63,6 +85,8 @@ export class PresetBrowserTreeBuilder {
     presetType: PresetFileKind,
     rootDirectory: string,
     relativePath: readonly string[],
+    occupiedPaths: PresetEntryPath[],
+    includeTree: boolean,
   ): Promise<PresetBrowserTreeNode[]> {
     const directoryPath = resolvePresetPath(rootDirectory, relativePath);
     if (!directoryPath) {
@@ -71,6 +95,12 @@ export class PresetBrowserTreeBuilder {
 
     const directoryEntries = await this.storage.readDirectoryEntries(directoryPath);
     const entries: PresetBrowserTreeNode[] = [];
+    for (const entry of directoryEntries) {
+      occupiedPaths.push({
+        presetType,
+        relativePath: [...relativePath, entry.name],
+      });
+    }
 
     const childDirectories = directoryEntries
       .filter((entry) => entry.isDirectory())
@@ -85,23 +115,33 @@ export class PresetBrowserTreeBuilder {
 
     for (const directory of childDirectories) {
       const nextRelativePath = [...relativePath, directory.name];
-      entries.push({
-        kind: 'folder',
-        id: `preset:${presetType}:${nextRelativePath.join('/')}`,
-        label: directory.name,
+      const children = await this.buildChildren(
         presetType,
-        relativePath: nextRelativePath,
-        children: await this.buildChildren(
+        rootDirectory,
+        nextRelativePath,
+        occupiedPaths,
+        includeTree,
+      );
+      if (includeTree) {
+        entries.push({
+          kind: 'folder',
+          id: `preset:${presetType}:${nextRelativePath.join('/')}`,
+          label: directory.name,
           presetType,
-          rootDirectory,
-          nextRelativePath,
-        ),
-      });
+          relativePath: nextRelativePath,
+          children,
+        });
+      }
+    }
+
+    if (!includeTree) {
+      return [];
     }
 
     const fileEntries = directoryEntries
+      .filter((entry) => entry.isFile())
       .filter((entry) =>
-        entry.isFile() && hasPresetExtension(entry.name, PRESET_FILE_SPECS[presetType].extension))
+        hasPresetExtension(entry.name, PRESET_FILE_SPECS[presetType].extension))
       .sort((left, right) => compareEntryNames(left.name, right.name));
 
     for (const entry of fileEntries) {

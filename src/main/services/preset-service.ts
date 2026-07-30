@@ -4,8 +4,10 @@ import { watch, type FSWatcher } from 'node:fs';
 import { isDeviceBrowserSystemDirectoryPath } from '../../devices/browser-categories';
 import type {
   CreatePresetFolderResponse,
+  DeletedPresetEntry,
   DeletePresetEntriesResponse,
   ListPresetBrowserTreeResponse,
+  MovePresetEntriesResponse,
   ReadPresetEntryResponse,
   RenameRackFileResponse,
   RenamePresetFileResponse,
@@ -14,6 +16,7 @@ import type {
   SavePresetFileResponse,
   ShowPresetEntryInFolderResponse,
 } from '../../shared/contracts/ipc/presets';
+import { preparePresetEntryMove } from '../../shared/preset-entry-move';
 import { normalizePresetEntrySelection } from '../../shared/preset-entry-selection';
 import { PRESET_FILE_SPECS } from './presets/preset-config';
 import { PresetBrowserTreeBuilder } from './presets/preset-browser-tree';
@@ -25,6 +28,7 @@ import {
 import {
   parseCreatePresetFolderRequest,
   parseDeletePresetEntriesRequest,
+  parseMovePresetEntriesRequest,
   parsePresetEntryRequest,
   parseReadPresetEntryRequest,
   parseSaveRackFileRequest,
@@ -203,9 +207,10 @@ export class PresetService {
 
   public async listPresetBrowserTree(): Promise<ListPresetBrowserTreeResponse> {
     try {
+      const result = await this.browserTreeBuilder.listTree();
       return {
         status: 'ok',
-        tree: await this.browserTreeBuilder.listTree(),
+        ...result,
       };
     } catch (error) {
       return {
@@ -252,6 +257,7 @@ export class PresetService {
       );
       return {
         status: 'renamed',
+        sourcePath: filePath,
         filePath: renamedPath,
         relativePath: [
           ...parsedRequest.relativePath.slice(0, -1),
@@ -274,6 +280,18 @@ export class PresetService {
       return {
         status: 'error',
         message: 'Invalid folder request.',
+      };
+    }
+    if (
+      parsedRequest.presetType === 'device'
+      && isDeviceBrowserSystemDirectoryPath([
+        ...parsedRequest.relativePath,
+        parsedRequest.folderName.trim(),
+      ])
+    ) {
+      return {
+        status: 'error',
+        message: 'Built-in device folder names are reserved.',
       };
     }
 
@@ -313,15 +331,28 @@ export class PresetService {
         message: 'Built-in device folders cannot be renamed.',
       };
     }
+    if (
+      parsedRequest.presetType === 'device'
+      && isDeviceBrowserSystemDirectoryPath([
+        ...parsedRequest.relativePath.slice(0, -1),
+        parsedRequest.folderName.trim(),
+      ])
+    ) {
+      return {
+        status: 'error',
+        message: 'Built-in device folder names are reserved.',
+      };
+    }
 
     try {
+      const renamedFolder = await this.storage.renamePresetFolder(
+        parsedRequest.presetType,
+        parsedRequest.relativePath,
+        parsedRequest.folderName,
+      );
       return {
         status: 'ok',
-        relativePath: await this.storage.renamePresetFolder(
-          parsedRequest.presetType,
-          parsedRequest.relativePath,
-          parsedRequest.folderName,
-        ),
+        ...renamedFolder,
       };
     } catch (error) {
       return {
@@ -448,7 +479,7 @@ export class PresetService {
         };
       }
 
-      const filePaths: string[] = [];
+      const entriesToDelete: DeletedPresetEntry[] = [];
       for (const entry of normalizedEntries) {
         const rootDirectory = await this.storage.resolvePresetDirectory(entry.presetType);
         const filePath = resolvePresetPath(rootDirectory, entry.relativePath);
@@ -469,18 +500,76 @@ export class PresetService {
           };
         }
 
-        await this.storage.ensurePresetEntryKind(filePath, entry.entryKind);
-        filePaths.push(filePath);
+        entriesToDelete.push({
+          entryKind: entry.entryKind,
+          filePath,
+          presetType: entry.presetType,
+          relativePath: [...entry.relativePath],
+        });
       }
 
-      for (const filePath of filePaths) {
-        await shell.trashItem(filePath);
-      }
-      return { status: 'ok' };
+      await this.storage.trashPresetEntries(entriesToDelete);
+      return { status: 'ok', entries: entriesToDelete };
     } catch (error) {
       return {
         status: 'error',
         message: toErrorMessage(error, 'Failed to delete preset item.'),
+      };
+    }
+  }
+
+  public async movePresetEntries(
+    request: unknown,
+  ): Promise<MovePresetEntriesResponse> {
+    const parsedRequest = parseMovePresetEntriesRequest(request);
+    if (!parsedRequest) {
+      return {
+        status: 'error',
+        message: 'Invalid preset move request.',
+      };
+    }
+
+    try {
+      const occupiedPaths = await this.browserTreeBuilder.listOccupiedPaths(
+        parsedRequest.destination.presetType,
+      );
+      const movePlan = preparePresetEntryMove(
+        parsedRequest.entries,
+        parsedRequest.destination,
+        occupiedPaths,
+      );
+      if (movePlan.status === 'error') {
+        return movePlan;
+      }
+
+      for (const { entry } of movePlan.plans) {
+        if (
+          entry.entryKind === 'file'
+          && !hasPresetExtension(
+            entry.relativePath[entry.relativePath.length - 1] ?? '',
+            PRESET_FILE_SPECS[movePlan.presetType].extension,
+          )
+        ) {
+          return {
+            status: 'error',
+            message: 'Invalid file type.',
+          };
+        }
+      }
+
+      return {
+        status: 'ok',
+        entries: await this.storage.movePresetEntries(
+          movePlan.presetType,
+          movePlan.plans,
+          movePlan.destinationRelativePath,
+          movePlan.createDestination,
+        ),
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to move preset items.'),
       };
     }
   }

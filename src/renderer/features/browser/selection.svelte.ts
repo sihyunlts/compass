@@ -55,6 +55,18 @@ export class BrowserSelection {
     ));
   }
 
+  public replace(
+    rowIds: readonly string[],
+    orderedRowIds: readonly string[],
+  ): void {
+    const selectedIds = orderedRowIds.filter((rowId) =>
+      rowIds.includes(rowId));
+    this.apply({
+      selectedIds,
+      anchorId: selectedIds[selectedIds.length - 1] ?? null,
+    });
+  }
+
   public reconcile(orderedRowIds: readonly string[]): void {
     this.apply(reconcileOrderedSelection(this.snapshot(), orderedRowIds));
   }

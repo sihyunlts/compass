@@ -550,7 +550,13 @@
   class="browser-drag-badge app-hint"
   aria-hidden="true"
   hidden
-></div>
+>
+  <span
+    class="browser-drag-badge-icon browser-entry-icon material-symbols-rounded"
+    aria-hidden="true"
+  ></span>
+  <span class="browser-drag-badge-label"></span>
+</div>
 
 <style lang="scss">
   .device-rack {
@@ -726,6 +732,13 @@
   .browser-drag-badge {
     transform: translate3d(-9999px, -9999px, 0);
     opacity: 0;
+    display: flex;
+    align-items: center;
+
+    :global(.browser-drag-badge-icon) {
+      flex: 0 0 auto;
+      margin-right: var(--gap-4);
+    }
   }
 
   .browser-drag-badge:global(.is-visible) {

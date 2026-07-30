@@ -1,9 +1,20 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
 
   import type { RendererDeviceKind } from '../../../devices';
   import type { AppLocale } from '../../../shared/i18n';
-  import type { PresetFileKind } from '../../../shared/presets';
+  import {
+    isPresetFileKind,
+    type PresetFileKind,
+  } from '../../../shared/presets';
+  import {
+    canMovePresetEntriesTo,
+  } from '../../../shared/preset-entry-move';
+  import {
+    arePresetPathsEqual as areEqualRelativePaths,
+    normalizePresetEntrySelection,
+    type PresetEntryPath,
+  } from '../../../shared/preset-entry-selection';
   import {
     getDeviceBrowserCategory,
     getDeviceBrowserCategoryAccentColorVar,
@@ -19,7 +30,7 @@
     BrowserTreeDeviceNode,
     BrowserTreeNode,
     PendingPresetFolderDraft,
-    PresetFolderSelectionTarget,
+    PresetEntrySelectionTarget,
     BrowserTreePresetLeafNode,
     BrowserTreePresetFolderNode,
   } from '../../features/browser/types';
@@ -39,6 +50,11 @@
     getDeviceMessageKey,
   } from '../../device-i18n';
   import { createBrowserSelection } from '../../features/browser/selection.svelte';
+  import {
+    BrowserPresetMoveDrag,
+    type BrowserPresetMoveDestination,
+  } from '../../features/browser/preset-move-drag.svelte';
+  import type { BrowserDragBadgeContent } from '../../features/browser/drag-badge';
   import { hasAdditiveSelectionModifier } from '../../features/selection/ordered-selection';
 
   interface VisibleTreeRow {
@@ -63,6 +79,18 @@
 
   type VisibleBrowserTreeNode = BrowserTreeNode | PendingPresetFolderNode;
 
+  const PRESET_PAGE_BY_TYPE = {
+    device: 'devices',
+    group: 'groups',
+    rack: 'racks',
+  } as const;
+
+  const PRESET_TYPE_BY_PAGE = {
+    devices: 'device',
+    groups: 'group',
+    racks: 'rack',
+  } as const;
+
   const hasTreeNodeChildren = (
     node: VisibleBrowserTreeNode,
   ): node is VisibleBrowserTreeNode & { children: BrowserTreeNode[] } =>
@@ -78,12 +106,6 @@
     sourceEvent: PointerEvent;
     itemEl: HTMLElement;
   };
-
-  const areEqualRelativePaths = (
-    left: readonly string[],
-    right: readonly string[],
-  ): boolean =>
-    left.length === right.length && left.every((segment, index) => segment === right[index]);
 
   const buildPendingPresetFolderNode = (
     draft: PendingPresetFolderDraft,
@@ -133,12 +155,12 @@
 
   const resolveBrowserPageForPresetType = (
     presetType: PresetFileKind,
-  ): Exclude<BrowserPage, 'settings'> =>
-    presetType === 'device'
-      ? 'devices'
-      : presetType === 'group'
-        ? 'groups'
-        : 'racks';
+  ): Exclude<BrowserPage, 'settings'> => PRESET_PAGE_BY_TYPE[presetType];
+
+  const resolvePresetTypeForPage = (
+    page: BrowserPage,
+  ): PresetFileKind | null =>
+    page === 'settings' ? null : PRESET_TYPE_BY_PAGE[page];
 
   const isPendingPresetFolderRow = (
     node: VisibleBrowserTreeNode,
@@ -278,9 +300,10 @@
     activePage = 'devices',
     deviceTree = [] as BrowserTreeDeviceFolderNode[],
     presetTree = [] as BrowserTreePresetFolderNode[],
+    presetOccupiedPaths = [] as PresetEntryPath[],
     presetErrorText = null,
     pendingPresetFolderDraft = null,
-    presetFolderSelectionTarget = null,
+    presetEntrySelectionTarget = null,
     reserveTitlebarSpace = true,
     canToggleWindowLayer = false,
     mainWindowAlwaysOnTop = false,
@@ -319,14 +342,16 @@
     onPendingPresetFolderDraftNameChange = () => {},
     onPendingPresetFolderDraftCommit = () => {},
     onPendingPresetFolderDraftCancel = () => {},
-    onPresetFolderSelectionHandled = () => {},
+    onPresetEntriesMove = () => {},
+    onPresetEntrySelectionHandled = () => {},
   } = $props<{
     activePage?: BrowserPage;
     deviceTree: BrowserTreeDeviceFolderNode[];
     presetTree: BrowserTreePresetFolderNode[];
+    presetOccupiedPaths?: PresetEntryPath[];
     presetErrorText?: string | null;
     pendingPresetFolderDraft?: PendingPresetFolderDraft | null;
-    presetFolderSelectionTarget?: PresetFolderSelectionTarget | null;
+    presetEntrySelectionTarget?: PresetEntrySelectionTarget | null;
     reserveTitlebarSpace?: boolean;
     canToggleWindowLayer?: boolean;
     mainWindowAlwaysOnTop?: boolean;
@@ -369,11 +394,19 @@
       entry: BrowserTreePresetLeafNode,
       event: PointerEvent,
       itemEl: HTMLElement,
+      dragSignal: AbortSignal,
     ) => void | Promise<void>;
     onPendingPresetFolderDraftNameChange?: (nextName: string) => void;
     onPendingPresetFolderDraftCommit?: () => void | Promise<void>;
     onPendingPresetFolderDraftCancel?: () => void;
-    onPresetFolderSelectionHandled?: (token: number) => void;
+    onPresetEntriesMove?: (
+      entries: readonly PresetEntryContextTarget[],
+      destination: {
+        presetType: PresetFileKind;
+        relativePath: readonly string[];
+      },
+    ) => void | Promise<void>;
+    onPresetEntrySelectionHandled?: (token: number) => void;
   }>();
 
   let expandedFolderIds = $state<string[]>([]);
@@ -384,6 +417,7 @@
   let pendingPresetFolderInputEl = $state<HTMLInputElement | null>(null);
   let skipPendingPresetFolderBlurId = $state<string | null>(null);
   let focusedPresetDraftKey = $state<string | null>(null);
+  let browserPagePanelEl = $state<HTMLDivElement | null>(null);
 
   const settingsButtonHasUpdateIndicator = $derived(
     updateAvailable && activePage !== 'settings',
@@ -434,21 +468,17 @@
       return devicePageTree;
     }
 
-    if (activePage === 'groups') {
-      return presetRootByType.get('group')?.children ?? [];
-    }
-
-    if (activePage === 'racks') {
-      return presetRootByType.get('rack')?.children ?? [];
-    }
-
-    return [];
+    const presetType = resolvePresetTypeForPage(activePage);
+    return presetType ? presetRootByType.get(presetType)?.children ?? [] : [];
   });
   const expandedFolderIdSet = $derived.by(() => new Set(expandedFolderIds));
   const visibleRows = $derived.by(() =>
     collectVisibleRows(activeTreeRoots, expandedFolderIdSet));
   const visibleTreeNodeById = $derived.by(
     () => new Map(visibleRows.map((row) => [row.node.id, row.node])),
+  );
+  const visibleTreeRowById = $derived.by(
+    () => new Map(visibleRows.map((row) => [row.node.id, row])),
   );
   const visibleRowIds = $derived(visibleRows.map((row) => row.node.id));
   const selectedRowIdSet = $derived.by(
@@ -478,11 +508,6 @@
     focusedRowId = rowId;
     await tick();
     treeItemRefs[rowId]?.focus();
-  };
-
-  const focusAndSelectSingleRow = async (rowId: string): Promise<void> => {
-    selectSingleRow(rowId);
-    await focusRow(rowId);
   };
 
   const focusRowFromKeyboard = async (
@@ -533,7 +558,7 @@
     }
 
     if (node.presetType === 'group') {
-      return 'stacks';
+      return 'combine_columns';
     }
 
     if (node.presetType === 'rack') {
@@ -560,6 +585,7 @@
   const handleLeafPointerDown = (
     node: BrowserTreeDeviceNode | BrowserTreePresetLeafNode,
     event: PointerEvent,
+    dragSignal: AbortSignal | null,
   ): void => {
     const itemEl = event.currentTarget;
     if (!(itemEl instanceof HTMLElement)) {
@@ -588,17 +614,20 @@
               deviceKind: selectedDeviceKinds[0] ?? node.deviceKind,
             },
         badgeLabel: selectedDeviceKinds.length > 1
-          ? `+ ${i18n.t('browser.selectedDevices', {
+          ? i18n.t('browser.selectedDevices', {
               count: selectedDeviceKinds.length,
-            })}`
-          : `+ ${resolveTreeNodeLabel(node)}`,
+            })
+          : resolveTreeNodeLabel(node),
         sourceEvent: event,
         itemEl,
       });
       return;
     }
 
-    void onPresetFilePointerDown(node, event, itemEl);
+    if (!dragSignal) {
+      return;
+    }
+    void onPresetFilePointerDown(node, event, itemEl, dragSignal);
   };
 
   const handleLeafDoubleClick = (
@@ -628,19 +657,11 @@
       };
     }
 
-    if (node.kind === 'device' && node.presetDirectoryExists) {
-      return {
-        kind: 'preset-entry',
-        presetType: 'device',
-        relativePath: [...node.presetRelativePath],
-        entryKind: 'directory',
-        isSystemFolder: true,
-      };
-    }
-
     if (
-      node.kind === 'folder'
-      && node.treeKind === 'device'
+      (
+        node.kind === 'device'
+        || (node.kind === 'folder' && node.treeKind === 'device')
+      )
       && node.presetDirectoryExists
     ) {
       return {
@@ -691,6 +712,181 @@
     };
   };
 
+  const isMovablePresetEntry = (
+    target: PresetEntryContextTarget | null,
+  ): target is PresetEntryContextTarget =>
+    target !== null
+    && !target.isSystemFolder
+    && target.relativePath.length > 0;
+
+  const resolvePresetMoveEntries = (
+    node: VisibleBrowserTreeNode,
+  ): {
+    entries: PresetEntryContextTarget[];
+    sourceRowIds: string[];
+    badge: BrowserDragBadgeContent;
+  } | null => {
+    const clickedTarget = resolvePresetContextMenuTarget(node);
+    if (!isMovablePresetEntry(clickedTarget)) {
+      return null;
+    }
+
+    const selectedRowIds = browserSelection.includes(node.id)
+      ? browserSelection.getOrderedSelectedRowIds(visibleRowIds)
+      : [node.id];
+    const candidates: {
+      rowId: string;
+      node: VisibleBrowserTreeNode;
+      target: PresetEntryContextTarget;
+    }[] = [];
+    for (const rowId of selectedRowIds) {
+      const selectedNode = visibleTreeNodeById.get(rowId);
+      const target = selectedNode
+        ? resolvePresetContextMenuTarget(selectedNode)
+        : null;
+      if (
+        isMovablePresetEntry(target)
+        && target.presetType === clickedTarget.presetType
+      ) {
+        candidates.push({ rowId, node: selectedNode, target });
+      }
+    }
+    const entries = normalizePresetEntrySelection(
+      candidates.map((candidate) => candidate.target),
+    );
+    if (entries.length === 0) {
+      return null;
+    }
+    const sourceNode = entries.length === 1
+      ? candidates.find(({ target }) => target === entries[0])?.node ?? node
+      : null;
+
+    return {
+      entries,
+      sourceRowIds: candidates.map((candidate) => candidate.rowId),
+      badge: {
+        icon: sourceNode ? resolveTreeNodeIcon(sourceNode) : 'select_all',
+        iconStyle: sourceNode ? resolveTreeNodeAccentStyle(sourceNode) : '',
+        label: sourceNode
+          ? resolveTreeNodeLabel(sourceNode)
+          : i18n.t('browser.selectedItems', { count: entries.length }),
+      },
+    };
+  };
+
+  const resolvePresetMoveDestinationForNode = (
+    node: VisibleBrowserTreeNode,
+  ): BrowserPresetMoveDestination | null => {
+    if (node.kind === 'folder' && 'isPending' in node && node.isPending) {
+      return null;
+    }
+    if (
+      node.kind === 'device'
+      || (node.kind === 'folder' && node.treeKind === 'device')
+    ) {
+      return {
+        presetType: 'device',
+        relativePath: [...node.presetRelativePath],
+        rowId: node.id,
+      };
+    }
+    if (node.kind === 'folder' && node.treeKind === 'preset') {
+      return {
+        presetType: node.presetType,
+        relativePath: [...node.relativePath],
+        rowId: node.id,
+      };
+    }
+
+    return null;
+  };
+
+  const isValidPresetMoveDestination = (
+    destination: BrowserPresetMoveDestination,
+    entries: readonly PresetEntryContextTarget[],
+  ): boolean => canMovePresetEntriesTo(
+    entries,
+    destination,
+    presetOccupiedPaths,
+  );
+
+  const resolvePresetMoveRootDestination = (
+    presetType: PresetFileKind | null,
+  ): BrowserPresetMoveDestination | null =>
+    presetType
+      ? {
+          presetType,
+          relativePath: [],
+          rowId: null,
+        }
+      : null;
+
+  const resolvePresetMoveDestinationAtPoint = (
+    clientX: number,
+    clientY: number,
+    entries: readonly PresetEntryContextTarget[],
+  ): BrowserPresetMoveDestination | null => {
+    const element = document.elementFromPoint(clientX, clientY);
+    if (!(element instanceof HTMLElement)) {
+      return null;
+    }
+
+    const rowElement = element.closest<HTMLElement>('[data-browser-row-id]');
+    if (rowElement) {
+      const rowId = rowElement.dataset.browserRowId;
+      const row = rowId ? visibleTreeRowById.get(rowId) : null;
+      const directDestination = row
+        ? resolvePresetMoveDestinationForNode(row.node)
+        : null;
+      if (directDestination) {
+        return isValidPresetMoveDestination(directDestination, entries)
+          ? directDestination
+          : null;
+      }
+
+      const parentNode = row?.parentId
+        ? visibleTreeNodeById.get(row.parentId)
+        : null;
+      const destination = parentNode
+        ? resolvePresetMoveDestinationForNode(parentNode)
+        : resolvePresetMoveRootDestination(
+            resolvePresetTypeForPage(activePage),
+          );
+      return destination
+        && isValidPresetMoveDestination(destination, entries)
+        ? destination
+        : null;
+    }
+
+    const presetRoot = element.closest<HTMLElement>('[data-preset-root-type]');
+    const rootType = presetRoot?.dataset.presetRootType;
+    const isActiveTreeArea =
+      element.closest('.browser-tree-root') !== null
+      || element.closest('.browser-page-panel') === browserPagePanelEl;
+    const presetType = isPresetFileKind(rootType)
+      ? rootType
+      : isActiveTreeArea
+        ? resolvePresetTypeForPage(activePage)
+        : null;
+    const destination = resolvePresetMoveRootDestination(presetType);
+    return destination && isValidPresetMoveDestination(destination, entries)
+      ? destination
+      : null;
+  };
+
+  const presetMoveDrag = new BrowserPresetMoveDrag({
+    resolveDestination: resolvePresetMoveDestinationAtPoint,
+    getDragBadge: () => document.getElementById('browser-drag-badge'),
+    getScrollContainer: () => browserPagePanelEl,
+    expandDestination: (rowId) => {
+      if (!expandedFolderIdSet.has(rowId)) {
+        expandedFolderIds = [...expandedFolderIds, rowId];
+      }
+    },
+    onMove: (entries, destination) =>
+      onPresetEntriesMove(entries, destination),
+  });
+
   const handleTreeItemContextMenu = (
     node: VisibleBrowserTreeNode,
     event: MouseEvent,
@@ -731,6 +927,11 @@
     row: VisibleTreeRow,
     event: MouseEvent,
   ): void => {
+    if (presetMoveDrag.consumeSuppressedClick()) {
+      event.preventDefault();
+      return;
+    }
+
     focusedRowId = row.node.id;
     if (event.shiftKey) {
       browserSelection.selectRange(
@@ -771,8 +972,20 @@
       selectSingleRow(row.node.id);
     }
 
+    const move = !event.shiftKey && !hasAdditiveSelectionModifier(event)
+      ? resolvePresetMoveEntries(row.node)
+      : null;
+    const dragSignal = move
+      ? presetMoveDrag.begin(
+          move.entries,
+          move.sourceRowIds,
+          move.badge,
+          event,
+        )
+      : null;
+
     if (row.node.kind !== 'folder') {
-      handleLeafPointerDown(row.node, event);
+      handleLeafPointerDown(row.node, event, dragSignal);
     }
   };
 
@@ -891,6 +1104,16 @@
     handlePendingPresetFolderDraftCommit();
   };
 
+  const matchesPresetEntrySelection = (
+    row: VisibleTreeRow,
+    entry: PresetEntrySelectionTarget['entries'][number],
+  ): boolean => {
+    const target = resolvePresetContextMenuTarget(row.node);
+    return target?.entryKind === entry.entryKind
+      && target.presetType === entry.presetType
+      && areEqualRelativePaths(target.relativePath, entry.relativePath);
+  };
+
   $effect(() => {
     const nextRootIds = deviceTree
       .map((node) => node.id)
@@ -978,28 +1201,36 @@
   });
 
   $effect(() => {
-    const selectionTarget = presetFolderSelectionTarget;
+    const selectionTarget = presetEntrySelectionTarget;
     if (
       !selectionTarget
-      || activePage !== resolveBrowserPageForPresetType(selectionTarget.presetType)
+      || selectionTarget.entries.length === 0
+      || activePage
+        !== resolveBrowserPageForPresetType(selectionTarget.entries[0].presetType)
     ) {
       return;
     }
 
-    const match = visibleRows.find((row) =>
-      (selectionTarget.entryKind === 'directory'
-        ? row.node.kind === 'folder' && row.node.treeKind === 'preset'
-        : row.node.kind === 'preset')
-      && row.node.presetType === selectionTarget.presetType
-      && areEqualRelativePaths(row.node.relativePath, selectionTarget.relativePath));
-    if (!match) {
+    const matches = selectionTarget.entries
+      .map((entry) =>
+        visibleRows.find((row) =>
+          matchesPresetEntrySelection(row, entry)))
+      .filter(
+        (row): row is VisibleTreeRow => row !== undefined,
+      );
+    if (matches.length === 0) {
       return;
     }
 
-    void focusAndSelectSingleRow(match.node.id).then(() => {
-      onPresetFolderSelectionHandled(selectionTarget.token);
+    const matchIds = matches.map((row) => row.node.id);
+    browserSelection.replace(matchIds, visibleRowIds);
+    detachedKeyboardFocusRowId = null;
+    void focusRow(matchIds[matchIds.length - 1]).then(() => {
+      onPresetEntrySelectionHandled(selectionTarget.token);
     });
   });
+
+  onMount(() => presetMoveDrag.mount());
 </script>
 
 <aside class="browser-panel" class:has-titlebar-spacer={reserveTitlebarSpace}>
@@ -1008,6 +1239,7 @@
       <div class="browser-page-switch-group">
         <Button
           class="browser-page-switch-button"
+          data-preset-root-type="device"
           variant="icon"
           label={i18n.t('browser.devices')}
           icon="widgets"
@@ -1018,9 +1250,10 @@
         />
         <Button
           class="browser-page-switch-button"
+          data-preset-root-type="group"
           variant="icon"
           label={i18n.t('browser.groups')}
-          icon="folder_copy"
+          icon="combine_columns"
           pressed={activePage === 'groups'}
           onClick={() => onPageSelect('groups')}
           oncontextmenu={(event: MouseEvent) =>
@@ -1028,6 +1261,7 @@
         />
         <Button
           class="browser-page-switch-button"
+          data-preset-root-type="rack"
           variant="icon"
           label={i18n.t('browser.racks')}
           icon="view_column"
@@ -1061,7 +1295,14 @@
       </div>
     </div>
 
-    <div class="browser-page-panel">
+    <div
+      bind:this={browserPagePanelEl}
+      class="browser-page-panel"
+      class:is-preset-move-root-target={
+        presetMoveDrag.destination !== null
+        && presetMoveDrag.destination.relativePath.length === 0
+      }
+    >
       {#if activePage === 'settings'}
         <SidebarSettingsPage
           {launchpadMk2Enabled}
@@ -1117,7 +1358,15 @@
             >
               <div
                 use:registerTreeItem={row.node.id}
+                data-browser-row-id={row.node.id}
                 class="browser-tree-item"
+                class:is-preset-move-source={
+                  presetMoveDrag.active?.didMove === true
+                  && presetMoveDrag.active.sourceRowIds.includes(row.node.id)
+                }
+                class:is-preset-move-drop-target={
+                  presetMoveDrag.destination?.rowId === row.node.id
+                }
                 class:has-detached-keyboard-focus={
                   detachedKeyboardFocusRowId === row.node.id
                 }
@@ -1157,6 +1406,7 @@
                     type="button"
                     aria-label={folderToggleLabel}
                     tabindex="-1"
+                    onpointerdown={(event) => event.stopPropagation()}
                     onclick={(event) => {
                       event.stopPropagation();
                       if (!browserSelection.includes(row.node.id)) {
@@ -1178,7 +1428,7 @@
                   ></span>
                 {/if}
                 <span
-                  class="browser-tree-leading-slot browser-tree-item-icon material-symbols-rounded"
+                  class="browser-tree-leading-slot browser-tree-item-icon browser-entry-icon material-symbols-rounded"
                   style={resolveTreeNodeAccentStyle(row.node)}
                   aria-hidden="true"
                 >
@@ -1315,6 +1565,11 @@
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-app-region: no-drag;
+
+    &.is-preset-move-root-target {
+      background: var(--color-surface-interactive);
+      border-radius: var(--radius-4);
+    }
   }
 
   .browser-tree-list {
@@ -1393,14 +1648,18 @@
       opacity: 0.7;
     }
 
+    &.is-preset-move-source {
+      opacity: 0.55;
+    }
+
+    &.is-preset-move-drop-target {
+      background: var(--color-surface-active);
+    }
+
     &-icon {
       width: 1.25rem;
       flex: 0 0 1.25rem;
       margin-right: var(--gap-2);
-      font-size: var(--text-14);
-      line-height: 1;
-      color: var(--browser-icon-accent, var(--color-text-secondary));
-      font-variation-settings: 'FILL' 1, 'wght' 400;
     }
 
     &-label {
@@ -1441,4 +1700,11 @@
     text-align: center;
     pointer-events: none;
   }
+
+  :global(html.is-browser-preset-moving),
+  :global(html.is-browser-preset-moving *) {
+    cursor: grabbing !important;
+    user-select: none;
+  }
+
 </style>
