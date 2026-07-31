@@ -2,7 +2,10 @@ import { app, BrowserWindow } from 'electron';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
-import { createMainWindow } from './main/app-window';
+import {
+  createMainWindow,
+  getMainWindow,
+} from './main/app-window';
 import { installApplicationMenu } from './main/application-menu';
 import { LiveTempoListener } from './main/bridge/live-tempo-listener';
 import { registerIpcHandlers } from './main/ipc/handlers';
@@ -52,6 +55,22 @@ const sendToAllWindows = <T>(channel: string, payload: T): void => {
   }
 };
 
+const focusOrCreateMainWindow = (): void => {
+  const mainWindow = getMainWindow();
+  if (!mainWindow) {
+    createMainWindow();
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  if (!mainWindow.isVisible()) {
+    mainWindow.show();
+  }
+  mainWindow.focus();
+};
+
 const resolveDevUserDataPath = (): string | null => {
   if (process.env.NODE_ENV !== 'development') {
     return null;
@@ -69,12 +88,14 @@ if (process.platform === 'win32') {
   app.setAppUserModelId(WINDOWS_APP_USER_MODEL_ID);
 }
 
-if (!handleSquirrelStartupEvent()) {
+const startApplication = (): void => {
   const generatorService = new GeneratorService();
   const presetService = new PresetService();
   const updateCheckService = new UpdateCheckService();
   const liveTempoListener = new LiveTempoListener();
   registerIpcHandlers(generatorService, presetService, updateCheckService);
+
+  app.on('second-instance', focusOrCreateMainWindow);
 
   app.whenReady().then(() => {
     installApplicationMenu();
@@ -86,13 +107,8 @@ if (!handleSquirrelStartupEvent()) {
       sendToAllWindows(IPC_CHANNELS.presetBrowserTreeChanged, undefined);
     });
 
-    createMainWindow();
-
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        createMainWindow();
-      }
-    });
+    focusOrCreateMainWindow();
+    app.on('activate', focusOrCreateMainWindow);
   });
 
   app.on('window-all-closed', () => {
@@ -103,4 +119,12 @@ if (!handleSquirrelStartupEvent()) {
     presetService.stopWatchingBrowserTree();
     liveTempoListener.stop();
   });
+};
+
+if (!handleSquirrelStartupEvent()) {
+  if (app.requestSingleInstanceLock()) {
+    startApplication();
+  } else {
+    app.quit();
+  }
 }
