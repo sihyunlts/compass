@@ -42,7 +42,9 @@
   };
 
   const resolveInitialIndex = (): number => {
-    const selectedIndex = options.findIndex((option) => isSelected(option) && !option.disabled);
+    const selectedIndex = options.findIndex(
+      (option: DropdownOption) => isSelected(option) && !option.disabled,
+    );
     return selectedIndex >= 0 ? selectedIndex : findEnabledIndex(0, 1);
   };
 

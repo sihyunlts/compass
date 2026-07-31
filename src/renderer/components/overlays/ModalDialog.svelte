@@ -17,6 +17,8 @@
     FLOATING_LAYER_ENTER_DURATION_MS,
     FLOATING_LAYER_ENTER_EASING,
     FLOATING_LAYER_EXIT_EASING,
+    type FloatingLayerEnterTarget,
+    type FloatingLayerExitTarget,
   } from './floating-layer';
   import { FloatingLayerPresence } from './floating-layer-presence.svelte';
 
@@ -34,17 +36,23 @@
     durationMs: 250,
     easing: FLOATING_LAYER_EXIT_EASING,
   } as const;
-  const MODAL_DIALOG_BACKDROP_ENTER_ANIMATION_OPTIONS = {
+  const MODAL_DIALOG_BACKDROP_ENTER_ANIMATION_OPTIONS: Omit<
+    FloatingLayerEnterTarget,
+    'element'
+  > = {
     blurPx: null,
     durationMs: FLOATING_LAYER_ENTER_DURATION_MS,
     easing: 'ease',
-  } as const;
-  const MODAL_DIALOG_BACKDROP_EXIT_ANIMATION_OPTIONS = {
+  };
+  const MODAL_DIALOG_BACKDROP_EXIT_ANIMATION_OPTIONS: Omit<
+    FloatingLayerExitTarget,
+    'element'
+  > = {
     targetScale: null,
     blurPx: null,
     durationMs: MODAL_DIALOG_EXIT_ANIMATION_OPTIONS.durationMs,
     easing: 'ease',
-  } as const;
+  };
   const MODAL_DIALOG_ENTER_ANIMATION_OPTIONS = {
     blurPx: 8,
     durationMs: FLOATING_LAYER_ENTER_DURATION_MS,

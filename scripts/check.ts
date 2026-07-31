@@ -49,6 +49,10 @@ const collectTestFiles = (
 };
 
 run(npmCommand, ['run', 'lint']);
+run(path.join(repoRoot, 'node_modules', '.bin', `svelte-check${binSuffix}`), [
+  '--tsconfig',
+  './tsconfig.json',
+]);
 const testFiles = collectTestFiles(path.join(repoRoot, 'src'));
 if (testFiles.length > 0) {
   run(path.join(repoRoot, 'node_modules', '.bin', `tsx${binSuffix}`), [

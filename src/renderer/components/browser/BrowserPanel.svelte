@@ -140,7 +140,7 @@
         }
 
         const device = category.children.find(
-          (node): node is BrowserTreeDeviceNode =>
+          (node: BrowserTreeNode): node is BrowserTreeDeviceNode =>
             node.kind === 'device'
             && areEqualRelativePaths(node.presetRelativePath, relativePath),
         );
@@ -1116,8 +1116,8 @@
 
   $effect(() => {
     const nextRootIds = deviceTree
-      .map((node) => node.id)
-      .filter((id) => !initializedRootFolderIds.includes(id));
+      .map((node: BrowserTreeDeviceFolderNode) => node.id)
+      .filter((id: string) => !initializedRootFolderIds.includes(id));
     if (nextRootIds.length === 0) {
       return;
     }
@@ -1212,17 +1212,17 @@
     }
 
     const matches = selectionTarget.entries
-      .map((entry) =>
-        visibleRows.find((row) =>
+      .map((entry: PresetEntrySelectionTarget['entries'][number]) =>
+        visibleRows.find((row: VisibleTreeRow) =>
           matchesPresetEntrySelection(row, entry)))
       .filter(
-        (row): row is VisibleTreeRow => row !== undefined,
+        (row: VisibleTreeRow | undefined): row is VisibleTreeRow => row !== undefined,
       );
     if (matches.length === 0) {
       return;
     }
 
-    const matchIds = matches.map((row) => row.node.id);
+    const matchIds = matches.map((row: VisibleTreeRow) => row.node.id);
     browserSelection.replace(matchIds, visibleRowIds);
     detachedKeyboardFocusRowId = null;
     void focusRow(matchIds[matchIds.length - 1]).then(() => {

@@ -60,9 +60,9 @@
     onPresetInsertDrop = () => {},
     onRackPresetDrop = () => {},
     onScrollMetricsChange = () => {},
-    onMiniMapContentRevisionChange = () => {},
-    getFilePath = () => null,
-    onPresetFileDrop = async () => {},
+    onMiniMapContentRevisionChange = (): void => {},
+    getFilePath = (): string | null => null,
+    onPresetFileDrop = async (): Promise<void> => {},
     onSaveDevicePreset = () => {},
     onSaveGroupPreset = () => {},
     onToggleGroupEnabled = () => {},
@@ -137,7 +137,9 @@
     buildRackContentItems(devices, resolveGroupEnabled));
 
   const isModulatorDeviceId = (deviceId: string): boolean => {
-    const device = devices.find((item) => item.id === deviceId) ?? null;
+    const device = devices.find(
+      (item: GeneratorDeviceNode) => item.id === deviceId,
+    ) ?? null;
     return device !== null && isCurveModulatorNode(device);
   };
 

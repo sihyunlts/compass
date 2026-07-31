@@ -76,7 +76,10 @@ const TEMPORAL_EFFECT_POLICIES = {
 
 const resolveTemporalCleanupMode = (
   kind: TemporalEffectKind,
-): GenerationFinalCleanupMode | undefined => TEMPORAL_EFFECT_POLICIES[kind].cleanupMode;
+): GenerationFinalCleanupMode | undefined => {
+  const policy = TEMPORAL_EFFECT_POLICIES[kind];
+  return 'cleanupMode' in policy ? policy.cleanupMode : undefined;
+};
 
 const resolveTemporalEffectSourceWindow = (
   kind: TemporalEffectKind,

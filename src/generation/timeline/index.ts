@@ -182,7 +182,9 @@ export const toFrameWindow = (
 export const addStrokeToFrame = (
   timeline: GeometryTimeline | TimelineStageBuffer,
   frameIndex: number,
-  stroke: Omit<GeometryStroke, 'writeId' | 'masks'> & { masks?: GeometryMask[] },
+  stroke: Omit<GeometryStroke, 'writeId' | 'masks'> & {
+    masks?: ReadonlyArray<GeometryMask>;
+  },
 ): void => {
   const writableFrame = getWritableFrame(timeline, frameIndex);
   const nextStroke: GeometryStroke = {
@@ -199,7 +201,9 @@ export const addStrokeToFrameRange = (
   timeline: GeometryTimeline | TimelineStageBuffer,
   startFrame: number,
   endFrameExclusive: number,
-  stroke: Omit<GeometryStroke, 'writeId' | 'masks'> & { masks?: GeometryMask[] },
+  stroke: Omit<GeometryStroke, 'writeId' | 'masks'> & {
+    masks?: ReadonlyArray<GeometryMask>;
+  },
 ): void => {
   const safeStartFrame = Math.min(Math.max(Math.trunc(startFrame), 0), timeline.frames.length);
   const safeEndFrameExclusive = Math.min(

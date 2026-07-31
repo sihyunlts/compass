@@ -292,11 +292,11 @@
         ? mappingCaptureSlotIndex
         : undefined}
       {resolvePaletteRgb}
-      onDeviceTabChange={(tabId) => {
+      onDeviceTabChange={(tabId: string) => {
         activeDeviceTab = tabId;
         onDeviceTabChange?.(device.id, tabId);
       }}
-      onModulationTargetSlotSelect={(slotIndex) => {
+      onModulationTargetSlotSelect={(slotIndex: number) => {
         onModulationTargetSlotSelect?.(device.id, slotIndex);
       }}
       {onControlChange}
