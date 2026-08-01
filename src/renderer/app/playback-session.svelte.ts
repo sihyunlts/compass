@@ -31,7 +31,7 @@ interface PlaybackSessionState {
 interface ApplyPreviewResultInput {
   preview: GeneratorPreview;
   bridge: BridgeSettings | null;
-  source: 'preview' | 'send';
+  source: 'preview' | 'delivery';
   sourceChain: GeneratorChain;
   sourceKey: string;
   launchpadModel: LaunchpadModel;
@@ -111,7 +111,7 @@ export class PlaybackSessionController {
 
   private previewGenerationRequestId = 0;
 
-  private previewGenerationPurpose: 'preview' | 'send' | null = null;
+  private previewGenerationPurpose: 'preview' | 'delivery' | null = null;
 
   private latestGeneratedPreview: CachedGeneratedPreview | null = null;
 
@@ -235,7 +235,7 @@ export class PlaybackSessionController {
   }
 
   public async runPreview(): Promise<void> {
-    if (this.previewGenerationPurpose === 'send') {
+    if (this.previewGenerationPurpose === 'delivery') {
       return;
     }
 
@@ -274,8 +274,10 @@ export class PlaybackSessionController {
     }
   }
 
-  public async generatePreviewForSend(input: PreviewGenerationSource): Promise<GeneratorPreview> {
-    return this.resolveGeneratedPreview(input, 'send');
+  public async generatePreviewForDelivery(
+    input: PreviewGenerationSource,
+  ): Promise<GeneratorPreview> {
+    return this.resolveGeneratedPreview(input, 'delivery');
   }
 
   public applyPreviewResult(input: ApplyPreviewResultInput): void {
@@ -353,7 +355,7 @@ export class PlaybackSessionController {
     this.playbackScheduler?.stop();
   }
 
-  public prepareForSend(): void {
+  public prepareForDelivery(): void {
     if (this.previewVisualPhase !== 'disabled') {
       this.previewVisualPhase = 'consumed';
     }
@@ -461,7 +463,7 @@ export class PlaybackSessionController {
 
   private async resolveGeneratedPreview(
     input: PreviewGenerationSource,
-    purpose: 'preview' | 'send',
+    purpose: 'preview' | 'delivery',
   ): Promise<GeneratorPreview> {
     const cachedPreview = this.resolveCachedGeneratedPreview(input);
     if (cachedPreview) {
@@ -496,7 +498,7 @@ export class PlaybackSessionController {
     }
   }
 
-  private beginPreviewGeneration(purpose: 'preview' | 'send'): number {
+  private beginPreviewGeneration(purpose: 'preview' | 'delivery'): number {
     this.previewGenerationRequestId += 1;
     this.previewGenerationPurpose = purpose;
     this.state.isPreviewGenerating = true;

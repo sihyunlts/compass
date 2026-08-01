@@ -40,7 +40,7 @@
   import { createHeaderIndicator } from './app/header-indicator.svelte';
   import { mountKeyboardShortcuts } from './app/keyboard-shortcuts';
   import { createPlaybackSession } from './app/playback-session.svelte';
-  import { createSendFlow } from './app/send-flow';
+  import { createResultDeliveryFlow } from './app/result-delivery-flow';
   import { setKaguyaThemeEnabled } from './app/theme';
   import {
     createEditorSession,
@@ -69,6 +69,7 @@
 
   const bridgeClient = resolveCompassBridge();
   const isWebFallback = !window.compass;
+  const resultDeliveryMode = isWebFallback ? 'midi-download' : 'ableton';
   const hasWindowsTitlebarControls = navigator.userAgent.includes('Windows');
   const reserveBrowserTitlebarSpace = !isWebFallback && !hasWindowsTitlebarControls;
   let rackViewApi: RackViewApi | null = $state(null);
@@ -95,6 +96,16 @@
   let badAppleAnimation: BadAppleAnimation | null = $state(null);
   const uiState = editorSession.state;
   const previewState = previewSession.state;
+  const deliveryButtonMessageKeys = {
+    idle: isWebFallback ? 'status.download' : 'status.send',
+    working: isWebFallback ? 'status.downloading' : 'status.sending',
+  } as const;
+  const deliveryButtonText = $derived.by(() =>
+    i18n.t(
+      uiState.deliveryButtonState === 'done'
+        ? 'status.done'
+        : deliveryButtonMessageKeys[uiState.deliveryButtonState],
+    ));
   const historyControls = $derived.by(() => selectHistoryControls(uiState));
   const localizedRedoActionLabel = $derived(
     historyControls.redoActionKind
@@ -173,11 +184,12 @@
   let isRackRenamePending = $state(false);
   let rackRenameDraft = $state('');
   let isRackRevertDialogOpen = $state(false);
-  const sendFlow = createSendFlow({
+  const resultDeliveryFlow = createResultDeliveryFlow({
     bridgeClient,
     editorSession,
     headerIndicator,
     playbackSession,
+    mode: resultDeliveryMode,
   });
 
   let rackScrollMetrics: RackScrollMetrics = $state({
@@ -505,7 +517,7 @@
       disposeMainWindowCloseRequest();
       disposeKeyboardShortcuts();
       disposeBridgeSubscriptions();
-      sendFlow.dispose();
+      resultDeliveryFlow.dispose();
       playbackSession.dispose();
       headerIndicator.dispose();
       settingsController.dispose();
@@ -683,17 +695,12 @@
             />
           </div>
           <Button
-            id="send-button"
+            id="delivery-button"
             variant="primary"
-            text={i18n.t(
-              uiState.sendButtonState === 'sending'
-                ? 'status.sending'
-                : uiState.sendButtonState === 'done'
-                  ? 'status.done'
-                  : 'status.send',
-            )}
-            disabled={uiState.sendButtonDisabled}
-            onClick={() => sendFlow.send(presetState.currentRackDisplayName)}
+            text={deliveryButtonText}
+            disabled={uiState.deliveryButtonState === 'working'}
+            onClick={() =>
+              resultDeliveryFlow.deliver(presetState.currentRackDisplayName)}
           />
         </div>
       </header>
@@ -735,6 +742,7 @@
           <PreviewPanel
             surfaceModel={previewState.surfaceModel}
             onPopout={() => playbackSession.openPreviewPopout()}
+            canPopout={!isWebFallback}
             isPlaying={playbackSession.state.isPlaying}
             isGenerating={playbackSession.state.isPreviewGenerating}
             loopEnabled={uiState.isPreviewLoopEnabled}

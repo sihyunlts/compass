@@ -113,8 +113,7 @@ export interface EditorSessionState {
   isPreviewPopoutOpen: boolean;
   previewScrubValue: number;
   autoCreateLengthLabel: string;
-  sendButtonState: 'idle' | 'sending' | 'done';
-  sendButtonDisabled: boolean;
+  deliveryButtonState: 'idle' | 'working' | 'done';
   sidebarWidthPx: number;
   isSidebarResizing: boolean;
   collapsedDeviceIds: string[];

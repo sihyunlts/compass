@@ -4,7 +4,10 @@ import {
 } from '../../core/launchpad-map';
 import { LIVE_BRIDGE_TARGET } from '../../shared/bridge/protocol';
 import { sanitizeBridgeSettings } from '../../shared/validation/bridge-settings';
-import type { ClipNote } from '../../shared/model';
+import {
+  normalizeCustomName,
+  type ClipNote,
+} from '../../shared/model';
 import type {
   RequestLiveTempoResponse,
   SendGeneratedPreviewRequest,
@@ -58,9 +61,7 @@ export class GeneratorService {
     request: SendGeneratedPreviewRequest,
   ): Promise<SendGeneratedPreviewResponse> {
     const bridgeSettings = sanitizeBridgeSettings(request.bridge);
-    const clipName = typeof request.clipName === 'string'
-      ? request.clipName.trim()
-      : '';
+    const clipName = normalizeCustomName(request.clipName);
     if (!clipName) {
       throw new Error('Clip name is required.');
     }

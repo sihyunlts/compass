@@ -7,7 +7,7 @@ export const normalizeCustomName = (value: unknown): string | null => {
     return null;
   }
 
-  const trimmed = value.trim();
+  const trimmed = value.trim().normalize('NFC');
   return trimmed ? trimmed : null;
 };
 

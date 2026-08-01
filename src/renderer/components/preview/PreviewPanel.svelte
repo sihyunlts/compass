@@ -9,6 +9,7 @@
   let {
     surfaceModel,
     onPopout,
+    canPopout = true,
     isPlaying = false,
     isGenerating = false,
     loopEnabled,
@@ -19,6 +20,7 @@
   } = $props<{
     surfaceModel: PreviewSurfaceViewModel;
     onPopout: () => void | Promise<void>;
+    canPopout?: boolean;
     isPlaying?: boolean;
     isGenerating?: boolean;
     loopEnabled: boolean;
@@ -90,15 +92,17 @@
       pressed={loopEnabled}
       onClick={onLoopToggle}
     />
-    <Button
-      id="preview-popout"
-      class="preview-panel-control-button preview-popout-toggle"
-      variant="icon"
-      label={i18n.t('preview.openPopout')}
-      title={i18n.t('preview.openPopout')}
-      icon="open_in_new"
-      onClick={handlePopout}
-    />
+    {#if canPopout}
+      <Button
+        id="preview-popout"
+        class="preview-panel-control-button preview-popout-toggle"
+        variant="icon"
+        label={i18n.t('preview.openPopout')}
+        title={i18n.t('preview.openPopout')}
+        icon="open_in_new"
+        onClick={handlePopout}
+      />
+    {/if}
   </div>
 </section>
 

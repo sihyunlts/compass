@@ -1,5 +1,6 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { MessageKey } from '../../shared/i18n';
+import { normalizeCustomName } from '../../shared/model';
 import {
   normalizePresetEntrySelection,
   type PresetEntryPath,
@@ -179,14 +180,11 @@ const stripRackExtension = (fileName: string): string => {
     : fileName;
 };
 
-const resolveRackDisplayNameFromPath = (filePath: string): string => {
-  const name = stripRackExtension(resolveFileName(filePath)).trim();
-  return name || resolveDefaultRackFileDisplayName();
-};
-
-const resolveRackDisplayNameFromFileName = (fileName: string): string => {
-  const name = stripRackExtension(resolveFileName(fileName)).trim();
-  return name || resolveDefaultRackFileDisplayName();
+const resolveRackDisplayName = (filePathOrName: string): string => {
+  const name = normalizeCustomName(
+    stripRackExtension(resolveFileName(filePathOrName)),
+  );
+  return name ?? resolveDefaultRackFileDisplayName();
 };
 
 const toCollapsedDeviceIdsKey = (ids: readonly string[]): string =>
@@ -328,7 +326,7 @@ class PresetController {
   }
 
   public async renameCurrentRack(rawName: string): Promise<boolean> {
-    const nextName = resolveRackDisplayNameFromFileName(rawName);
+    const nextName = resolveRackDisplayName(rawName);
     if (nextName === this.state.currentRackDisplayName) {
       return true;
     }
@@ -349,7 +347,7 @@ class PresetController {
       return false;
     }
 
-    this.setCurrentRackFile(response.filePath, resolveRackDisplayNameFromPath(response.filePath));
+    this.setCurrentRackFile(response.filePath, resolveRackDisplayName(response.filePath));
     this.cleanRackDisplayName = this.state.currentRackDisplayName;
     this.syncRackDirtyState();
     await this.loadTree();
@@ -384,8 +382,8 @@ class PresetController {
 
   private setCurrentRackFile(filePath: string | null, displayName: string): void {
     this.state.currentRackFilePath = filePath;
-    this.state.currentRackDisplayName = displayName.trim()
-      || resolveDefaultRackFileDisplayName();
+    this.state.currentRackDisplayName = normalizeCustomName(displayName)
+      ?? resolveDefaultRackFileDisplayName();
   }
 
   private syncCurrentRackAfterPresetEntriesMove(
@@ -412,7 +410,7 @@ class PresetController {
       this.setCurrentRackFile(
         nextFilePath,
         entry.entryKind === 'file'
-          ? resolveRackDisplayNameFromPath(nextFilePath)
+          ? resolveRackDisplayName(nextFilePath)
           : this.state.currentRackDisplayName,
       );
       if (entry.entryKind === 'file') {
@@ -470,7 +468,7 @@ class PresetController {
       payload: this.buildCurrentRackFile(),
     });
     if (response.status === 'saved') {
-      this.setCurrentRackFile(response.filePath, resolveRackDisplayNameFromPath(response.filePath));
+      this.setCurrentRackFile(response.filePath, resolveRackDisplayName(response.filePath));
       this.markCurrentRackClean({ captureRevertTarget: true });
       if (options.showSuccessMessage) {
         this.showMessage(i18n.t('status.rackSaved'));
@@ -488,7 +486,7 @@ class PresetController {
   ): Promise<boolean> {
     const response = await this.options.bridgeClient.savePresetFile(this.buildRackSaveAsRequest());
     if (response.status === 'saved') {
-      this.setCurrentRackFile(response.filePath, resolveRackDisplayNameFromPath(response.filePath));
+      this.setCurrentRackFile(response.filePath, resolveRackDisplayName(response.filePath));
       this.markCurrentRackClean({ captureRevertTarget: true });
       if (options.showSuccessMessage) {
         this.showMessage(i18n.t('status.rackSaved'));
@@ -1035,7 +1033,7 @@ class PresetController {
 
     if (parsed.preset.presetType === 'rack') {
       await this.requestRackOpen({
-        label: resolveRackDisplayNameFromFileName(payload.file.name),
+        label: resolveRackDisplayName(payload.file.name),
         preset: parsed.preset,
         filePath: payload.filePath,
         needsSave: parsed.needsSave,
