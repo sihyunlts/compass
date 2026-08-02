@@ -281,7 +281,7 @@
     width: calc(var(--window-end, 0%) - var(--window-start, 0%));
     min-width: 0;
     background: var(--time-window-accent);
-    opacity: 0.75;
+    opacity: 0.85;
   }
 
   .time-window-playhead {
@@ -298,6 +298,7 @@
     bottom: 0;
     width: 1px;
     background: var(--color-overlay-highlight-secondary);
+    mix-blend-mode: overlay;
     transform: translateX(-0.5px);
 
     &.is-major {
