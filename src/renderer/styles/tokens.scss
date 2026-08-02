@@ -30,7 +30,7 @@
   --color-surface-emphasis: var(--theme-tone-40);
   --color-surface-inverse: var(--theme-tone-90);
   --color-surface-floating: color-mix(in oklch, var(--color-surface) 92%, transparent);
-  --color-surface-floating-interactive: oklch(100% 0 0 / 0.08);
+  --color-surface-floating-interactive: oklch(100% calc(0.05 * var(--theme-chroma-scale)) var(--theme-hue) / 0.08);
 
   /* Borders */
   --color-border-primary: var(--theme-tone-50);
