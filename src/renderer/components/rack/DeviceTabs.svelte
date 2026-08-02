@@ -80,7 +80,7 @@
     min-height: 1rem;
     border: 0;
     border-radius: var(--radius-4);
-    padding: 0 var(--gap-6);
+    padding: 0 var(--gap-4);
     background: transparent;
     color: var(--color-text-secondary);
     font-size: var(--text-12);
@@ -94,7 +94,7 @@
     }
 
     &.is-active {
-      background: var(--color-surface-active);
+      background: var(--color-overlay-highlight-secondary);
       color: var(--color-text-primary);
     }
   }
