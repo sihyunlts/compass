@@ -94,7 +94,7 @@
     }
 
     &.is-active {
-      background: var(--color-overlay-highlight-secondary);
+      background: var(--color-surface-floating-interactive);
       color: var(--color-text-primary);
     }
   }
