@@ -126,14 +126,14 @@ export const compileModulationProgram = (
 
 export const evaluateModulationProgramReadouts = (
   program: CompiledModulationProgram,
-  beat01: number,
+  beat: number,
   loopLengthBeats: number,
   options?: {
     wrap?: boolean;
   },
 ): ModulationRuntimeReadout[] => {
   const baseTimelineT = toLoopProgress01(
-    beat01,
+    beat,
     loopLengthBeats,
     options?.wrap !== false,
   );
@@ -163,14 +163,14 @@ export const evaluateModulationProgramReadouts = (
 export const applyModulationRoutesToDevice = (
   routes: ReadonlyArray<CompiledModulationRoute>,
   targetDevice: GeneratorDeviceNode,
-  beat01: number,
+  beat: number,
   loopLengthBeats: number,
   options?: {
     wrap?: boolean;
   },
 ): void => {
   const baseTimelineT = toLoopProgress01(
-    beat01,
+    beat,
     loopLengthBeats,
     options?.wrap !== false,
   );

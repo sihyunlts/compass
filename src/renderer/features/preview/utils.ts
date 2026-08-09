@@ -4,15 +4,6 @@ import type { PreviewWindowState } from '../../../shared/contracts/preview/windo
 
 export const EMPTY_ACTIVE_VELOCITY_BY_PITCH = new SvelteMap<number, number>();
 
-export const toWrappedLoopBeat01 = (beat: number): number => {
-  const safeBeat = Number.isFinite(beat) ? beat : 0;
-  const wrapped = ((safeBeat % 1) + 1) % 1;
-  if (wrapped === 0 && safeBeat > 0) {
-    return 1;
-  }
-  return wrapped;
-};
-
 export const toActiveCells = (
   activeVelocityByPitch: ReadonlyMap<number, number>,
   resolveLedRgb: (velocity: number) => string,

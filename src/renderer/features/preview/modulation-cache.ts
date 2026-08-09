@@ -10,10 +10,8 @@ import {
   formatNumericParameterDisplayValue,
   formatNumericParameterValue,
 } from '../../../devices/numeric-parameters';
-import { clamp } from '../../../shared/math';
 import type { GeneratorChain } from '../../../shared/model';
 import { LatestSourceKeyFamilyCache } from './source-key-cache';
-import { toWrappedLoopBeat01 } from './utils';
 import { i18n } from '../../i18n.svelte';
 
 const EMPTY_MODULATION_READOUT_BY_ID: Readonly<Record<string, string>> = Object.freeze({});
@@ -41,9 +39,6 @@ class ModulationReadoutCache {
       return EMPTY_MODULATION_READOUT_BY_ID;
     }
 
-    const modulationBeat01 = isLoopEnabled
-      ? toWrappedLoopBeat01(beat)
-      : clamp(beat, 0, 1);
     const readoutById = Object.fromEntries(
       modulationCache.modulatorIds.map((modulatorId) => [
         modulatorId,
@@ -53,7 +48,7 @@ class ModulationReadoutCache {
 
     const readouts = evaluateModulationProgramReadouts(
       modulationCache.program,
-      modulationBeat01,
+      beat,
       loopLengthBeats,
       { wrap: isLoopEnabled },
     );
