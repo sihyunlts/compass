@@ -1,6 +1,4 @@
 import {
-  clonePendingFrameApplications,
-  clonePendingTemporalWriteOrderByOriginId,
   cloneTimelineStateByOriginId,
   type MutableGenerationState,
   type OriginTimelineState,
@@ -46,9 +44,9 @@ export const transitionGenerationState = (
 ): MutableGenerationState => ({
   timeline: overrides.timeline ?? state.timeline,
   timelineStateByOriginId: overrides.timelineStateByOriginId
-    ?? cloneTimelineStateByOriginId(state.timelineStateByOriginId),
+    ?? state.timelineStateByOriginId,
   pendingTemporalWriteOrderByOriginId: overrides.pendingTemporalWriteOrderByOriginId
-    ?? clonePendingTemporalWriteOrderByOriginId(state.pendingTemporalWriteOrderByOriginId),
+    ?? state.pendingTemporalWriteOrderByOriginId,
   pendingFrameApplications: overrides.pendingFrameApplications
-    ?? clonePendingFrameApplications(state.pendingFrameApplications),
+    ?? state.pendingFrameApplications,
 });

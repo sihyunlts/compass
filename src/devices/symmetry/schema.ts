@@ -19,7 +19,7 @@ const createDefaultSymmetryNode = (
 ): SymmetryEffectNode => ({
   id,
   kind: 'symmetry',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: { ...DEFAULT_SYMMETRY_PARAMS },
 });

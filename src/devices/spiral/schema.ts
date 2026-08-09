@@ -50,7 +50,7 @@ const createDefaultSpiralNode = (
 ): SpiralGeneratorNode => ({
   id,
   kind: 'spiral',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: { ...DEFAULT_SPIRAL_PARAMS },
 });

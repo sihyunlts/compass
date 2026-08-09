@@ -36,7 +36,7 @@ const createDefaultRotateNode = (
 ): RotateEffectNode => ({
   id,
   kind: 'rotate',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: { ...DEFAULT_ROTATE_PARAMS },
 });

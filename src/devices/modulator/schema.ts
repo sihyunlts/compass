@@ -27,7 +27,7 @@ const createDefaultModulatorNode = (
 ): CurveModulatorNode => ({
   id,
   kind: 'modulator',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: {
     targets: [],

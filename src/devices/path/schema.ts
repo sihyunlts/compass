@@ -175,7 +175,7 @@ const createDefaultPathNode = (
 ): PathGeneratorNode => ({
   id,
   kind: 'path',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: sanitizePathParams({}),
 });

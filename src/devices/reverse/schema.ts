@@ -12,7 +12,7 @@ const createDefaultReverseNode = (
 ): ReverseEffectNode => ({
   id,
   kind: 'reverse',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
 });
 
