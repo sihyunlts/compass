@@ -64,7 +64,7 @@
     -webkit-app-region: no-drag;
 
     &.is-checked {
-      background: var(--color-surface-inverse);
+      background: var(--device-control-accent, var(--color-surface-inverse));
 
       .switch-thumb {
         background: var(--color-surface);

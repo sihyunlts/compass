@@ -1,6 +1,7 @@
 import {
   createMergeKeyResolver,
   parseFiniteControlNumber,
+  parseStructuredControlValue,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
 import { sanitizeCurveDivisions, sanitizeCurveNodes } from '../../core/modulation/curve';
@@ -161,18 +162,12 @@ export const modulatorDeviceControls = {
         return false;
       }
 
-      let parsed: unknown;
-      if (typeof change.value === 'string') {
-        try {
-          parsed = JSON.parse(change.value);
-        } catch {
-          return false;
-        }
-      } else {
-        parsed = change.value;
+      const parsed = parseStructuredControlValue(change.value);
+      if (!parsed.ok) {
+        return false;
       }
 
-      device.params.curve.nodes = sanitizeCurveNodes(parsed);
+      device.params.curve.nodes = sanitizeCurveNodes(parsed.value);
       return true;
     },
   }),

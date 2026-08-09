@@ -54,14 +54,40 @@ export interface SpiralGeneratorNode extends GroupedDeviceNode {
   params: SpiralParams;
 }
 
-export interface PathPoint {
+export interface PathHandle {
   x: number;
   y: number;
 }
 
+export interface PathAnchor {
+  id: string;
+  x: number;
+  y: number;
+  handleIn?: PathHandle;
+  handleOut?: PathHandle;
+}
+
+export interface PathAnimation {
+  enabled: boolean;
+  direction: 'forward' | 'reverse';
+  startAnchorId: string;
+}
+
+export interface PathTransform {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  tx: number;
+  ty: number;
+}
+
 export interface PathParams {
-  points: PathPoint[];
+  anchors: PathAnchor[];
   closed: boolean;
+  fill: boolean;
+  transform: PathTransform;
+  animation: PathAnimation;
 }
 
 export interface PathGeneratorNode extends GroupedDeviceNode {

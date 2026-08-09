@@ -78,6 +78,6 @@ export interface Polyline {
   readonly velocity: number;
   readonly colorAgeBandIndex?: number;
   readonly colorAgeBandCount?: number;
-  readonly rasterMode?: 'centerline';
+  readonly rasterMode?: 'centerline' | 'fill';
   readonly clipStack: ReadonlyArray<SceneClip>;
 }

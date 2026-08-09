@@ -17,6 +17,14 @@ import {
 
 const NORMALIZED_GENERATOR_END_BEAT = 1;
 
+const toInclusiveFrameProgress = (
+  beat: number,
+  sampleStepBeats: number,
+): number => {
+  const lastFrameBeat = NORMALIZED_GENERATOR_END_BEAT - sampleStepBeats;
+  return lastFrameBeat <= 0 ? 0 : Math.min(Math.max(beat / lastFrameBeat, 0), 1);
+};
+
 const toPolylineArray = (
   polyline: Polyline | null,
 ): Polyline[] => polyline ? [polyline] : [];
@@ -92,6 +100,9 @@ const buildGeneratorPolylines = (
     buildPathPolyline(
       device.id,
       device.params,
+      device.params.closed
+        ? beat01
+        : toInclusiveFrameProgress(beat01, sampleStepBeats),
       GENERATED_VELOCITY,
     ),
   );

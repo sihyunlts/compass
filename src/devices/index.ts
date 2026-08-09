@@ -69,13 +69,18 @@ const rendererDeviceViewByKind: RendererDeviceViewByKind = {
     controls: modulatorDeviceControls,
     defaultTabId: 'curve',
     tabs: () => [
-      { id: 'curve', label: 'Curve' },
-      { id: 'map', label: 'Map' },
+      { id: 'curve', labelKey: 'tab.curve' },
+      { id: 'map', labelKey: 'tab.map' },
     ],
   },
   path: {
     editor: './path/ui.svelte',
     controls: pathDeviceControls,
+    defaultTabId: 'path',
+    tabs: () => [
+      { id: 'path', labelKey: 'tab.path' },
+      { id: 'animate', labelKey: 'tab.animate' },
+    ],
   },
   rain: {
     editor: './rain/ui.svelte',

@@ -49,11 +49,7 @@
       onclick={() => selectTab(tab)}
     >
       <span class="device-tab-label">
-        {tab.id === 'curve'
-          ? i18n.t('tab.curve')
-          : tab.id === 'map'
-            ? i18n.t('tab.map')
-            : tab.label}
+        {i18n.t(tab.labelKey)}
       </span>
     </button>
   {/each}
