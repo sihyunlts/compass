@@ -8,6 +8,7 @@ import {
   createCoordinateMask,
 } from '../timeline/analysis';
 import {
+  createEmptyTimeline,
   createIdentityMask,
 } from '../timeline';
 import type { CanonicalOutputAdapter, GeometryMask, GeometryTimeline } from '../types';
@@ -30,8 +31,13 @@ import {
 const resolveMaskSourceTimeReversed = (
   chain: GeneratorChain,
   targetGroupId: string | null,
-  consumingDeviceIndex: number,
+  consumingDeviceId: string,
 ): boolean => {
+  const consumingDeviceIndex = chain.devices.findIndex((device) => device.id === consumingDeviceId);
+  if (consumingDeviceIndex < 0) {
+    return false;
+  }
+
   let reverseParity = false;
 
   for (let index = chain.devices.length - 1; index > consumingDeviceIndex; index -= 1) {
@@ -59,23 +65,25 @@ const resolveMaskSourceTimeline = (
     return currentTimeline;
   }
 
-  const sourceId = normalizeOptionalId(effect.params.sourceId);
-  if (!sourceId) {
-    return currentTimeline;
+  const result = referenceContext.resolveReference({
+    sourceKind: effect.params.sourceKind,
+    sourceId: normalizeOptionalId(effect.params.sourceId),
+  });
+  switch (result.status) {
+    case 'resolved':
+      return result.timeline;
+    case 'unconfigured':
+      return currentTimeline;
+    case 'cycle':
+      return createEmptyTimeline();
   }
-
-  const referenceTimeline = referenceContext.resolveReferenceTimeline(
-    effect.params.sourceKind,
-    sourceId,
-  );
-  return referenceTimeline ?? currentTimeline;
 };
 
 const resolveMaskSourceMask = (
   sourceTimeline: GeometryTimeline,
   chain: GeneratorChain,
   effect: MaskEffectNode,
-  consumingDeviceIndex: number,
+  consumingDeviceId: string,
   outputAdapter: CanonicalOutputAdapter,
   targetGroupId: string | null,
   frameIndex: number,
@@ -93,7 +101,7 @@ const resolveMaskSourceMask = (
   const isTimeReversed = resolveMaskSourceTimeReversed(
     chain,
     targetGroupId,
-    consumingDeviceIndex,
+    consumingDeviceId,
   );
   const resolvedFrameIndex = isTimeReversed
     ? Math.max(sourceTimeline.frames.length - 1 - frameIndex, 0)
@@ -120,7 +128,7 @@ const applyMaskEffect = (
   effect: MaskEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
-  consumingDeviceIndex: number,
+  consumingDeviceId: string,
   outputAdapter: CanonicalOutputAdapter,
   executionPlan: OperatorExecutionPlan,
   referenceContext: MaskSourceReferenceContext,
@@ -146,7 +154,7 @@ const applyMaskEffect = (
         sourceTimeline,
         chain,
         effect,
-        consumingDeviceIndex,
+        consumingDeviceId,
         outputAdapter,
         targetGroupId,
         frameIndex,
@@ -184,7 +192,7 @@ export const maskOperator = createPendingFrameApplicationOperator<'mask'>(
       device,
       stage.groupId,
       stage.stageIndex,
-      stage.stageIndex,
+      stage.deviceId,
       context.outputAdapter,
       executionPlan,
       context.referenceContext,
