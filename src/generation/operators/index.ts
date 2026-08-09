@@ -3,7 +3,6 @@ import type { OperatorExecutionPlan } from '../analysis/types';
 import type { CompiledRackPlan, CompiledRackStage, RackStageDeviceKind } from '../plan/types';
 import { resolveCompiledRackSampleStepBeats } from '../plan/sampling';
 import { createEmptyGenerationState, type MutableGenerationState } from '../timeline/state';
-import { createEmptyTimeline } from '../timeline';
 import type { CanonicalOutputAdapter, GeometryTimeline } from '../types';
 import { colorOperator } from './color';
 import { generatorOperator } from './generator';
@@ -14,10 +13,13 @@ import {
   createModulationContext,
   createRackStageExecutionContext,
   materializeAndNormalizeRackState,
+  prepareRackOperatorInput,
   resolveMaskReferenceMutedGeneratorIds,
   resolveMaskReferenceMutedGroupIds,
   shouldApplyReferenceStage,
   type MaskSourceReferenceContext,
+  type MaskSourceReferenceRequest,
+  type MaskSourceReferenceResult,
   type RackOperator,
   type RackStageExecutionContext,
 } from './runtime';
@@ -52,26 +54,39 @@ const applyCompiledRackStage = (
   context: RackStageExecutionContext,
 ): MutableGenerationState => {
   const operator = getRackOperator(stage.deviceKind);
-  return operator.execute(
-    operator.prepareInput(state, context),
-    stage,
-    context,
-  );
+  switch (operator.inputPolicy) {
+    case 'preserve-pending':
+      return operator.execute(
+        prepareRackOperatorInput(operator.inputPolicy, state, context),
+        stage,
+        context,
+      );
+    case 'materialize-all':
+      return operator.execute(
+        prepareRackOperatorInput(operator.inputPolicy, state, context),
+        stage,
+        context,
+      );
+  }
 };
 
-const resolveMaskSourceReferenceTimeline = (
+const resolveMaskSourceReference = (
   context: MaskSourceReferenceContext,
-  sourceKind: 'group' | 'generator',
-  sourceId: string,
-): GeometryTimeline | null => {
+  request: MaskSourceReferenceRequest,
+): MaskSourceReferenceResult => {
+  const { sourceKind, sourceId } = request;
+  if (!sourceId) {
+    return { status: 'unconfigured' };
+  }
+
   const sourceKey = `${sourceKind}:${sourceId}`;
   const cached = context.timelineBySourceKey.get(sourceKey);
   if (cached) {
-    return cached;
+    return { status: 'resolved', timeline: cached };
   }
 
   if (context.resolvingSourceKeys.has(sourceKey)) {
-    return createEmptyTimeline();
+    return { status: 'cycle' };
   }
 
   context.resolvingSourceKeys.add(sourceKey);
@@ -109,7 +124,7 @@ const resolveMaskSourceReferenceTimeline = (
     const normalizedState = materializeAndNormalizeRackState(currentState, stageExecutionContext);
     const timeline = normalizedState.timeline;
     context.timelineBySourceKey.set(sourceKey, timeline);
-    return timeline;
+    return { status: 'resolved', timeline };
   } finally {
     context.resolvingSourceKeys.delete(sourceKey);
   }
@@ -136,10 +151,9 @@ export const executeCompiledRackPlan = (
     mutedGeneratorIds,
     timelineBySourceKey: new Map<string, GeometryTimeline>(),
     resolvingSourceKeys: new Set<string>(),
-    resolveReferenceTimeline: (sourceKind, sourceId) => resolveMaskSourceReferenceTimeline(
+    resolveReference: (request) => resolveMaskSourceReference(
       referenceContext,
-      sourceKind,
-      sourceId,
+      request,
     ),
   };
   const stageExecutionContext = createRackStageExecutionContext(referenceContext);

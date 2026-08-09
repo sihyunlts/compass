@@ -13,6 +13,8 @@ import type {
   RackStageDeviceNode,
 } from '../../plan/types';
 import type {
+  DeferredGenerationState,
+  MaterializedGenerationState,
   MutableGenerationState,
   PendingTemporalMaterializationCheckpoint,
 } from '../../timeline/state';
@@ -34,8 +36,18 @@ export interface MaskSourceReferenceContext {
   mutedGeneratorIds: ReadonlySet<string>;
   timelineBySourceKey: Map<string, GeometryTimeline>;
   resolvingSourceKeys: Set<string>;
-  resolveReferenceTimeline(sourceKind: 'group' | 'generator', sourceId: string): GeometryTimeline | null;
+  resolveReference(request: MaskSourceReferenceRequest): MaskSourceReferenceResult;
 }
+
+export interface MaskSourceReferenceRequest {
+  sourceKind: 'group' | 'generator';
+  sourceId: string | null;
+}
+
+export type MaskSourceReferenceResult =
+  | { status: 'resolved'; timeline: GeometryTimeline }
+  | { status: 'unconfigured' }
+  | { status: 'cycle' };
 
 export interface RackStageExecutionContext {
   compiledPlan: CompiledRackPlan;
@@ -47,25 +59,31 @@ export interface RackStageExecutionContext {
   referenceContext: MaskSourceReferenceContext;
 }
 
-export type RackOperatorInputPreparation = (
-  state: MutableGenerationState,
-  context: RackStageExecutionContext,
-) => MutableGenerationState;
+export type RackOperatorInputPolicy = 'preserve-pending' | 'materialize-all';
+
+export type RackOperatorInput<TPolicy extends RackOperatorInputPolicy> =
+  TPolicy extends 'materialize-all'
+    ? MaterializedGenerationState
+    : MutableGenerationState;
 
 export interface PendingFrameApplicationOperatorInput {
-  baseState: MutableGenerationState;
-  sourceState: MutableGenerationState;
+  baseState: DeferredGenerationState;
+  sourceState: MaterializedGenerationState;
   precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
 }
 
-export interface RackOperator {
-  prepareInput: RackOperatorInputPreparation;
+export interface RackOperatorContract<TPolicy extends RackOperatorInputPolicy> {
+  inputPolicy: TPolicy;
   execute(
-    state: MutableGenerationState,
+    state: RackOperatorInput<TPolicy>,
     stage: CompiledRackStage,
     context: RackStageExecutionContext,
   ): MutableGenerationState;
 }
+
+export type RackOperator =
+  | RackOperatorContract<'preserve-pending'>
+  | RackOperatorContract<'materialize-all'>;
 
 export type RackStageOfKind<TKind extends RackStageDeviceKind> = CompiledRackStage & {
   deviceKind: TKind;
@@ -75,15 +93,18 @@ export type RackStageOfKind<TKind extends RackStageDeviceKind> = CompiledRackSta
 export type GeneratorStageKind = GeneratorNode['kind'];
 export type SpatialTransformStageKind = Extract<GeneratorEffectNode['kind'], 'mirror' | 'rotate' | 'translate' | 'scale'>;
 
-export const createRackOperator = <TKind extends RackStageDeviceKind>(
-  prepareInput: RackOperatorInputPreparation,
+export const createRackOperator = <
+  TKind extends RackStageDeviceKind,
+  TPolicy extends RackOperatorInputPolicy,
+>(
+  inputPolicy: TPolicy,
   execute: (
-    state: MutableGenerationState,
+    state: RackOperatorInput<TPolicy>,
     stage: RackStageOfKind<TKind>,
     context: RackStageExecutionContext,
   ) => MutableGenerationState,
-): RackOperator => ({
-  prepareInput,
+): RackOperatorContract<TPolicy> => ({
+  inputPolicy,
   execute: (state, stage, context) => execute(
     state,
     stage as RackStageOfKind<TKind>,
