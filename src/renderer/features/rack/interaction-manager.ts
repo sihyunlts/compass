@@ -117,12 +117,16 @@ export class RackInteractionManager {
     this.centerPicker.syncSelection(change.deviceId);
 
     const mergeKey = resolveChainControlMergeKey(change);
+    const shouldSchedulePreview = change.finalize
+      || !this.numericInputInteraction.isActive();
     this.commitChainChange(
       {
         kind: 'control-edit',
         mergeKey,
         finalize: change.finalize,
       },
+      undefined,
+      shouldSchedulePreview,
     );
     return true;
   }
@@ -281,11 +285,17 @@ export class RackInteractionManager {
       .map((device) => device.id);
   }
 
-  private commitChainChange(meta: ChainMutationMeta, delayMs?: number): void {
+  private commitChainChange(
+    meta: ChainMutationMeta,
+    delayMs?: number,
+    schedulePreview = true,
+  ): void {
     const chain = this.getChainState();
     reconcileGeneratorChainModulators(chain);
     this.saveChain(chain, meta);
-    this.scheduleAutoPreview(delayMs);
+    if (schedulePreview) {
+      this.scheduleAutoPreview(delayMs);
+    }
   }
 
   private getCardElement(id: string): HTMLElement | null {
