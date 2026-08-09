@@ -242,15 +242,25 @@ export class PlaybackSessionController {
     try {
       const { editorSession } = this.options;
       const uiState = editorSession.state;
+      const sourceRevision = uiState.chainRevision;
       const launchpadModel = uiState.launchpadModel;
+      const loopLengthBeats = uiState.previewLoopLengthBeats;
       const sourceChain = cloneChainForIpc(uiState.chainState);
-      const sourceKey = createPreviewSourceKey(uiState.chainRevision, sourceChain);
+      const sourceKey = createPreviewSourceKey(sourceRevision, sourceChain);
       const preview = await this.resolveGeneratedPreview({
         sourceChain,
         sourceKey,
-        loopLengthBeats: uiState.previewLoopLengthBeats,
+        loopLengthBeats,
         launchpadModel,
       }, 'preview');
+
+      if (
+        uiState.chainRevision !== sourceRevision
+        || uiState.previewLoopLengthBeats !== loopLengthBeats
+        || uiState.launchpadModel !== launchpadModel
+      ) {
+        return;
+      }
 
       this.applyPreviewResult({
         preview,
@@ -283,6 +293,7 @@ export class PlaybackSessionController {
   public applyPreviewResult(input: ApplyPreviewResultInput): void {
     const { editorSession, previewSession } = this.options;
     const shouldAnnounce = input.announce ?? true;
+    const currentBeat = this.playbackScheduler?.getCurrentBeat() ?? this.state.currentBeat;
     const nextLoopLengthBeats =
       input.bridge?.autoCreateLengthBeats
       ?? editorSession.readBridgeSettings().autoCreateLengthBeats;
@@ -303,9 +314,9 @@ export class PlaybackSessionController {
     };
 
     if (this.playbackScheduler) {
-      this.playbackScheduler.setCurrentBeat(0);
+      this.playbackScheduler.setCurrentBeat(currentBeat);
     } else {
-      this.state.currentBeat = 0;
+      this.state.currentBeat = currentBeat;
       this.renderPreviewFrame();
     }
 
@@ -502,7 +513,9 @@ export class PlaybackSessionController {
     this.previewGenerationRequestId += 1;
     this.previewGenerationPurpose = purpose;
     this.state.isPreviewGenerating = true;
-    this.pausePlaybackForPreviewGeneration();
+    if (purpose === 'delivery') {
+      this.pausePlaybackForPreviewGeneration();
+    }
     return this.previewGenerationRequestId;
   }
 

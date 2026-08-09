@@ -10,6 +10,7 @@ interface NumericInputDragState {
   lastPointerX: number;
   lastPointerY: number;
   didMove: boolean;
+  didChange: boolean;
   dragRawValue: number;
   step: number;
   min: number | null;
@@ -33,6 +34,7 @@ const createNumericInputDragState = (): NumericInputDragState => ({
   lastPointerX: 0,
   lastPointerY: 0,
   didMove: false,
+  didChange: false,
   dragRawValue: 0,
   step: 1,
   min: null,
@@ -125,6 +127,7 @@ export class NumericInputInteraction {
     this.dragState.lastPointerX = event.clientX;
     this.dragState.lastPointerY = event.clientY;
     this.dragState.didMove = false;
+    this.dragState.didChange = false;
     this.dragState.dragRawValue = initialValue;
     this.dragState.step = step;
     this.dragState.min = min;
@@ -168,7 +171,7 @@ export class NumericInputInteraction {
   }
 
   handlePointerUp(at: number): void {
-    const { inputEl, didMove } = this.dragState;
+    const { inputEl, didMove, didChange } = this.dragState;
     this.clearDragState();
 
     if (!inputEl) {
@@ -177,6 +180,9 @@ export class NumericInputInteraction {
     }
 
     if (didMove) {
+      if (didChange) {
+        this.finalizeChangedInput(inputEl);
+      }
       this.clearClickState();
       return;
     }
@@ -195,13 +201,18 @@ export class NumericInputInteraction {
   }
 
   handlePointerCancel(): void {
+    const { inputEl, didChange } = this.dragState;
     this.clearDragState();
+    if (inputEl && didChange) {
+      this.finalizeChangedInput(inputEl);
+    }
     this.clearClickState();
   }
 
   handleWindowBlur(): void {
     if (this.isActive()) {
-      this.clearDragState();
+      this.handlePointerCancel();
+      return;
     }
     this.clearClickState();
   }
@@ -214,8 +225,7 @@ export class NumericInputInteraction {
     this.dragState.isPointerLocked = isPointerLocked;
 
     if (wasPointerLocked && !isPointerLocked && this.isActive()) {
-      this.clearDragState();
-      this.clearClickState();
+      this.handlePointerCancel();
     }
   }
 
@@ -341,7 +351,12 @@ export class NumericInputInteraction {
     }
 
     input.value = nextText;
+    this.dragState.didChange = true;
     input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  private finalizeChangedInput(input: HTMLInputElement): void {
+    input.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
   private clearClickState(): void {
