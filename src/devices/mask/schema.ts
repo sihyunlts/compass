@@ -24,7 +24,7 @@ const createDefaultMaskNode = (
 ): MaskEffectNode => ({
   id,
   kind: 'mask',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: {
     mode: DEFAULT_MASK_PARAMS.mode,

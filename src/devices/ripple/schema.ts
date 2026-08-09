@@ -49,7 +49,7 @@ const createDefaultRippleNode = (
 ): RippleGeneratorNode => ({
   id,
   kind: 'ripple',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: { ...DEFAULT_RIPPLE_PARAMS },
 });

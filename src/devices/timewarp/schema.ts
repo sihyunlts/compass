@@ -18,7 +18,7 @@ const createDefaultTimeWarpNode = (
 ): TimeWarpEffectNode => ({
   id,
   kind: 'timewarp',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: {
     curve: sanitizeTimeWarpCurve(DEFAULT_TIME_WARP_PARAMS.curve),

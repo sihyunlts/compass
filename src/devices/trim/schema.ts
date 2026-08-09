@@ -24,7 +24,7 @@ const createDefaultTrimNode = (
 ): TrimEffectNode => ({
   id,
   kind: 'trim',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: { ...DEFAULT_TRIM_PARAMS },
 });

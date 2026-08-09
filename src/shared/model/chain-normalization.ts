@@ -4,6 +4,10 @@ import {
   isRendererDeviceKind,
 } from '../../devices/schema-registry';
 import { normalizeColorDeviceParams } from '../../devices/color/schema';
+import {
+  isImportRecord as isRecord,
+  toBoolean,
+} from '../../devices/import-hydration';
 import { sanitizePathParams } from '../../devices/path/schema';
 import { reconcileGeneratorChainModulators } from '../../core/modulation/routing';
 import { normalizeOptionalId } from '../normalize-id';
@@ -13,12 +17,6 @@ import type {
 } from './chain';
 import { cloneChainForIpc } from './chain-clone';
 import { normalizeCustomName, normalizeRackName } from './naming';
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const toBoolean = (value: unknown, fallback: boolean): boolean =>
-  typeof value === 'boolean' ? value : fallback;
 
 export const hydrateImportedGeneratorDevice = (
   value: unknown,

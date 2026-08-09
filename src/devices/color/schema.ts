@@ -47,7 +47,7 @@ const createDefaultColorNode = (
 ): ColorEffectNode => ({
   id,
   kind: 'color',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: normalizeColorDeviceParams(DEFAULT_COLOR_PARAMS),
 });

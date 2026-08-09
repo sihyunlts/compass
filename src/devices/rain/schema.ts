@@ -61,7 +61,7 @@ const createDefaultRainNode = (
 ): RainGeneratorNode => ({
   id,
   kind: 'rain',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: { ...DEFAULT_RAIN_PARAMS },
 });

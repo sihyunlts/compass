@@ -177,7 +177,7 @@ const parseGroupPresetPayload = (
   }
 
   const hydratedDevices = hydrateImportedGeneratorDevices(group.devices);
-  if (!hydratedDevices || hydratedDevices.length === 0) {
+  if (!hydratedDevices) {
     return null;
   }
 
@@ -217,11 +217,7 @@ const parseRackPresetPayload = (
   },
 ): ParsedPresetPayload | null => {
   const hydratedChain = hydrateImportedGeneratorChain(rawChain);
-  const sourceDevices = (rawChain as { devices?: unknown } | undefined)?.devices;
-  if (
-    !hydratedChain
-    || (Array.isArray(sourceDevices) && sourceDevices.length > 0 && hydratedChain.devices.length === 0)
-  ) {
+  if (!hydratedChain) {
     return null;
   }
 
@@ -283,27 +279,7 @@ export const parseStoredPresetValue = (
     return null;
   }
 
-  const header = parsePresetFileHeader(migrated.value);
-  if (!header) {
-    return null;
-  }
-
-  let parsed: ParsedPresetPayload | null;
-  if (header.presetType === 'device') {
-    parsed = parseDevicePresetPayload(migrated.value.device, header);
-  } else if (header.presetType === 'group') {
-    parsed = parseGroupPresetPayload(
-      migrated.value.group,
-      migrated.value.ui,
-      header,
-    );
-  } else {
-    parsed = parseRackPresetPayload(
-      migrated.value.chain,
-      migrated.value.ui,
-      header,
-    );
-  }
+  const parsed = parsePresetFile(migrated.value);
 
   return parsed
     ? {

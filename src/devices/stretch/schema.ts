@@ -24,7 +24,7 @@ const createDefaultStretchNode = (
 ): StretchEffectNode => ({
   id,
   kind: 'stretch',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: { ...DEFAULT_STRETCH_PARAMS },
 });
