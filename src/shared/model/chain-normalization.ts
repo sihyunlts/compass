@@ -3,7 +3,6 @@ import {
   hydrateImportedRendererDeviceNode,
   isRendererDeviceKind,
 } from '../../devices/schema-registry';
-import type { RendererDeviceKind } from '../../devices/types';
 import { normalizeColorDeviceParams } from '../../devices/color/schema';
 import { sanitizePathParams } from '../../devices/path/schema';
 import { reconcileGeneratorChainModulators } from '../../core/modulation/routing';
@@ -21,30 +20,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const toBoolean = (value: unknown, fallback: boolean): boolean =>
   typeof value === 'boolean' ? value : fallback;
 
-const LEGACY_RENDERER_DEVICE_KIND_MAP = {
-  waterdrop: 'ripple',
-} as const satisfies Readonly<Record<string, RendererDeviceKind>>;
-
-export const isLegacyRendererDeviceKind = (
-  value: unknown,
-): boolean => typeof value === 'string'
-  && Object.hasOwn(LEGACY_RENDERER_DEVICE_KIND_MAP, value);
-
-const resolveImportedRendererDeviceKind = (
-  value: unknown,
-): RendererDeviceKind | null => {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  if (isRendererDeviceKind(value)) {
-    return value;
-  }
-
-  return LEGACY_RENDERER_DEVICE_KIND_MAP[
-    value as keyof typeof LEGACY_RENDERER_DEVICE_KIND_MAP
-  ] ?? null;
-};
-
 export const hydrateImportedGeneratorDevice = (
   value: unknown,
 ): GeneratorDeviceNode | null => {
@@ -52,7 +27,9 @@ export const hydrateImportedGeneratorDevice = (
     return null;
   }
 
-  const kind = resolveImportedRendererDeviceKind(value.kind);
+  const kind = typeof value.kind === 'string' && isRendererDeviceKind(value.kind)
+    ? value.kind
+    : null;
   if (!kind) {
     return null;
   }
