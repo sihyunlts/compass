@@ -14,6 +14,24 @@ export const parseFiniteControlNumber = (value: unknown): number | null => {
   return parseFiniteNumericParameterValue(value);
 };
 
+export type StructuredControlValueParseResult =
+  | { ok: true; value: unknown }
+  | { ok: false };
+
+export const parseStructuredControlValue = (
+  value: unknown,
+): StructuredControlValueParseResult => {
+  if (typeof value !== 'string') {
+    return { ok: true, value };
+  }
+
+  try {
+    return { ok: true, value: JSON.parse(value) };
+  } catch {
+    return { ok: false };
+  }
+};
+
 export const readControlParam = <ParamKey extends string>(
   change: RendererControlChange,
   allowedParamKeys: readonly ParamKey[],

@@ -11,29 +11,40 @@
         "groupId": null,
         "name": null,
         "params": {
-          "points": [
+          "anchors": [
             {
+              "id": "edge-anchor-1",
               "x": 0,
               "y": 0
             },
             {
+              "id": "edge-anchor-2",
               "x": 8,
               "y": 0
             },
             {
+              "id": "edge-anchor-3",
               "x": 8,
               "y": 8
             },
             {
+              "id": "edge-anchor-4",
               "x": 0,
               "y": 8
             },
             {
+              "id": "edge-anchor-5",
               "x": 4.5,
               "y": 4.5
             }
           ],
-          "closed": false
+          "closed": false,
+          "fill": false,
+          "animation": {
+            "enabled": false,
+            "direction": "forward",
+            "startAnchorId": "edge-anchor-1"
+          }
         }
       },
       {

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-08-01T00:00:00.000Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "path-open-forward",
+        "kind": "path",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "anchors": [
+            {
+              "id": "curve-anchor-start",
+              "x": 1.5,
+              "y": 2,
+              "handleOut": { "x": 2, "y": 0 }
+            },
+            {
+              "id": "curve-anchor-middle",
+              "x": 4.5,
+              "y": 7,
+              "handleIn": { "x": -1.5, "y": 0 },
+              "handleOut": { "x": 1.5, "y": 0 }
+            },
+            {
+              "id": "curve-anchor-end",
+              "x": 7.5,
+              "y": 2,
+              "handleIn": { "x": -2, "y": 0 }
+            }
+          ],
+          "closed": false,
+          "fill": false,
+          "animation": {
+            "enabled": true,
+            "direction": "forward",
+            "startAnchorId": "curve-anchor-start"
+          }
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

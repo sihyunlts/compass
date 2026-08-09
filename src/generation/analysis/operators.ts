@@ -7,6 +7,7 @@ import {
   toScaleTransformAt,
   toTranslationTransform,
 } from '../../core/geometry';
+import { collectPathControlPoints } from '../../core/generators/path';
 import { isIdentityTimeWarpCurve } from '../../core/timewarp/curve';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import type { BeatRange } from './types';
@@ -157,7 +158,10 @@ const buildGeneratorAnalysis = (
   }
 
   return createOperatorAnalysis({
-    outputBounds: createBoundsFromPoints(device.params.points),
+    outputBounds: createBoundsFromPoints(collectPathControlPoints(
+      device.params.anchors,
+      device.params.transform,
+    )),
     inputRoi: 'none',
     framesNeeded: 'current',
   });

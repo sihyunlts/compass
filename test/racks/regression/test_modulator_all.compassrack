@@ -11,17 +11,25 @@
         "groupId": null,
         "name": null,
         "params": {
-          "points": [
+          "anchors": [
             {
+              "id": "modulator-path-anchor-1",
               "x": 2,
               "y": 4.5
             },
             {
+              "id": "modulator-path-anchor-2",
               "x": 7,
               "y": 4.5
             }
           ],
-          "closed": false
+          "closed": false,
+          "fill": false,
+          "animation": {
+            "enabled": false,
+            "direction": "forward",
+            "startAnchorId": "modulator-path-anchor-1"
+          }
         }
       },
       {

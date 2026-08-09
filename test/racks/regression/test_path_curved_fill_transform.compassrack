@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "presetType": "rack",
+  "savedAtIso": "2026-08-01T00:00:00.000Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "path-curved-fill",
+        "kind": "path",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "anchors": [
+            {
+              "id": "fill-anchor-left",
+              "x": 2,
+              "y": 4.5,
+              "handleIn": { "x": 0, "y": -1.4 },
+              "handleOut": { "x": 0, "y": 1.4 }
+            },
+            {
+              "id": "fill-anchor-top",
+              "x": 4.5,
+              "y": 7,
+              "handleIn": { "x": -1.4, "y": 0 },
+              "handleOut": { "x": 1.4, "y": 0 }
+            },
+            {
+              "id": "fill-anchor-right",
+              "x": 7,
+              "y": 4.5,
+              "handleIn": { "x": 0, "y": 1.4 },
+              "handleOut": { "x": 0, "y": -1.4 }
+            },
+            {
+              "id": "fill-anchor-bottom",
+              "x": 4.5,
+              "y": 2,
+              "handleIn": { "x": 1.4, "y": 0 },
+              "handleOut": { "x": -1.4, "y": 0 }
+            }
+          ],
+          "closed": true,
+          "fill": true,
+          "animation": {
+            "enabled": false,
+            "direction": "forward",
+            "startAnchorId": "fill-anchor-left"
+          }
+        }
+      },
+      {
+        "id": "path-fill-rotate",
+        "kind": "rotate",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": { "angleDeg": 20 }
+      },
+      {
+        "id": "path-fill-scale",
+        "kind": "scale",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "scaleX": 1.15,
+          "scaleY": 0.8
+        }
+      },
+      {
+        "id": "path-fill-color",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [5, 21],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}
