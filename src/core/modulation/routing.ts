@@ -53,7 +53,6 @@ export const reconcileGeneratorChainModulators = (
   chain: GeneratorChain,
 ): boolean => {
   let changed = false;
-  const seenTargetKeys = new Set<string>();
 
   for (let deviceIndex = 0; deviceIndex < chain.devices.length; deviceIndex += 1) {
     const device = chain.devices[deviceIndex];
@@ -79,6 +78,7 @@ export const reconcileGeneratorChainModulators = (
     }
 
     const nextTargets: ModulationTarget[] = [];
+    const seenTargetKeys = new Set<string>();
     for (const target of sanitized.params.targets) {
       const targetKey = `${target.deviceId}:${target.paramKey}`;
       if (!resolveValidModulationTargetDevice(chain, target) || seenTargetKeys.has(targetKey)) {
@@ -108,7 +108,6 @@ export const collectValidatedModulationRoutes = (
   chain: GeneratorChain,
 ): ValidatedModulationRoute[] => {
   const routes: ValidatedModulationRoute[] = [];
-  const seenTargetKeys = new Set<string>();
 
   for (let deviceIndex = 0; deviceIndex < chain.devices.length; deviceIndex += 1) {
     const device = chain.devices[deviceIndex];
@@ -117,6 +116,7 @@ export const collectValidatedModulationRoutes = (
     }
 
     const sanitized = sanitizeCurveModulatorNode(device);
+    const seenTargetKeys = new Set<string>();
     for (const target of sanitized.params.targets) {
       const targetKey = `${target.deviceId}:${target.paramKey}`;
       if (seenTargetKeys.has(targetKey)) {
