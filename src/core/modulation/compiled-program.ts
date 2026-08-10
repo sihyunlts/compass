@@ -14,6 +14,7 @@ type CompiledModulationCurve = { segments: ReadonlyArray<CurveSegment> };
 
 interface CompiledModulationRoute {
   modulatorId: string;
+  targetId: string;
   targetDeviceId: string;
   targetParamKey: string;
   amount: number;
@@ -29,10 +30,10 @@ export interface CompiledModulationProgram {
 
 interface ModulationRuntimeReadout {
   modulatorId: string;
+  targetId: string;
   targetDeviceId: string;
   targetParamKey: string;
   baseValue: number;
-  curveValue: number;
   amount: number;
   modulatedValue: number;
 }
@@ -101,6 +102,7 @@ export const compileModulationProgram = (
 
     const compiledRoute: CompiledModulationRoute = {
       modulatorId: route.modulator.id,
+      targetId: route.target.id,
       targetDeviceId: route.targetDevice.id,
       targetParamKey: route.targetParamKey,
       amount: route.target.amount,
@@ -148,10 +150,10 @@ export const evaluateModulationProgramReadouts = (
 
     readouts.push({
       modulatorId: route.modulatorId,
+      targetId: route.targetId,
       targetDeviceId: route.targetDeviceId,
       targetParamKey: route.targetParamKey,
       baseValue: route.baseValue,
-      curveValue,
       amount: route.amount,
       modulatedValue,
     });
@@ -174,13 +176,29 @@ export const applyModulationRoutesToDevice = (
     loopLengthBeats,
     options?.wrap !== false,
   );
+  const modulationByParamKey = new Map<string, {
+    baseValue: number;
+    offset: number;
+  }>();
 
   for (const route of routes) {
     const timelineT = route.isTimelineReversed
       ? reverseLoopProgress01(baseTimelineT)
       : baseTimelineT;
     const curveValue = evaluateCurveSegments(route.curve.segments, timelineT);
-    const modulatedValue = route.baseValue + curveValue * route.amount;
-    writeNumericDeviceParam(targetDevice, route.targetParamKey, modulatedValue);
+    const accumulated = modulationByParamKey.get(route.targetParamKey) ?? {
+      baseValue: route.baseValue,
+      offset: 0,
+    };
+    accumulated.offset += curveValue * route.amount;
+    modulationByParamKey.set(route.targetParamKey, accumulated);
+  }
+
+  for (const [paramKey, modulation] of modulationByParamKey) {
+    writeNumericDeviceParam(
+      targetDevice,
+      paramKey,
+      modulation.baseValue + modulation.offset,
+    );
   }
 };
