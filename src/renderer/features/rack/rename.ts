@@ -53,8 +53,8 @@ export const resolveDeviceRenameValue = (
 
 export const resolveEditableDeviceName = (
   device: GeneratorDeviceNode,
-  deviceDisplayNameById: Record<string, string>,
-): string => normalizeCustomName(device.name) ?? resolveDeviceDisplayName(deviceDisplayNameById, device.id);
+  resolveDefaultDeviceName: (kind: GeneratorDeviceNode['kind']) => string,
+): string => normalizeCustomName(device.name) ?? `${resolveDefaultDeviceName(device.kind)} #`;
 
 export const resolveEditableGroupName = (
   groupId: string,
@@ -89,7 +89,8 @@ export const resolveCommittedRenameDraft = ({
       return renameDraft;
     }
 
-    if (nextName === normalizeCustomName(resolveDefaultDeviceName(device.kind))) {
+    const defaultName = resolveDefaultDeviceName(device.kind);
+    if (nextName === normalizeCustomName(`${defaultName} #`)) {
       return '';
     }
 

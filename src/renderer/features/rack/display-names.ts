@@ -75,11 +75,14 @@ export const buildDeviceDisplayNameById = (
   devices: readonly GeneratorDeviceNode[],
   resolveFallbackName: (kind: RendererDeviceKind) => string = getRendererDeviceLabel,
 ): Record<string, string> => buildDisplayNameById(
-  devices.map((device) => ({
-    id: device.id,
-    fallbackName: resolveFallbackName(device.kind),
-    rawName: resolveStoredDeviceName(device),
-  })),
+  devices.map((device) => {
+    const fallbackName = resolveFallbackName(device.kind);
+    return {
+      id: device.id,
+      fallbackName,
+      rawName: resolveStoredDeviceName(device) ?? `${fallbackName} #`,
+    };
+  }),
 );
 
 export const buildGroupDisplayNameById = (

@@ -149,7 +149,7 @@ class RackRenameController {
 
     return this.openEditor(
       { kind: 'device', id: deviceId },
-      resolveEditableDeviceName(device, this.options.getDeviceDisplayNameById()),
+      resolveEditableDeviceName(device, (kind) => i18n.t(getDeviceMessageKey(kind))),
     );
   }
 
