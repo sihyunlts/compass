@@ -13,11 +13,16 @@ type HintAction = {
   destroy: () => void;
 };
 
+interface VisibleHintOwner {
+  closeImmediately: () => void;
+}
+
 const HINT_DELAY_MS = 360;
 const VIEWPORT_PADDING_PX = 8;
 const HINT_GAP_PX = 6;
 const FLOATING_LAYER_VIEWPORT_TOP_PROPERTY = '--floating-layer-viewport-top';
 const windowBlurCallbacks = new Set<() => void>();
+let visibleHintOwner: VisibleHintOwner | null = null;
 
 const handleWindowBlur = (): void => {
   for (const closeHint of windowBlurCallbacks) {
@@ -65,6 +70,9 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
   let showTimer: number | null = null;
   let previousDescribedBy: string | null = null;
   const hintId = `app-hint-${++hintIdCounter}`;
+  const owner: VisibleHintOwner = {
+    closeImmediately: () => closeHintImmediately(),
+  };
 
   const clearShowTimer = (): void => {
     if (showTimer === null) {
@@ -136,6 +144,9 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
             exitingHintEl = null;
             cancelExitAnimation = null;
           }
+          if (visibleHintOwner === owner) {
+            visibleHintOwner = null;
+          }
         },
       );
     }
@@ -147,13 +158,43 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
     document.removeEventListener('keydown', handleDocumentKeyDown, true);
   };
 
-  const openHint = (): void => {
+  const closeHintImmediately = (): void => {
+    clearShowTimer();
+    const wasOpen = hintEl !== null;
+    if (wasOpen) {
+      if (previousDescribedBy === null) {
+        node.removeAttribute('aria-describedby');
+      } else {
+        node.setAttribute('aria-describedby', previousDescribedBy);
+      }
+    }
+    previousDescribedBy = null;
+
+    cancelEnterAnimation?.();
+    cancelExitAnimation?.();
+    hintEl?.remove();
+    exitingHintEl?.remove();
+    hintEl = null;
+    exitingHintEl = null;
+    cancelEnterAnimation = null;
+    cancelExitAnimation = null;
+    if (visibleHintOwner === owner) {
+      visibleHintOwner = null;
+    }
+
+    window.removeEventListener('scroll', closeHint, true);
+    window.removeEventListener('resize', closeHint);
+    document.removeEventListener('pointerdown', closeHint, true);
+    document.removeEventListener('keydown', handleDocumentKeyDown, true);
+  };
+
+  const openHint = (animateEnter = true): void => {
     clearShowTimer();
     if (!hintText || node.matches(':disabled')) {
       return;
     }
 
-    const shouldAnimateEnter = hintEl === null;
+    const shouldAnimateEnter = animateEnter && hintEl === null;
     if (!hintEl) {
       cancelExitAnimation?.();
       cancelExitAnimation = null;
@@ -171,6 +212,7 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
       hintEl.dataset.floatingLayerMotion = 'managed';
       hintEl.role = 'tooltip';
       document.body.append(hintEl);
+      visibleHintOwner = owner;
 
       window.addEventListener('scroll', closeHint, true);
       window.addEventListener('resize', closeHint);
@@ -210,6 +252,11 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
 
   const handlePointerMove = (event: PointerEvent): void => {
     if (event.pointerType === 'touch' || hintEl || showTimer !== null) {
+      return;
+    }
+    if (hintText && visibleHintOwner && visibleHintOwner !== owner) {
+      visibleHintOwner.closeImmediately();
+      openHint(false);
       return;
     }
     scheduleHint(HINT_DELAY_MS);
@@ -253,13 +300,7 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
       node.removeEventListener('focus', handleFocus);
       node.removeEventListener('blur', closeHint);
       unregisterWindowBlurHandler();
-      closeHint();
-      cancelEnterAnimation?.();
-      cancelExitAnimation?.();
-      exitingHintEl?.remove();
-      exitingHintEl = null;
-      cancelEnterAnimation = null;
-      cancelExitAnimation = null;
+      closeHintImmediately();
     },
   };
 };
