@@ -531,12 +531,12 @@ export class PlaybackSessionController {
     this.previewGenerationPurpose = purpose;
     this.state.isPreviewGenerating = true;
     if (purpose === 'delivery') {
-      this.pausePlaybackForPreviewGeneration();
+      this.pausePlaybackPreservingPreviewVisual();
     }
     return this.previewGenerationRequestId;
   }
 
-  private pausePlaybackForPreviewGeneration(): void {
+  private pausePlaybackPreservingPreviewVisual(): void {
     if (
       this.previewVisualPhase === 'waiting'
       || this.previewVisualPhase === 'active'
@@ -548,8 +548,8 @@ export class PlaybackSessionController {
   }
 
   private resetPlaybackForPreviewReplacement(): void {
+    this.pausePlaybackPreservingPreviewVisual();
     if (this.playbackScheduler) {
-      this.playbackScheduler.stop();
       this.playbackScheduler.setCurrentBeat(0, false);
       this.state.currentBeat = 0;
       return;
