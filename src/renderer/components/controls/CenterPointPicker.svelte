@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import type { RendererControlChange } from '../../../devices/control-types';
+  import type { ModulationStateByParameter } from '../../../shared/contracts/preview/modulation';
   import type { NumericParameterRule } from '../../../devices/numeric-parameters';
   import { clamp } from '../../../shared/math';
   import FieldShell from '../fields/FieldShell.svelte';
@@ -13,12 +14,14 @@
     centerX,
     centerY,
     parameter,
+    modulationStateByParameter = {},
     onControlChange,
   } = $props<{
     deviceId: string;
     centerX: number;
     centerY: number;
     parameter?: NumericParameterRule;
+    modulationStateByParameter?: ModulationStateByParameter;
     onControlChange: (change: RendererControlChange) => void;
   }>();
 
@@ -90,6 +93,7 @@
       dataAction="set-center-picker-param"
       dataId={deviceId}
       dataParam="centerX"
+      {modulationStateByParameter}
       {onControlChange}
     />
     <NumberField
@@ -102,6 +106,7 @@
       dataAction="set-center-picker-param"
       dataId={deviceId}
       dataParam="centerY"
+      {modulationStateByParameter}
       {onControlChange}
     />
   </div>

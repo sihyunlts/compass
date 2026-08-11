@@ -12,7 +12,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'ripple' }>;
   };
 
-  let { device, onControlChange }: RippleDeviceEditorProps = $props();
+  let { device, modulationStateByParameter, onControlChange }: RippleDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -21,6 +21,7 @@
     centerX={device.params.centerX}
     centerY={device.params.centerY}
     parameter={RIPPLE_NUMERIC_PARAMETERS.centerX}
+    {modulationStateByParameter}
     {onControlChange}
   />
   <NumberField
@@ -30,6 +31,7 @@
     dataAction="set-ripple-param"
     dataId={device.id}
     dataParam="curvature"
+    {modulationStateByParameter}
     {onControlChange}
   />
 </div>

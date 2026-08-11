@@ -3,6 +3,7 @@ import type { Component } from 'svelte';
 import type { GeneratorDeviceNode } from '../shared/model';
 import type { RendererControlChange, RendererKindControlDefinition } from './control-types';
 import type { NumericParameterRules } from './numeric-parameters';
+import type { ModulationStateByParameter } from '../shared/contracts/preview/modulation';
 
 export type RendererDeviceKind = GeneratorDeviceNode['kind'];
 export type RendererDeviceGroup = 'generator' | 'effect';
@@ -23,6 +24,7 @@ export interface RendererDeviceEditorPropsBase {
   currentBeatBeats?: number;
   currentProgress01?: number;
   modulationReadoutById?: Record<string, string>;
+  modulationStateByParameter?: ModulationStateByParameter;
   activeDeviceTab?: string;
   resolvePaletteRgb: (velocity: number) => string;
   onDeviceTabChange?: (tabId: string) => void;

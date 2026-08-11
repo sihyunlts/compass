@@ -10,7 +10,12 @@
     device: Extract<GeneratorDeviceNode, { kind: 'stretch' }>;
   };
 
-  let { device, currentProgress01, onControlChange }: StretchDeviceEditorProps = $props();
+  let {
+    device,
+    currentProgress01,
+    modulationStateByParameter,
+    onControlChange,
+  }: StretchDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -22,6 +27,7 @@
     mode="stretch"
     parameter={STRETCH_NUMERIC_PARAMETERS.start}
     {currentProgress01}
+    {modulationStateByParameter}
     {onControlChange}
   />
 </div>

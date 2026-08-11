@@ -46,6 +46,7 @@
     device,
     paletteRevision,
     resolvePaletteRgb,
+    modulationStateByParameter,
     onControlChange,
   }: ColorDeviceEditorProps = $props();
 
@@ -147,6 +148,8 @@
       value={device.params.noteLengthPercent}
       dataAction="set-color-note-length-percent"
       dataId={device.id}
+      dataParam="noteLengthPercent"
+      {modulationStateByParameter}
       {onControlChange}
     />
 
@@ -156,6 +159,8 @@
       value={device.params.gapPercent}
       dataAction="set-color-gap-percent"
       dataId={device.id}
+      dataParam="gapPercent"
+      {modulationStateByParameter}
       {onControlChange}
     />
 

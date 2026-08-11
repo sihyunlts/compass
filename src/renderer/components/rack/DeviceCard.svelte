@@ -8,6 +8,7 @@
     type GeneratorDeviceNode,
   } from '../../../shared/model';
   import type { RendererControlChange } from '../../../devices/control-types';
+  import type { ModulationStateByParameter } from '../../../shared/contracts/preview/modulation';
   import type { RendererDeviceTabDefinition } from '../../../devices/types';
   import { getDeviceBrowserCategory } from '../../features/editor/device-browser-categories';
   import {
@@ -29,6 +30,7 @@
     currentBeatBeats = 0,
     currentProgress01 = 0,
     modulationReadoutById = {},
+    modulationStateByParameter = {},
     resolvePaletteRgb,
     isCollapsed = false,
     isDisabledByGroup = false,
@@ -59,6 +61,7 @@
     currentBeatBeats?: number;
     currentProgress01?: number;
     modulationReadoutById?: Record<string, string>;
+    modulationStateByParameter?: ModulationStateByParameter;
     resolvePaletteRgb: (velocity: number) => string;
     isCollapsed?: boolean;
     isDisabledByGroup?: boolean;
@@ -287,6 +290,7 @@
       {currentBeatBeats}
       {currentProgress01}
       {modulationReadoutById}
+      {modulationStateByParameter}
       {activeDeviceTab}
       activeModulationTargetSlotIndex={mappingCaptureModulatorId === device.id
         ? mappingCaptureSlotIndex

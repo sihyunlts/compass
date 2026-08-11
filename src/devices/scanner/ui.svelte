@@ -11,7 +11,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'scanner' }>;
   };
 
-  let { device, onControlChange }: ScannerDeviceEditorProps = $props();
+  let { device, modulationStateByParameter, onControlChange }: ScannerDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -22,6 +22,7 @@
     dataId={device.id}
     dataParam="angleDeg"
     parameter={SCANNER_NUMERIC_PARAMETERS.angleDeg}
+    {modulationStateByParameter}
     {onControlChange}
   />
 </div>

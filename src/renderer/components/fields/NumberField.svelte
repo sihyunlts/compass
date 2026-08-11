@@ -3,6 +3,11 @@
 <script lang="ts">
   import type { RendererControlChange } from '../../../devices/control-types';
   import {
+    createModulationParameterKey,
+    type ModulationParameterState,
+    type ModulationStateByParameter,
+  } from '../../../shared/contracts/preview/modulation';
+  import {
     formatNumericParameterDisplayValue,
     formatNumericParameterValue,
     type NumericParameterRule,
@@ -14,6 +19,16 @@
     FieldShellSize,
   } from '../fields/FieldShell.svelte';
   import FieldShell from '../fields/FieldShell.svelte';
+  import ModulatableControl from './ModulatableControl.svelte';
+  import ModulationIndicator from './ModulationIndicator.svelte';
+  import {
+    resolveLinearModulationRangeFillRatio,
+    resolveModulationDisplayDomain,
+  } from './modulation-display-domain';
+  import { resolveDisplayedModulationStates } from '../../features/preview/modulation-display-selection.svelte';
+
+  const MODULATION_CORNER_REDUCTION_START = 0.9;
+  const MODULATION_MIN_CORNER_SCALE = 0.5;
 
   let {
     label,
@@ -31,6 +46,7 @@
     size = 'default',
     labelVisibility = 'visible',
     fill = false,
+    modulationStateByParameter = {},
     readonly = false,
     disabled = false,
     tabindex,
@@ -52,6 +68,7 @@
     size?: FieldShellSize;
     labelVisibility?: FieldShellLabelVisibility;
     fill?: boolean;
+    modulationStateByParameter?: ModulationStateByParameter;
     readonly?: boolean;
     disabled?: boolean;
     tabindex?: number | string;
@@ -64,6 +81,39 @@
   const resolvedMax = $derived(max ?? parameter?.input.max);
   const resolvedUnit = $derived(unit ?? parameter?.display.unit);
   const resolvedAriaLabel = $derived(ariaLabel ?? label);
+  const modulationDomain = $derived(resolveModulationDisplayDomain({
+    min: resolvedMin,
+    max: resolvedMax,
+    step: resolvedStep,
+    circular: parameter?.input.dragMode === 'circular',
+  }));
+  const modulationParameterKey = $derived(
+    dataParam ? createModulationParameterKey(dataId, dataParam) : '',
+  );
+  const modulationStates = $derived(
+    modulationParameterKey ? modulationStateByParameter[modulationParameterKey] ?? [] : [],
+  );
+  const displayedModulationStates = $derived(
+    resolveDisplayedModulationStates(modulationParameterKey, modulationStates),
+  );
+  const modulationRangeFillRatio = $derived(Math.max(
+    0,
+    ...displayedModulationStates
+      .map((state: ModulationParameterState) => resolveLinearModulationRangeFillRatio(
+        state.baseValue,
+        state.amount,
+        modulationDomain,
+      )),
+  ));
+  const modulationCornerScale = $derived(
+    modulationRangeFillRatio <= MODULATION_CORNER_REDUCTION_START
+      ? 1
+      : 1 - Math.min(
+          (modulationRangeFillRatio - MODULATION_CORNER_REDUCTION_START)
+            / (1 - MODULATION_CORNER_REDUCTION_START),
+          1,
+        ) * (1 - MODULATION_MIN_CORNER_SCALE),
+  );
   const displayValue = $derived.by(() => {
     const valueText = String(value);
     return parameter
@@ -96,36 +146,69 @@
   {fill}
   class={className}
 >
-  <input
-    class:has-display-unit={resolvedUnit !== undefined}
-    type="number"
-    step={resolvedStep}
-    min={resolvedMin}
-    max={resolvedMax}
-    value={value}
-    data-control-action={dataAction}
-    data-device-id={dataId}
-    data-param={dataParam}
-    data-drag-mode={parameter?.input.dragMode}
-    aria-label={resolvedAriaLabel}
-    {readonly}
-    {disabled}
-    {tabindex}
-    oninput={(event: Event) => emitChange(event, false)}
-    onchange={(event: Event) => emitChange(event, true)}
-  />
-  {#if resolvedUnit}
-    <span
-      class="numeric-value-display number-field-display-value"
-      class:is-compact={size === 'compact'}
-      aria-hidden="true"
-    >
-      {displayValue}
-    </span>
-  {/if}
+  <ModulatableControl
+    class="field-control number-field-control"
+    states={modulationStates}
+    parameterKey={modulationParameterKey}
+    modulationContextDeviceId={dataId}
+    modulationContextParamKey={dataParam ?? ''}
+    domain={modulationDomain}
+    cornerScale={modulationCornerScale}
+    {onControlChange}
+  >
+    <input
+      class:has-display-unit={resolvedUnit !== undefined}
+      type="number"
+      step={resolvedStep}
+      min={resolvedMin}
+      max={resolvedMax}
+      value={value}
+      data-control-action={dataAction}
+      data-device-id={dataId}
+      data-param={dataParam}
+      data-drag-mode={parameter?.input.dragMode}
+      aria-label={resolvedAriaLabel}
+      {readonly}
+      {disabled}
+      {tabindex}
+      oninput={(event: Event) => emitChange(event, false)}
+      onchange={(event: Event) => emitChange(event, true)}
+    />
+    {#if resolvedUnit}
+      <span
+        class="numeric-value-display number-field-display-value"
+        class:is-compact={size === 'compact'}
+        aria-hidden="true"
+      >
+        {displayValue}
+      </span>
+    {/if}
+    <ModulationIndicator
+      states={displayedModulationStates}
+      domain={modulationDomain}
+    />
+  </ModulatableControl>
 </FieldShell>
 
 <style lang="scss">
+  :global(.number-field-control) {
+    overflow: hidden;
+    border-radius: var(--radius-4);
+    border-bottom-right-radius: calc(
+      var(--radius-4) * var(--modulation-control-corner-scale)
+    );
+    border-bottom-left-radius: calc(
+      var(--radius-4) * var(--modulation-control-corner-scale)
+    );
+  }
+
+  :global(.number-field-control > input) {
+    width: 100%;
+    height: 100%;
+    border-bottom-right-radius: inherit;
+    border-bottom-left-radius: inherit;
+  }
+
   .number-field-display-value {
     position: absolute;
     left: 0;
@@ -138,4 +221,5 @@
       font-size: var(--text-12);
     }
   }
+
 </style>

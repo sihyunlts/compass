@@ -21,6 +21,7 @@ export type AnchoredFloatingLayerPosition = FloatingLayerPosition & {
 type AdjacentFloatingLayerOptions = {
   gapPx?: number;
   marginPx?: number;
+  horizontalAlignment?: 'start' | 'center' | 'end';
 };
 
 type FloatingLayerDismissHandlers = {
@@ -274,10 +275,15 @@ export const resolveAnchoredFloatingLayerPosition = (
   const preferredY = opensBelow
     ? anchorRect.bottom + gapPx
     : anchorRect.top - gapPx - renderedHeight;
+  const preferredX = options.horizontalAlignment === 'center'
+    ? anchorRect.left + (anchorRect.width - size.width) / 2
+    : options.horizontalAlignment === 'end'
+      ? anchorRect.right - size.width
+      : anchorRect.left;
 
   return {
     x: clamp(
-      anchorRect.left,
+      preferredX,
       marginPx,
       Math.max(marginPx, window.innerWidth - size.width - marginPx),
     ),

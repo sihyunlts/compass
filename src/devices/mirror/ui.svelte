@@ -11,7 +11,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'mirror' }>;
   };
 
-  let { device, onControlChange }: MirrorDeviceEditorProps = $props();
+  let { device, modulationStateByParameter, onControlChange }: MirrorDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -22,6 +22,7 @@
     dataId={device.id}
     dataParam="angleDeg"
     parameter={MIRROR_NUMERIC_PARAMETERS.angleDeg}
+    {modulationStateByParameter}
     {onControlChange}
   />
 </div>

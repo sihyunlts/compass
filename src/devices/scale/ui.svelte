@@ -12,7 +12,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'scale' }>;
   };
 
-  let { device, onControlChange }: ScaleDeviceEditorProps = $props();
+  let { device, modulationStateByParameter, onControlChange }: ScaleDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -21,6 +21,7 @@
     centerX={device.params.centerX}
     centerY={device.params.centerY}
     parameter={SCALE_NUMERIC_PARAMETERS.centerX}
+    {modulationStateByParameter}
     {onControlChange}
   />
   <div class="column-wrapper">
@@ -31,6 +32,7 @@
       dataAction="set-scale-param"
       dataId={device.id}
       dataParam="scaleX"
+      {modulationStateByParameter}
       {onControlChange}
     />
     <NumberField
@@ -40,6 +42,7 @@
       dataAction="set-scale-param"
       dataId={device.id}
       dataParam="scaleY"
+      {modulationStateByParameter}
       {onControlChange}
     />
   </div>

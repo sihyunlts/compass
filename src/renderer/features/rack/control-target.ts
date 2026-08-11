@@ -17,6 +17,15 @@ interface RackNumericInputTarget {
   pointerElement: HTMLElement;
 }
 
+const controlsMatch = (
+  left: RackControlTarget,
+  right: RackControlTarget,
+): boolean => (
+  left.action === right.action
+  && left.deviceId === right.deviceId
+  && left.paramKey === right.paramKey
+);
+
 export const readRackControlTarget = (
   element: HTMLElement,
 ): RackControlTarget | null => {
@@ -89,18 +98,18 @@ export const closestRackNumericInputTarget = (
 
   const proxy = target.closest<HTMLElement>(RACK_NUMERIC_INPUT_PROXY_SELECTOR);
   const scope = proxy?.closest<HTMLElement>(RACK_NUMERIC_INPUT_SCOPE_SELECTOR);
-  const proxyInput = scope?.querySelector<HTMLInputElement>(RACK_NUMERIC_INPUT_SELECTOR);
   const proxyControl = proxy ? readRackControlTarget(proxy) : null;
-  const inputControl = proxyInput ? readRackControlTarget(proxyInput) : null;
-  if (
-    !proxy
-    || !proxyInput
-    || !proxyControl
-    || !inputControl
-    || proxyControl.action !== inputControl.action
-    || proxyControl.deviceId !== inputControl.deviceId
-    || proxyControl.paramKey !== inputControl.paramKey
-  ) {
+  if (!proxy || !scope || !proxyControl) {
+    return null;
+  }
+
+  const proxyInput = Array.from(
+    scope.querySelectorAll<HTMLInputElement>(RACK_NUMERIC_INPUT_SELECTOR),
+  ).find((candidate) => {
+    const inputControl = readRackControlTarget(candidate);
+    return inputControl !== null && controlsMatch(proxyControl, inputControl);
+  }) ?? null;
+  if (!proxyInput) {
     return null;
   }
 

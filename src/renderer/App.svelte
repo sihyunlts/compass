@@ -223,6 +223,11 @@
   });
 
   $effect(() => {
+    void uiState.chainRevision;
+    untrack(() => playbackSession.renderPreviewFrame());
+  });
+
+  $effect(() => {
     const enabled = isBadAppleRack;
     untrack(() => {
       playbackSession.setPreviewVisualEnabled(enabled);
@@ -714,6 +719,7 @@
           currentBeatBeats={currentPreviewBeatBeats}
           currentProgress01={currentPreviewProgress01}
           modulationReadoutById={previewState.modulationReadoutById}
+          modulationStateByParameter={previewState.modulationStateByParameter}
           {resolvePaletteRgb}
           isSidebarResizing={uiState.isSidebarResizing}
           interactiveElementSelector={INTERACTIVE_ELEMENT_SELECTOR}

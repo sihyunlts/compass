@@ -11,7 +11,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'translate' }>;
   };
 
-  let { device, onControlChange }: TranslateDeviceEditorProps = $props();
+  let { device, modulationStateByParameter, onControlChange }: TranslateDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -23,6 +23,7 @@
       dataAction="set-translate-param"
       dataId={device.id}
       dataParam="offsetX"
+      {modulationStateByParameter}
       {onControlChange}
     />
     <NumberField
@@ -32,6 +33,7 @@
       dataAction="set-translate-param"
       dataId={device.id}
       dataParam="offsetY"
+      {modulationStateByParameter}
       {onControlChange}
     />
   </div>

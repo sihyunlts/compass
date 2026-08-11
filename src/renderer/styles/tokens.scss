@@ -59,6 +59,9 @@
   --color-overlay-highlight-secondary: oklch(100% 0 0 / 0.18);
   --color-overlay-backdrop: oklch(0% 0 0 / 0.4);
 
+  /* Overlay layers */
+  --z-layer-floating-stack-base: 60;
+
   /* ==========================================================================
    * Preview
    * ======================================================================= */

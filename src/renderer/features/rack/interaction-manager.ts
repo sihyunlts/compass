@@ -117,15 +117,20 @@ export class RackInteractionManager {
     this.centerPicker.syncSelection(change.deviceId);
 
     const mergeKey = resolveChainControlMergeKey(change);
+    const isNumericDragActive = this.numericInputInteraction.isActive();
+    const isLiveModulationAmountDrag = change.action === 'set-modulation-target-amount'
+      && !change.finalize
+      && isNumericDragActive;
     const shouldSchedulePreview = change.finalize
-      || !this.numericInputInteraction.isActive();
+      || !isNumericDragActive
+      || isLiveModulationAmountDrag;
     this.commitChainChange(
       {
         kind: 'control-edit',
         mergeKey,
         finalize: change.finalize,
       },
-      undefined,
+      isLiveModulationAmountDrag ? 0 : undefined,
       shouldSchedulePreview,
     );
     return true;
