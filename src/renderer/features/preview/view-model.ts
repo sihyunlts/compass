@@ -26,6 +26,24 @@ const previewCellCache = new Map<LaunchpadModel, ReadonlyArray<PreviewSurfaceCel
 
 const cellKey = (row: number, col: number): string => `${row}:${col}`;
 
+export const resolvePreviewCenterCornerCutClassName = (
+  previewCellKey: string,
+): string => {
+  if (previewCellKey === '4:4') {
+    return 'is-center-corner-bottom-right';
+  }
+  if (previewCellKey === '4:5') {
+    return 'is-center-corner-bottom-left';
+  }
+  if (previewCellKey === '5:4') {
+    return 'is-center-corner-top-right';
+  }
+  if (previewCellKey === '5:5') {
+    return 'is-center-corner-top-left';
+  }
+  return '';
+};
+
 const buttonToPreviewCell = (
   button: LaunchpadButton,
 ): { row: number; col: number } | null => {

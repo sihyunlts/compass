@@ -1,6 +1,7 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { MessageKey } from '../../shared/i18n';
 import {
+  cloneDeviceNode,
   normalizeAuthoredMetadata,
   normalizeCustomName,
   replaceAuthoredMetadata,
@@ -28,6 +29,7 @@ import type {
 import {
   parsePresetFileText,
   resolvePresetNameFromFileName,
+  type PresetBrowserPreview,
   type RackPresetFile,
 } from '../../shared/presets';
 import type {
@@ -145,6 +147,33 @@ interface PresetControllerOptions {
   showMessage: (message: string) => void;
 }
 
+const clonePresetBrowserPreview = (
+  preview: PresetBrowserPreview,
+): PresetBrowserPreview => {
+  if (preview.kind === 'color') {
+    return {
+      ...preview,
+      velocities: [...preview.velocities],
+    };
+  }
+  if (preview.kind === 'generator') {
+    return {
+      ...preview,
+      device: cloneDeviceNode(preview.device),
+    };
+  }
+  if (preview.kind === 'rack') {
+    return { ...preview };
+  }
+  return {
+      ...preview,
+      curve: {
+        divisions: preview.curve.divisions,
+        nodes: preview.curve.nodes.map((node) => ({ ...node })),
+      },
+    };
+};
+
 const mapPresetTreeNode = (
   node: PresetBrowserTreeNode,
 ): BrowserTreePresetFolderNode | BrowserTreePresetLeafNode => {
@@ -168,6 +197,11 @@ const mapPresetTreeNode = (
     relativePath: [...node.relativePath],
     savedAtIso: node.savedAtIso,
     deviceKind: node.deviceKind,
+    ...(node.preview
+      ? {
+          preview: clonePresetBrowserPreview(node.preview),
+        }
+      : {}),
   };
 };
 
@@ -619,6 +653,20 @@ export class PresetController {
     await this.runPresetAction(async () => {
       await this.loadPresetFromBrowserEntry(entry);
     }, 'status.presetLoadFailed');
+  }
+
+  public async loadRackPresetForPreview(
+    entry: BrowserTreePresetLeafNode,
+  ): Promise<RackPresetFile | null> {
+    if (entry.presetType !== 'rack') {
+      return null;
+    }
+
+    const response = await this.options.bridgeClient.readPresetEntry({
+      presetType: 'rack',
+      relativePath: [...entry.relativePath],
+    });
+    return response.status === 'loaded' ? response.payload : null;
   }
 
   public async handlePresetFilePointerDown(

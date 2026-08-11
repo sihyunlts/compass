@@ -26,6 +26,7 @@ import {
   PRESET_FILE_EXTENSIONS,
   isPresetFileKind,
   parseStoredPresetValue,
+  resolvePresetBrowserPreview,
   resolvePresetNameFromFileName,
   withPresetAuthoredMetadata,
   type PresetFile,
@@ -298,19 +299,23 @@ const buildChildren = (
       file.presetType === presetType
       && file.relativePath.length === relativePath.length + 1
       && relativePathEquals(file.relativePath.slice(0, -1), relativePath))
-    .map((file): PresetBrowserTreeNode => ({
-      kind: 'preset',
-      id: `preset:${presetType}:${file.relativePath.join('/')}`,
-      label: getFileStem(file.relativePath[file.relativePath.length - 1] ?? '', presetType),
-      presetType,
-      relativePath: [...file.relativePath],
-      savedAtIso: file.payload.savedAtIso,
-      ...(file.payload.presetType === 'device'
-        ? {
-            deviceKind: file.payload.device.kind,
-          }
-        : {}),
-    }));
+    .map((file): PresetBrowserTreeNode => {
+      const preview = resolvePresetBrowserPreview(file.payload);
+      return {
+        kind: 'preset',
+        id: `preset:${presetType}:${file.relativePath.join('/')}`,
+        label: getFileStem(file.relativePath[file.relativePath.length - 1] ?? '', presetType),
+        presetType,
+        relativePath: [...file.relativePath],
+        savedAtIso: file.payload.savedAtIso,
+        ...(preview ? { preview } : {}),
+        ...(file.payload.presetType === 'device'
+          ? {
+              deviceKind: file.payload.device.kind,
+            }
+          : {}),
+      };
+    });
 
   return [
     ...sortByLabel(folderChildren),

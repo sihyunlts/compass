@@ -1,26 +1,10 @@
 import { toGeneratorPreview } from '../../../domain/generator-preview';
 import { buildGeneratedFieldResult } from '../../../domain/field-result';
-import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
-import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
-
-interface PreviewGenerationRequest {
-  requestId: number;
-  sourceChain: GeneratorChain;
-  loopLengthBeats: number;
-  launchpadModel: LaunchpadModel;
-}
-
-type PreviewGenerationResponse =
-  | {
-    requestId: number;
-    ok: true;
-    preview: GeneratorPreview;
-  }
-  | {
-    requestId: number;
-    ok: false;
-    error: string;
-  };
+import { resolveEvenlySpacedSampleIndices } from '../../../shared/even-sampling';
+import type {
+  PreviewGenerationRequest,
+  PreviewGenerationResponse,
+} from './generation-worker-protocol';
 
 interface PreviewGenerationWorkerScope {
   addEventListener(
@@ -33,23 +17,39 @@ interface PreviewGenerationWorkerScope {
 const workerScope = self as PreviewGenerationWorkerScope;
 
 workerScope.addEventListener('message', (event: MessageEvent<PreviewGenerationRequest>) => {
-  const { requestId, sourceChain, loopLengthBeats, launchpadModel } = event.data;
+  const request = event.data;
 
   try {
     const generated = buildGeneratedFieldResult({
-      chain: sourceChain,
-      loopLengthBeats,
-      launchpadModel,
+      chain: request.sourceChain,
+      loopLengthBeats: request.loopLengthBeats,
+      launchpadModel: request.launchpadModel,
     });
+    if (request.kind === 'led-frames') {
+      const response: PreviewGenerationResponse = {
+        requestId: request.requestId,
+        kind: request.kind,
+        ok: true,
+        ledFrames: resolveEvenlySpacedSampleIndices(
+          generated.ledFramesBySampleIndex.length,
+          request.frameCount,
+        ).map((frameIndex) => generated.ledFramesBySampleIndex[frameIndex]),
+      };
+      workerScope.postMessage(response);
+      return;
+    }
+
     const response: PreviewGenerationResponse = {
-      requestId,
+      requestId: request.requestId,
+      kind: request.kind,
       ok: true,
       preview: toGeneratorPreview(generated),
     };
     workerScope.postMessage(response);
   } catch (error) {
     const response: PreviewGenerationResponse = {
-      requestId,
+      requestId: request.requestId,
+      kind: request.kind,
       ok: false,
       error: error instanceof Error ? error.message : 'Unknown preview generation error',
     };

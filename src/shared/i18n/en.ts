@@ -4,6 +4,7 @@ export const en = {
   'app.open': 'Open',
   'app.version': 'Version',
   'browser.collapseFolder': 'Collapse folder',
+  'browser.colorPresetColors': '{count} colors',
   'browser.devices': 'Devices',
   'browser.devicesAria': 'Devices browser',
   'browser.emptyGroups': 'No saved groups yet.',

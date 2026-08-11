@@ -1,7 +1,10 @@
 import type { RendererDeviceKind } from '../../../devices';
 import type { DeviceBrowserCategoryId } from '../../../devices/browser-categories';
 import type { PresetEntrySelectionItem } from '../../../shared/preset-entry-selection';
-import type { PresetFileKind } from '../../../shared/presets';
+import type {
+  PresetBrowserPreview,
+  PresetFileKind,
+} from '../../../shared/presets';
 
 interface BrowserTreeBaseFolderNode {
   kind: 'folder';
@@ -41,6 +44,7 @@ export interface BrowserTreePresetLeafNode {
   relativePath: string[];
   savedAtIso: string;
   deviceKind?: RendererDeviceKind;
+  preview?: PresetBrowserPreview;
 }
 
 export interface PendingPresetFolderDraft {

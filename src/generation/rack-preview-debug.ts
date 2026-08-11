@@ -5,6 +5,7 @@ import { buildGeneratedFieldResult } from '../domain/field-result';
 import { toGeneratorPreview } from '../domain/generator-preview';
 import type { GeneratorPreview } from '../shared/contracts/preview/generator-preview';
 import type { LaunchpadModel } from '../shared/model';
+import { resolveEvenlySpacedSampleIndices } from '../shared/even-sampling';
 import { parsePresetFileText } from '../shared/presets';
 
 export const RACK_PREVIEW_LOOP_LENGTH_BEATS = 1;
@@ -65,30 +66,10 @@ export const loadRackPreviewFromFixture = async (
 export const sampleRackPreviewFrames = (
   preview: GeneratorPreview,
   requestedFrameCount: number,
-): SampledRackFrame[] => {
-  const sourceFrameCount = preview.ledFramesBySampleIndex.length;
-  if (sourceFrameCount === 0) {
-    return [];
-  }
-
-  const safeRequestedFrameCount = Number.isFinite(requestedFrameCount)
-    ? Math.floor(requestedFrameCount)
-    : sourceFrameCount;
-  const frameCount = Math.max(1, Math.min(safeRequestedFrameCount, sourceFrameCount));
-  if (frameCount === sourceFrameCount) {
-    return preview.ledFramesBySampleIndex.map((entries, frameIndex) => ({
-      frameIndex,
-      entries,
-    }));
-  }
-
-  return Array.from({ length: frameCount }, (_, sampleIndex) => {
-    const frameIndex = frameCount === 1
-      ? 0
-      : Math.round((sampleIndex * (sourceFrameCount - 1)) / (frameCount - 1));
-    return {
-      frameIndex,
-      entries: preview.ledFramesBySampleIndex[frameIndex] ?? [],
-    };
-  });
-};
+): SampledRackFrame[] => resolveEvenlySpacedSampleIndices(
+  preview.ledFramesBySampleIndex.length,
+  requestedFrameCount,
+).map((frameIndex) => ({
+  frameIndex,
+  entries: preview.ledFramesBySampleIndex[frameIndex] ?? [],
+}));
