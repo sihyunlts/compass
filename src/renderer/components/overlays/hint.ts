@@ -7,9 +7,17 @@ import {
 let hintIdCounter = 0;
 
 type HintValue = string | null | undefined;
+type HintPlacement = 'auto' | 'below';
+type HintInput = HintValue | {
+  text: HintValue;
+  placement?: HintPlacement;
+  delayMs?: number;
+  gapPx?: number;
+  dismissOnPointerDown?: boolean;
+};
 
 type HintAction = {
-  update: (nextValue: HintValue) => void;
+  update: (nextValue: HintInput) => void;
   destroy: () => void;
 };
 
@@ -17,7 +25,7 @@ interface VisibleHintOwner {
   closeImmediately: () => void;
 }
 
-const HINT_DELAY_MS = 360;
+const DEFAULT_HINT_DELAY_MS = 360;
 const VIEWPORT_PADDING_PX = 8;
 const HINT_GAP_PX = 6;
 const FLOATING_LAYER_VIEWPORT_TOP_PROPERTY = '--floating-layer-viewport-top';
@@ -46,8 +54,30 @@ const registerWindowBlurHandler = (closeHint: () => void): (() => void) => {
   };
 };
 
-const normalizeHint = (value: HintValue): string =>
-  typeof value === 'string' ? value.trim() : '';
+const normalizeNonNegativeOption = (
+  value: unknown,
+  fallback: number,
+): number => typeof value === 'number' && Number.isFinite(value)
+  ? Math.max(0, value)
+  : fallback;
+
+const normalizeHint = (value: HintInput): {
+  text: string;
+  placement: HintPlacement;
+  delayMs: number;
+  gapPx: number;
+  dismissOnPointerDown: boolean;
+} => {
+  const options = typeof value === 'object' && value !== null ? value : null;
+  const textValue = options?.text ?? value;
+  return {
+    text: typeof textValue === 'string' ? textValue.trim() : '',
+    placement: options?.placement ?? 'auto',
+    delayMs: normalizeNonNegativeOption(options?.delayMs, DEFAULT_HINT_DELAY_MS),
+    gapPx: normalizeNonNegativeOption(options?.gapPx, HINT_GAP_PX),
+    dismissOnPointerDown: options?.dismissOnPointerDown ?? true,
+  };
+};
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(Math.max(value, min), max);
@@ -61,8 +91,14 @@ const resolveViewportTop = (node: HTMLElement): number => {
     : VIEWPORT_PADDING_PX;
 };
 
-export const hint = (node: HTMLElement, value: HintValue): HintAction => {
-  let hintText = normalizeHint(value);
+export const hint = (node: HTMLElement, value: HintInput): HintAction => {
+  let {
+    text: hintText,
+    placement: hintPlacement,
+    delayMs: hintDelayMs,
+    gapPx: hintGapPx,
+    dismissOnPointerDown,
+  } = normalizeHint(value);
   let hintEl: HTMLDivElement | null = null;
   let exitingHintEl: HTMLDivElement | null = null;
   let cancelEnterAnimation: (() => void) | null = null;
@@ -97,13 +133,15 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
       VIEWPORT_PADDING_PX,
       maxX,
     );
-    const belowY = anchorRect.bottom + HINT_GAP_PX;
-    const aboveY = anchorRect.top - hintRect.height - HINT_GAP_PX;
+    const belowY = anchorRect.bottom + hintGapPx;
+    const aboveY = anchorRect.top - hintRect.height - hintGapPx;
     const canOpenAbove = aboveY >= viewportTop;
     const canOpenBelow =
       belowY + hintRect.height <= window.innerHeight - VIEWPORT_PADDING_PX;
-    const opensAbove = canOpenAbove
-      || (!canOpenBelow && anchorRect.top >= window.innerHeight - anchorRect.bottom);
+    const opensAbove = hintPlacement === 'auto' && (
+      canOpenAbove
+      || (!canOpenBelow && anchorRect.top >= window.innerHeight - anchorRect.bottom)
+    );
     const y = opensAbove
       ? Math.max(viewportTop, aboveY)
       : Math.min(
@@ -154,7 +192,7 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
 
     window.removeEventListener('scroll', closeHint, true);
     window.removeEventListener('resize', closeHint);
-    document.removeEventListener('pointerdown', closeHint, true);
+    document.removeEventListener('pointerdown', handleDocumentPointerDown, true);
     document.removeEventListener('keydown', handleDocumentKeyDown, true);
   };
 
@@ -184,7 +222,7 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
 
     window.removeEventListener('scroll', closeHint, true);
     window.removeEventListener('resize', closeHint);
-    document.removeEventListener('pointerdown', closeHint, true);
+    document.removeEventListener('pointerdown', handleDocumentPointerDown, true);
     document.removeEventListener('keydown', handleDocumentKeyDown, true);
   };
 
@@ -216,7 +254,7 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
 
       window.addEventListener('scroll', closeHint, true);
       window.addEventListener('resize', closeHint);
-      document.addEventListener('pointerdown', closeHint, true);
+      document.addEventListener('pointerdown', handleDocumentPointerDown, true);
       document.addEventListener('keydown', handleDocumentKeyDown, true);
     }
 
@@ -241,6 +279,13 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
     }
   }
 
+  function handleDocumentPointerDown(event: PointerEvent): void {
+    if (!dismissOnPointerDown && event.composedPath().includes(node)) {
+      return;
+    }
+    closeHint();
+  }
+
   const scheduleHint = (delayMs: number): void => {
     clearShowTimer();
     if (!hintText || node.matches(':disabled')) {
@@ -259,10 +304,12 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
       openHint(false);
       return;
     }
-    scheduleHint(HINT_DELAY_MS);
+    scheduleHint(hintDelayMs);
   };
   const handlePointerDown = (): void => {
-    closeHint();
+    if (dismissOnPointerDown) {
+      closeHint();
+    }
   };
   const handleFocus = (): void => {
     if (
@@ -281,8 +328,13 @@ export const hint = (node: HTMLElement, value: HintValue): HintAction => {
   const unregisterWindowBlurHandler = registerWindowBlurHandler(closeHint);
 
   return {
-    update(nextValue: HintValue): void {
-      hintText = normalizeHint(nextValue);
+    update(nextValue: HintInput): void {
+      const normalized = normalizeHint(nextValue);
+      hintText = normalized.text;
+      hintPlacement = normalized.placement;
+      hintDelayMs = normalized.delayMs;
+      hintGapPx = normalized.gapPx;
+      dismissOnPointerDown = normalized.dismissOnPointerDown;
       if (!hintText) {
         closeHint();
         return;
