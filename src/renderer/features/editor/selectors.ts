@@ -1,5 +1,5 @@
 import {
-  isPresetBrowserContextTarget,
+  isRackSelectionContextTarget,
   type ContextMenuTarget,
 } from '../context-menu/types';
 import type { GroupSelectionContext } from '../rack/selection.svelte';
@@ -102,7 +102,7 @@ export const resolveSelectionSnapshotFromContextTarget = (
   chain: GeneratorChain,
   target: ContextMenuTarget,
 ): RackSelectionSnapshot | null => {
-  if (isPresetBrowserContextTarget(target)) {
+  if (!isRackSelectionContextTarget(target)) {
     return null;
   }
 

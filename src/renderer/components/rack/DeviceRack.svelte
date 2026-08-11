@@ -202,6 +202,42 @@
     setMappingCapture(modulatorId, null);
   };
 
+  const handleModulationParameterContextMenu = (
+    event: MouseEvent,
+    deviceId: string,
+    paramKey: string,
+  ): boolean => {
+    const targetDevice = devices.find((device: GeneratorDeviceNode) => device.id === deviceId);
+    if (!targetDevice) {
+      return false;
+    }
+
+    const connections = devices.flatMap((device: GeneratorDeviceNode) => {
+      if (!isCurveModulatorNode(device)) {
+        return [];
+      }
+      return device.params.targets
+        .filter((target) => target.deviceId === deviceId && target.paramKey === paramKey)
+        .map((target) => ({
+          modulatorId: device.id,
+          modulatorLabel: deviceDisplayNameById[device.id]
+            ?? i18n.t(getDeviceMessageKey(device.kind)),
+          targetId: target.id,
+        }));
+    });
+    if (connections.length === 0) {
+      return false;
+    }
+
+    onOpenContextMenu(event.clientX, event.clientY, {
+      kind: 'modulation-parameter',
+      deviceId,
+      paramKey,
+      connections,
+    });
+    return true;
+  };
+
   const clearMappingCaptureSlot = (): void => {
     if (mappingCaptureSlotIndex !== null) {
       setMappingCapture(mappingCaptureModulatorId, null);
@@ -393,6 +429,7 @@
             onDeviceTabChange={handleDeviceTabChange}
             onModulationTargetSlotSelect={handleModulationTargetSlotSelect}
             onModulationTargetPick={handleModulationTargetPick}
+            onModulationParameterContextMenu={handleModulationParameterContextMenu}
             onControlChange={(change) => controller.surface.handleControlChange(change)}
             onHeaderPointerDown={(event) => {
               clearMappingCaptureSlot();
@@ -476,6 +513,7 @@
                     onDeviceTabChange={handleDeviceTabChange}
                     onModulationTargetSlotSelect={handleModulationTargetSlotSelect}
                     onModulationTargetPick={handleModulationTargetPick}
+                    onModulationParameterContextMenu={handleModulationParameterContextMenu}
                     onControlChange={(change) => controller.surface.handleControlChange(change)}
                     onHeaderPointerDown={(event) => {
                       clearMappingCaptureSlot();

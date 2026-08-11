@@ -1,5 +1,10 @@
 import type { BridgeSettings } from '../../../shared/bridge/types';
-import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
+import {
+  cloneChainForIpc,
+  isCurveModulatorNode,
+  type GeneratorChain,
+  type LaunchpadModel,
+} from '../../../shared/model';
 import type {
   DevicePresetFile,
   GroupPresetFile,
@@ -9,8 +14,9 @@ import type { RendererDeviceKind } from '../../../devices';
 import type { BrowserPage } from '../browser/types';
 import { isRendererDeviceKind } from '../../../devices';
 import {
-  isPresetBrowserContextTarget,
+  isRackSelectionContextTarget,
   type ContextMenuTarget,
+  type ModulationParameterContextTarget,
 } from '../context-menu/types';
 import type {
   BrowserNonRackPresetInsertSource,
@@ -272,6 +278,39 @@ export class EditorSession {
         this.selectInsertedDevices(previousChain, nextChain);
       }
     },
+    disconnectModulation: (
+      target: ModulationParameterContextTarget,
+      modulatorId?: string,
+    ): void => {
+      const nextChain = cloneChainForIpc(this.state.chainState);
+      const modulatorIds = modulatorId
+        ? [modulatorId]
+        : target.connections.map((connection) => connection.modulatorId);
+      let changed = false;
+
+      for (const device of nextChain.devices) {
+        if (!isCurveModulatorNode(device) || !modulatorIds.includes(device.id)) {
+          continue;
+        }
+
+        const nextTargets = device.params.targets.filter((modulationTarget) =>
+          modulationTarget.deviceId !== target.deviceId
+          || modulationTarget.paramKey !== target.paramKey);
+        if (nextTargets.length === device.params.targets.length) {
+          continue;
+        }
+
+        device.params.targets = nextTargets;
+        changed = true;
+      }
+
+      if (changed) {
+        this.applyChainMutation(nextChain, {
+          kind: 'control-edit',
+          finalize: true,
+        });
+      }
+    },
     toggleGroupEnabled: (groupId: string, nextEnabled: boolean): void => {
       toggleEditorGroupEnabled(this.buildGroupingContext(), groupId, nextEnabled);
     },
@@ -301,7 +340,7 @@ export class EditorSession {
     ungroupSelectedGroups: (): boolean => this.ungroupSelectedGroups(),
     beginRenameSelection: (): boolean => this.beginRenameSelection(),
     deleteFromContextTarget: (target: ContextMenuTarget): void => {
-      if (isPresetBrowserContextTarget(target)) {
+      if (!isRackSelectionContextTarget(target)) {
         return;
       }
 
@@ -316,28 +355,28 @@ export class EditorSession {
       this.deleteDevicesById(target.deviceIds);
     },
     copyFromContextTarget: (target: ContextMenuTarget): void => {
-      if (isPresetBrowserContextTarget(target)) {
+      if (!isRackSelectionContextTarget(target)) {
         return;
       }
 
       this.copySelectionToClipboard(this.resolveContextSelection(target));
     },
     cutFromContextTarget: (target: ContextMenuTarget): void => {
-      if (isPresetBrowserContextTarget(target)) {
+      if (!isRackSelectionContextTarget(target)) {
         return;
       }
 
       this.cutSelection(this.resolveContextSelection(target));
     },
     pasteFromContextTarget: (target: ContextMenuTarget): void => {
-      if (isPresetBrowserContextTarget(target)) {
+      if (!isRackSelectionContextTarget(target)) {
         return;
       }
 
       this.pasteClipboard(undefined, this.resolveContextSelection(target));
     },
     duplicateFromContextTarget: (target: ContextMenuTarget): void => {
-      if (isPresetBrowserContextTarget(target)) {
+      if (!isRackSelectionContextTarget(target)) {
         return;
       }
 
@@ -600,7 +639,7 @@ export class EditorSession {
       return false;
     }
 
-    if (isPresetBrowserContextTarget(target)) {
+    if (!isRackSelectionContextTarget(target)) {
       return false;
     }
 

@@ -47,6 +47,7 @@
     onDeviceTabChange,
     onModulationTargetSlotSelect,
     onModulationTargetPick,
+    onModulationParameterContextMenu,
     onControlChange,
     onHeaderPointerDown,
     onHeaderClick,
@@ -78,6 +79,11 @@
     onDeviceTabChange?: (deviceId: string, tabId: string) => void;
     onModulationTargetSlotSelect?: (deviceId: string, slotIndex: number) => void;
     onModulationTargetPick?: (targetDeviceId: string, paramKey: string) => void;
+    onModulationParameterContextMenu?: (
+      event: MouseEvent,
+      deviceId: string,
+      paramKey: string,
+    ) => boolean;
     onControlChange: (change: RendererControlChange) => void;
     onHeaderPointerDown?: (event: PointerEvent) => void;
     onHeaderClick?: (event: MouseEvent) => void;
@@ -188,6 +194,43 @@
     onModulationTargetPick?.(device.id, control.paramKey);
   };
 
+  const handleEditorContextMenu = (event: Event): void => {
+    if (!(event instanceof MouseEvent)) {
+      return;
+    }
+
+    const eventElement = event.target instanceof Element ? event.target : null;
+    const modulationContextTarget = eventElement?.closest<HTMLElement>(
+      '[data-modulation-context-device-id][data-modulation-context-param]',
+    ) ?? null;
+    const contextDeviceId = modulationContextTarget
+      ?.dataset.modulationContextDeviceId?.trim();
+    const contextParamKey = modulationContextTarget
+      ?.dataset.modulationContextParam?.trim();
+    const control = contextDeviceId === device.id
+      && contextParamKey
+      && modulationTargetParamKeys.has(contextParamKey)
+      ? { deviceId: contextDeviceId, paramKey: contextParamKey }
+      : closestRackControlTarget(event.target, {
+          requireParam: true,
+          deviceId: device.id,
+          paramKeys: modulationTargetParamKeys,
+        });
+    if (!control?.paramKey) {
+      return;
+    }
+
+    const didOpenContextMenu = onModulationParameterContextMenu?.(
+      event,
+      control.deviceId,
+      control.paramKey,
+    ) ?? false;
+    if (didOpenContextMenu) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
+
   $effect(() => {
     const element = editorScopeEl;
     if (!element) {
@@ -196,9 +239,11 @@
 
     element.addEventListener('pointerdown', handleEditorMappingCapture, { capture: true });
     element.addEventListener('click', handleEditorMappingCapture, { capture: true });
+    element.addEventListener('contextmenu', handleEditorContextMenu, { capture: true });
     return () => {
       element.removeEventListener('pointerdown', handleEditorMappingCapture, { capture: true });
       element.removeEventListener('click', handleEditorMappingCapture, { capture: true });
+      element.removeEventListener('contextmenu', handleEditorContextMenu, { capture: true });
     };
   });
 </script>

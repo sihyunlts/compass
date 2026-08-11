@@ -2,6 +2,8 @@
   import { onMount, tick } from 'svelte';
   import {
     isPresetBrowserContextTarget,
+    isRackSelectionContextTarget,
+    type ModulationParameterContextTarget,
     type ContextMenuTarget,
     type PresetEntryContextTarget,
   } from '../../features/context-menu/types';
@@ -25,6 +27,7 @@
     onShowInFolder,
     onGroup,
     onUngroupGroup,
+    onDisconnectModulation,
     clipboardAvailable = false,
   } = $props<{
     onCopy: (target: ContextMenuTarget) => void;
@@ -37,6 +40,10 @@
     onShowInFolder: (target: PresetEntryContextTarget) => void;
     onGroup: (ids: string[]) => void;
     onUngroupGroup: (groupId: string) => void;
+    onDisconnectModulation: (
+      target: ModulationParameterContextTarget,
+      modulatorId?: string,
+    ) => void;
     clipboardAvailable?: boolean;
   }>();
 
@@ -69,8 +76,7 @@
   const canShowInFolder = $derived.by(() =>
     target?.kind === 'preset-entry');
   const canPasteForTarget = $derived.by(() =>
-    target !== null
-    && !isPresetBrowserContextTarget(target)
+    isRackSelectionContextTarget(target)
     && clipboardAvailable);
   type ClipboardActionKind = 'copy' | 'cut' | 'paste' | 'duplicate';
   type ClipboardActionMeta = {
@@ -86,15 +92,15 @@
     { id: 'context-duplicate', kind: 'duplicate', labelKey: 'context.duplicate' },
   ];
   const visibleClipboardActions = $derived.by(() =>
-    isPresetBrowserContextTarget(target)
-      ? []
-      : CLIPBOARD_ACTIONS.filter((action) => !action.requiresClipboard || canPasteForTarget));
+    isRackSelectionContextTarget(target)
+      ? CLIPBOARD_ACTIONS.filter((action) => !action.requiresClipboard || canPasteForTarget)
+      : []);
   const canRenameTarget = $derived.by(() => {
     if (target?.kind === 'preset-entry') {
       return !target.isSystemFolder
         && (target.entryKind === 'file' || target.relativePath.length > 0);
     }
-    if (!target || isPresetBrowserContextTarget(target)) {
+    if (!isRackSelectionContextTarget(target)) {
       return false;
     }
     return target.kind === 'group' || target.deviceIds.length === 1;
@@ -223,6 +229,15 @@
     close();
   }
 
+  function handleDisconnectModulationClick(modulatorId?: string) {
+    if (target?.kind !== 'modulation-parameter') {
+      return;
+    }
+
+    onDisconnectModulation(target, modulatorId);
+    close();
+  }
+
   onMount(() => {
     const detachDismissHandlers = attachFloatingLayerDismissHandlers({
       isActive: () => isOpen,
@@ -280,6 +295,28 @@
       {/if}
       {#if canShowInFolder}
         {@render menuItem('context-show-in-folder', i18n.t('context.showInFolder'), handleShowInFolderClick)}
+      {/if}
+    {:else if target.kind === 'modulation-parameter'}
+      {#if target.connections.length === 1}
+        {@render menuItem(
+          'context-disconnect-modulation',
+          i18n.t('modulation.disconnect'),
+          () => handleDisconnectModulationClick(),
+        )}
+      {:else}
+        {@render menuItem(
+          'context-disconnect-modulation-all',
+          i18n.t('modulation.disconnectAll'),
+          () => handleDisconnectModulationClick(),
+        )}
+        <hr class="context-menu-separator floating-menu-separator" />
+        {#each target.connections as connection (`${connection.modulatorId}:${connection.targetId}`)}
+          {@render menuItem(
+            `context-disconnect-modulation-${connection.modulatorId}-${connection.targetId}`,
+            i18n.t('modulation.disconnectFrom', { modulator: connection.modulatorLabel }),
+            () => handleDisconnectModulationClick(connection.modulatorId),
+          )}
+        {/each}
       {/if}
     {:else}
       {#each visibleClipboardActions as action (action.id)}

@@ -20,6 +20,16 @@ export type PresetDeleteContextTarget =
 
 export type ContextMenuTarget =
   | {
+      kind: 'modulation-parameter';
+      deviceId: string;
+      paramKey: string;
+      connections: readonly {
+        modulatorId: string;
+        modulatorLabel: string;
+        targetId: string;
+      }[];
+    }
+  | {
       kind: 'devices';
       deviceIds: readonly string[];
       canGroup: boolean;
@@ -30,6 +40,21 @@ export type ContextMenuTarget =
       memberDeviceIds: readonly string[];
     }
   | PresetBrowserContextTarget;
+
+export type ModulationParameterContextTarget = Extract<
+  ContextMenuTarget,
+  { kind: 'modulation-parameter' }
+>;
+
+export type RackSelectionContextTarget = Extract<
+  ContextMenuTarget,
+  { kind: 'devices' | 'group' }
+>;
+
+export const isRackSelectionContextTarget = (
+  target: ContextMenuTarget | null | undefined,
+): target is RackSelectionContextTarget =>
+  target?.kind === 'devices' || target?.kind === 'group';
 
 export const isPresetBrowserContextTarget = (
   target: ContextMenuTarget | null | undefined,
