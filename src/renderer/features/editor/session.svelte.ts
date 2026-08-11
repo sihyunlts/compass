@@ -149,10 +149,14 @@ export interface EditorRackBinding {
   ): void;
 }
 
+interface AutoPreviewRequest {
+  restartPlayback: boolean;
+}
+
 interface EditorSessionOptions {
   autoPreviewDebounceMs?: number;
   historyMaxEntries?: number;
-  onAutoPreview?: () => void | Promise<void>;
+  onAutoPreview?: (request: AutoPreviewRequest) => void | Promise<void>;
   onSyncAfterRender?: () => void | Promise<void>;
 }
 
@@ -163,11 +167,14 @@ export class EditorSession {
 
   private readonly autoPreviewDebounceMs: number;
 
-  private readonly onAutoPreview: (() => void | Promise<void>) | null;
+  private readonly onAutoPreview: ((request: AutoPreviewRequest) =>
+    void | Promise<void>) | null;
 
   private readonly onSyncAfterRender: (() => void | Promise<void>) | null;
 
   private autoPreviewTimer: number | null = null;
+
+  private autoPreviewShouldRestartPlayback = false;
 
   private rackBinding: EditorRackBinding | null = null;
 
@@ -363,15 +370,25 @@ export class EditorSession {
     syncPreviewBpm: (nextBpm: number): boolean => syncPreviewBpm(this.state, nextBpm),
   };
 
-  public scheduleAutoPreview(delayMs = this.autoPreviewDebounceMs): void {
+  public scheduleAutoPreview(
+    delayMs = this.autoPreviewDebounceMs,
+    options: { restartPlayback?: boolean } = {},
+  ): void {
+    const restartPlayback = this.autoPreviewShouldRestartPlayback
+      || options.restartPlayback === true;
     this.cancelAutoPreview();
+    this.autoPreviewShouldRestartPlayback = restartPlayback;
     this.autoPreviewTimer = window.setTimeout(() => {
       this.autoPreviewTimer = null;
+      const shouldRestartPlayback = this.autoPreviewShouldRestartPlayback;
+      this.autoPreviewShouldRestartPlayback = false;
       if (!this.onAutoPreview) {
         return;
       }
 
-      void Promise.resolve(this.onAutoPreview()).catch(() => {
+      void Promise.resolve(this.onAutoPreview({
+        restartPlayback: shouldRestartPlayback,
+      })).catch(() => {
         // Preview scheduling failures should not break editor mutations.
       });
     }, delayMs);
@@ -384,6 +401,7 @@ export class EditorSession {
 
     window.clearTimeout(this.autoPreviewTimer);
     this.autoPreviewTimer = null;
+    this.autoPreviewShouldRestartPlayback = false;
   }
 
   private requestSyncAfterRender(): void {
@@ -458,7 +476,9 @@ export class EditorSession {
     resetChainHistory(this.state, this.history, nextChain, meta, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
-      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),
+      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs, {
+        restartPlayback: true,
+      }),
     });
   }
 
