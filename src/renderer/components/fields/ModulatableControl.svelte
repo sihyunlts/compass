@@ -325,7 +325,7 @@
               aria-label={amountHint(state)}
               use:hint={{
                 text: amountHint(state),
-                placement: 'below',
+                placement: amountListVerticalPlacement,
                 delayMs: 0,
                 gapPx: resolvedAmountHintGapPx,
                 dismissOnPointerDown: false,

@@ -14,7 +14,7 @@ import {
 let hintIdCounter = 0;
 
 type HintValue = string | null | undefined;
-type HintPlacement = 'auto' | 'below';
+type HintPlacement = 'auto' | 'above' | 'below';
 type HintInput = HintValue | {
   text: HintValue;
   placement?: HintPlacement;
@@ -147,9 +147,11 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
     const canOpenAbove = aboveY >= viewportTop;
     const canOpenBelow =
       belowY + hintRect.height <= window.innerHeight - VIEWPORT_PADDING_PX;
-    const opensAbove = hintPlacement === 'auto' && (
-      canOpenAbove
-      || (!canOpenBelow && anchorRect.top >= window.innerHeight - anchorRect.bottom)
+    const opensAbove = hintPlacement === 'above' || (
+      hintPlacement === 'auto' && (
+        canOpenAbove
+        || (!canOpenBelow && anchorRect.top >= window.innerHeight - anchorRect.bottom)
+      )
     );
     const y = opensAbove
       ? Math.max(viewportTop, aboveY)
