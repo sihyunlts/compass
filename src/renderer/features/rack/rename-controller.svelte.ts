@@ -5,6 +5,13 @@ import {
   resolveAdjacentFloatingLayerPosition,
 } from '../../components/overlays/floating-layer';
 import {
+  activateFloatingLayer,
+  createFloatingLayerId,
+  deactivateFloatingLayer,
+  hasActiveFloatingLayerDescendant,
+  resolveFloatingLayerParentId,
+} from '../../components/overlays/floating-layer-stack';
+import {
   isRenamingDevice,
   isRenamingGroup,
   resolveCommittedRenameDraft,
@@ -23,6 +30,7 @@ type RackRenamePopoverHandle = {
   measure(): { width: number; height: number };
   focusSelect(): void;
   containsTarget(eventTarget: EventTarget | null): boolean;
+  setStackOrder(stackOrder: number): void;
 };
 
 interface RackRenameControllerOptions {
@@ -56,12 +64,17 @@ class RackRenameController {
 
   private skipBlur = false;
 
+  private pendingBlurCommit = false;
+
+  private readonly floatingLayerId = createFloatingLayerId('rack-rename');
+
   public constructor(options: RackRenameControllerOptions) {
     this.options = options;
   }
 
   public mount(): () => void {
-    return attachFloatingLayerDismissHandlers({
+    const detachDismissHandlers = attachFloatingLayerDismissHandlers({
+      layerId: this.floatingLayerId,
       isActive: () => this.getPopoverTarget() !== null,
       containsEventTarget: (eventTarget) => this.popover?.containsTarget(eventTarget) ?? false,
       onPointerDownOutside: () => {
@@ -71,10 +84,15 @@ class RackRenameController {
         this.commit();
       },
     });
+    return () => {
+      deactivateFloatingLayer(this.floatingLayerId);
+      detachDismissHandlers();
+    };
   }
 
   public setPopover(popover: RackRenamePopoverHandle | null): void {
     this.popover = popover;
+    this.syncFloatingLayer();
   }
 
   public getPopoverTarget(): RackRenameTarget | null {
@@ -119,6 +137,11 @@ class RackRenameController {
 
   public handleInputBlur(): void {
     if (this.skipBlur) {
+      return;
+    }
+
+    if (hasActiveFloatingLayerDescendant(this.floatingLayerId)) {
+      this.pendingBlurCommit = true;
       return;
     }
 
@@ -205,10 +228,12 @@ class RackRenameController {
   }
 
   private clearState(): void {
+    deactivateFloatingLayer(this.floatingLayerId);
     this.target = null;
     this.draft = '';
     this.popover = null;
     this.popoverPosition = null;
+    this.pendingBlurCommit = false;
   }
 
   private releaseBlurGuard(): void {
@@ -262,6 +287,38 @@ class RackRenameController {
         gapPx: RENAME_POPOVER_GAP_PX,
       },
     );
+    this.syncFloatingLayer();
+  }
+
+  private syncFloatingLayer(): void {
+    const target = this.getPopoverTarget();
+    const anchor = target ? this.resolvePopoverAnchor(target) : null;
+    if (!target || !anchor || !this.popover) {
+      deactivateFloatingLayer(this.floatingLayerId);
+      return;
+    }
+
+    activateFloatingLayer({
+      id: this.floatingLayerId,
+      parentId: resolveFloatingLayerParentId(anchor, this.floatingLayerId),
+      containsEventTarget: (eventTarget) =>
+        this.popover?.containsTarget(eventTarget) === true
+        || (eventTarget instanceof Node && anchor.contains(eventTarget)),
+      onDismissRequest: () => {
+        this.commit();
+      },
+      onEscapeRequest: () => {
+        this.cancel();
+      },
+      onDescendantStateChange: (hasActiveDescendant) => {
+        if (!hasActiveDescendant && this.pendingBlurCommit) {
+          this.commit();
+        }
+      },
+      onStackOrderChange: (stackOrder) => {
+        this.popover?.setStackOrder(stackOrder);
+      },
+    });
   }
 
   private commit(): boolean {

@@ -12,6 +12,12 @@
     resolveFloatingLayerEnterOffsetY,
   } from '../overlays/floating-layer';
   import { FloatingLayerPresence } from '../overlays/floating-layer-presence.svelte';
+  import {
+    activateFloatingLayer,
+    createFloatingLayerId,
+    deactivateFloatingLayer,
+    resolveFloatingLayerParentId,
+  } from '../overlays/floating-layer-stack';
 
   let {
     open = false,
@@ -33,6 +39,12 @@
   let maxHeightPx = $state(384);
   let isPositioned = $state(false);
   let positionToken = 0;
+  let floatingLayerStackOrder = $state(1);
+  const floatingLayerId = createFloatingLayerId('floating-dropdown');
+  let hasOpenDescendant = $state(false);
+  const isLayerOpen = $derived(
+    open || hasOpenDescendant,
+  );
 
   const rootClass = $derived(`floating-dropdown floating-menu-surface ${className}`.trim());
   const presence = new FloatingLayerPresence();
@@ -42,7 +54,7 @@
     const token = ++positionToken;
     await tick();
 
-    if (!open || token !== positionToken || !dropdownEl || !anchorEl) {
+    if (!isLayerOpen || token !== positionToken || !dropdownEl || !anchorEl) {
       return;
     }
 
@@ -73,7 +85,22 @@
   };
 
   $effect(() => {
-    if (open && anchorEl) {
+    if (isLayerOpen && anchorEl) {
+      activateFloatingLayer({
+        id: floatingLayerId,
+        parentId: resolveFloatingLayerParentId(anchorEl, floatingLayerId),
+        containsEventTarget: (eventTarget) =>
+          isEventTargetWithinFloatingLayer(eventTarget, dropdownEl)
+          || isEventTargetWithinFloatingLayer(eventTarget, anchorEl),
+        onDismissRequest: () => onClose(false),
+        onEscapeRequest: () => onClose(true),
+        onDescendantStateChange: (hasActiveDescendant) => {
+          hasOpenDescendant = hasActiveDescendant;
+        },
+        onStackOrderChange: (stackOrder) => {
+          floatingLayerStackOrder = stackOrder;
+        },
+      });
       presence.show();
       void updatePosition();
       return;
@@ -85,12 +112,14 @@
 
     if (!dropdownEl || !isPositioned) {
       presence.hideImmediately();
+      deactivateFloatingLayer(floatingLayerId);
       isPositioned = false;
       void enterY.set(0, { instant: true });
       return;
     }
 
     presence.hide([{ element: dropdownEl }], () => {
+      deactivateFloatingLayer(floatingLayerId);
       isPositioned = false;
       void enterY.set(0, { instant: true });
     });
@@ -98,7 +127,8 @@
 
   onMount(() => {
     const detachDismissHandlers = attachFloatingLayerDismissHandlers({
-      isActive: () => open,
+      layerId: floatingLayerId,
+      isActive: () => isLayerOpen,
       containsEventTarget: (eventTarget) =>
         isEventTargetWithinFloatingLayer(eventTarget, dropdownEl)
         || isEventTargetWithinFloatingLayer(eventTarget, anchorEl),
@@ -110,6 +140,7 @@
     });
 
     return () => {
+      deactivateFloatingLayer(floatingLayerId);
       presence.destroy();
       detachDismissHandlers();
     };
@@ -121,10 +152,11 @@
     bind:this={dropdownEl}
     class={rootClass}
     class:is-positioned={isPositioned}
-    aria-hidden={!open || !isPositioned}
+    aria-hidden={!isLayerOpen || !isPositioned}
     style:transform={`translate3d(${x}px, ${y}px, 0)`}
     style:--floating-dropdown-max-height={`${maxHeightPx}px`}
     style:--floating-dropdown-enter-y={`${enterY.current}px`}
+    style:--floating-layer-stack-order={floatingLayerStackOrder}
   >
     {#if children}
       {@render children()}
@@ -134,7 +166,6 @@
 
 <style lang="scss">
   .floating-dropdown {
-    z-index: 44;
     max-height: min(24rem, var(--floating-dropdown-max-height, calc(100vh - 1rem)));
     overflow-y: auto;
     visibility: hidden;

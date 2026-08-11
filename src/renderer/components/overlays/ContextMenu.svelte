@@ -13,6 +13,12 @@
     resolveViewportFloatingLayerPosition,
   } from './floating-layer';
   import { FloatingLayerPresence } from './floating-layer-presence.svelte';
+  import {
+    activateFloatingLayer,
+    createFloatingLayerId,
+    deactivateFloatingLayer,
+    resolveFloatingLayerParentId,
+  } from './floating-layer-stack';
   import { i18n } from '../../i18n.svelte';
   import type { MessageKey } from '../../../shared/i18n';
 
@@ -53,7 +59,9 @@
   let y = $state(0);
   let target = $state<ContextMenuTarget | null>(null);
   let menuEl = $state<HTMLElement | null>(null);
+  let floatingLayerStackOrder = $state(1);
   let openToken = 0;
+  const floatingLayerId = createFloatingLayerId('context-menu');
   const presence = new FloatingLayerPresence();
 
   const isPresetBrowserTarget = $derived.by(() =>
@@ -115,6 +123,17 @@
     }
 
     target = structuredClone(nextTarget);
+    const sourceElement = document.elementFromPoint(clientX, clientY);
+    deactivateFloatingLayer(floatingLayerId);
+    activateFloatingLayer({
+      id: floatingLayerId,
+      parentId: resolveFloatingLayerParentId(sourceElement, floatingLayerId),
+      containsEventTarget: (eventTarget) => isEventTargetWithinFloatingLayer(eventTarget, menuEl),
+      onDismissRequest: close,
+      onStackOrderChange: (stackOrder) => {
+        floatingLayerStackOrder = stackOrder;
+      },
+    });
     presence.show();
     isPositioned = false;
     isOpen = true;
@@ -143,6 +162,7 @@
     }
 
     const finishClose = (): void => {
+      deactivateFloatingLayer(floatingLayerId);
       isPositioned = false;
       target = null;
     };
@@ -240,6 +260,7 @@
 
   onMount(() => {
     const detachDismissHandlers = attachFloatingLayerDismissHandlers({
+      layerId: floatingLayerId,
       isActive: () => isOpen,
       containsEventTarget: (eventTarget) => isEventTargetWithinFloatingLayer(eventTarget, menuEl),
       onPointerDownOutside: close,
@@ -248,6 +269,7 @@
     });
 
     return () => {
+      deactivateFloatingLayer(floatingLayerId);
       presence.destroy();
       detachDismissHandlers();
     };
@@ -275,6 +297,7 @@
   aria-hidden={!isOpen || !isPositioned}
   hidden={!presence.rendered}
   style:transform={presence.rendered ? `translate3d(${x}px, ${y}px, 0)` : undefined}
+  style:--floating-layer-stack-order={floatingLayerStackOrder}
 >
   {#if target}
     {#if isPresetBrowserTarget}

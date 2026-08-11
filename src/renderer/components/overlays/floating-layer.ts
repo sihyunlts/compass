@@ -1,5 +1,6 @@
 import { clamp } from '../../../shared/math';
 import { SPRING_PRECISION } from '../../motion';
+import { isTopmostFloatingLayer } from './floating-layer-stack';
 
 export type FloatingLayerSize = {
   width: number;
@@ -25,6 +26,7 @@ type AdjacentFloatingLayerOptions = {
 };
 
 type FloatingLayerDismissHandlers = {
+  layerId?: string;
   isActive: () => boolean;
   containsEventTarget: (eventTarget: EventTarget | null) => boolean;
   onPointerDownOutside: () => void;
@@ -322,6 +324,7 @@ export const resolveAdjacentFloatingLayerPosition = (
 
 /** Attaches shared outside-interaction dismissal for a floating layer. */
 export const attachFloatingLayerDismissHandlers = ({
+  layerId,
   isActive,
   containsEventTarget,
   onPointerDownOutside,
@@ -329,7 +332,11 @@ export const attachFloatingLayerDismissHandlers = ({
   onDismissRequest,
 }: FloatingLayerDismissHandlers): (() => void) => {
   const handleWindowPointerDown = (event: PointerEvent): void => {
-    if (!isActive() || containsEventTarget(event.target)) {
+    if (
+      !isActive()
+      || (layerId && !isTopmostFloatingLayer(layerId))
+      || containsEventTarget(event.target)
+    ) {
       return;
     }
 
@@ -345,7 +352,11 @@ export const attachFloatingLayerDismissHandlers = ({
   };
 
   const dismissFromOutsideEvent = (event: Event): void => {
-    if (!isActive() || containsEventTarget(event.target)) {
+    if (
+      !isActive()
+      || (layerId && !isTopmostFloatingLayer(layerId))
+      || containsEventTarget(event.target)
+    ) {
       return;
     }
 

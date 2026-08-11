@@ -708,7 +708,7 @@
     left: calc(var(--gap-10) - var(--drop-indicator-edge-room));
     overflow: hidden;
     pointer-events: none;
-    z-index: 50;
+    z-index: var(--z-layer-drag-indicator);
   }
 
   .drop-indicator {

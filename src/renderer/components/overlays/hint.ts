@@ -3,6 +3,13 @@ import {
   animateFloatingLayerExit,
   resolveFloatingLayerEnterOffsetY,
 } from './floating-layer';
+import {
+  activateFloatingLayer,
+  createFloatingLayerId,
+  deactivateFloatingLayer,
+  hasActiveFloatingLayerDescendant,
+  resolveFloatingLayerParentId,
+} from './floating-layer-stack';
 
 let hintIdCounter = 0;
 
@@ -106,6 +113,8 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
   let showTimer: number | null = null;
   let previousDescribedBy: string | null = null;
   const hintId = `app-hint-${++hintIdCounter}`;
+  const floatingLayerId = createFloatingLayerId('hint');
+  let closePendingForDescendant = false;
   const owner: VisibleHintOwner = {
     closeImmediately: () => closeHintImmediately(),
   };
@@ -155,6 +164,11 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
 
   const closeHint = (): void => {
     clearShowTimer();
+    if (hintEl && hasActiveFloatingLayerDescendant(floatingLayerId)) {
+      closePendingForDescendant = true;
+      return;
+    }
+    closePendingForDescendant = false;
     const wasOpen = hintEl !== null;
     const closingHintEl = hintEl;
     const cancelEnteringHint = cancelEnterAnimation;
@@ -171,6 +185,7 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
     }
 
     if (closingHintEl) {
+      deactivateFloatingLayer(floatingLayerId);
       cancelExitAnimation?.();
       exitingHintEl?.remove();
       exitingHintEl = closingHintEl;
@@ -193,11 +208,12 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
     window.removeEventListener('scroll', closeHint, true);
     window.removeEventListener('resize', closeHint);
     document.removeEventListener('pointerdown', handleDocumentPointerDown, true);
-    document.removeEventListener('keydown', handleDocumentKeyDown, true);
   };
 
   const closeHintImmediately = (): void => {
     clearShowTimer();
+    closePendingForDescendant = false;
+    deactivateFloatingLayer(floatingLayerId);
     const wasOpen = hintEl !== null;
     if (wasOpen) {
       if (previousDescribedBy === null) {
@@ -223,7 +239,6 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
     window.removeEventListener('scroll', closeHint, true);
     window.removeEventListener('resize', closeHint);
     document.removeEventListener('pointerdown', handleDocumentPointerDown, true);
-    document.removeEventListener('keydown', handleDocumentKeyDown, true);
   };
 
   const openHint = (animateEnter = true): void => {
@@ -251,11 +266,27 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
       hintEl.role = 'tooltip';
       document.body.append(hintEl);
       visibleHintOwner = owner;
+      activateFloatingLayer({
+        id: floatingLayerId,
+        parentId: resolveFloatingLayerParentId(node, floatingLayerId),
+        containsEventTarget: (eventTarget) => eventTarget instanceof Node && (
+          node.contains(eventTarget)
+          || hintEl?.contains(eventTarget) === true
+        ),
+        onDismissRequest: closeHint,
+        onDescendantStateChange: (hasActiveDescendant) => {
+          if (!hasActiveDescendant && closePendingForDescendant) {
+            queueMicrotask(closeHint);
+          }
+        },
+        onStackOrderChange: (stackOrder) => {
+          hintEl?.style.setProperty('--floating-layer-stack-order', String(stackOrder));
+        },
+      });
 
       window.addEventListener('scroll', closeHint, true);
       window.addEventListener('resize', closeHint);
       document.addEventListener('pointerdown', handleDocumentPointerDown, true);
-      document.addEventListener('keydown', handleDocumentKeyDown, true);
     }
 
     hintEl.textContent = hintText;
@@ -272,12 +303,6 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
       );
     }
   };
-
-  function handleDocumentKeyDown(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-      closeHint();
-    }
-  }
 
   function handleDocumentPointerDown(event: PointerEvent): void {
     if (!dismissOnPointerDown && event.composedPath().includes(node)) {

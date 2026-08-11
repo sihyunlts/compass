@@ -202,7 +202,10 @@ html.reduce-animation {
 .floating-menu-surface {
   position: fixed;
   inset: 0 auto auto 0;
-  z-index: 42;
+  z-index: calc(
+    var(--z-layer-floating-stack-base)
+    + var(--floating-layer-stack-order, 0)
+  );
   display: inline-flex;
   flex-direction: column;
   align-items: stretch;
@@ -281,7 +284,10 @@ html.reduce-animation {
 .app-hint {
   position: fixed;
   inset: 0 auto auto 0;
-  z-index: 70;
+  z-index: calc(
+    var(--z-layer-floating-stack-base)
+    + var(--floating-layer-stack-order, 0)
+  );
   max-width: min(16rem, calc(100vw - var(--gap-16)));
   padding: var(--gap-4) var(--gap-6);
   border: 1px solid var(--color-border-floating);
