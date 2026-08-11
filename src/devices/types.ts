@@ -1,6 +1,7 @@
 import type { Component } from 'svelte';
 
 import type { GeneratorDeviceNode } from '../shared/model';
+import type { MessageKey } from '../shared/i18n';
 import type { RendererControlChange, RendererKindControlDefinition } from './control-types';
 import type { NumericParameterRules } from './numeric-parameters';
 import type { ModulationStateByParameter } from '../shared/contracts/preview/modulation';
@@ -56,7 +57,7 @@ export interface RendererDeviceSchema<K extends RendererDeviceKind = RendererDev
 
 export interface RendererDeviceTabDefinition {
   id: string;
-  label: string;
+  labelKey: MessageKey;
   disabled?: boolean;
 }
 

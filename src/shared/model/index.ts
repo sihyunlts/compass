@@ -17,8 +17,11 @@ export type {
   ModulationCurve,
   ModulationTarget,
   PathGeneratorNode,
+  PathAnchor,
+  PathAnimation,
+  PathHandle,
   PathParams,
-  PathPoint,
+  PathTransform,
   RainGeneratorNode,
   RainParams,
   ReverseEffectNode,
@@ -39,7 +42,7 @@ export type {
 } from './chain';
 export type { ClipNote } from './clip';
 export { cloneChainForIpc } from './chain-clone';
-export { cloneDeviceNode } from './device-clone';
+export { cloneDeviceNode, clonePathAnchors } from './device-clone';
 export {
   isCurveModulatorNode,
   isGeneratorDeviceKind,

@@ -1,4 +1,6 @@
 import {
+  type DeferredGenerationState,
+  type MaterializedGenerationState,
   type MutableGenerationState,
   type OriginTimelineState,
   type PendingTemporalMaterializationCheckpoint,
@@ -13,7 +15,8 @@ import {
 import type {
   PendingFrameApplicationOperatorInput,
   RackOperator,
-  RackOperatorInputPreparation,
+  RackOperatorInput,
+  RackOperatorInputPolicy,
   RackStageExecutionContext,
   RackStageOfKind,
 } from './types';
@@ -31,20 +34,20 @@ import {
 import { applyFinalTimelineNormalization } from './final-normalization';
 
 interface PendingFrameApplicationInputPlan {
-  baseState: MutableGenerationState;
-  sourceState: MutableGenerationState;
+  baseState: DeferredGenerationState;
+  sourceState: MaterializedGenerationState;
   precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
 }
 
 export interface PendingGeometryApplicationOperatorInput {
-  baseState: MutableGenerationState;
+  baseState: DeferredGenerationState;
   precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
 }
 
-export const materializePendingRackOperatorInput: RackOperatorInputPreparation = (
+export const materializePendingRackOperatorInput = (
   state: MutableGenerationState,
   context: RackStageExecutionContext,
-): MutableGenerationState => {
+): MaterializedGenerationState => {
   const frameMaterializedState = materializePendingFrameApplications(
     state,
     context.outputAdapter,
@@ -57,7 +60,20 @@ export const materializePendingRackOperatorInput: RackOperatorInputPreparation =
     context.outputAdapter,
     context.mutedGroupIds,
     context.mutedGeneratorIds,
-  );
+  ) as MaterializedGenerationState;
+};
+
+export const prepareRackOperatorInput = <TPolicy extends RackOperatorInputPolicy>(
+  policy: TPolicy,
+  state: MutableGenerationState,
+  context: RackStageExecutionContext,
+): RackOperatorInput<TPolicy> => {
+  switch (policy) {
+    case 'preserve-pending':
+      return state as RackOperatorInput<TPolicy>;
+    case 'materialize-all':
+      return materializePendingRackOperatorInput(state, context) as RackOperatorInput<TPolicy>;
+  }
 };
 
 const buildPendingFrameApplicationInputPlan = (
@@ -73,7 +89,7 @@ const buildPendingFrameApplicationInputPlan = (
     baseState,
     sourceState: needsSourceMaterialization
       ? materializePendingRackOperatorInput(state, context)
-      : state,
+      : state as MaterializedGenerationState,
     precedingTemporalCheckpoint: pendingTemporalExtraction?.checkpoint ?? null,
   };
 };
@@ -130,18 +146,14 @@ export const materializeAndNormalizeRackState = (
   context.mutedGeneratorIds,
 );
 
-export const preservePendingRackOperatorInput: RackOperatorInputPreparation = (
-  state: MutableGenerationState,
-): MutableGenerationState => state;
-
 export const createPendingFrameApplicationOperator = <TKind extends RackStageDeviceKind>(
   execute: (
     input: PendingFrameApplicationOperatorInput,
     stage: RackStageOfKind<TKind>,
     context: RackStageExecutionContext,
   ) => MutableGenerationState,
-): RackOperator => createRackOperator<TKind>(
-  preservePendingRackOperatorInput,
+): RackOperator => createRackOperator<TKind, 'preserve-pending'>(
+  'preserve-pending',
   (state, stage, context) => execute(
     preparePendingFrameApplicationInput(state, context),
     stage,
@@ -155,8 +167,8 @@ export const createPendingGeometryApplicationOperator = <TKind extends RackStage
     stage: RackStageOfKind<TKind>,
     context: RackStageExecutionContext,
   ) => MutableGenerationState,
-): RackOperator => createRackOperator<TKind>(
-  preservePendingRackOperatorInput,
+): RackOperator => createRackOperator<TKind, 'preserve-pending'>(
+  'preserve-pending',
   (state, stage, context) => execute(
     preparePendingGeometryApplicationInput(state),
     stage,

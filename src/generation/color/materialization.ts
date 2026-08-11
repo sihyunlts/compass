@@ -9,7 +9,6 @@ import {
   type FrameWindow,
 } from '../timeline';
 import type {
-  GeometryMask,
   GeometryStroke,
   GeometryTimeline,
 } from '../types';
@@ -42,13 +41,6 @@ interface ColorAgeWrite {
 
 const COLOR_AGE_EPSILON = 1e-9;
 
-const cloneMask = (
-  mask: GeometryMask,
-): GeometryMask => ({
-  contains: mask.contains,
-  inverseTransform: { ...mask.inverseTransform },
-});
-
 const colorizeEventStroke = (
   stroke: GeometryStroke,
   velocity: number,
@@ -66,7 +58,7 @@ const colorizeEventStroke = (
   },
   originGroupId: stroke.originGroupId,
   writeOrder,
-  masks: stroke.masks.map(cloneMask),
+  masks: stroke.masks,
 });
 
 const median = (

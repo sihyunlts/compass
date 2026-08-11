@@ -32,8 +32,9 @@ import { resolveFrameWindow } from './frame-window';
 import {
   createRackOperator,
   type OriginFrameRemap,
-  type RackOperator,
-  type RackOperatorInputPreparation,
+  type RackOperatorContract,
+  type RackOperatorInput,
+  type RackOperatorInputPolicy,
   type RackStageExecutionContext,
   type RackStageOfKind,
 } from './types';
@@ -178,7 +179,7 @@ const applyTemporalStateUpdates = (
   state: MutableGenerationState,
   temporalUpdates: ReadonlyMap<string, SceneTemporalState>,
   writeOrder: number,
-  finalCleanupMode?: GenerationFinalCleanupMode,
+  finalCleanupMode: GenerationFinalCleanupMode | undefined,
 ): MutableGenerationState => {
   if (temporalUpdates.size === 0) {
     return state;
@@ -221,16 +222,19 @@ const applyTemporalStateUpdates = (
   });
 };
 
-export const createTemporalStateUpdateOperator = <TKind extends RackStageDeviceKind>(
+export const createTemporalStateUpdateOperator = <
+  TKind extends RackStageDeviceKind,
+  TPolicy extends RackOperatorInputPolicy,
+>(
   buildTemporalUpdates: (
-    state: MutableGenerationState,
+    state: RackOperatorInput<TPolicy>,
     stage: RackStageOfKind<TKind>,
     context: RackStageExecutionContext,
   ) => ReadonlyMap<string, SceneTemporalState>,
-  finalCleanupMode?: GenerationFinalCleanupMode,
-  prepareInput: RackOperatorInputPreparation = (state) => state,
-): RackOperator => createRackOperator<TKind>(
-  prepareInput,
+  finalCleanupMode: GenerationFinalCleanupMode | undefined,
+  inputPolicy: TPolicy,
+): RackOperatorContract<TPolicy> => createRackOperator<TKind, TPolicy>(
+  inputPolicy,
   (state, stage, context) => applyTemporalStateUpdates(
     state,
     buildTemporalUpdates(state, stage, context),

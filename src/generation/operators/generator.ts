@@ -1,6 +1,5 @@
 import {
   createRackOperator,
-  preservePendingRackOperatorInput,
   replaceTimelineAndRefreshRackState,
   resolveFrameWindow,
   resolveModulatedDeviceAtFrame,
@@ -75,7 +74,7 @@ const applyGeneratorDevice = (
   );
 };
 
-export const generatorOperator = createRackOperator<GeneratorStageKind>(
-  preservePendingRackOperatorInput,
+export const generatorOperator = createRackOperator<GeneratorStageKind, 'preserve-pending'>(
+  'preserve-pending',
   (state, stage, context) => applyGeneratorDevice(state, stage, context),
 );

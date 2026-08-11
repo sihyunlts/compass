@@ -19,17 +19,7 @@ export const hasAdditiveSelectionModifier = (
   event: { metaKey: boolean; ctrlKey: boolean },
 ): boolean => event.metaKey || event.ctrlKey;
 
-const dedupeIds = (ids: Iterable<string>): string[] => {
-  const nextIds: string[] = [];
-
-  for (const id of ids) {
-    if (!nextIds.includes(id)) {
-      nextIds.push(id);
-    }
-  }
-
-  return nextIds;
-};
+const dedupeIds = (ids: Iterable<string>): string[] => [...new Set(ids)];
 
 const buildSelectionRange = (
   orderedIds: readonly string[],
@@ -50,7 +40,10 @@ const buildSelectionRange = (
 export const getOrderedSelectedIds = (
   selectedIds: readonly string[],
   orderedIds: readonly string[],
-): string[] => orderedIds.filter((id) => selectedIds.includes(id));
+): string[] => {
+  const selectedIdSet = new Set(selectedIds);
+  return orderedIds.filter((id) => selectedIdSet.has(id));
+};
 
 export const updateOrderedSelection = (
   current: OrderedSelectionState,
@@ -58,8 +51,9 @@ export const updateOrderedSelection = (
   requestedAnchorId: string | null,
   orderedIds: readonly string[],
 ): OrderedSelectionUpdate => {
-  const selectedIds = dedupeIds(ids).filter((id) => orderedIds.includes(id));
-  const anchorId = requestedAnchorId && orderedIds.includes(requestedAnchorId)
+  const orderedIdSet = new Set(orderedIds);
+  const selectedIds = dedupeIds(ids).filter((id) => orderedIdSet.has(id));
+  const anchorId = requestedAnchorId && orderedIdSet.has(requestedAnchorId)
     ? requestedAnchorId
     : selectedIds.length === 0
       ? null
@@ -74,12 +68,15 @@ export const updateOrderedSelection = (
 export const reconcileOrderedSelection = (
   current: OrderedSelectionState,
   orderedIds: readonly string[],
-): OrderedSelectionUpdate => ({
-  selectedIds: current.selectedIds.filter((id) => orderedIds.includes(id)),
-  anchorId: current.anchorId && orderedIds.includes(current.anchorId)
-    ? current.anchorId
-    : null,
-});
+): OrderedSelectionUpdate => {
+  const orderedIdSet = new Set(orderedIds);
+  return {
+    selectedIds: current.selectedIds.filter((id) => orderedIdSet.has(id)),
+    anchorId: current.anchorId && orderedIdSet.has(current.anchorId)
+      ? current.anchorId
+      : null,
+  };
+};
 
 export const applyOrderedRangeSelection = (
   current: OrderedSelectionState,

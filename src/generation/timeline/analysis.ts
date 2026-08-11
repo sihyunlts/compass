@@ -1,5 +1,9 @@
 import { THICKNESS } from '../../core/pipeline/constants';
-import { applyAffine, distanceToPolylineSquared } from '../../core/geometry';
+import {
+  applyAffine,
+  distanceToPolylineSquared,
+  distanceToRasterizedPolylineSquared,
+} from '../../core/geometry';
 import { toRoundedCoordinateKey } from '../coordinates';
 import type {
   GeometryMask,
@@ -182,20 +186,16 @@ const collectCenterlineCandidateCoordinates = (
     return [];
   }
 
-  const start = points[0];
-  const end = points[points.length - 1];
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
   const coordinates = new Map<string, { x: number; y: number }>();
 
   const addCoordinate = (x: number, y: number): void => {
-    const coordinateKey = toRoundedCoordinateKey(x, y);
+    const roundedX = Math.round(x);
+    const roundedY = Math.round(y);
+    const coordinateKey = toRoundedCoordinateKey(roundedX, roundedY);
     if (!coordinateKey) {
       return;
     }
 
-    const roundedX = Math.round(x);
-    const roundedY = Math.round(y);
     if (
       outputBounds
       && (
@@ -211,30 +211,45 @@ const collectCenterlineCandidateCoordinates = (
     coordinates.set(coordinateKey, { x: roundedX, y: roundedY });
   };
 
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    const startX = Math.ceil(Math.min(start.x, end.x));
-    const endX = Math.floor(Math.max(start.x, end.x));
-    for (let x = startX; x <= endX; x += 1) {
-      const t = dx === 0 ? 0 : (x - start.x) / dx;
-      if (t < 0 || t > 1) {
-        continue;
+  const addSegmentCoordinates = (
+    start: GeometryStroke['polyline']['points'][number],
+    end: GeometryStroke['polyline']['points'][number],
+  ): void => {
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      const startX = Math.ceil(Math.min(start.x, end.x));
+      const endX = Math.floor(Math.max(start.x, end.x));
+      for (let x = startX; x <= endX; x += 1) {
+        const t = dx === 0 ? 0 : (x - start.x) / dx;
+        if (t < 0 || t > 1) {
+          continue;
+        }
+        addCoordinate(x, start.y + t * dy);
       }
-      addCoordinate(x, start.y + t * dy);
-    }
-  } else {
-    const startY = Math.ceil(Math.min(start.y, end.y));
-    const endY = Math.floor(Math.max(start.y, end.y));
-    for (let y = startY; y <= endY; y += 1) {
-      const t = dy === 0 ? 0 : (y - start.y) / dy;
-      if (t < 0 || t > 1) {
-        continue;
+    } else {
+      const startY = Math.ceil(Math.min(start.y, end.y));
+      const endY = Math.floor(Math.max(start.y, end.y));
+      for (let y = startY; y <= endY; y += 1) {
+        const t = dy === 0 ? 0 : (y - start.y) / dy;
+        if (t < 0 || t > 1) {
+          continue;
+        }
+        addCoordinate(start.x + t * dx, y);
       }
-      addCoordinate(start.x + t * dx, y);
     }
-  }
+    addCoordinate(start.x, start.y);
+    addCoordinate(end.x, end.y);
+  };
 
-  addCoordinate(start.x, start.y);
-  addCoordinate(end.x, end.y);
+  for (let index = 0; index < points.length - 1; index += 1) {
+    addSegmentCoordinates(points[index], points[index + 1]);
+  }
+  if (stroke.polyline.closed && points.length > 1) {
+    addSegmentCoordinates(points[points.length - 1], points[0]);
+  } else if (points.length === 1) {
+    addCoordinate(points[0].x, points[0].y);
+  }
   return Array.from(coordinates.values());
 };
 
@@ -251,7 +266,11 @@ const resolveStrokeOccupiedCoordinateCandidates = (
   stroke: GeometryStroke,
   outputBounds: OccupiedCoordinateCandidateBounds | null,
 ): StrokeOccupiedCoordinateCandidate[] => {
-  const cacheKey = toCandidateCacheKey(outputBounds);
+  const cacheKey = [
+    toCandidateCacheKey(outputBounds),
+    stroke.polyline.closed ? 'closed' : 'open',
+    stroke.polyline.rasterMode ?? 'stroke',
+  ].join(':');
   const cached = occupiedCoordinateCandidatesByStroke.get(stroke)?.get(cacheKey);
   if (cached) {
     return cached;
@@ -283,12 +302,15 @@ const resolveStrokeOccupiedCoordinateCandidates = (
       coordinates = [];
       for (let y = bounds.startY; y <= bounds.endY; y += 1) {
         for (let x = bounds.startX; x <= bounds.endX; x += 1) {
-          const distanceSquared = distanceToPolylineSquared({ x, y }, stroke.polyline);
-          if (distanceSquared > THICKNESS * THICKNESS) {
+          const rasterDistanceSquared = distanceToRasterizedPolylineSquared(
+            { x, y },
+            stroke.polyline,
+          );
+          if (rasterDistanceSquared > THICKNESS * THICKNESS) {
             continue;
           }
 
-          coordinates.push({ x, y, distanceSquared });
+          coordinates.push({ x, y, distanceSquared: rasterDistanceSquared });
         }
       }
     }

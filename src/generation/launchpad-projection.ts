@@ -1,6 +1,10 @@
 import { MIN_NOTE_DURATION, THICKNESS } from '../core/pipeline/constants';
 import { collectPitchSampledNotes, type SampledActivePitch } from '../core/pipeline/note-sampling';
-import { applyAffine, COMPOSITION_BOUNDS, distanceToPolylineSquared } from '../core/geometry';
+import {
+  applyAffine,
+  COMPOSITION_BOUNDS,
+  distanceToRasterizedPolylineSquared,
+} from '../core/geometry';
 import {
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   type RuntimeMapData,
@@ -39,8 +43,8 @@ interface CoordinateGroupHit {
 
 /**
  * Stores output-space facts that depend only on geometry and masks. Visibility
- * and final coordinate hits stay separate because centerline visibility uses a
- * different footprint rule from final integer rasterization.
+ * keeps only whether any mapped note is hit, while final projection retains the
+ * matching integer and fractional coordinate groups.
  */
 interface StrokeOutputProjection {
   noteOutputHit?: boolean;
@@ -211,16 +215,19 @@ const isStrokeActiveAtCoordinate = (
     return false;
   }
 
-  const points = stroke.polyline.points;
-  if (stroke.polyline.rasterMode === 'centerline' && points.length === 1) {
-    const point = points[0];
-    return Number.isFinite(point.x)
-      && Number.isFinite(point.y)
-      && Math.round(point.x) === x
-      && Math.round(point.y) === y;
+  if (
+    stroke.polyline.rasterMode === 'centerline'
+    && (
+      stroke.polyline.points.length === 1
+      || (Number.isInteger(x) && Number.isInteger(y))
+    )
+  ) {
+    return collectStrokeOccupiedCoordinateCandidates(stroke).some(
+      (coordinate) => coordinate.x === x && coordinate.y === y,
+    );
   }
 
-  return distanceToPolylineSquared({ x, y }, stroke.polyline)
+  return distanceToRasterizedPolylineSquared({ x, y }, stroke.polyline)
     <= THICKNESS * THICKNESS;
 };
 
@@ -370,7 +377,7 @@ const resolveFractionalCoordinateHits = (
     && isStrokeActiveAtCoordinate(stroke, coordinateGroup.x, coordinateGroup.y)
       ? [{
           coordinateGroup,
-          distanceSquared: distanceToPolylineSquared(
+          distanceSquared: distanceToRasterizedPolylineSquared(
             { x: coordinateGroup.x, y: coordinateGroup.y },
             stroke.polyline,
           ),

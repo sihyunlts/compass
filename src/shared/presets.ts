@@ -7,10 +7,10 @@ import {
   hydrateImportedGeneratorChain,
   hydrateImportedGeneratorDevice,
   hydrateImportedGeneratorDevices,
-  isLegacyRendererDeviceKind,
 } from './model/chain-normalization';
+import { migratePresetValue } from './preset-migrations';
 
-export const PRESET_FILE_SCHEMA_VERSION = 1 as const;
+export const PRESET_FILE_SCHEMA_VERSION = 2 as const;
 
 export type PresetFileKind = 'device' | 'group' | 'rack';
 
@@ -126,34 +126,6 @@ interface ParsedPresetPayload {
 const hasStoredName = (value: unknown): boolean =>
   isRecord(value) && Object.hasOwn(value, 'name');
 
-// Temporary backward compatibility detector for the old single-target Modulator format.
-// TODO: Remove this legacy detector with the params.target/params.amount hydration fallback.
-const hasLegacyModulatorSingleTarget = (value: unknown): boolean => {
-  if (!isRecord(value) || value.kind !== 'modulator') {
-    return false;
-  }
-
-  const params = isRecord(value.params) ? value.params : null;
-  if (!params || Array.isArray(params.targets)) {
-    return false;
-  }
-
-  const target = isRecord(params.target) ? params.target : null;
-  return typeof target?.deviceId === 'string'
-    && target.deviceId.trim().length > 0
-    && typeof target.paramKey === 'string'
-    && target.paramKey.trim().length > 0;
-};
-
-const hasLegacyModulatorSingleTargetInDevices = (devices: unknown): boolean =>
-  Array.isArray(devices) && devices.some((device) => hasLegacyModulatorSingleTarget(device));
-
-const hasLegacyRendererDeviceKind = (value: unknown): boolean =>
-  isRecord(value) && isLegacyRendererDeviceKind(value.kind);
-
-const hasLegacyRendererDeviceKindInDevices = (devices: unknown): boolean =>
-  Array.isArray(devices) && devices.some((device) => hasLegacyRendererDeviceKind(device));
-
 export const toStandaloneDevicePresetDevice = (
   device: GeneratorDeviceNode,
 ): GeneratorDeviceNode => {
@@ -181,9 +153,7 @@ const parseDevicePresetPayload = (
       savedAtIso: header.savedAtIso,
       device: toStandaloneDevicePresetDevice(device),
     },
-    needsSave:
-      hasLegacyModulatorSingleTarget(rawDevice)
-      || hasLegacyRendererDeviceKind(rawDevice),
+    needsSave: false,
   };
 };
 
@@ -207,7 +177,7 @@ const parseGroupPresetPayload = (
   }
 
   const hydratedDevices = hydrateImportedGeneratorDevices(group.devices);
-  if (!hydratedDevices || hydratedDevices.length === 0) {
+  if (!hydratedDevices) {
     return null;
   }
 
@@ -234,9 +204,7 @@ const parseGroupPresetPayload = (
           }
         : {}),
     },
-    needsSave:
-      hasLegacyModulatorSingleTargetInDevices(group.devices)
-      || hasLegacyRendererDeviceKindInDevices(group.devices),
+    needsSave: false,
   };
 };
 
@@ -249,11 +217,7 @@ const parseRackPresetPayload = (
   },
 ): ParsedPresetPayload | null => {
   const hydratedChain = hydrateImportedGeneratorChain(rawChain);
-  const sourceDevices = (rawChain as { devices?: unknown } | undefined)?.devices;
-  if (
-    !hydratedChain
-    || (Array.isArray(sourceDevices) && sourceDevices.length > 0 && hydratedChain.devices.length === 0)
-  ) {
+  if (!hydratedChain) {
     return null;
   }
 
@@ -276,9 +240,7 @@ const parseRackPresetPayload = (
           }
         : {}),
     },
-    needsSave:
-      hasLegacyModulatorSingleTargetInDevices(sourceDevices)
-      || hasLegacyRendererDeviceKindInDevices(sourceDevices),
+    needsSave: false,
   };
 };
 
@@ -309,60 +271,22 @@ export const parsePresetFile = (
   );
 };
 
-const parseStoredDevicePresetPayload = (
-  rawDevice: unknown,
-  header: {
-    schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
-    savedAtIso: string;
-  },
-): ParsedPresetPayload | null => {
-  if (hasStoredName(rawDevice)) {
-    return null;
-  }
-
-  return parseDevicePresetPayload(rawDevice, header);
-};
-
-const parseStoredGroupPresetPayload = (
-  rawGroup: unknown,
-  rawUi: unknown,
-  header: {
-    schemaVersion: typeof PRESET_FILE_SCHEMA_VERSION;
-    savedAtIso: string;
-  },
-): ParsedPresetPayload | null => {
-  if (hasStoredName(rawGroup)) {
-    return null;
-  }
-
-  return parseGroupPresetPayload(rawGroup, rawUi, header);
-};
-
-const parseStoredPresetFile = (
+export const parseStoredPresetValue = (
   value: unknown,
 ): ParsedPresetPayload | null => {
-  const header = parsePresetFileHeader(value);
-  if (!header) {
+  const migrated = migratePresetValue(value, PRESET_FILE_SCHEMA_VERSION);
+  if (!migrated) {
     return null;
   }
 
-  if (header.presetType === 'device') {
-    return parseStoredDevicePresetPayload((value as { device?: unknown }).device, header);
-  }
+  const parsed = parsePresetFile(migrated.value);
 
-  if (header.presetType === 'group') {
-    return parseStoredGroupPresetPayload(
-      (value as { group?: unknown }).group,
-      (value as { ui?: unknown }).ui,
-      header,
-    );
-  }
-
-  return parseRackPresetPayload(
-    (value as { chain?: unknown }).chain,
-    (value as { ui?: unknown }).ui,
-    header,
-  );
+  return parsed
+    ? {
+        ...parsed,
+        needsSave: migrated.migrated,
+      }
+    : null;
 };
 
 const resolvePresetFileKindFromName = (
@@ -434,6 +358,19 @@ const applyPresetNameFromFileName = (
   };
 };
 
+const hasSerializedPresetName = (value: unknown): boolean => {
+  if (!isRecord(value)) {
+    return false;
+  }
+  if (value.presetType === 'device') {
+    return hasStoredName(value.device);
+  }
+  if (value.presetType === 'group') {
+    return hasStoredName(value.group);
+  }
+  return false;
+};
+
 interface ParsePresetFileTextOptions {
   fileName: string;
 }
@@ -460,7 +397,14 @@ export const parsePresetFileText = (
     };
   }
 
-  const parsedPreset = parseStoredPresetFile(parsed);
+  if (hasSerializedPresetName(parsed)) {
+    return {
+      ok: false,
+      message: 'Invalid file format.',
+    };
+  }
+
+  const parsedPreset = parseStoredPresetValue(parsed);
   if (!parsedPreset) {
     return {
       ok: false,

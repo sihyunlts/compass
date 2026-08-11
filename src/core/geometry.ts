@@ -208,6 +208,39 @@ export const distanceToPolylineSquared = (point: Vec2, polyline: Polyline): numb
   return minDist;
 };
 
+const isPointInsideNonZeroFill = (
+  point: Readonly<Vec2>,
+  polyline: Polyline,
+): boolean => {
+  const points = polyline.points;
+  if (!polyline.closed || points.length < 3) {
+    return false;
+  }
+
+  let windingNumber = 0;
+  for (let index = 0; index < points.length; index += 1) {
+    const start = points[index];
+    const end = points[(index + 1) % points.length];
+    const cross = (end.x - start.x) * (point.y - start.y)
+      - (point.x - start.x) * (end.y - start.y);
+    if (start.y <= point.y) {
+      if (end.y > point.y && cross > 0) {
+        windingNumber += 1;
+      }
+    } else if (end.y <= point.y && cross < 0) {
+      windingNumber -= 1;
+    }
+  }
+  return windingNumber !== 0;
+};
+
+export const distanceToRasterizedPolylineSquared = (
+  point: Vec2,
+  polyline: Polyline,
+): number => polyline.rasterMode === 'fill' && isPointInsideNonZeroFill(point, polyline)
+  ? 0
+  : distanceToPolylineSquared(point, polyline);
+
 export const applyTransformToPolyline = (polyline: Polyline, transform: AffineTransform): Polyline => ({
   ...polyline,
   points: polyline.points.map((pt) => applyAffine(transform, pt)),

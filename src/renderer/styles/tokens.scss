@@ -30,7 +30,7 @@
   --color-surface-emphasis: var(--theme-tone-40);
   --color-surface-inverse: var(--theme-tone-90);
   --color-surface-floating: color-mix(in oklch, var(--color-surface) 92%, transparent);
-  --color-surface-floating-interactive: oklch(100% 0 0 / 0.08);
+  --color-surface-floating-interactive: oklch(100% calc(0.05 * var(--theme-chroma-scale)) var(--theme-hue) / 0.08);
 
   /* Borders */
   --color-border-primary: var(--theme-tone-50);
@@ -55,8 +55,10 @@
   --color-category-utility: oklch(68% 0.262 318);
 
   /* Overlays */
-  --color-overlay-highlight-primary: oklch(100% 0 0 / 0.32);
-  --color-overlay-highlight-secondary: oklch(100% 0 0 / 0.18);
+  /* Always use highlight colors with mix-blend-mode: overlay.
+   * TimeWindowEditor uses Secondary for ticks and Primary for major ticks. */
+  --color-overlay-highlight-primary: oklch(100% 0 0);
+  --color-overlay-highlight-secondary: oklch(100% 0 0 / 0.6);
   --color-overlay-backdrop: oklch(0% 0 0 / 0.4);
 
   /* Overlay layers */

@@ -19,6 +19,10 @@
   import type { CurveNode } from '../../../shared/model';
   import ControlSurfaceFrame from './ControlSurfaceFrame.svelte';
   import FieldShell from '../fields/FieldShell.svelte';
+  import {
+    hasExceededControlPointDragThreshold,
+    toSoftSnappedValue,
+  } from './control-point-editor';
 
   interface EditableCurve {
     divisions: number;
@@ -87,8 +91,6 @@
   let isKeyboardDeleteEnabled = $state(false);
 
   const NODE_DOUBLE_CLICK_WINDOW_MS = 300;
-  const NODE_CLICK_MOVE_THRESHOLD_PX = 4;
-  const CURVE_SOFT_SNAP_DISTANCE_PX = 10;
 
   const roundCurveNumber = (value: number): number =>
     Number(value.toFixed(6));
@@ -208,29 +210,6 @@
   const createNodeId = (): string =>
     `curve-node-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
 
-  const toSoftSnappedRatio = (
-    value: number,
-    snapPoints: ReadonlyArray<number>,
-    spanPx: number,
-  ): number => {
-    if (snapPoints.length === 0 || spanPx <= 0) {
-      return value;
-    }
-
-    const threshold = CURVE_SOFT_SNAP_DISTANCE_PX / spanPx;
-    let nearest = value;
-    let nearestDistance = Number.POSITIVE_INFINITY;
-    for (const snapPoint of snapPoints) {
-      const distance = Math.abs(value - snapPoint);
-      if (distance < nearestDistance) {
-        nearest = snapPoint;
-        nearestDistance = distance;
-      }
-    }
-
-    return nearestDistance <= threshold ? nearest : value;
-  };
-
   const isEndpointNode = (nodeId: string | null): boolean => {
     if (nodeId === null || sortedNodes.length < 2) {
       return false;
@@ -277,10 +256,10 @@
     const divisionRatio = Math.round((ratioX * divisions)) / divisions;
     const snappedRatioX = options?.snapToDivisions === false
       ? ratioX
-      : toSoftSnappedRatio(ratioX, [divisionRatio], rect.width);
+      : toSoftSnappedValue(ratioX, [divisionRatio], rect.width);
     const snappedRatioY = options?.snapToCenterLine === false
       ? ratioY
-      : toSoftSnappedRatio(
+      : toSoftSnappedValue(
         ratioY,
         guideValue === null ? [] : [toPlotY(guideValue) / 100],
         rect.height,
@@ -361,8 +340,12 @@
     if (
       !pointerDidMove
       && (
-        Math.abs(clientX - pointerDownClientX) > NODE_CLICK_MOVE_THRESHOLD_PX
-        || Math.abs(clientY - pointerDownClientY) > NODE_CLICK_MOVE_THRESHOLD_PX
+        hasExceededControlPointDragThreshold(
+          clientX,
+          clientY,
+          pointerDownClientX,
+          pointerDownClientY,
+        )
       )
     ) {
       pointerDidMove = true;

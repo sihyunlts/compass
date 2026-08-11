@@ -24,6 +24,7 @@ import type {
 import {
   PRESET_FILE_EXTENSIONS,
   isPresetFileKind,
+  parseStoredPresetValue,
   resolvePresetNameFromFileName,
   type PresetFile,
   type PresetFileKind,
@@ -59,6 +60,7 @@ interface BrowserPresetEntry {
   presetType: PresetFileKind;
   relativePath: string[];
   payload: PresetFile;
+  needsSave: boolean;
 }
 
 interface BrowserPresetStore {
@@ -180,10 +182,16 @@ const readStore = (): BrowserPresetStore => {
         continue;
       }
 
+      const parsedPayload = parseStoredPresetValue(file.payload);
+      if (!parsedPayload || parsedPayload.preset.presetType !== file.presetType) {
+        continue;
+      }
+
       store.files.push({
-        presetType: file.presetType,
+        presetType: parsedPayload.preset.presetType,
         relativePath: file.relativePath,
-        payload: file.payload as unknown as PresetFile,
+        payload: parsedPayload.preset,
+        needsSave: parsedPayload.needsSave,
       });
     }
 
@@ -328,6 +336,7 @@ const upsertPresetFile = <K extends PresetFileKind>(
     presetType,
     relativePath,
     payload: clonePreset(payload),
+    needsSave: false,
   };
 
   if (existingIndex === -1) {
@@ -815,7 +824,7 @@ export const createBrowserCompassBridge = (): CompassApi => ({
       status: 'loaded',
       filePath: toVirtualPresetPath(request.presetType, request.relativePath),
       payload: clonePreset(entry.payload as Extract<PresetFile, { presetType: K }>),
-      needsSave: false,
+      needsSave: entry.needsSave,
     };
   },
 });
