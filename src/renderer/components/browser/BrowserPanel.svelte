@@ -1615,8 +1615,13 @@
     padding: 0;
     list-style: none;
 
-    li.is-selected {
+    li:not(.is-selected):hover {
+      border-radius: var(--radius-4);
       background: var(--color-surface-interactive);
+    }
+
+    li.is-selected {
+      background: var(--color-surface-active);
       border-radius: var(--radius-4);
 
       &.has-selected-previous {
@@ -1672,10 +1677,6 @@
     align-items: center;
     font-size: var(--text-12);
     cursor: pointer;
-
-    &:hover {
-      background: var(--color-surface-interactive);
-    }
 
     &:focus-visible {
       outline: none;
