@@ -70,12 +70,14 @@
       <TextField
         value={name}
         label={i18n.t('info.name')}
+        placeholder={i18n.t('info.namePlaceholder')}
         disabled={busy}
         onValueChange={onNameChange}
       />
       <TextField
         value={author}
         label={i18n.t('info.author')}
+        placeholder={i18n.t('info.authorPlaceholder')}
         maxLength={AUTHORED_METADATA_AUTHOR_MAX_LENGTH}
         disabled={busy}
         onValueChange={onAuthorChange}
@@ -85,6 +87,7 @@
       <TextAreaField
         value={description}
         label={i18n.t('info.description')}
+        placeholder={i18n.t('info.descriptionPlaceholder')}
         maxLength={AUTHORED_METADATA_DESCRIPTION_MAX_LENGTH}
         rows={1}
         disabled={busy}
