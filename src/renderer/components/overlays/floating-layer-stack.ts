@@ -4,6 +4,7 @@ type FloatingLayerStackEntry = {
   order: number;
   containsEventTarget: (eventTarget: EventTarget | null) => boolean;
   onDismissRequest: () => void;
+  onEscapeRequest?: () => void;
   onDescendantStateChange?: (hasActiveDescendant: boolean) => void;
   onStackOrderChange?: (stackOrder: number) => void;
 };
@@ -16,9 +17,14 @@ let nextFloatingLayerOrder = 1;
 let isListeningForDismissKeys = false;
 
 const handleDismissKeyDown = (event: KeyboardEvent): void => {
-  if (event.key !== 'Escape' || !dismissTopmostFloatingLayer()) {
+  if (event.key !== 'Escape') {
     return;
   }
+  const topmost = resolveTopmostFloatingLayer();
+  if (!topmost) {
+    return;
+  }
+  (topmost.onEscapeRequest ?? topmost.onDismissRequest)();
   event.preventDefault();
   event.stopPropagation();
 };
@@ -129,9 +135,12 @@ export const isTopmostFloatingLayer = (id: string): boolean => {
   return true;
 };
 
+const resolveTopmostFloatingLayer = (): FloatingLayerStackEntry | null =>
+  Array.from(activeFloatingLayers.values())
+    .sort((left, right) => right.order - left.order)[0] ?? null;
+
 export const dismissTopmostFloatingLayer = (): boolean => {
-  const topmost = Array.from(activeFloatingLayers.values())
-    .sort((left, right) => right.order - left.order)[0];
+  const topmost = resolveTopmostFloatingLayer();
   if (!topmost) {
     return false;
   }

@@ -60,7 +60,10 @@
   --color-overlay-backdrop: oklch(0% 0 0 / 0.4);
 
   /* Overlay layers */
-  --z-layer-floating-stack-base: 60;
+  --z-layer-sidebar-resizer: 20;
+  --z-layer-drag-indicator: 50;
+  --z-layer-modal: 1000;
+  --z-layer-floating-stack-base: 1010;
 
   /* ==========================================================================
    * Preview

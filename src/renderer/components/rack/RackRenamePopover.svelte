@@ -36,6 +36,10 @@
 
   export const containsTarget = (eventTarget: EventTarget | null): boolean =>
     isEventTargetWithinFloatingLayer(eventTarget, popoverEl);
+
+  export const setStackOrder = (stackOrder: number): void => {
+    popoverEl?.style.setProperty('--floating-layer-stack-order', String(stackOrder));
+  };
 </script>
 
 <div
@@ -62,7 +66,10 @@
     position: fixed;
     left: 0;
     top: 0;
-    z-index: 43;
+    z-index: calc(
+      var(--z-layer-floating-stack-base)
+      + var(--floating-layer-stack-order, 0)
+    );
     min-width: 120px;
     padding: var(--gap-4);
     border: 1px solid var(--color-border-floating);

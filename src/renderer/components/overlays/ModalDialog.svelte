@@ -21,6 +21,7 @@
     type FloatingLayerExitTarget,
   } from './floating-layer';
   import { FloatingLayerPresence } from './floating-layer-presence.svelte';
+  import { dismissAllFloatingLayers } from './floating-layer-stack';
 
   const FOCUSABLE_SELECTOR = 'input:not([disabled]), button:not([disabled])';
   const MODAL_DIALOG_ENTER_SCALE = 1.06;
@@ -261,6 +262,7 @@
 
   $effect(() => {
     if (open && !wasOpen) {
+      dismissAllFloatingLayers();
       const shouldAnimateEnter = presence.show();
       previouslyFocusedEl = document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -384,7 +386,7 @@
   .modal-dialog-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 60;
+    z-index: var(--z-layer-modal);
     display: flex;
     align-items: center;
     justify-content: center;

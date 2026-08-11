@@ -95,7 +95,7 @@
     left: var(--sidebar-width, 240px);
     width: 12px;
     transform: translateX(-50%);
-    z-index: 20;
+    z-index: var(--z-layer-sidebar-resizer);
     cursor: col-resize;
     -webkit-app-region: no-drag;
     touch-action: none;
