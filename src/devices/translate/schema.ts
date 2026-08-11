@@ -38,7 +38,7 @@ const createDefaultTranslateNode = (
 ): TranslateEffectNode => ({
   id,
   kind: 'translate',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: { ...DEFAULT_TRANSLATE_PARAMS },
 });

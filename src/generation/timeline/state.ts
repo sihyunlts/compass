@@ -29,10 +29,10 @@ export interface PendingStrokeRewriteApplication {
   writes: ReadonlyArray<PendingStrokeRewriteFrameWrite>;
 }
 
-export interface PendingGeometryRewriteInput {
-  timeline: GeometryTimeline;
-  frameIndex: number;
-  strokes: ReadonlyArray<GeometryStroke>;
+export interface MaterializedGeometryRewriteInput {
+  readonly timeline: GeometryTimeline;
+  readonly frameIndex: number;
+  readonly strokes: ReadonlyArray<GeometryStroke>;
 }
 
 export interface PendingGeometryRewriteApplication {
@@ -41,7 +41,7 @@ export interface PendingGeometryRewriteApplication {
   targetOriginIds: ReadonlySet<string>;
   requiredFrameWindow: BeatRange | 'all';
   rewriteFrameStrokes: (
-    input: PendingGeometryRewriteInput,
+    input: MaterializedGeometryRewriteInput,
   ) => ReadonlyArray<Omit<GeometryStroke, 'writeId'>>;
 }
 
@@ -49,12 +49,20 @@ export type PendingFrameApplication =
   | PendingStrokeRewriteApplication
   | PendingGeometryRewriteApplication;
 
-export interface MutableGenerationState {
+export interface DeferredGenerationState {
   timeline: GeometryTimeline;
   timelineStateByOriginId: Map<string, OriginTimelineState>;
   pendingTemporalWriteOrderByOriginId: Map<string, number>;
   pendingFrameApplications: PendingFrameApplication[];
 }
+
+export type MutableGenerationState = DeferredGenerationState;
+
+declare const materializedGenerationStateBrand: unique symbol;
+
+export type MaterializedGenerationState = DeferredGenerationState & {
+  readonly [materializedGenerationStateBrand]: true;
+};
 
 export const createEmptyGenerationState = (
   sampleStepBeats = DEFAULT_SAMPLE_STEP_BEATS,

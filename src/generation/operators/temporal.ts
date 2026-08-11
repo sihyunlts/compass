@@ -29,7 +29,6 @@ import {
   buildTemporalStateUpdatesForTargetOrigins,
   createTemporalStateUpdateOperator,
   isFrameWithinWindow,
-  materializePendingRackOperatorInput,
   resolveModulatedDeviceAtFrame,
   type ModulationContext,
 } from './runtime';
@@ -417,7 +416,7 @@ const buildTimeWarpTemporalUpdates = (
   );
 };
 
-export const reverseOperator = createTemporalStateUpdateOperator<'reverse'>(
+export const reverseOperator = createTemporalStateUpdateOperator<'reverse', 'preserve-pending'>(
   (state, stage) => {
     return buildReverseTemporalUpdates(
       state,
@@ -426,9 +425,10 @@ export const reverseOperator = createTemporalStateUpdateOperator<'reverse'>(
     );
   },
   resolveTemporalCleanupMode('reverse'),
+  'preserve-pending',
 );
 
-export const trimOperator = createTemporalStateUpdateOperator<'trim'>(
+export const trimOperator = createTemporalStateUpdateOperator<'trim', 'preserve-pending'>(
   (state, stage, context) => {
     const device = stage.device;
     return buildTrimTemporalUpdates(
@@ -440,9 +440,10 @@ export const trimOperator = createTemporalStateUpdateOperator<'trim'>(
     );
   },
   resolveTemporalCleanupMode('trim'),
+  'preserve-pending',
 );
 
-export const stretchOperator = createTemporalStateUpdateOperator<'stretch'>(
+export const stretchOperator = createTemporalStateUpdateOperator<'stretch', 'preserve-pending'>(
   (state, stage, context) => {
     const device = stage.device;
     return buildStretchTemporalUpdates(
@@ -454,9 +455,10 @@ export const stretchOperator = createTemporalStateUpdateOperator<'stretch'>(
     );
   },
   resolveTemporalCleanupMode('stretch'),
+  'preserve-pending',
 );
 
-export const timeWarpOperator = createTemporalStateUpdateOperator<'timewarp'>(
+export const timeWarpOperator = createTemporalStateUpdateOperator<'timewarp', 'materialize-all'>(
   (state, stage) => {
     const device = stage.device;
     return buildTimeWarpTemporalUpdates(
@@ -467,5 +469,5 @@ export const timeWarpOperator = createTemporalStateUpdateOperator<'timewarp'>(
     );
   },
   resolveTemporalCleanupMode('timewarp'),
-  materializePendingRackOperatorInput,
+  'materialize-all',
 );

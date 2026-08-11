@@ -1,4 +1,19 @@
-import type { CurveNode, GeneratorDeviceNode, ModulationCurve, TimeWarpCurve } from './chain';
+import type {
+  CurveNode,
+  GeneratorDeviceNode,
+  ModulationCurve,
+  PathAnchor,
+  TimeWarpCurve,
+} from './chain';
+
+export const clonePathAnchors = (anchors: readonly PathAnchor[]): PathAnchor[] =>
+  anchors.map((anchor) => ({
+    id: anchor.id,
+    x: anchor.x,
+    y: anchor.y,
+    ...(anchor.handleIn ? { handleIn: { ...anchor.handleIn } } : {}),
+    ...(anchor.handleOut ? { handleOut: { ...anchor.handleOut } } : {}),
+  }));
 
 const cloneCurveNodes = (nodes: readonly CurveNode[]): CurveNode[] =>
   nodes.map((node) => ({
@@ -85,10 +100,10 @@ export function cloneDeviceNode(
       name: device.name ?? null,
       params: {
         closed: device.params.closed === true,
-        points: device.params.points.map((point) => ({
-          x: point.x,
-          y: point.y,
-        })),
+        fill: device.params.fill === true,
+        transform: { ...device.params.transform },
+        animation: { ...device.params.animation },
+        anchors: clonePathAnchors(device.params.anchors),
       },
     };
   }

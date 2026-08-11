@@ -35,7 +35,7 @@ const createDefaultScannerNode = (
 ): ScannerGeneratorNode => ({
   id,
   kind: 'scanner',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: { ...DEFAULT_SCANNER_PARAMS },
 });

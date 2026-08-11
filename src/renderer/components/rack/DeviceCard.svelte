@@ -378,6 +378,7 @@
 
     .device-head {
       padding: var(--gap-6) var(--gap-8);
+      padding-right: var(--gap-6);
       border-top: 0.125rem solid var(--device-category-accent);
       border-bottom: 1px solid var(--color-border-tertiary);
       border-radius: var(--device-head-radius) var(--device-head-radius) 0 0;

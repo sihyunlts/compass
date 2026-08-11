@@ -35,7 +35,7 @@ const createDefaultMirrorNode = (
 ): MirrorEffectNode => ({
   id,
   kind: 'mirror',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: { ...DEFAULT_MIRROR_PARAMS },
 });

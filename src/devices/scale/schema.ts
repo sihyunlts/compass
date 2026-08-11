@@ -59,7 +59,7 @@ const createDefaultScaleNode = (
 ): ScaleEffectNode => ({
   id,
   kind: 'scale',
-  enabled: enabled !== false,
+  enabled,
   groupId: null,
   params: { ...DEFAULT_SCALE_PARAMS },
 });

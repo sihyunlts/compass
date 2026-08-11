@@ -49,11 +49,7 @@
       onclick={() => selectTab(tab)}
     >
       <span class="device-tab-label">
-        {tab.id === 'curve'
-          ? i18n.t('tab.curve')
-          : tab.id === 'map'
-            ? i18n.t('tab.map')
-            : tab.label}
+        {i18n.t(tab.labelKey)}
       </span>
     </button>
   {/each}
@@ -80,7 +76,7 @@
     min-height: 1rem;
     border: 0;
     border-radius: var(--radius-4);
-    padding: 0 var(--gap-6);
+    padding: 0 var(--gap-4);
     background: transparent;
     color: var(--color-text-secondary);
     font-size: var(--text-12);
@@ -94,7 +90,7 @@
     }
 
     &.is-active {
-      background: var(--color-surface-active);
+      background: var(--color-surface-floating-interactive);
       color: var(--color-text-primary);
     }
   }
