@@ -776,6 +776,7 @@
     description={i18n.t('rack.revertDescription')}
     confirmLabel={i18n.t('rack.revert')}
     cancelLabel={i18n.t('app.cancel')}
+    defaultAction="cancel"
     onConfirm={confirmRackRevertDialog}
     onCancel={closeRackRevertDialog}
   />
@@ -791,6 +792,7 @@
     confirmLabel={i18n.t('rack.trash')}
     cancelLabel={i18n.t('app.cancel')}
     busy={presetState.isPresetDeletePending}
+    defaultAction="cancel"
     onConfirm={() => presetController.confirmPresetBrowserDelete()}
     onCancel={() => presetController.closePresetDeleteDialog()}
   />
@@ -805,6 +807,7 @@
     secondaryLabel={i18n.t('rack.dontSave')}
     cancelLabel={i18n.t('app.cancel')}
     busy={presetState.isRackPresetLoadPending}
+    defaultAction="confirm"
     onConfirm={() => presetController.confirmRackSaveBeforeLoad()}
     onSecondary={() => presetController.confirmRackDiscardBeforeLoad()}
     onCancel={() => presetController.closeRackPresetLoadDialog()}

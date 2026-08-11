@@ -61,6 +61,7 @@
   cancelLabel={i18n.t('app.cancel')}
   {busy}
   wide
+  defaultAction="confirm"
   {onConfirm}
   {onCancel}
 >
