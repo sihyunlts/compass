@@ -117,21 +117,15 @@ export class RackInteractionManager {
     this.centerPicker.syncSelection(change.deviceId);
 
     const mergeKey = resolveChainControlMergeKey(change);
-    const isNumericDragActive = this.numericInputInteraction.isActive();
-    const isLiveModulationAmountDrag = change.action === 'set-modulation-target-amount'
-      && !change.finalize
-      && isNumericDragActive;
-    const shouldSchedulePreview = change.finalize
-      || !isNumericDragActive
-      || isLiveModulationAmountDrag;
+    const isLiveNumericDrag = !change.finalize
+      && this.numericInputInteraction.isActive();
     this.commitChainChange(
       {
         kind: 'control-edit',
         mergeKey,
         finalize: change.finalize,
       },
-      isLiveModulationAmountDrag ? 0 : undefined,
-      shouldSchedulePreview,
+      isLiveNumericDrag ? 0 : undefined,
     );
     return true;
   }
@@ -293,14 +287,11 @@ export class RackInteractionManager {
   private commitChainChange(
     meta: ChainMutationMeta,
     delayMs?: number,
-    schedulePreview = true,
   ): void {
     const chain = this.getChainState();
     reconcileGeneratorChainModulators(chain);
     this.saveChain(chain, meta);
-    if (schedulePreview) {
-      this.scheduleAutoPreview(delayMs);
-    }
+    this.scheduleAutoPreview(delayMs);
   }
 
   private getCardElement(id: string): HTMLElement | null {
