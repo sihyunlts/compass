@@ -23,9 +23,12 @@
   import { FloatingLayerPresence } from './floating-layer-presence.svelte';
   import { dismissAllFloatingLayers } from './floating-layer-stack';
 
-  const FOCUSABLE_SELECTOR = [
+  const MODAL_DIALOG_INPUT_SELECTOR = [
     'input:not([disabled])',
     'textarea:not([disabled])',
+  ].join(', ');
+  const FOCUSABLE_SELECTOR = [
+    MODAL_DIALOG_INPUT_SELECTOR,
     'button:not([disabled])',
   ].join(', ');
   const MODAL_DIALOG_ENTER_SCALE = 1.06;
@@ -71,6 +74,7 @@
     secondaryLabel: string | null;
     cancelLabel: string;
   };
+  type ModalDialogDefaultAction = 'confirm' | 'cancel' | 'none';
 
   let {
     open = false,
@@ -82,6 +86,7 @@
     cancelLabel = 'Cancel',
     busy = false,
     wide = false,
+    defaultAction = 'confirm',
     onConfirm = () => {},
     onSecondary = () => {},
     onCancel = () => {},
@@ -96,6 +101,7 @@
     cancelLabel?: string;
     busy?: boolean;
     wide?: boolean;
+    defaultAction?: ModalDialogDefaultAction;
     onConfirm?: () => void | Promise<void>;
     onSecondary?: () => void | Promise<void>;
     onCancel?: () => void | Promise<void>;
@@ -150,9 +156,19 @@
       return;
     }
 
-    const firstFocusableElement = resolveFocusableElements()[0];
-    if (firstFocusableElement) {
-      firstFocusableElement.focus();
+    const firstInputElement = dialogEl?.querySelector<HTMLElement>(
+      MODAL_DIALOG_INPUT_SELECTOR,
+    );
+    const defaultActionElement = defaultAction === 'none'
+      ? null
+      : dialogEl?.querySelector<HTMLElement>(
+          `[data-modal-action="${defaultAction}"]:not([disabled])`,
+        );
+    const initialFocusElement = firstInputElement
+      ?? defaultActionElement
+      ?? resolveFocusableElements()[0];
+    if (initialFocusElement) {
+      initialFocusElement.focus();
       return;
     }
 
@@ -214,6 +230,11 @@
     void onConfirm();
   };
 
+  const handleSubmit = (event: SubmitEvent): void => {
+    event.preventDefault();
+    handleConfirm();
+  };
+
   const handleSecondary = (): void => {
     if (busy) {
       return;
@@ -230,12 +251,39 @@
     handleCancel();
   };
 
+  const handleDefaultAction = (): void => {
+    if (defaultAction === 'confirm') {
+      handleConfirm();
+    } else if (defaultAction === 'cancel') {
+      handleCancel();
+    }
+  };
+
   const handleKeyDown = (event: KeyboardEvent): void => {
     event.stopPropagation();
 
     if (event.key === 'Escape') {
       event.preventDefault();
       handleCancel();
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      if (
+        event.isComposing
+        || event.target instanceof HTMLTextAreaElement
+        || (
+          event.target instanceof Element
+          && event.target.closest('button') !== null
+        )
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      if (!event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+        handleDefaultAction();
+      }
       return;
     }
 
@@ -356,43 +404,52 @@
       style:transform={`scale(${dialogScale.current})`}
       onkeydown={handleKeyDown}
     >
-      <h2 id={titleId} class="modal-dialog-title">{displayedText.title}</h2>
+      <form onsubmit={handleSubmit}>
+        <h2 id={titleId} class="modal-dialog-title">{displayedText.title}</h2>
 
-      {#if displayedText.description}
-        <p id={descriptionId} class="modal-dialog-description">{displayedText.description}</p>
-      {/if}
-
-      {#if children}
-        <div class="modal-dialog-body">
-          {@render children()}
-        </div>
-      {/if}
-
-      <footer class="modal-dialog-actions">
-        {#if displayedText.footerNote}
-          <span class="modal-dialog-footer-note">{displayedText.footerNote}</span>
+        {#if displayedText.description}
+          <p id={descriptionId} class="modal-dialog-description">{displayedText.description}</p>
         {/if}
-        <Button
-          class="modal-dialog-action-button"
-          disabled={busy}
-          text={displayedText.cancelLabel}
-          onClick={handleCancel}
-        />
-        {#if displayedText.secondaryLabel}
+
+        {#if children}
+          <div class="modal-dialog-body">
+            {@render children()}
+          </div>
+        {/if}
+
+        <footer class="modal-dialog-actions">
+          {#if displayedText.footerNote}
+            <span class="modal-dialog-footer-note">{displayedText.footerNote}</span>
+          {/if}
           <Button
             class="modal-dialog-action-button"
+            type="button"
+            variant={defaultAction === 'cancel' ? 'primary' : 'secondary'}
+            data-modal-action="cancel"
             disabled={busy}
-            text={displayedText.secondaryLabel}
-            onClick={handleSecondary}
+            text={displayedText.cancelLabel}
+            onClick={handleCancel}
           />
-        {/if}
-        <Button
-          class="modal-dialog-action-button"
-          disabled={busy}
-          text={displayedText.confirmLabel}
-          onClick={handleConfirm}
-        />
-      </footer>
+          {#if displayedText.secondaryLabel}
+            <Button
+              class="modal-dialog-action-button"
+              type="button"
+              data-modal-action="secondary"
+              disabled={busy}
+              text={displayedText.secondaryLabel}
+              onClick={handleSecondary}
+            />
+          {/if}
+          <Button
+            class="modal-dialog-action-button"
+            type="submit"
+            variant={defaultAction === 'confirm' ? 'primary' : 'secondary'}
+            data-modal-action="confirm"
+            disabled={busy}
+            text={displayedText.confirmLabel}
+          />
+        </footer>
+      </form>
     </div>
   </div>
 {/if}
@@ -424,7 +481,7 @@
 
     :global(input[type='text']),
     :global(textarea),
-    :global(.button.modal-dialog-action-button) {
+    :global(.button.modal-dialog-action-button:not(.button-primary)) {
       background: var(--color-surface-floating-interactive);
     }
 
