@@ -123,7 +123,7 @@ export class PresetService {
 
       await this.storage.writePresetFile(dialogResult.filePath, parsedRequest.payload);
       await this.dialogs.rememberSaveDirectory(
-        parsedRequest.payload.presetType,
+        parsedRequest,
         dialogResult.filePath,
       );
       return {

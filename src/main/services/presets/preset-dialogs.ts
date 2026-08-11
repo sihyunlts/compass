@@ -15,10 +15,12 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 
+import { RENDERER_DEVICE_KINDS } from '../../../devices/schema-registry';
+import type { RendererDeviceKind } from '../../../devices/types';
 import type {
   SavePresetFileRequest,
 } from '../../../shared/contracts/ipc/presets';
-import { type PresetFileKind } from '../../../shared/presets';
+import type { PresetFileKind } from '../../../shared/presets';
 import { PRESET_FILE_SPECS } from './preset-config';
 import {
   ensurePresetExtension,
@@ -29,39 +31,69 @@ import {
 const PRESET_DIALOG_STATE_SCHEMA_VERSION = 1 as const;
 const PRESET_DIALOG_STATE_FILE_NAME = 'preset-dialog-state.json';
 
+interface LastSaveDirectoryByContext {
+  device: Partial<Record<RendererDeviceKind, string>>;
+  group?: string;
+  rack?: string;
+}
+
 interface PresetDialogState {
   schemaVersion: typeof PRESET_DIALOG_STATE_SCHEMA_VERSION;
-  lastSaveDirectoryByPresetType: Partial<Record<PresetFileKind, string>>;
+  lastSaveDirectoryByContext: LastSaveDirectoryByContext;
 }
 
 const createEmptyPresetDialogState = (): PresetDialogState => ({
   schemaVersion: PRESET_DIALOG_STATE_SCHEMA_VERSION,
-  lastSaveDirectoryByPresetType: {},
+  lastSaveDirectoryByContext: {
+    device: {},
+  },
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
+const assignNonDeviceSaveDirectories = (
+  target: LastSaveDirectoryByContext,
+  source: Record<string, unknown>,
+): void => {
+  for (const presetType of ['group', 'rack'] as const) {
+    const directory = source[presetType];
+    if (typeof directory === 'string' && path.isAbsolute(directory)) {
+      target[presetType] = path.resolve(directory);
+    }
+  }
+};
+
 const parsePresetDialogState = (value: unknown): PresetDialogState => {
+  if (!isRecord(value)) {
+    return createEmptyPresetDialogState();
+  }
+
   if (
-    !isRecord(value)
-    || value.schemaVersion !== PRESET_DIALOG_STATE_SCHEMA_VERSION
-    || !isRecord(value.lastSaveDirectoryByPresetType)
+    value.schemaVersion !== PRESET_DIALOG_STATE_SCHEMA_VERSION
+    || !isRecord(value.lastSaveDirectoryByContext)
+    || !isRecord(value.lastSaveDirectoryByContext.device)
   ) {
     return createEmptyPresetDialogState();
   }
 
-  const lastSaveDirectoryByPresetType: Partial<Record<PresetFileKind, string>> = {};
-  for (const presetType of ['device', 'group', 'rack'] as const) {
-    const directory = value.lastSaveDirectoryByPresetType[presetType];
+  const device: Partial<Record<RendererDeviceKind, string>> = {};
+  for (const deviceKind of RENDERER_DEVICE_KINDS) {
+    const directory = value.lastSaveDirectoryByContext.device[deviceKind];
     if (typeof directory === 'string' && path.isAbsolute(directory)) {
-      lastSaveDirectoryByPresetType[presetType] = path.resolve(directory);
+      device[deviceKind] = path.resolve(directory);
     }
   }
 
+  const lastSaveDirectoryByContext: LastSaveDirectoryByContext = { device };
+  assignNonDeviceSaveDirectories(
+    lastSaveDirectoryByContext,
+    value.lastSaveDirectoryByContext,
+  );
+
   return {
     schemaVersion: PRESET_DIALOG_STATE_SCHEMA_VERSION,
-    lastSaveDirectoryByPresetType,
+    lastSaveDirectoryByContext,
   };
 };
 
@@ -99,7 +131,7 @@ export class PresetDialogs {
     const fallbackDirectory = resolvePresetSaveDirectory(baseDirectory, request);
     await mkdir(fallbackDirectory, { recursive: true });
     const directory = await this.resolveInitialSaveDirectory(
-      request.payload.presetType,
+      request,
       fallbackDirectory,
     );
     const suggestedFileName = `${sanitizeFileStem(
@@ -130,7 +162,7 @@ export class PresetDialogs {
   }
 
   public async rememberSaveDirectory(
-    presetType: PresetFileKind,
+    request: SavePresetFileRequest,
     filePath: string,
   ): Promise<void> {
     const directory = path.resolve(path.dirname(filePath));
@@ -138,10 +170,18 @@ export class PresetDialogs {
       const state = await this.loadState();
       const nextState: PresetDialogState = {
         ...state,
-        lastSaveDirectoryByPresetType: {
-          ...state.lastSaveDirectoryByPresetType,
-          [presetType]: directory,
-        },
+        lastSaveDirectoryByContext: request.payload.presetType === 'device'
+          ? {
+              ...state.lastSaveDirectoryByContext,
+              device: {
+                ...state.lastSaveDirectoryByContext.device,
+                [request.payload.device.kind]: directory,
+              },
+            }
+          : {
+              ...state.lastSaveDirectoryByContext,
+              [request.payload.presetType]: directory,
+            },
       };
       this.statePromise = Promise.resolve(nextState);
 
@@ -156,11 +196,13 @@ export class PresetDialogs {
   }
 
   private async resolveInitialSaveDirectory(
-    presetType: PresetFileKind,
+    request: SavePresetFileRequest,
     fallbackDirectory: string,
   ): Promise<string> {
     const state = await this.loadState();
-    const rememberedDirectory = state.lastSaveDirectoryByPresetType[presetType];
+    const rememberedDirectory = request.payload.presetType === 'device'
+      ? state.lastSaveDirectoryByContext.device[request.payload.device.kind]
+      : state.lastSaveDirectoryByContext[request.payload.presetType];
     if (!rememberedDirectory) {
       return fallbackDirectory;
     }
