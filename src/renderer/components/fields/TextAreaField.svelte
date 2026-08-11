@@ -6,6 +6,7 @@
     value,
     label,
     ariaLabel,
+    placeholder,
     disabled = false,
     readonly = false,
     maxLength,
@@ -16,6 +17,7 @@
     value: string;
     label?: string;
     ariaLabel?: string;
+    placeholder?: string;
     disabled?: boolean;
     readonly?: boolean;
     maxLength?: number;
@@ -41,6 +43,7 @@
     {id}
     {value}
     aria-label={inputLabel}
+    {placeholder}
     {disabled}
     {readonly}
     maxlength={maxLength}
@@ -71,6 +74,11 @@
       font: inherit;
       font-size: var(--text-13);
       line-height: 1.45;
+
+      &::placeholder {
+        color: var(--color-text-tertiary);
+        opacity: 1;
+      }
     }
   }
 
