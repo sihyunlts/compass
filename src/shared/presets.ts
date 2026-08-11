@@ -5,6 +5,9 @@ import {
   type AuthoredMetadata,
   type GeneratorChain,
   type GeneratorDeviceNode,
+  type GeneratorNode,
+  type TimeWarpCurve,
+  isGeneratorNode,
 } from './model';
 import {
   hydrateImportedGeneratorChain,
@@ -53,6 +56,78 @@ export interface RackPresetFile extends PresetFileBase<'rack'> {
 }
 
 export type PresetFile = DevicePresetFile | GroupPresetFile | RackPresetFile;
+
+interface PresetBrowserPreviewBase {
+  author?: string;
+}
+
+interface ColorPresetBrowserPreview extends PresetBrowserPreviewBase {
+  kind: 'color';
+  velocities: number[];
+}
+
+interface TimeWarpPresetBrowserPreview extends PresetBrowserPreviewBase {
+  kind: 'timewarp';
+  curve: TimeWarpCurve;
+}
+
+interface GeneratorPresetBrowserPreview extends PresetBrowserPreviewBase {
+  kind: 'generator';
+  device: GeneratorNode;
+}
+
+interface RackPresetBrowserPreview extends PresetBrowserPreviewBase {
+  kind: 'rack';
+}
+
+export type PresetBrowserPreview =
+  | ColorPresetBrowserPreview
+  | TimeWarpPresetBrowserPreview
+  | GeneratorPresetBrowserPreview
+  | RackPresetBrowserPreview;
+
+export const resolvePresetBrowserPreview = (
+  preset: PresetFile,
+): PresetBrowserPreview | undefined => {
+  if (preset.presetType === 'rack') {
+    const author = preset.chain.metadata?.author;
+    return {
+      kind: 'rack',
+      ...(author ? { author } : {}),
+    };
+  }
+  if (preset.presetType !== 'device') {
+    return undefined;
+  }
+
+  const author = preset.device.metadata?.author;
+  if (preset.device.kind === 'color') {
+    return {
+      kind: 'color',
+      velocities: [...preset.device.params.velocities],
+      ...(author ? { author } : {}),
+    };
+  }
+  if (preset.device.kind === 'timewarp') {
+    return {
+      kind: 'timewarp',
+      curve: {
+        divisions: preset.device.params.curve.divisions,
+        nodes: preset.device.params.curve.nodes.map((node) => ({ ...node })),
+      },
+      ...(author ? { author } : {}),
+    };
+  }
+  if (isGeneratorNode(preset.device)) {
+    return {
+      kind: 'generator',
+      device: preset.device,
+      ...(author ? { author } : {}),
+    };
+  }
+
+  return undefined;
+};
 
 export const withPresetAuthoredMetadata = (
   preset: PresetFile,

@@ -544,6 +544,8 @@
       launchpadMk2Enabled={uiState.launchpadModel === 'mk2'}
       {paletteDescription}
       paletteDescriptionTone={settingsState.paletteDescriptionTone}
+      paletteRevision={settingsState.paletteRevision}
+      {resolvePaletteRgb}
       appVersionText={settingsState.appVersionText}
       updateCheckText={settingsState.updateCheckText}
       updateAvailable={settingsState.updateAvailable}
@@ -577,6 +579,8 @@
       onOpenGitHub={() => settingsController.openGitHub()}
       onOpenLatestReleasePage={() => settingsController.openLatestReleasePage()}
       onPresetEntryOpen={(entry) => presetController.handlePresetEntryOpen(entry)}
+      onRackPresetPreviewLoad={(entry) =>
+        presetController.loadRackPresetForPreview(entry)}
       onPresetFilePointerDown={(entry, sourceEvent, itemEl, dragSignal) =>
         presetController.handlePresetFilePointerDown(
           entry,

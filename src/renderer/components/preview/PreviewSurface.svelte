@@ -5,6 +5,7 @@
 
   import {
     createEmptyPreviewSurfaceViewModel,
+    resolvePreviewCenterCornerCutClassName,
     type PreviewSurfaceViewModel,
   } from "../../features/preview/view-model";
 
@@ -72,22 +73,6 @@
   const ledRgbByCellKey = $derived.by(() =>
     resolveLedRgbByCellKey(surfaceModel),
   );
-
-  const resolveCenterCornerCutClass = (cellKey: string): string => {
-    if (cellKey === "4:4") {
-      return "is-center-corner-bottom-right";
-    }
-    if (cellKey === "4:5") {
-      return "is-center-corner-bottom-left";
-    }
-    if (cellKey === "5:4") {
-      return "is-center-corner-top-right";
-    }
-    if (cellKey === "5:5") {
-      return "is-center-corner-top-left";
-    }
-    return "";
-  };
 </script>
 
 <div
@@ -101,7 +86,7 @@
   {#each surfaceModel.cells as cell (cell.key)}
     {@const ledRgb = ledRgbByCellKey.get(cell.key)}
     <div
-      class={`preview-button ${resolveCenterCornerCutClass(cell.key)}`}
+      class={`preview-button ${resolvePreviewCenterCornerCutClassName(cell.key)}`}
       class:is-button={cell.pitches.length > 0}
       class:is-edge-button={cell.isEdgeButton}
       class:is-corner-placeholder={cell.isCornerPlaceholder}
@@ -112,6 +97,8 @@
 </div>
 
 <style lang="scss">
+  @use '../../styles/preview-cell';
+
   .preview-launchpad {
     --preview-border-width: 1px;
     --preview-gap: var(--gap-2);
@@ -145,8 +132,6 @@
   }
 
   .preview-button {
-    --center-corner-cut-size: 15%;
-
     border-radius: var(--radius-percent-3);
 
     &.is-button {
@@ -176,45 +161,7 @@
         background: rgb(var(--led-rgb, var(--preview-led-default-rgb)));
       }
 
-      &.is-center-corner-bottom-right {
-        clip-path: polygon(
-          0 0,
-          100% 0,
-          100% calc(100% - var(--center-corner-cut-size)),
-          calc(100% - var(--center-corner-cut-size)) 100%,
-          0 100%
-        );
-      }
-
-      &.is-center-corner-bottom-left {
-        clip-path: polygon(
-          0 0,
-          100% 0,
-          100% 100%,
-          var(--center-corner-cut-size) 100%,
-          0 calc(100% - var(--center-corner-cut-size))
-        );
-      }
-
-      &.is-center-corner-top-right {
-        clip-path: polygon(
-          0 0,
-          calc(100% - var(--center-corner-cut-size)) 0,
-          100% var(--center-corner-cut-size),
-          100% 100%,
-          0 100%
-        );
-      }
-
-      &.is-center-corner-top-left {
-        clip-path: polygon(
-          var(--center-corner-cut-size) 0,
-          100% 0,
-          100% 100%,
-          0 100%,
-          0 var(--center-corner-cut-size)
-        );
-      }
+      @include preview-cell.center-corner-cuts;
     }
   }
 </style>

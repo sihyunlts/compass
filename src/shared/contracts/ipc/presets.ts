@@ -3,7 +3,12 @@ import type {
   PresetEntryPath,
   PresetEntrySelectionItem,
 } from '../../preset-entry-selection';
-import type { PresetFile, PresetFileKind, RackPresetFile } from '../../presets';
+import type {
+  PresetBrowserPreview,
+  PresetFile,
+  PresetFileKind,
+  RackPresetFile,
+} from '../../presets';
 
 type RendererDeviceKind = GeneratorDeviceNode['kind'];
 
@@ -145,6 +150,7 @@ export interface PresetBrowserTreeLeafNode<K extends PresetFileKind = PresetFile
   relativePath: string[];
   savedAtIso: string;
   deviceKind?: RendererDeviceKind;
+  preview?: PresetBrowserPreview;
 }
 
 export interface PresetBrowserTreeFolderNode {

@@ -1,5 +1,12 @@
-import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
+import type {
+  GeneratorPreview,
+  GeneratorPreviewLedFrame,
+} from '../../../shared/contracts/preview/generator-preview';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
+import type {
+  PreviewGenerationRequest,
+  PreviewGenerationResponse,
+} from './generation-worker-protocol';
 
 interface PreviewGenerationInput {
   sourceChain: GeneratorChain;
@@ -7,17 +14,9 @@ interface PreviewGenerationInput {
   launchpadModel: LaunchpadModel;
 }
 
-type PreviewGenerationWorkerResponse =
-  | {
-    requestId: number;
-    ok: true;
-    preview: GeneratorPreview;
-  }
-  | {
-    requestId: number;
-    ok: false;
-    error: string;
-  };
+interface LedFrameGenerationInput extends PreviewGenerationInput {
+  frameCount: number;
+}
 
 class PreviewGenerationWorkerClient {
   private worker: Worker | null = null;
@@ -27,6 +26,57 @@ class PreviewGenerationWorkerClient {
   private nextRequestId = 1;
 
   public generate(input: PreviewGenerationInput): Promise<GeneratorPreview> {
+    return this.request(
+      (requestId) => ({
+        kind: 'full',
+        requestId,
+        ...input,
+      }),
+      (response) => {
+        if (response.ok === false) {
+          throw new Error(response.error);
+        }
+        if (response.kind !== 'full') {
+          throw new Error('Preview worker returned an unexpected response');
+        }
+        return response.preview;
+      },
+    );
+  }
+
+  public generateLedFrames(
+    input: LedFrameGenerationInput,
+  ): Promise<ReadonlyArray<GeneratorPreviewLedFrame>> {
+    return this.request(
+      (requestId) => ({
+        kind: 'led-frames',
+        requestId,
+        ...input,
+      }),
+      (response) => {
+        if (response.ok === false) {
+          throw new Error(response.error);
+        }
+        if (response.kind !== 'led-frames') {
+          throw new Error('Preview worker returned an unexpected response');
+        }
+        return response.ledFrames;
+      },
+    );
+  }
+
+  public cancel(): void {
+    this.cancelActive();
+  }
+
+  public dispose(): void {
+    this.cancelActive();
+  }
+
+  private request<T>(
+    createRequest: (requestId: number) => PreviewGenerationRequest,
+    resolveResponse: (response: PreviewGenerationResponse) => T,
+  ): Promise<T> {
     this.cancelActive();
 
     const requestId = this.nextRequestId;
@@ -36,22 +86,21 @@ class PreviewGenerationWorkerClient {
     });
     this.worker = worker;
 
-    return new Promise<GeneratorPreview>((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       this.activeReject = reject;
 
-      worker.onmessage = (event: MessageEvent<PreviewGenerationWorkerResponse>): void => {
+      worker.onmessage = (event: MessageEvent<PreviewGenerationResponse>): void => {
         const response = event.data;
         if (response.requestId !== requestId) {
           return;
         }
 
         this.clearWorker(worker);
-        if (response.ok === true) {
-          resolve(response.preview);
-          return;
+        try {
+          resolve(resolveResponse(response));
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error(String(error)));
         }
-
-        reject(new Error(response.error));
       };
 
       worker.onerror = (event): void => {
@@ -59,15 +108,8 @@ class PreviewGenerationWorkerClient {
         reject(new Error(event.message || 'Preview worker failed'));
       };
 
-      worker.postMessage({
-        requestId,
-        ...input,
-      });
+      worker.postMessage(createRequest(requestId));
     });
-  }
-
-  public dispose(): void {
-    this.cancelActive();
   }
 
   private cancelActive(): void {

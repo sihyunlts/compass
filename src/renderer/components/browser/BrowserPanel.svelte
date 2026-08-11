@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
 
   import type { RendererDeviceKind } from '../../../devices';
   import type { AppLocale } from '../../../shared/i18n';
   import {
     isPresetFileKind,
     type PresetFileKind,
+    type RackPresetFile,
   } from '../../../shared/presets';
   import {
     canMovePresetEntriesTo,
@@ -56,6 +57,8 @@
   } from '../../features/browser/preset-move-drag.svelte';
   import type { BrowserDragBadgeContent } from '../../features/browser/drag-badge';
   import { hasAdditiveSelectionModifier } from '../../features/selection/ordered-selection';
+  import { createPresetPreviewHintController } from '../../features/browser/preset-preview-hint';
+  import { hint, type HintInput } from '../overlays/hint';
 
   interface VisibleTreeRow {
     node: VisibleBrowserTreeNode;
@@ -79,6 +82,10 @@
 
   type VisibleBrowserTreeNode = BrowserTreeNode | PendingPresetFolderNode;
 
+  const presetPreviewHintController = createPresetPreviewHintController();
+
+  onDestroy(() => presetPreviewHintController.dispose());
+
   const PRESET_PAGE_BY_TYPE = {
     device: 'devices',
     group: 'groups',
@@ -90,6 +97,24 @@
     groups: 'group',
     racks: 'rack',
   } as const;
+
+  const resolvePresetPreviewHint = (
+    node: VisibleBrowserTreeNode,
+    paletteRevision: number,
+    resolvePaletteRgb: (velocity: number) => string,
+  ): HintInput => {
+    if (node.kind === 'folder') {
+      return null;
+    }
+
+    return presetPreviewHintController.resolveHint(
+      node,
+      paletteRevision,
+      launchpadMk2Enabled ? 'mk2' : 'mk3',
+      resolvePaletteRgb,
+      onRackPresetPreviewLoad,
+    );
+  };
 
   const hasTreeNodeChildren = (
     node: VisibleBrowserTreeNode,
@@ -315,6 +340,8 @@
     locale = 'en',
     paletteDescription = 'Default palette',
     paletteDescriptionTone = 'neutral',
+    paletteRevision = 0,
+    resolvePaletteRgb = () => '0 0 0',
     appVersionText = '',
     updateCheckText = '',
     updateAvailable = false,
@@ -338,6 +365,7 @@
     onOpenGitHub = () => {},
     onOpenLatestReleasePage = () => {},
     onPresetEntryOpen,
+    onRackPresetPreviewLoad = async (): Promise<RackPresetFile | null> => null,
     onPresetFilePointerDown,
     onPendingPresetFolderDraftNameChange = () => {},
     onPendingPresetFolderDraftCommit = () => {},
@@ -363,6 +391,8 @@
     locale?: AppLocale;
     paletteDescription?: string;
     paletteDescriptionTone?: 'neutral' | 'error';
+    paletteRevision?: number;
+    resolvePaletteRgb?: (velocity: number) => string;
     appVersionText?: string;
     updateCheckText?: string;
     updateAvailable?: boolean;
@@ -390,6 +420,9 @@
     onOpenGitHub?: () => void | Promise<void>;
     onOpenLatestReleasePage?: () => void | Promise<void>;
     onPresetEntryOpen: (entry: BrowserTreePresetLeafNode) => void | Promise<void>;
+    onRackPresetPreviewLoad?: (
+      entry: BrowserTreePresetLeafNode,
+    ) => Promise<RackPresetFile | null>;
     onPresetFilePointerDown: (
       entry: BrowserTreePresetLeafNode,
       event: PointerEvent,
@@ -1358,6 +1391,11 @@
             >
               <div
                 use:registerTreeItem={row.node.id}
+                use:hint={resolvePresetPreviewHint(
+                  row.node,
+                  paletteRevision,
+                  resolvePaletteRgb,
+                )}
                 data-browser-row-id={row.node.id}
                 class="browser-tree-item"
                 class:is-preset-move-source={
@@ -1634,6 +1672,10 @@
     align-items: center;
     font-size: var(--text-12);
     cursor: pointer;
+
+    &:hover {
+      background: var(--color-surface-interactive);
+    }
 
     &:focus-visible {
       outline: none;

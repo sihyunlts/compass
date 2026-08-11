@@ -6,6 +6,7 @@ export const ko = {
   'app.open': '열기',
   'app.version': '버전',
   'browser.collapseFolder': '폴더 접기',
+  'browser.colorPresetColors': '{count}색',
   'browser.devices': '디바이스',
   'browser.devicesAria': '디바이스 브라우저',
   'browser.emptyGroups': '저장된 그룹이 없습니다.',

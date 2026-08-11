@@ -6,7 +6,10 @@ import type {
   PresetBrowserTreeNode,
 } from '../../../shared/contracts/ipc/presets';
 import type { PresetEntryPath } from '../../../shared/preset-entry-selection';
-import type { PresetFileKind } from '../../../shared/presets';
+import {
+  resolvePresetBrowserPreview,
+  type PresetFileKind,
+} from '../../../shared/presets';
 import { PRESET_FILE_SPECS, PRESET_ROOT_SECTION_LABELS } from './preset-config';
 import { hasPresetExtension, resolvePresetPath } from './preset-paths';
 import { PresetStorage } from './preset-storage';
@@ -155,6 +158,7 @@ export class PresetBrowserTreeBuilder {
       if (readResult.status === 'error') {
         continue;
       }
+      const preview = resolvePresetBrowserPreview(readResult.payload);
 
       entries.push({
         kind: 'preset',
@@ -163,6 +167,7 @@ export class PresetBrowserTreeBuilder {
         label: path.parse(entry.name).name,
         relativePath: nextRelativePath,
         savedAtIso: readResult.payload.savedAtIso,
+        ...(preview ? { preview } : {}),
         ...(readResult.payload.presetType === 'device'
           ? {
               deviceKind: readResult.payload.device.kind,
