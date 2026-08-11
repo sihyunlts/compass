@@ -3,6 +3,7 @@ import {
   isDeviceBrowserSystemDirectoryPath,
 } from '../../devices/browser-categories';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
+import { normalizeAuthoredMetadata } from '../../shared/model';
 import {
   preparePresetEntryMove,
   type PresetEntryMovePlan,
@@ -26,6 +27,7 @@ import {
   isPresetFileKind,
   parseStoredPresetValue,
   resolvePresetNameFromFileName,
+  withPresetAuthoredMetadata,
   type PresetFile,
   type PresetFileKind,
 } from '../../shared/presets';
@@ -464,12 +466,12 @@ export const createBrowserCompassBridge = (): CompassApi => ({
       filePath: request.filePath,
     };
   },
-  renameRackFile: async (request) => {
+  updateRackFileInfo: async (request) => {
     const parsed = parseVirtualPresetPath(request.filePath);
     if (!parsed || parsed.presetType !== 'rack') {
       return {
         status: 'error',
-        message: 'Browser rack renames require a browser preset path.',
+        message: 'Browser rack info updates require a browser preset path.',
         filePath: request.filePath,
       };
     }
@@ -488,9 +490,6 @@ export const createBrowserCompassBridge = (): CompassApi => ({
     if (fileIndex === -1) {
       return { status: 'error', message: 'Rack file does not exist.', filePath: request.filePath };
     }
-    if (relativePathEquals(parsed.relativePath, nextRelativePath)) {
-      return { status: 'renamed', filePath: request.filePath };
-    }
     if (
       store.files.some((file, index) =>
         index !== fileIndex
@@ -506,14 +505,22 @@ export const createBrowserCompassBridge = (): CompassApi => ({
       };
     }
 
+    const savedAtIso = new Date().toISOString();
     store.files[fileIndex] = {
       ...store.files[fileIndex],
       relativePath: nextRelativePath,
+      payload: withPresetAuthoredMetadata(
+        store.files[fileIndex].payload,
+        normalizeAuthoredMetadata(request.metadata),
+        savedAtIso,
+      ),
+      needsSave: false,
     };
     writeStore(store);
     return {
-      status: 'renamed',
+      status: 'updated',
       filePath: toVirtualPresetPath('rack', nextRelativePath),
+      savedAtIso,
     };
   },
   renamePresetFile: async (request) => {
@@ -561,6 +568,58 @@ export const createBrowserCompassBridge = (): CompassApi => ({
       relativePath: nextRelativePath,
       sourcePath: toVirtualPresetPath(request.presetType, request.relativePath),
       filePath: toVirtualPresetPath(request.presetType, nextRelativePath),
+    };
+  },
+  updatePresetFileInfo: async (request) => {
+    const fileName = ensurePresetExtension(
+      sanitizeFileStem(
+        request.fileName,
+        getFileStem(
+          request.relativePath[request.relativePath.length - 1] ?? 'Preset',
+          request.presetType,
+        ),
+      ),
+      request.presetType,
+    );
+    const nextRelativePath = [...request.relativePath.slice(0, -1), fileName];
+    const store = readStore();
+    const fileIndex = store.files.findIndex((file) =>
+      file.presetType === request.presetType
+      && relativePathEquals(file.relativePath, request.relativePath));
+    if (fileIndex === -1) {
+      return { status: 'error', message: 'Preset file does not exist.' };
+    }
+    if (
+      store.files.some((file, index) =>
+        index !== fileIndex
+        && file.presetType === request.presetType
+        && relativePathCollides(file.relativePath, nextRelativePath))
+      || store.folders[request.presetType].some((path) =>
+        relativePathCollides(path, nextRelativePath))
+    ) {
+      return { status: 'error', message: 'An item or folder with that name already exists.' };
+    }
+
+    const savedAtIso = new Date().toISOString();
+    const sourcePath = toVirtualPresetPath(request.presetType, request.relativePath);
+    const filePath = toVirtualPresetPath(request.presetType, nextRelativePath);
+    store.files[fileIndex] = {
+      ...store.files[fileIndex],
+      relativePath: nextRelativePath,
+      payload: withPresetAuthoredMetadata(
+        store.files[fileIndex].payload,
+        normalizeAuthoredMetadata(request.metadata),
+        savedAtIso,
+      ),
+      needsSave: false,
+    };
+    writeStore(store);
+    return {
+      status: 'updated',
+      relativePath: nextRelativePath,
+      sourcePath,
+      filePath,
+      savedAtIso,
     };
   },
   createPresetFolder: async (request) => {

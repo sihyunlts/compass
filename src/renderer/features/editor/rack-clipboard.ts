@@ -1,5 +1,10 @@
 import { normalizeOptionalId } from '../../../shared/normalize-id';
-import { cloneDeviceNode, type GeneratorDeviceNode } from '../../../shared/model';
+import {
+  cloneAuthoredMetadata,
+  cloneDeviceNode,
+  type AuthoredMetadata,
+  type GeneratorDeviceNode,
+} from '../../../shared/model';
 import {
   cloneDevicesWithFreshIds,
   remapInternalDeviceReferences,
@@ -15,18 +20,29 @@ export type RackClipboard =
       kind: 'group';
       enabled: boolean;
       name: string | null;
+      metadata?: AuthoredMetadata;
       devices: GeneratorDeviceNode[];
     };
 
 type ClipboardBuildOptions =
   | { kind: 'devices' }
-  | { kind: 'group'; enabled: boolean; name: string | null };
+  | {
+      kind: 'group';
+      enabled: boolean;
+      name: string | null;
+      metadata?: AuthoredMetadata;
+    };
 
 type PreparedClipboardInsert = {
   devices: GeneratorDeviceNode[];
   idMap: ReadonlyMap<string, string>;
   forcedGroupId: string | null;
-  groupStatePatch: { groupId: string; enabled: boolean; name: string | null } | null;
+  groupStatePatch: {
+    groupId: string;
+    enabled: boolean;
+    name: string | null;
+    metadata?: AuthoredMetadata;
+  } | null;
 };
 
 type PrepareClipboardInsertOptions = {
@@ -50,10 +66,12 @@ export const createRackClipboard = (
   }
 
   if (options.kind === 'group') {
+    const metadata = cloneAuthoredMetadata(options.metadata);
     return {
       kind: 'group',
       enabled: options.enabled,
       name: options.name,
+      ...(metadata ? { metadata } : {}),
       devices: cloned,
     };
   }
@@ -95,6 +113,7 @@ export const prepareClipboardInsert = (
       );
     }
 
+    const metadata = cloneAuthoredMetadata(clipboard.metadata);
     return {
       devices: cloned,
       idMap,
@@ -103,6 +122,7 @@ export const prepareClipboardInsert = (
         groupId: nextGroupId,
         enabled: clipboard.enabled,
         name: clipboard.name,
+        ...(metadata ? { metadata } : {}),
       },
     };
   }

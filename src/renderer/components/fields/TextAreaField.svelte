@@ -9,8 +9,8 @@
     disabled = false,
     readonly = false,
     maxLength,
+    rows = 5,
     onValueChange,
-    onKeyDown,
   } = $props<{
     id?: string;
     value: string;
@@ -19,55 +19,62 @@
     disabled?: boolean;
     readonly?: boolean;
     maxLength?: number;
+    rows?: number;
     onValueChange?: (value: string) => void;
-    onKeyDown?: (event: KeyboardEvent) => void;
   }>();
 
   const inputLabel = $derived(ariaLabel ?? label);
 
   const handleInput = (event: Event): void => {
     const input = event.currentTarget;
-    if (input instanceof HTMLInputElement) {
+    if (input instanceof HTMLTextAreaElement) {
       onValueChange?.(input.value);
     }
   };
 </script>
 
-<label class="text-field">
+<label class="text-area-field">
   {#if label}
-    <span class="text-field-label">{label}</span>
+    <span class="text-area-field-label">{label}</span>
   {/if}
-  <input
+  <textarea
     {id}
-    type="text"
     {value}
     aria-label={inputLabel}
     {disabled}
     {readonly}
     maxlength={maxLength}
+    {rows}
     oninput={handleInput}
-    onkeydown={onKeyDown}
-  />
+  ></textarea>
 </label>
 
 <style lang="scss">
-  .text-field {
+  .text-area-field {
     display: grid;
     gap: var(--gap-6);
     min-width: 0;
     color: var(--color-text-secondary);
     font-size: var(--text-12);
 
-    input {
+    textarea {
       width: 100%;
+      min-height: 5.5rem;
+      max-height: 8rem;
       box-sizing: border-box;
-      color: var(--color-text-primary);
+      resize: none;
+      border: 0;
+      border-radius: var(--radius-4);
       padding: var(--gap-6) var(--gap-8);
+      background: var(--color-surface-interactive);
+      color: var(--color-text-primary);
+      font: inherit;
       font-size: var(--text-13);
+      line-height: 1.45;
     }
   }
 
-  .text-field-label {
+  .text-area-field-label {
     color: var(--color-text-secondary);
   }
 </style>

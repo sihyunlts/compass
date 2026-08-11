@@ -1,4 +1,4 @@
-import type { GeneratorDeviceNode } from '../../model';
+import type { AuthoredMetadata, GeneratorDeviceNode } from '../../model';
 import type {
   PresetEntryPath,
   PresetEntrySelectionItem,
@@ -47,15 +47,17 @@ export type SaveRackFileResponse =
       filePath?: string;
     };
 
-export interface RenameRackFileRequest {
+export interface UpdateRackFileInfoRequest {
   filePath: string;
   fileName: string;
+  metadata?: AuthoredMetadata;
 }
 
-export type RenameRackFileResponse =
+export type UpdateRackFileInfoResponse =
   | {
-      status: 'renamed';
+      status: 'updated';
       filePath: string;
+      savedAtIso: string;
     }
   | {
       status: 'error';
@@ -75,6 +77,26 @@ export type RenamePresetFileResponse =
       relativePath: string[];
       sourcePath: string;
       filePath: string;
+    }
+  | {
+      status: 'error';
+      message: string;
+    };
+
+export interface UpdatePresetFileInfoRequest<K extends PresetFileKind = PresetFileKind> {
+  presetType: K;
+  relativePath: string[];
+  fileName: string;
+  metadata?: AuthoredMetadata;
+}
+
+export type UpdatePresetFileInfoResponse =
+  | {
+      status: 'updated';
+      relativePath: string[];
+      sourcePath: string;
+      filePath: string;
+      savedAtIso: string;
     }
   | {
       status: 'error';

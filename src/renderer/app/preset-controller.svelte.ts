@@ -1,6 +1,11 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { MessageKey } from '../../shared/i18n';
-import { normalizeCustomName } from '../../shared/model';
+import {
+  normalizeAuthoredMetadata,
+  normalizeCustomName,
+  replaceAuthoredMetadata,
+  type AuthoredMetadata,
+} from '../../shared/model';
 import {
   normalizePresetEntrySelection,
   type PresetEntryPath,
@@ -129,6 +134,7 @@ interface PresetControllerState {
   isRackPresetLoadPending: boolean;
   currentRackFilePath: string | null;
   currentRackDisplayName: string;
+  currentRackSavedAtIso: string | null;
   isRackDirty: boolean;
   canRevertRack: boolean;
 }
@@ -205,7 +211,7 @@ const replaceMovedPathPrefix = (
 };
 
 /** Owns renderer-side preset browser state and preset IPC workflows. */
-class PresetController {
+export class PresetController {
   private defaultRackFileDisplayName = resolveDefaultRackFileDisplayName();
 
   public readonly state: PresetControllerState = $state({
@@ -220,6 +226,7 @@ class PresetController {
     isRackPresetLoadPending: false,
     currentRackFilePath: null,
     currentRackDisplayName: this.defaultRackFileDisplayName,
+    currentRackSavedAtIso: null,
     isRackDirty: false,
     canRevertRack: false,
   });
@@ -325,33 +332,90 @@ class PresetController {
     this.showMessage(i18n.t('status.rackReverted'));
   }
 
-  public async renameCurrentRack(rawName: string): Promise<boolean> {
+  public async updateCurrentRackInfo(
+    rawName: string,
+    metadata: AuthoredMetadata | undefined,
+  ): Promise<boolean> {
     const nextName = resolveRackDisplayName(rawName);
-    if (nextName === this.state.currentRackDisplayName) {
-      return true;
-    }
+    const normalizedMetadata = normalizeAuthoredMetadata(metadata);
 
     const filePath = this.state.currentRackFilePath;
     if (!filePath) {
       this.state.currentRackDisplayName = nextName;
+      this.options.editorSession.commands.updateRackInfo({
+        author: normalizedMetadata?.author ?? '',
+        description: normalizedMetadata?.description ?? '',
+      });
       this.syncRackDirtyState();
       return true;
     }
 
-    const response = await this.options.bridgeClient.renameRackFile({
+    const response = await this.options.bridgeClient.updateRackFileInfo({
       filePath,
       fileName: nextName,
+      ...(normalizedMetadata ? { metadata: normalizedMetadata } : {}),
     });
     if (response.status === 'error') {
-      this.showError('status.rackRenameFailed', response.message);
+      this.showError('status.presetInfoSaveFailed', response.message);
       return false;
     }
 
-    this.setCurrentRackFile(response.filePath, resolveRackDisplayName(response.filePath));
+    this.options.editorSession.synchronizePersistedRackMetadata(
+      normalizedMetadata,
+    );
+    this.setCurrentRackFile(
+      response.filePath,
+      resolveRackDisplayName(response.filePath),
+      response.savedAtIso,
+    );
     this.cleanRackDisplayName = this.state.currentRackDisplayName;
+    if (this.cleanRackPreset) {
+      this.cleanRackPreset = {
+        ...this.cleanRackPreset,
+        savedAtIso: response.savedAtIso,
+        chain: replaceAuthoredMetadata(
+          this.cleanRackPreset.chain,
+          normalizedMetadata,
+        ),
+      };
+    }
     this.syncRackDirtyState();
     await this.loadTree();
-    this.showMessage(i18n.t('status.rackRenamed'));
+    return true;
+  }
+
+  public async updatePresetInfo(
+    entry: PresetEntryContextTarget,
+    rawName: string,
+    metadata: AuthoredMetadata | undefined,
+  ): Promise<boolean> {
+    const normalizedMetadata = normalizeAuthoredMetadata(metadata);
+    const response = await this.options.bridgeClient.updatePresetFileInfo({
+      presetType: entry.presetType,
+      relativePath: [...entry.relativePath],
+      fileName: rawName,
+      ...(normalizedMetadata ? { metadata: normalizedMetadata } : {}),
+    });
+    if (response.status === 'error') {
+      this.showError('status.presetInfoSaveFailed', response.message);
+      return false;
+    }
+
+    await this.loadTree();
+    if (entry.presetType === 'rack') {
+      this.syncCurrentRackAfterPresetEntriesMove([{
+        presetType: 'rack',
+        entryKind: 'file',
+        relativePath: response.relativePath,
+        sourcePath: response.sourcePath,
+        filePath: response.filePath,
+      }]);
+    }
+    this.setPresetEntrySelectionTarget([{
+      presetType: entry.presetType,
+      relativePath: response.relativePath,
+      entryKind: 'file',
+    }]);
     return true;
   }
 
@@ -380,10 +444,15 @@ class PresetController {
     this.state.canRevertRack = false;
   }
 
-  private setCurrentRackFile(filePath: string | null, displayName: string): void {
+  private setCurrentRackFile(
+    filePath: string | null,
+    displayName: string,
+    savedAtIso: string | null = this.state.currentRackSavedAtIso,
+  ): void {
     this.state.currentRackFilePath = filePath;
     this.state.currentRackDisplayName = normalizeCustomName(displayName)
       ?? resolveDefaultRackFileDisplayName();
+    this.state.currentRackSavedAtIso = filePath ? savedAtIso : null;
   }
 
   private syncCurrentRackAfterPresetEntriesMove(
@@ -463,12 +532,17 @@ class PresetController {
       return this.saveRackAs(options);
     }
 
+    const payload = this.buildCurrentRackFile();
     const response = await this.options.bridgeClient.saveRackFile({
       filePath,
-      payload: this.buildCurrentRackFile(),
+      payload,
     });
     if (response.status === 'saved') {
-      this.setCurrentRackFile(response.filePath, resolveRackDisplayName(response.filePath));
+      this.setCurrentRackFile(
+        response.filePath,
+        resolveRackDisplayName(response.filePath),
+        payload.savedAtIso,
+      );
       this.markCurrentRackClean({ captureRevertTarget: true });
       if (options.showSuccessMessage) {
         this.showMessage(i18n.t('status.rackSaved'));
@@ -484,9 +558,14 @@ class PresetController {
   private async saveRackAs(
     options: { showSuccessMessage: boolean },
   ): Promise<boolean> {
-    const response = await this.options.bridgeClient.savePresetFile(this.buildRackSaveAsRequest());
+    const request = this.buildRackSaveAsRequest();
+    const response = await this.options.bridgeClient.savePresetFile(request);
     if (response.status === 'saved') {
-      this.setCurrentRackFile(response.filePath, resolveRackDisplayName(response.filePath));
+      this.setCurrentRackFile(
+        response.filePath,
+        resolveRackDisplayName(response.filePath),
+        request.payload.savedAtIso,
+      );
       this.markCurrentRackClean({ captureRevertTarget: true });
       if (options.showSuccessMessage) {
         this.showMessage(i18n.t('status.rackSaved'));
@@ -1184,7 +1263,11 @@ class PresetController {
       return;
     }
 
-    this.setCurrentRackFile(target.filePath, target.label);
+    this.setCurrentRackFile(
+      target.filePath,
+      target.label,
+      target.filePath ? target.preset.savedAtIso : null,
+    );
     if (target.needsSave) {
       this.captureCurrentRackRevertTarget();
       this.syncRackDirtyState();
@@ -1224,7 +1307,7 @@ class PresetController {
       return;
     }
 
-    this.setCurrentRackFile(null, resolveDefaultRackFileDisplayName());
+    this.setCurrentRackFile(null, resolveDefaultRackFileDisplayName(), null);
     this.clearRevertTarget();
     this.markCurrentRackClean();
     this.showMessage(i18n.t('status.newRackCreated'));

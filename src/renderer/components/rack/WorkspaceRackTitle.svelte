@@ -20,7 +20,7 @@
     onSaveRackAs,
     onRevertRack,
     canRevertRack = false,
-    onRenameRack,
+    onEditRackInfo,
   } = $props<{
     title: string;
     dirty?: boolean;
@@ -30,7 +30,7 @@
     onSaveRackAs: () => void;
     onRevertRack: () => void;
     canRevertRack?: boolean;
-    onRenameRack: () => void;
+    onEditRackInfo: () => void;
   }>();
 
   let rootEl = $state<HTMLDivElement | null>(null);
@@ -38,16 +38,18 @@
   let isOpen = $state(false);
 
   const displayTitle = $derived(dirty ? `${title}*` : title);
-  const titleHint = $derived(
-    dirty ? i18n.t('rack.renameDirty') : i18n.t('rack.rename'),
-  );
+  const titleHint = $derived(i18n.t('info.rackTitle'));
   const titleLabel = $derived(
     dirty
       ? i18n.t('rack.titleDirtyAria', { title })
       : i18n.t('rack.titleAria', { title }),
   );
   const rackActions = $derived.by((): RackActionItem[] => [
-    { id: 'rack-new-button', label: i18n.t('rack.new'), run: onNewRack },
+    {
+      id: 'rack-new-button',
+      label: i18n.t('rack.new'),
+      run: onNewRack,
+    },
     { id: 'rack-save-button', label: i18n.t('rack.save'), run: onSaveRack },
     { id: 'rack-save-as-button', label: i18n.t('rack.saveAs'), run: onSaveRackAs },
     {
@@ -88,7 +90,7 @@
     text={displayTitle}
     title={titleHint}
     label={titleLabel}
-    onClick={onRenameRack}
+    onClick={onEditRackInfo}
     menuId="rack-file-actions-trigger"
     menuDisabled={disabled}
     menuLabel={i18n.t('rack.actions')}

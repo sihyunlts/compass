@@ -28,6 +28,7 @@
     onPaste,
     onDuplicate,
     onRename,
+    onInfo,
     onDelete,
     onCreatePresetFolder,
     onShowInFolder,
@@ -41,6 +42,7 @@
     onPaste: (target: ContextMenuTarget) => void;
     onDuplicate: (target: ContextMenuTarget) => void;
     onRename: (target: ContextMenuTarget) => void;
+    onInfo: (target: ContextMenuTarget) => void;
     onDelete: (target: ContextMenuTarget) => void;
     onCreatePresetFolder: (target: PresetEntryContextTarget) => void;
     onShowInFolder: (target: PresetEntryContextTarget) => void;
@@ -113,6 +115,13 @@
     }
     return target.kind === 'group' || target.deviceIds.length === 1;
   });
+  const canShowInfo = $derived.by(() =>
+    (
+      target?.kind === 'preset-entry'
+      && target.entryKind === 'file'
+    )
+    || target?.kind === 'group'
+    || (target?.kind === 'devices' && target.deviceIds.length === 1));
   export async function open(clientX: number, clientY: number, nextTarget: ContextMenuTarget) {
     if (
       (nextTarget.kind === 'devices' && nextTarget.deviceIds.length === 0)
@@ -215,6 +224,15 @@
     close();
   }
 
+  function handleInfoClick() {
+    if (!target || !canShowInfo) {
+      return;
+    }
+
+    onInfo(target);
+    close();
+  }
+
   function handleShowInFolderClick() {
     if (target?.kind !== 'preset-entry') {
       return;
@@ -301,6 +319,9 @@
 >
   {#if target}
     {#if isPresetBrowserTarget}
+      {#if canShowInfo}
+        {@render menuItem('context-info', i18n.t('context.info'), handleInfoClick)}
+      {/if}
       {#if canCreatePresetFolder}
         {@render menuItem('context-new-folder', i18n.t('context.newFolder'), handleCreatePresetFolderClick)}
       {/if}
@@ -342,6 +363,9 @@
         {/each}
       {/if}
     {:else}
+      {#if canShowInfo}
+        {@render menuItem('context-info', i18n.t('context.info'), handleInfoClick)}
+      {/if}
       {#each visibleClipboardActions as action (action.id)}
         {@render menuItem(action.id, i18n.t(action.labelKey), () => handleClipboardAction(action.kind))}
       {/each}

@@ -64,6 +64,9 @@ export const renameGroupById = (
       [groupId]: {
         enabled: reconciledById[groupId]?.enabled !== false,
         name: nextName,
+        ...(reconciledById[groupId]?.metadata
+          ? { metadata: reconciledById[groupId].metadata }
+          : {}),
       },
     },
   };

@@ -1,5 +1,8 @@
 import {
   cloneDeviceNode,
+  normalizeAuthoredMetadata,
+  replaceAuthoredMetadata,
+  type AuthoredMetadata,
   type GeneratorChain,
   type GeneratorDeviceNode,
 } from './model';
@@ -34,6 +37,7 @@ export interface GroupPresetFile extends PresetFileBase<'group'> {
   group: {
     enabled: boolean;
     name: string | null;
+    metadata?: AuthoredMetadata;
     devices: GeneratorDeviceNode[];
   };
   ui?: PresetFileUiMetadata;
@@ -49,6 +53,34 @@ export interface RackPresetFile extends PresetFileBase<'rack'> {
 }
 
 export type PresetFile = DevicePresetFile | GroupPresetFile | RackPresetFile;
+
+export const withPresetAuthoredMetadata = (
+  preset: PresetFile,
+  metadata: AuthoredMetadata | undefined,
+  savedAtIso: string,
+): PresetFile => {
+  if (preset.presetType === 'device') {
+    return {
+      ...preset,
+      savedAtIso,
+      device: replaceAuthoredMetadata(preset.device, metadata),
+    };
+  }
+
+  if (preset.presetType === 'group') {
+    return {
+      ...preset,
+      savedAtIso,
+      group: replaceAuthoredMetadata(preset.group, metadata),
+    };
+  }
+
+  return {
+    ...preset,
+    savedAtIso,
+    chain: replaceAuthoredMetadata(preset.chain, metadata),
+  };
+};
 
 export type ParsedPresetFileResult =
   | {
@@ -185,6 +217,7 @@ const parseGroupPresetPayload = (
     hydratedDevices,
     isRecord(rawUi) ? rawUi.collapsedDeviceIds : undefined,
   );
+  const metadata = normalizeAuthoredMetadata(group.metadata);
 
   return {
     preset: {
@@ -194,6 +227,7 @@ const parseGroupPresetPayload = (
       group: {
         enabled: group.enabled,
         name: typeof group.name === 'string' ? group.name : null,
+        ...(metadata ? { metadata } : {}),
         devices: hydratedDevices,
       },
       ...(collapsedDeviceIds.length > 0

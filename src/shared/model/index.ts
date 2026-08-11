@@ -1,3 +1,11 @@
+export type { AuthoredMetadata } from './authored-metadata';
+export {
+  AUTHORED_METADATA_AUTHOR_MAX_LENGTH,
+  AUTHORED_METADATA_DESCRIPTION_MAX_LENGTH,
+  cloneAuthoredMetadata,
+  normalizeAuthoredMetadata,
+  replaceAuthoredMetadata,
+} from './authored-metadata';
 export type {
   ColorEffectNode,
   CurveModulatorNode,

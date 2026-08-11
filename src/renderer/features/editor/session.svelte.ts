@@ -2,6 +2,9 @@ import type { BridgeSettings } from '../../../shared/bridge/types';
 import {
   cloneChainForIpc,
   isCurveModulatorNode,
+  normalizeAuthoredMetadata,
+  replaceAuthoredMetadata,
+  type AuthoredMetadata,
   type GeneratorChain,
   type LaunchpadModel,
 } from '../../../shared/model';
@@ -86,6 +89,12 @@ import {
   renameDeviceById,
   renameGroupById,
 } from './naming';
+import {
+  updateDeviceAuthoredInfo,
+  updateGroupAuthoredInfo,
+  updateRackAuthoredMetadata,
+  type AuthoredInfoDraft,
+} from './authored-info';
 import {
   applyRackPresetFile,
   type GroupPresetApplyResult,
@@ -394,6 +403,13 @@ export class EditorSession {
       this.renameDevice(deviceId, rawName),
     renameGroup: (groupId: string, rawName: string): boolean =>
       this.renameGroup(groupId, rawName),
+    updateDeviceInfo: (deviceId: string, draft: AuthoredInfoDraft): boolean =>
+      this.updateDeviceInfo(deviceId, draft),
+    updateGroupInfo: (groupId: string, draft: AuthoredInfoDraft): boolean =>
+      this.updateGroupInfo(groupId, draft),
+    updateRackInfo: (
+      draft: Pick<AuthoredInfoDraft, 'author' | 'description'>,
+    ): boolean => this.updateRackInfo(draft),
     insertDevicePreset: (
       dropZone: RackDropZone,
       preset: DevicePresetFile,
@@ -476,6 +492,16 @@ export class EditorSession {
 
   public clearSelection(): void {
     this.rackBinding?.clearSelection();
+  }
+
+  public synchronizePersistedRackMetadata(
+    metadata: AuthoredMetadata | undefined,
+  ): void {
+    const normalizedMetadata = normalizeAuthoredMetadata(metadata);
+    const applyMetadata = (chain: GeneratorChain): GeneratorChain =>
+      replaceAuthoredMetadata(chain, normalizedMetadata);
+    this.state.chainState = applyMetadata(this.state.chainState);
+    this.history.mapChains(applyMetadata);
   }
 
   public listUndoHistoryEntries(): EditorHistoryListEntry[] {
@@ -671,6 +697,46 @@ export class EditorSession {
     }
 
     this.persistChainMutation(nextChain, EDITOR_HISTORY_META.renameGroup);
+    return true;
+  }
+
+  private updateDeviceInfo(deviceId: string, draft: AuthoredInfoDraft): boolean {
+    const nextChain = updateDeviceAuthoredInfo(
+      this.state.chainState,
+      deviceId,
+      draft,
+    );
+    if (!nextChain) {
+      return false;
+    }
+
+    this.persistChainMutation(nextChain, EDITOR_HISTORY_META.editDeviceInfo);
+    return true;
+  }
+
+  private updateGroupInfo(groupId: string, draft: AuthoredInfoDraft): boolean {
+    const nextChain = updateGroupAuthoredInfo(
+      this.state.chainState,
+      groupId,
+      draft,
+    );
+    if (!nextChain) {
+      return false;
+    }
+
+    this.persistChainMutation(nextChain, EDITOR_HISTORY_META.editGroupInfo);
+    return true;
+  }
+
+  private updateRackInfo(
+    draft: Pick<AuthoredInfoDraft, 'author' | 'description'>,
+  ): boolean {
+    const nextChain = updateRackAuthoredMetadata(this.state.chainState, draft);
+    if (!nextChain) {
+      return false;
+    }
+
+    this.persistChainMutation(nextChain, EDITOR_HISTORY_META.editRackInfo);
     return true;
   }
 

@@ -11,8 +11,6 @@ import type {
   MovePresetEntriesResponse,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
-  RenameRackFileRequest,
-  RenameRackFileResponse,
   RenamePresetFileRequest,
   RenamePresetFileResponse,
   RenamePresetFolderRequest,
@@ -23,6 +21,10 @@ import type {
   SavePresetFileResponse,
   ShowPresetEntryInFolderRequest,
   ShowPresetEntryInFolderResponse,
+  UpdatePresetFileInfoRequest,
+  UpdatePresetFileInfoResponse,
+  UpdateRackFileInfoRequest,
+  UpdateRackFileInfoResponse,
 } from './presets';
 import type { PreviewWindowState } from '../preview/window-state';
 import type {
@@ -108,12 +110,15 @@ export interface CompassApi {
   saveRackFile: (
     request: SaveRackFileRequest,
   ) => Promise<SaveRackFileResponse>;
-  renameRackFile: (
-    request: RenameRackFileRequest,
-  ) => Promise<RenameRackFileResponse>;
+  updateRackFileInfo: (
+    request: UpdateRackFileInfoRequest,
+  ) => Promise<UpdateRackFileInfoResponse>;
   renamePresetFile: (
     request: RenamePresetFileRequest,
   ) => Promise<RenamePresetFileResponse>;
+  updatePresetFileInfo: (
+    request: UpdatePresetFileInfoRequest,
+  ) => Promise<UpdatePresetFileInfoResponse>;
   createPresetFolder: (
     request: CreatePresetFolderRequest,
   ) => Promise<CreatePresetFolderResponse>;

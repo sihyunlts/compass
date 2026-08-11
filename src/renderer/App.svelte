@@ -19,7 +19,6 @@
     isPresetDeleteContextTarget,
     type ContextMenuTarget,
   } from './features/context-menu/types';
-  import TextField from './components/fields/TextField.svelte';
   import Button from './components/primitives/Button.svelte';
   import DropdownSelect from './components/primitives/DropdownSelect.svelte';
   import SidebarResizer from './components/layout/SidebarResizer.svelte';
@@ -32,6 +31,7 @@
   import PreviewPanel from './components/preview/PreviewPanel.svelte';
   import ContextMenu from './components/overlays/ContextMenu.svelte';
   import ModalDialog from './components/overlays/ModalDialog.svelte';
+  import AuthoredInfoDialog from './components/overlays/AuthoredInfoDialog.svelte';
   import WorkspaceRackTitle from './components/rack/WorkspaceRackTitle.svelte';
   import { createPresetController } from './app/preset-controller.svelte';
   import { createSettingsController } from './app/settings-controller.svelte';
@@ -60,6 +60,7 @@
   import type { RackViewApi } from './features/rack/api';
   import { i18n } from './i18n.svelte';
   import { resolveHistoryActionLabel } from './features/editor/history-i18n';
+  import { createAuthoredInfoController } from './app/authored-info-controller.svelte';
 
   const AUTO_PREVIEW_DEBOUNCE_MS = 120;
   const HISTORY_MAX_ENTRIES = 100;
@@ -136,6 +137,15 @@
       headerIndicator.show(message);
     },
   });
+  const authoredInfoController = createAuthoredInfoController({
+    bridgeClient,
+    editorSession,
+    presetController,
+    showMessage: (message) => {
+      headerIndicator.show(message);
+    },
+  });
+  const authoredInfoState = authoredInfoController.state;
   const settingsController = createSettingsController({
     bridgeClient,
     editorSession,
@@ -182,9 +192,6 @@
     },
   });
   settingsController.attachPlaybackSession(playbackSession);
-  let isRackRenameDialogOpen = $state(false);
-  let isRackRenamePending = $state(false);
-  let rackRenameDraft = $state('');
   let isRackRevertDialogOpen = $state(false);
   const resultDeliveryFlow = createResultDeliveryFlow({
     bridgeClient,
@@ -317,44 +324,6 @@
   const handleRedoClick = (): void => {
     closeContextMenu();
     editorSession.commands.redo();
-  };
-
-  const openRackRenameDialog = (): void => {
-    rackRenameDraft = presetState.currentRackDisplayName;
-    isRackRenameDialogOpen = true;
-  };
-
-  const closeRackRenameDialog = (): void => {
-    if (isRackRenamePending) {
-      return;
-    }
-
-    isRackRenameDialogOpen = false;
-  };
-
-  const confirmRackRenameDialog = async (): Promise<void> => {
-    if (isRackRenamePending) {
-      return;
-    }
-
-    isRackRenamePending = true;
-    try {
-      const renamed = await presetController.renameCurrentRack(rackRenameDraft);
-      if (renamed) {
-        isRackRenameDialogOpen = false;
-      }
-    } finally {
-      isRackRenamePending = false;
-    }
-  };
-
-  const handleRackRenameInputKeyDown = (event: KeyboardEvent): void => {
-    if (event.key !== 'Enter') {
-      return;
-    }
-
-    event.preventDefault();
-    void confirmRackRenameDialog();
   };
 
   const openRackRevertDialog = (): void => {
@@ -654,7 +623,7 @@
             onSaveRackAs={() => presetController.handleSaveRackAs()}
             onRevertRack={openRackRevertDialog}
             canRevertRack={presetState.canRevertRack && presetState.isRackDirty}
-            onRenameRack={openRackRenameDialog}
+            onEditRackInfo={authoredInfoController.openRack}
           />
 
           <span
@@ -770,6 +739,7 @@
     onPaste={editorSession.commands.pasteFromContextTarget}
     onDuplicate={editorSession.commands.duplicateFromContextTarget}
     onRename={handleContextMenuRename}
+    onInfo={authoredInfoController.openFromContextTarget}
     onDelete={handleContextMenuDelete}
     onCreatePresetFolder={handleContextMenuCreatePresetFolder}
     onShowInFolder={(target) => presetController.handleShowPresetEntryInFolder(target)}
@@ -779,26 +749,26 @@
     clipboardAvailable={clipboardAvailable}
   />
 
-  <ModalDialog
-    open={isRackRenameDialogOpen}
-    title={i18n.t('rack.rename')}
-    description={i18n.t('rack.renameDescription')}
-    confirmLabel={i18n.t('context.rename')}
-    cancelLabel={i18n.t('app.cancel')}
-    busy={isRackRenamePending}
-    onConfirm={confirmRackRenameDialog}
-    onCancel={closeRackRenameDialog}
-  >
-    <TextField
-      value={rackRenameDraft}
-      disabled={isRackRenamePending}
-      ariaLabel={i18n.t('rack.fileName')}
-      onValueChange={(value) => {
-        rackRenameDraft = value;
-      }}
-      onKeyDown={handleRackRenameInputKeyDown}
-    />
-  </ModalDialog>
+  <AuthoredInfoDialog
+    open={authoredInfoState.target !== null}
+    title={authoredInfoController.title}
+    name={authoredInfoState.name}
+    author={authoredInfoState.author}
+    description={authoredInfoState.description}
+    savedAtIso={authoredInfoState.savedAtIso}
+    busy={authoredInfoState.isPending}
+    onNameChange={(value) => {
+      authoredInfoState.name = value;
+    }}
+    onAuthorChange={(value) => {
+      authoredInfoState.author = value;
+    }}
+    onDescriptionChange={(value) => {
+      authoredInfoState.description = value;
+    }}
+    onConfirm={authoredInfoController.confirm}
+    onCancel={authoredInfoController.close}
+  />
 
   <ModalDialog
     open={isRackRevertDialogOpen}

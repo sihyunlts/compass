@@ -12,14 +12,16 @@ import type {
   MovePresetEntriesResponse,
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
-  RenameRackFileRequest,
-  RenameRackFileResponse,
   RenamePresetFileRequest,
   RenamePresetFileResponse,
   RenamePresetFolderRequest,
   RenamePresetFolderResponse,
   ShowPresetEntryInFolderRequest,
   ShowPresetEntryInFolderResponse,
+  UpdatePresetFileInfoRequest,
+  UpdatePresetFileInfoResponse,
+  UpdateRackFileInfoRequest,
+  UpdateRackFileInfoResponse,
 } from './shared/contracts/ipc/presets';
 import type { PreviewWindowState } from './shared/contracts/preview/window-state';
 import {
@@ -164,10 +166,18 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.savePresetFile, request),
   saveRackFile: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.saveRackFile, request),
-  renameRackFile: (request: RenameRackFileRequest) =>
-    ipcRenderer.invoke(IPC_CHANNELS.renameRackFile, request) as Promise<RenameRackFileResponse>,
+  updateRackFileInfo: (request: UpdateRackFileInfoRequest) =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.updateRackFileInfo,
+      request,
+    ) as Promise<UpdateRackFileInfoResponse>,
   renamePresetFile: (request: RenamePresetFileRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.renamePresetFile, request) as Promise<RenamePresetFileResponse>,
+  updatePresetFileInfo: (request: UpdatePresetFileInfoRequest) =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.updatePresetFileInfo,
+      request,
+    ) as Promise<UpdatePresetFileInfoResponse>,
   createPresetFolder: (request: CreatePresetFolderRequest) =>
     ipcRenderer.invoke(IPC_CHANNELS.createPresetFolder, request) as Promise<CreatePresetFolderResponse>,
   renamePresetFolder: (request: RenamePresetFolderRequest) =>
