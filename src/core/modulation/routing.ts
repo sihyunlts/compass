@@ -158,10 +158,15 @@ export const stripModulationDevicesFromChain = (
     groupStateById[groupId] = {
       enabled: chain.groupStateById[groupId]?.enabled !== false,
       name: chain.groupStateById[groupId]?.name ?? null,
+      ...(chain.groupStateById[groupId]?.metadata
+        ? { metadata: chain.groupStateById[groupId].metadata }
+        : {}),
     };
   }
 
   return {
+    name: chain.name ?? null,
+    ...(chain.metadata ? { metadata: chain.metadata } : {}),
     devices,
     groupStateById,
   };

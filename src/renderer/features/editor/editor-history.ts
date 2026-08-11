@@ -37,6 +37,7 @@ export interface EditorHistory {
   getUndoEntry(): EditorHistorySnapshotEntry | null;
   getRedoEntry(): EditorHistorySnapshotEntry | null;
   replaceCurrent(chain: GeneratorChain): void;
+  mapChains(transform: (chain: GeneratorChain) => GeneratorChain): void;
   flushPendingMerge(): void;
 }
 
@@ -130,6 +131,11 @@ class EditorHistoryImpl implements EditorHistory {
 
   public replaceCurrent(chain: GeneratorChain): void {
     this.chainHistory.replaceCurrent(chain);
+    this.syncMetadata();
+  }
+
+  public mapChains(transform: (chain: GeneratorChain) => GeneratorChain): void {
+    this.chainHistory.mapChains(transform);
     this.syncMetadata();
   }
 

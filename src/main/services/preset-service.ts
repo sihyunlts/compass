@@ -9,13 +9,19 @@ import type {
   ListPresetBrowserTreeResponse,
   MovePresetEntriesResponse,
   ReadPresetEntryResponse,
-  RenameRackFileResponse,
   RenamePresetFileResponse,
   RenamePresetFolderResponse,
   SaveRackFileResponse,
   SavePresetFileResponse,
   ShowPresetEntryInFolderResponse,
+  UpdatePresetFileInfoResponse,
+  UpdateRackFileInfoResponse,
 } from '../../shared/contracts/ipc/presets';
+import type { AuthoredMetadata } from '../../shared/model';
+import {
+  withPresetAuthoredMetadata,
+  type PresetFileKind,
+} from '../../shared/presets';
 import { preparePresetEntryMove } from '../../shared/preset-entry-move';
 import { normalizePresetEntrySelection } from '../../shared/preset-entry-selection';
 import { PRESET_FILE_SPECS } from './presets/preset-config';
@@ -32,10 +38,11 @@ import {
   parsePresetEntryRequest,
   parseReadPresetEntryRequest,
   parseSaveRackFileRequest,
-  parseRenameRackFileRequest,
   parseRenamePresetFileRequest,
   parseRenamePresetFolderRequest,
   parseSavePresetFileRequest,
+  parseUpdatePresetFileInfoRequest,
+  parseUpdateRackFileInfoRequest,
 } from './presets/preset-requests';
 import { PresetStorage } from './presets/preset-storage';
 
@@ -172,14 +179,14 @@ export class PresetService {
     }
   }
 
-  public async renameRackFile(
+  public async updateRackFileInfo(
     request: unknown,
-  ): Promise<RenameRackFileResponse> {
-    const parsedRequest = parseRenameRackFileRequest(request);
+  ): Promise<UpdateRackFileInfoResponse> {
+    const parsedRequest = parseUpdateRackFileInfoRequest(request);
     if (!parsedRequest) {
       return {
         status: 'error',
-        message: 'Invalid rack rename request.',
+        message: 'Invalid rack info update request.',
       };
     }
 
@@ -192,18 +199,20 @@ export class PresetService {
     }
 
     try {
+      const updated = await this.updatePresetInfoAtPath(
+        'rack',
+        parsedRequest.filePath,
+        parsedRequest.fileName,
+        parsedRequest.metadata,
+      );
       return {
-        status: 'renamed',
-        filePath: await this.storage.renamePresetFile(
-          parsedRequest.filePath,
-          parsedRequest.fileName,
-          PRESET_FILE_SPECS.rack.extension,
-        ),
+        status: 'updated',
+        ...updated,
       };
     } catch (error) {
       return {
         status: 'error',
-        message: toErrorMessage(error, 'Failed to rename rack file.'),
+        message: toErrorMessage(error, 'Failed to update rack info.'),
         filePath: parsedRequest.filePath,
       };
     }
@@ -274,6 +283,86 @@ export class PresetService {
         message: toErrorMessage(error, 'Failed to rename preset file.'),
       };
     }
+  }
+
+  public async updatePresetFileInfo(
+    request: unknown,
+  ): Promise<UpdatePresetFileInfoResponse> {
+    const parsedRequest = parseUpdatePresetFileInfoRequest(request);
+    if (!parsedRequest) {
+      return {
+        status: 'error',
+        message: 'Invalid preset info update request.',
+      };
+    }
+
+    const spec = PRESET_FILE_SPECS[parsedRequest.presetType];
+    const currentFileName = parsedRequest.relativePath.at(-1) ?? '';
+    if (!hasPresetExtension(currentFileName, spec.extension)) {
+      return {
+        status: 'error',
+        message: 'Unsupported preset file extension.',
+      };
+    }
+
+    try {
+      const rootDirectory = await this.storage.resolvePresetDirectory(
+        parsedRequest.presetType,
+      );
+      const filePath = resolvePresetPath(rootDirectory, parsedRequest.relativePath);
+      if (!filePath) {
+        return {
+          status: 'error',
+          message: 'Invalid preset file path.',
+        };
+      }
+
+      const updated = await this.updatePresetInfoAtPath(
+        parsedRequest.presetType,
+        filePath,
+        parsedRequest.fileName,
+        parsedRequest.metadata,
+      );
+      return {
+        status: 'updated',
+        sourcePath: filePath,
+        filePath: updated.filePath,
+        relativePath: [
+          ...parsedRequest.relativePath.slice(0, -1),
+          updated.filePath.split(/[\\/]/).pop() ?? currentFileName,
+        ],
+        savedAtIso: updated.savedAtIso,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to update preset info.'),
+      };
+    }
+  }
+
+  private async updatePresetInfoAtPath(
+    presetType: PresetFileKind,
+    filePath: string,
+    fileName: string,
+    metadata: AuthoredMetadata | undefined,
+  ): Promise<{ filePath: string; savedAtIso: string }> {
+    const savedAtIso = new Date().toISOString();
+    const updatedPath = await this.storage.updatePresetFile(
+      presetType,
+      filePath,
+      fileName,
+      PRESET_FILE_SPECS[presetType].extension,
+      (payload) => withPresetAuthoredMetadata(
+        payload,
+        metadata,
+        savedAtIso,
+      ),
+    );
+    return {
+      filePath: updatedPath,
+      savedAtIso,
+    };
   }
 
   public async createPresetFolder(

@@ -37,6 +37,9 @@ export const EDITOR_HISTORY_META = {
   groupToggleEnabled: { kind: 'group-toggle-enabled' },
   renameDevice: { kind: 'rename-device' },
   renameGroup: { kind: 'rename-group' },
+  editDeviceInfo: { kind: 'edit-device-info' },
+  editGroupInfo: { kind: 'edit-group-info' },
+  editRackInfo: { kind: 'edit-rack-info' },
   clipboardCut: { kind: 'clipboard-cut' },
   clipboardPaste: { kind: 'clipboard-paste' },
   duplicate: { kind: 'duplicate' },
@@ -209,6 +212,7 @@ export const buildClipboardFromSelection = (
       kind: 'group',
       enabled: chain.groupStateById[selection.groupId]?.enabled !== false,
       name: chain.groupStateById[selection.groupId]?.name ?? null,
+      metadata: chain.groupStateById[selection.groupId]?.metadata,
     });
   }
 
@@ -244,6 +248,9 @@ export const buildChainWithClipboardPaste = (
     nextChain.groupStateById[prepared.groupStatePatch.groupId] = {
       enabled: prepared.groupStatePatch.enabled,
       name: prepared.groupStatePatch.name,
+      ...(prepared.groupStatePatch.metadata
+        ? { metadata: prepared.groupStatePatch.metadata }
+        : {}),
     };
   }
   return nextChain;
@@ -283,6 +290,9 @@ export const applyGroupEnabledChange = (
       [groupId]: {
         enabled: nextEnabled,
         name: reconciledById[groupId]?.name ?? null,
+        ...(reconciledById[groupId]?.metadata
+          ? { metadata: reconciledById[groupId].metadata }
+          : {}),
       },
     },
   };

@@ -1,3 +1,5 @@
+import type { AuthoredMetadata } from './authored-metadata';
+
 export interface RippleParams {
   centerX: number;
   centerY: number;
@@ -7,6 +9,7 @@ export interface RippleParams {
 export interface GroupedDeviceNode {
   groupId?: string | null;
   name?: string | null;
+  metadata?: AuthoredMetadata;
 }
 
 export interface RippleGeneratorNode extends GroupedDeviceNode {
@@ -277,10 +280,12 @@ export type GeneratorDeviceNode =
 export interface GroupStateEntry {
   enabled: boolean;
   name?: string | null;
+  metadata?: AuthoredMetadata;
 }
 
 export interface GeneratorChain {
   name?: string | null;
+  metadata?: AuthoredMetadata;
   devices: GeneratorDeviceNode[];
   groupStateById: Record<string, GroupStateEntry>;
 }

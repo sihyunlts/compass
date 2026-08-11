@@ -23,7 +23,11 @@
   import { FloatingLayerPresence } from './floating-layer-presence.svelte';
   import { dismissAllFloatingLayers } from './floating-layer-stack';
 
-  const FOCUSABLE_SELECTOR = 'input:not([disabled]), button:not([disabled])';
+  const FOCUSABLE_SELECTOR = [
+    'input:not([disabled])',
+    'textarea:not([disabled])',
+    'button:not([disabled])',
+  ].join(', ');
   const MODAL_DIALOG_ENTER_SCALE = 1.06;
   const MODAL_DIALOG_EXIT_SCALE = 1.10;
   const MODAL_DIALOG_ENTER_SPRING_OPTIONS = {
@@ -62,6 +66,7 @@
   type ModalDialogText = {
     title: string;
     description: string | null;
+    footerNote: string | null;
     confirmLabel: string;
     secondaryLabel: string | null;
     cancelLabel: string;
@@ -71,10 +76,12 @@
     open = false,
     title,
     description = null,
+    footerNote = null,
     confirmLabel = 'OK',
     secondaryLabel = null,
     cancelLabel = 'Cancel',
     busy = false,
+    wide = false,
     onConfirm = () => {},
     onSecondary = () => {},
     onCancel = () => {},
@@ -83,10 +90,12 @@
     open?: boolean;
     title: string;
     description?: string | null;
+    footerNote?: string | null;
     confirmLabel?: string;
     secondaryLabel?: string | null;
     cancelLabel?: string;
     busy?: boolean;
+    wide?: boolean;
     onConfirm?: () => void | Promise<void>;
     onSecondary?: () => void | Promise<void>;
     onCancel?: () => void | Promise<void>;
@@ -96,6 +105,7 @@
   let displayedText = $state<ModalDialogText>({
     title: '',
     description: null,
+    footerNote: null,
     confirmLabel: 'OK',
     secondaryLabel: null,
     cancelLabel: 'Cancel',
@@ -118,6 +128,7 @@
     displayedText = {
       title,
       description,
+      footerNote,
       confirmLabel,
       secondaryLabel,
       cancelLabel,
@@ -334,6 +345,7 @@
     <div
       bind:this={dialogEl}
       class="modal-dialog"
+      class:is-wide={wide}
       role="dialog"
       aria-hidden={!open}
       aria-modal="true"
@@ -357,6 +369,9 @@
       {/if}
 
       <footer class="modal-dialog-actions">
+        {#if displayedText.footerNote}
+          <span class="modal-dialog-footer-note">{displayedText.footerNote}</span>
+        {/if}
         <Button
           class="modal-dialog-action-button"
           disabled={busy}
@@ -403,7 +418,12 @@
     border: 1px solid var(--color-border-floating);
     box-shadow: var(--shadow-floating);
 
+    &.is-wide {
+      width: min(28rem, calc(100vw - 2rem));
+    }
+
     :global(input[type='text']),
+    :global(textarea),
     :global(.button.modal-dialog-action-button) {
       background: var(--color-surface-floating-interactive);
     }
@@ -425,8 +445,15 @@
 
     &-actions {
       display: flex;
+      align-items: center;
       justify-content: flex-end;
       gap: var(--gap-8);
+    }
+
+    &-footer-note {
+      margin-right: auto;
+      color: var(--color-text-secondary);
+      font-size: var(--text-12);
     }
   }
 </style>

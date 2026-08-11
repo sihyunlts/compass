@@ -3,19 +3,51 @@ import type {
   DeletePresetEntriesRequest,
   MovePresetEntriesRequest,
   ReadPresetEntryRequest,
-  RenameRackFileRequest,
   RenamePresetFileRequest,
   RenamePresetFolderRequest,
   SaveRackFileRequest,
   SavePresetFileRequest,
   ShowPresetEntryInFolderRequest,
+  UpdatePresetFileInfoRequest,
+  UpdateRackFileInfoRequest,
 } from '../../../shared/contracts/ipc/presets';
 import {
   isPresetFileKind,
   parsePresetFile,
   type PresetFileKind,
 } from '../../../shared/presets';
+import {
+  normalizeAuthoredMetadata,
+  type AuthoredMetadata,
+} from '../../../shared/model';
 import { isValidPresetPathSegment } from './preset-paths';
+
+const parseOptionalAuthoredMetadata = (
+  value: unknown,
+): { valid: boolean; metadata?: AuthoredMetadata } => {
+  if (value === undefined) {
+    return { valid: true };
+  }
+  if (
+    typeof value !== 'object'
+    || value === null
+    || (
+      (value as { author?: unknown }).author !== undefined
+      && typeof (value as { author?: unknown }).author !== 'string'
+    )
+    || (
+      (value as { description?: unknown }).description !== undefined
+      && typeof (value as { description?: unknown }).description !== 'string'
+    )
+  ) {
+    return { valid: false };
+  }
+
+  const metadata = normalizeAuthoredMetadata(value);
+  return metadata
+    ? { valid: true, metadata }
+    : { valid: true };
+};
 
 export const parseSavePresetFileRequest = (
   value: unknown,
@@ -61,9 +93,9 @@ export const parseSaveRackFileRequest = (
   };
 };
 
-export const parseRenameRackFileRequest = (
+export const parseUpdateRackFileInfoRequest = (
   value: unknown,
-): RenameRackFileRequest | null => {
+): UpdateRackFileInfoRequest | null => {
   if (
     typeof value !== 'object'
     || value === null
@@ -73,9 +105,17 @@ export const parseRenameRackFileRequest = (
     return null;
   }
 
+  const parsedMetadata = parseOptionalAuthoredMetadata(
+    (value as { metadata?: unknown }).metadata,
+  );
+  if (!parsedMetadata.valid) {
+    return null;
+  }
+
   return {
     filePath: (value as { filePath: string }).filePath,
     fileName: (value as { fileName: string }).fileName,
+    ...(parsedMetadata.metadata ? { metadata: parsedMetadata.metadata } : {}),
   };
 };
 
@@ -252,6 +292,40 @@ export const parseRenamePresetFileRequest = (
     presetType: (value as { presetType: PresetFileKind }).presetType,
     relativePath,
     fileName: (value as { fileName: string }).fileName,
+  };
+};
+
+export const parseUpdatePresetFileInfoRequest = (
+  value: unknown,
+): UpdatePresetFileInfoRequest | null => {
+  if (
+    typeof value !== 'object'
+    || value === null
+    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
+    || typeof (value as { fileName?: unknown }).fileName !== 'string'
+  ) {
+    return null;
+  }
+
+  const relativePath = parseRelativePath(
+    (value as { relativePath?: unknown }).relativePath,
+  );
+  if (!relativePath || relativePath.length === 0) {
+    return null;
+  }
+
+  const parsedMetadata = parseOptionalAuthoredMetadata(
+    (value as { metadata?: unknown }).metadata,
+  );
+  if (!parsedMetadata.valid) {
+    return null;
+  }
+
+  return {
+    presetType: (value as { presetType: PresetFileKind }).presetType,
+    relativePath,
+    fileName: (value as { fileName: string }).fileName,
+    ...(parsedMetadata.metadata ? { metadata: parsedMetadata.metadata } : {}),
   };
 };
 

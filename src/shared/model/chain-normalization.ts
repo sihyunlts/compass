@@ -17,6 +17,7 @@ import type {
 } from './chain';
 import { cloneChainForIpc } from './chain-clone';
 import { normalizeCustomName, normalizeRackName } from './naming';
+import { normalizeAuthoredMetadata } from './authored-metadata';
 
 export const hydrateImportedGeneratorDevice = (
   value: unknown,
@@ -32,7 +33,13 @@ export const hydrateImportedGeneratorDevice = (
     return null;
   }
 
-  return hydrateImportedRendererDeviceNode(kind, value);
+  const device = hydrateImportedRendererDeviceNode(kind, value);
+  if (!device) {
+    return null;
+  }
+
+  const metadata = normalizeAuthoredMetadata(value.metadata);
+  return metadata ? { ...device, metadata } : device;
 };
 
 export const hydrateImportedGeneratorDevices = (
@@ -76,9 +83,11 @@ const hydrateImportedGroupStateById = (
     }
 
     const state = isRecord(rawState) ? rawState : {};
+    const metadata = normalizeAuthoredMetadata(state.metadata);
     next[groupId] = {
       enabled: toBoolean(state.enabled, true),
       name: normalizeCustomName(state.name),
+      ...(metadata ? { metadata } : {}),
     };
   }
 
@@ -121,9 +130,11 @@ export const reconcileChainGroupStateById = (
     const prevEntry: Record<string, unknown> = isRecord(prev[groupId])
       ? prev[groupId]
       : {};
+    const metadata = normalizeAuthoredMetadata(prevEntry.metadata);
     next[groupId] = {
       enabled: toBoolean(prevEntry.enabled, true),
       name: normalizeCustomName(prevEntry.name),
+      ...(metadata ? { metadata } : {}),
     };
   }
 
@@ -197,6 +208,9 @@ export const sanitizeGeneratorChain = (
 ): GeneratorChain => {
   const sanitized = cloneChainForIpc(chain);
   sanitized.name = normalizeRackName((chain as { name?: unknown }).name);
+  sanitized.metadata = normalizeAuthoredMetadata(
+    (chain as { metadata?: unknown }).metadata,
+  );
   reconcileColorDeviceParams(sanitized);
   reconcilePathDeviceParams(sanitized);
   reconcileStoredNames(sanitized);
@@ -220,6 +234,7 @@ export const hydrateImportedGeneratorChain = (
 
   return sanitizeGeneratorChain({
     name: normalizeRackName(value.name),
+    metadata: normalizeAuthoredMetadata(value.metadata),
     devices,
     groupStateById: hydrateImportedGroupStateById(value.groupStateById),
   });

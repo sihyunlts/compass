@@ -100,6 +100,7 @@ const buildPreparedPresetInsert = (
       kind: 'group',
       enabled: preset.group.enabled,
       name: preset.group.name,
+      metadata: preset.group.metadata,
     })
     : createRackClipboard([preset.device], { kind: 'devices' });
   if (!clipboard) {
@@ -152,6 +153,9 @@ const buildChainWithPreparedPresetInsert = (
     nextGroupStateById[prepared.groupStatePatch.groupId] = {
       enabled: prepared.groupStatePatch.enabled,
       name: prepared.groupStatePatch.name,
+      ...(prepared.groupStatePatch.metadata
+        ? { metadata: prepared.groupStatePatch.metadata }
+        : {}),
     };
   }
 
@@ -246,6 +250,9 @@ export const buildGroupPresetFile = (
     group: {
       enabled: chain.groupStateById[groupId]?.enabled !== false,
       name: chain.groupStateById[groupId]?.name ?? null,
+      ...(chain.groupStateById[groupId]?.metadata
+        ? { metadata: chain.groupStateById[groupId].metadata }
+        : {}),
       devices: devices.map((device) => cloneDeviceNode(device)),
     },
     ...(sanitizedCollapsedDeviceIds.length > 0

@@ -178,6 +178,69 @@ export class PresetStorage {
     return targetPath;
   }
 
+  public async updatePresetFile(
+    presetType: PresetFileKind,
+    filePath: string,
+    fileName: string,
+    extension: string,
+    updatePayload: (payload: PresetFile) => PresetFile,
+  ): Promise<string> {
+    const nextFileName = ensurePresetExtension(
+      sanitizeFileStem(fileName, path.parse(filePath).name),
+      extension,
+    );
+    const targetPath = path.join(path.dirname(filePath), nextFileName);
+    const shouldRename = path.resolve(filePath) !== path.resolve(targetPath);
+
+    await this.enqueuePresetEntryMutation(async () => {
+      const loaded = await this.readPresetFileByType(presetType, filePath);
+      if (loaded.status === 'error') {
+        throw new Error(loaded.message);
+      }
+      const payload = updatePayload(loaded.payload);
+
+      if (shouldRename) {
+        await this.moveExistingPresetEntry(
+          {
+            entryKind: 'file',
+            sourcePath: filePath,
+            filePath: targetPath,
+          },
+          'File does not exist.',
+        );
+      }
+
+      try {
+        await writeFile(
+          targetPath,
+          `${JSON.stringify(serializePresetFile(payload), null, 2)}\n`,
+          'utf8',
+        );
+      } catch (error) {
+        if (shouldRename) {
+          try {
+            await this.moveExistingPresetEntry(
+              {
+                entryKind: 'file',
+                sourcePath: targetPath,
+                filePath,
+              },
+              'Renamed file does not exist.',
+            );
+          } catch {
+            throw new Error(
+              'Preset update failed and the renamed file could not be restored.',
+              { cause: error },
+            );
+          }
+        }
+        throw error;
+      }
+    });
+
+    return targetPath;
+  }
+
   public async createPresetFolder(
     presetType: PresetFileKind,
     parentRelativePath: readonly string[],

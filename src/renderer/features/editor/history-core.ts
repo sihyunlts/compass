@@ -15,6 +15,9 @@ export type ChainHistoryKind =
   | 'group-toggle-enabled'
   | 'rename-device'
   | 'rename-group'
+  | 'edit-device-info'
+  | 'edit-group-info'
+  | 'edit-rack-info'
   | 'clipboard-cut'
   | 'clipboard-paste'
   | 'duplicate'
@@ -229,6 +232,29 @@ export class ChainHistory {
     current.chain = snapshot.chain;
     current.signature = snapshot.signature;
     current.timestampMs = Date.now();
+  }
+
+  public mapChains(transform: (chain: GeneratorChain) => GeneratorChain): void {
+    this.flushPendingMerge();
+    const previousEntries = [...this.entries];
+    const previousCursor = this.cursor;
+    this.entries.splice(0);
+    this.cursor = 0;
+
+    for (const [index, entry] of previousEntries.entries()) {
+      const snapshot = toSnapshot(transform(entry.chain));
+      const previousEntry = this.entries.at(-1);
+      if (previousEntry?.signature !== snapshot.signature) {
+        this.entries.push({
+          ...entry,
+          chain: snapshot.chain,
+          signature: snapshot.signature,
+        });
+      }
+      if (index <= previousCursor) {
+        this.cursor = this.entries.length - 1;
+      }
+    }
   }
 
   public undo(): GeneratorChain | null {

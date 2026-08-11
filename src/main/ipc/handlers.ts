@@ -202,15 +202,21 @@ export const registerIpcHandlers = (
   );
 
   ipcMain.handle(
-    IPC_CHANNELS.renameRackFile,
+    IPC_CHANNELS.updateRackFileInfo,
     (_event, request) =>
-      presetService.renameRackFile(request),
+      presetService.updateRackFileInfo(request),
   );
 
   ipcMain.handle(
     IPC_CHANNELS.renamePresetFile,
     (_event, request) =>
       presetService.renamePresetFile(request),
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.updatePresetFileInfo,
+    (_event, request) =>
+      presetService.updatePresetFileInfo(request),
   );
 
   ipcMain.handle(

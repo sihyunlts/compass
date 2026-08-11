@@ -5,6 +5,7 @@ import type {
   PathAnchor,
   TimeWarpCurve,
 } from './chain';
+import { cloneAuthoredMetadata } from './authored-metadata';
 
 export const clonePathAnchors = (anchors: readonly PathAnchor[]): PathAnchor[] =>
   anchors.map((anchor) => ({
@@ -43,10 +44,9 @@ const assertUnsupportedDeviceKind = (device: never): never => {
   throw new Error(`Unsupported device kind: ${String(kind ?? 'unknown')}`);
 };
 
-export function cloneDeviceNode<TDevice extends GeneratorDeviceNode>(device: TDevice): TDevice;
-export function cloneDeviceNode(
+const cloneDeviceNodePayload = (
   device: GeneratorDeviceNode,
-): GeneratorDeviceNode {
+): GeneratorDeviceNode => {
   if (device.kind === 'ripple') {
     return {
       id: device.id,
@@ -262,4 +262,14 @@ export function cloneDeviceNode(
   }
 
   return assertUnsupportedDeviceKind(device);
+};
+
+export function cloneDeviceNode<TDevice extends GeneratorDeviceNode>(device: TDevice): TDevice;
+export function cloneDeviceNode(device: GeneratorDeviceNode): GeneratorDeviceNode;
+export function cloneDeviceNode(
+  device: GeneratorDeviceNode,
+): GeneratorDeviceNode {
+  const cloned = cloneDeviceNodePayload(device);
+  const metadata = cloneAuthoredMetadata(device.metadata);
+  return metadata ? { ...cloned, metadata } : cloned;
 }
