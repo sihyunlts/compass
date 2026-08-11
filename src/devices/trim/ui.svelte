@@ -10,7 +10,12 @@
     device: Extract<GeneratorDeviceNode, { kind: 'trim' }>;
   };
 
-  let { device, currentProgress01, onControlChange }: TrimDeviceEditorProps = $props();
+  let {
+    device,
+    currentProgress01,
+    modulationStateByParameter,
+    onControlChange,
+  }: TrimDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -22,6 +27,7 @@
     mode="trim"
     parameter={TRIM_NUMERIC_PARAMETERS.start}
     {currentProgress01}
+    {modulationStateByParameter}
     {onControlChange}
   />
 </div>

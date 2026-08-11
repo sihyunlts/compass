@@ -3,11 +3,19 @@
 <script lang="ts">
   import type { RendererControlChange } from '../../../devices/control-types';
   import {
+    createModulationParameterKey,
+    type ModulationStateByParameter,
+  } from '../../../shared/contracts/preview/modulation';
+  import {
     formatNumericParameterDisplayValue,
     formatNumericParameterValue,
     type NumericParameterRule,
   } from '../../../devices/numeric-parameters';
   import FieldShell from '../fields/FieldShell.svelte';
+  import ModulatableControl from '../fields/ModulatableControl.svelte';
+  import ModulationIndicator from '../fields/ModulationIndicator.svelte';
+  import { resolveModulationDisplayDomain } from '../fields/modulation-display-domain';
+  import { resolveDisplayedModulationStates } from '../../features/preview/modulation-display-selection.svelte';
 
   let {
     label,
@@ -19,6 +27,7 @@
     min,
     max,
     step,
+    modulationStateByParameter = {},
     onControlChange,
   } = $props<{
     label: string;
@@ -30,6 +39,7 @@
     min?: number;
     max?: number;
     step?: number;
+    modulationStateByParameter?: ModulationStateByParameter;
     onControlChange: (change: RendererControlChange) => void;
   }>();
 
@@ -40,6 +50,19 @@
   const dialMin = $derived(resolvedMin ?? 0);
   const dialMax = $derived(resolvedMax ?? 360);
   const valueSpan = $derived(Math.max(dialMax - dialMin, 0));
+  const modulationDomain = $derived(resolveModulationDisplayDomain({
+    min: dialMin,
+    max: dialMax,
+    step: resolvedStep,
+    circular: true,
+  }));
+  const modulationParameterKey = $derived(createModulationParameterKey(dataId, dataParam));
+  const modulationStates = $derived(
+    modulationStateByParameter[modulationParameterKey] ?? [],
+  );
+  const displayedModulationStates = $derived(
+    resolveDisplayedModulationStates(modulationParameterKey, modulationStates),
+  );
 
   const numberLabel = $derived(`${label} input`);
   const dialLabel = $derived(`${label} dial`);
@@ -94,54 +117,71 @@
 </script>
 
 <FieldShell {label} class="angle-picker">
-  <div class="angle-picker-controls" data-numeric-input-scope>
-    <div
-      class="angle-picker-dial"
-      role="slider"
-      tabindex="0"
-      data-numeric-input-proxy
-      data-control-action={dataAction}
-      data-device-id={dataId}
-      data-param={dataParam}
-      aria-label={dialLabel}
-      aria-valuemin={resolvedMin}
-      aria-valuemax={resolvedMax}
-      aria-valuenow={value}
-      aria-valuetext={accessibleValueText}
-      style={`--angle-deg:${dialDeg.toFixed(3)}deg;`}
-    >
-      <div class="angle-picker-dial-ring"></div>
-      <div class="angle-picker-dial-knob"></div>
-    </div>
-    <input
-      class="angle-picker-number-input"
-      class:has-display-unit={resolvedUnit !== undefined}
-      type="number"
-      min={resolvedMin}
-      max={resolvedMax}
-      step={resolvedStep}
-      value={value}
-      data-control-action={dataAction}
-      data-device-id={dataId}
-      data-param={dataParam}
-      data-drag-mode={parameter?.input.dragMode}
-      aria-label={numberLabel}
-      oninput={(event: Event) => emitControlChange(event, false)}
-      onchange={(event: Event) => emitControlChange(event, true)}
-    />
-    {#if resolvedUnit}
-      <span
-        class="numeric-value-display angle-picker-display-value"
-        aria-hidden="true"
+  <ModulatableControl
+    class="angle-picker-control"
+    states={modulationStates}
+    parameterKey={modulationParameterKey}
+    modulationContextDeviceId={dataId}
+    modulationContextParamKey={dataParam}
+    domain={modulationDomain}
+    amountPanelGapPx={6}
+    {onControlChange}
+  >
+    <div class="angle-picker-controls" data-numeric-input-scope>
+      <div
+        class="angle-picker-dial"
+        data-modulation-floating-anchor
+        role="slider"
+        tabindex="0"
+        data-numeric-input-proxy
+        data-control-action={dataAction}
+        data-device-id={dataId}
+        data-param={dataParam}
+        aria-label={dialLabel}
+        aria-valuemin={resolvedMin}
+        aria-valuemax={resolvedMax}
+        aria-valuenow={value}
+        aria-valuetext={accessibleValueText}
+        style={`--angle-deg:${dialDeg.toFixed(3)}deg;`}
       >
-        {accessibleValueText}
-      </span>
-    {/if}
-  </div>
+        <div class="angle-picker-dial-knob"></div>
+        <ModulationIndicator
+          states={displayedModulationStates}
+          domain={modulationDomain}
+        />
+      </div>
+      <input
+        class="angle-picker-number-input"
+        class:has-display-unit={resolvedUnit !== undefined}
+        type="number"
+        min={resolvedMin}
+        max={resolvedMax}
+        step={resolvedStep}
+        value={value}
+        data-control-action={dataAction}
+        data-device-id={dataId}
+        data-param={dataParam}
+        data-drag-mode={parameter?.input.dragMode}
+        aria-label={numberLabel}
+        oninput={(event: Event) => emitControlChange(event, false)}
+        onchange={(event: Event) => emitControlChange(event, true)}
+      />
+      {#if resolvedUnit}
+        <span
+          class="numeric-value-display angle-picker-display-value"
+          aria-hidden="true"
+        >
+          {accessibleValueText}
+        </span>
+      {/if}
+    </div>
+  </ModulatableControl>
 </FieldShell>
 
 <style lang="scss">
   .angle-picker-controls {
+    --angle-picker-dial-size: calc(var(--gap-32) + var(--gap-8));
+
     position: relative;
     display: flex;
     align-items: center;
@@ -149,10 +189,14 @@
     min-width: 0;
   }
 
+  :global(.angle-picker-control) {
+    width: fit-content;
+  }
+
   .angle-picker-dial {
     position: relative;
-    width: 2.5rem;
-    height: 2.5rem;
+    width: var(--angle-picker-dial-size);
+    height: var(--angle-picker-dial-size);
     border-radius: var(--radius-round);
     display: grid;
     place-items: center;
@@ -161,24 +205,18 @@
     touch-action: none;
     background-color: var(--color-surface-interactive);
 
-    &-ring {
-      position: absolute;
-      inset: 0;
-      border-radius: var(--radius-round);
-    }
-
     &-knob {
       position: absolute;
-      width: 0.5rem;
-      height: 0.5rem;
+      width: var(--gap-8);
+      height: var(--gap-8);
       border-radius: var(--radius-round);
       background: var(--device-control-accent, var(--color-surface-inverse));
-      transform: rotate(var(--angle-deg)) translateY(-0.75rem);
+      transform: rotate(var(--angle-deg)) translateY(calc(-1 * var(--gap-12)));
     }
 
     &:focus-visible {
-      outline: 2px solid var(--device-control-accent, var(--color-surface-inverse));
-      outline-offset: 2px;
+      outline: var(--gap-2) solid var(--device-control-accent, var(--color-surface-inverse));
+      outline-offset: var(--gap-2);
     }
   }
 

@@ -12,7 +12,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'rain' }>;
   };
 
-  let { device, onControlChange }: RainDeviceEditorProps = $props();
+  let { device, modulationStateByParameter, onControlChange }: RainDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -23,6 +23,7 @@
     dataId={device.id}
     dataParam="angleDeg"
     parameter={RAIN_NUMERIC_PARAMETERS.angleDeg}
+    {modulationStateByParameter}
     {onControlChange}
   />
   <div class="column-wrapper">
@@ -33,6 +34,7 @@
       dataAction="set-rain-param"
       dataId={device.id}
       dataParam="seed"
+      {modulationStateByParameter}
       {onControlChange}
     />
     <NumberField
@@ -42,6 +44,7 @@
       dataAction="set-rain-param"
       dataId={device.id}
       dataParam="density"
+      {modulationStateByParameter}
       {onControlChange}
     />
     <NumberField
@@ -51,6 +54,7 @@
       dataAction="set-rain-param"
       dataId={device.id}
       dataParam="speed"
+      {modulationStateByParameter}
       {onControlChange}
     />
   </div>

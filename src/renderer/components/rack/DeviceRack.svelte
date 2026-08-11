@@ -10,6 +10,7 @@
     type GeneratorChain,
   } from '../../../shared/model';
   import type { ContextMenuTarget } from '../../features/context-menu/types';
+  import type { ModulationStateByParameter } from '../../../shared/contracts/preview/modulation';
   import type {
     BrowserNonRackPresetInsertSource,
     BrowserPresetInsertSource,
@@ -49,6 +50,7 @@
     currentBeatBeats = 0,
     currentProgress01 = 0,
     modulationReadoutById = {},
+    modulationStateByParameter = {},
     resolvePaletteRgb,
     isSidebarResizing = false,
     interactiveElementSelector,
@@ -78,6 +80,7 @@
     currentBeatBeats?: number;
     currentProgress01?: number;
     modulationReadoutById?: Record<string, string>;
+    modulationStateByParameter?: ModulationStateByParameter;
     resolvePaletteRgb: (velocity: number) => string;
     isSidebarResizing: boolean;
     interactiveElementSelector: string;
@@ -373,6 +376,7 @@
             {currentBeatBeats}
             {currentProgress01}
             {modulationReadoutById}
+            {modulationStateByParameter}
             {resolvePaletteRgb}
             isCollapsed={collapsedSet.has(item.device.id)}
             isDisabledByGroup={false}
@@ -455,6 +459,7 @@
                     {currentBeatBeats}
                     {currentProgress01}
                     {modulationReadoutById}
+                    {modulationStateByParameter}
                     {resolvePaletteRgb}
                     isCollapsed={collapsedSet.has(col.device.id)}
                     isDisabledByGroup={!item.enabled}

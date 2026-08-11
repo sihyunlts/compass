@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import type { RendererControlChange } from '../../../devices/control-types';
+  import type { ModulationStateByParameter } from '../../../shared/contracts/preview/modulation';
   import type { NumericParameterRule } from '../../../devices/numeric-parameters';
   import { clamp } from '../../../shared/math';
   import FieldShell from '../fields/FieldShell.svelte';
@@ -20,6 +21,7 @@
     parameter,
     modeBadgeText = null,
     currentProgress01,
+    modulationStateByParameter = {},
     onControlChange,
   } = $props<{
     deviceId: string;
@@ -30,6 +32,7 @@
     parameter?: NumericParameterRule;
     modeBadgeText?: string | null;
     currentProgress01?: number;
+    modulationStateByParameter?: ModulationStateByParameter;
     onControlChange: (change: RendererControlChange) => void;
   }>();
 
@@ -174,6 +177,7 @@
       dataAction={dataAction}
       dataId={deviceId}
       dataParam="start"
+      {modulationStateByParameter}
       {onControlChange}
     />
     <NumberField
@@ -183,6 +187,7 @@
       dataAction={dataAction}
       dataId={deviceId}
       dataParam="end"
+      {modulationStateByParameter}
       {onControlChange}
     />
     <FieldShell label={i18n.t('control.length')}>

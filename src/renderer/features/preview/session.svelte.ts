@@ -1,5 +1,6 @@
 import { clamp } from '../../../shared/math';
 import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
+import type { ModulationStateByParameter } from '../../../shared/contracts/preview/modulation';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
 import type { PreviewWindowState } from '../../../shared/contracts/preview/window-state';
 import { createModulationReadoutCache } from './modulation-cache';
@@ -16,7 +17,6 @@ import {
 
 interface AppliedPreviewSource {
   previewKey: string;
-  sourceKey: string;
   sourceChain: GeneratorChain;
   previewRevision: number;
 }
@@ -48,6 +48,7 @@ interface PreviewSessionState {
   previewWindowState: PreviewWindowState | null;
   surfaceModel: PreviewSurfaceViewModel;
   modulationReadoutById: Record<string, string>;
+  modulationStateByParameter: ModulationStateByParameter;
   previewRevision: number;
   sourceTimelineEndBeat: number;
   noteCount: number;
@@ -59,6 +60,7 @@ export class PreviewSession {
     previewWindowState: null,
     surfaceModel: createEmptyPreviewSurfaceViewModel(),
     modulationReadoutById: {},
+    modulationStateByParameter: {},
     previewRevision: 0,
     sourceTimelineEndBeat: 1,
     noteCount: 0,
@@ -96,7 +98,6 @@ export class PreviewSession {
 
     this.currentPreviewSource = {
       previewKey: previewResult.key,
-      sourceKey: input.sourceKey,
       sourceChain: input.sourceChain,
       previewRevision,
     };
@@ -104,7 +105,7 @@ export class PreviewSession {
   }
 
   private renderFrame(input: PreviewFrameInput): PreviewWindowState {
-    const { previewResult, previewRevision, sourceChain, sourceKey } =
+    const { previewResult, previewRevision, sourceChain } =
       this.resolveRenderSource(input);
     const sourceTimelineEndBeat = previewResult?.sourceTimelineEndBeat ?? 1;
     const beat = clamp(input.currentBeat, 0, sourceTimelineEndBeat);
@@ -132,13 +133,15 @@ export class PreviewSession {
     this.syncPreviewSurface(
       previewWindowState,
     );
-    this.state.modulationReadoutById = this.modulationReadoutCache.resolveReadoutById(
-      sourceKey,
-      sourceChain,
+    const modulationCacheResult = this.modulationReadoutCache.resolveReadoutById(
+      input.fallbackKey,
+      input.fallbackChain,
       beat,
       input.loopLengthBeats,
       input.isLoopEnabled,
     );
+    this.state.modulationReadoutById = modulationCacheResult.readoutById;
+    this.state.modulationStateByParameter = modulationCacheResult.stateByParameter;
     this.state.previewRevision = previewRevision;
     this.state.sourceTimelineEndBeat = sourceTimelineEndBeat;
     this.state.noteCount = previewWindowState.noteCount;
@@ -149,6 +152,7 @@ export class PreviewSession {
   private applyWindowState(previewState: PreviewWindowState | null): void {
     this.currentPreviewSource = null;
     this.state.modulationReadoutById = {};
+    this.state.modulationStateByParameter = {};
 
     if (!previewState) {
       this.resetAppliedPreview();
@@ -169,6 +173,7 @@ export class PreviewSession {
     this.state.previewWindowState = null;
     this.state.surfaceModel = createEmptyPreviewSurfaceViewModel();
     this.state.modulationReadoutById = {};
+    this.state.modulationStateByParameter = {};
     this.state.previewRevision = 0;
     this.state.sourceTimelineEndBeat = 1;
     this.state.noteCount = 0;
@@ -194,7 +199,6 @@ export class PreviewSession {
     previewResult: PreviewResultCacheEntry | null;
     previewRevision: number;
     sourceChain: GeneratorChain;
-    sourceKey: string;
   } {
     const previewSource = this.currentPreviewSource;
     return {
@@ -203,7 +207,6 @@ export class PreviewSession {
         : null,
       previewRevision: previewSource?.previewRevision ?? 0,
       sourceChain: previewSource?.sourceChain ?? input.fallbackChain,
-      sourceKey: previewSource?.sourceKey ?? input.fallbackKey,
     };
   }
 

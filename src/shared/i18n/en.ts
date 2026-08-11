@@ -178,6 +178,8 @@ export const en = {
   'menu.zoomIn': 'Zoom In',
   'menu.zoomOut': 'Zoom Out',
   'modulation.current': 'Current {target}',
+  'modulation.connected': 'Modulation connected',
+  'modulation.amountFor': '{modulator}: {amount}',
   'modulation.noValidTarget': 'No valid target',
   'modulation.targetCount': '{count} targets',
   'option.bottomLeft': 'Bottom Left',

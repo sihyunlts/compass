@@ -12,7 +12,7 @@
     device: Extract<GeneratorDeviceNode, { kind: 'spiral' }>;
   };
 
-  let { device, onControlChange }: SpiralDeviceEditorProps = $props();
+  let { device, modulationStateByParameter, onControlChange }: SpiralDeviceEditorProps = $props();
 </script>
 
 <div class="device-controls">
@@ -21,6 +21,7 @@
     centerX={device.params.centerX}
     centerY={device.params.centerY}
     parameter={SPIRAL_NUMERIC_PARAMETERS.centerX}
+    {modulationStateByParameter}
     {onControlChange}
   />
   <NumberField
@@ -30,6 +31,7 @@
     dataAction="set-spiral-param"
     dataId={device.id}
     dataParam="turns"
+    {modulationStateByParameter}
     {onControlChange}
   />
 </div>

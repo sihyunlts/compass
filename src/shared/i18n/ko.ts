@@ -180,6 +180,8 @@ export const ko = {
   'menu.zoomIn': '확대',
   'menu.zoomOut': '축소',
   'modulation.current': '현재 {target}',
+  'modulation.connected': '모듈레이션 연결됨',
+  'modulation.amountFor': '{modulator}: {amount}',
   'modulation.noValidTarget': '유효한 대상 없음',
   'modulation.targetCount': '대상 {count}개',
   'option.bottomLeft': '왼쪽 아래',
