@@ -1,5 +1,5 @@
 import { clamp } from '../../../shared/math';
-import { SPRING_PRECISION } from '../../motion';
+import { SPRING_PRECISION, shouldReduceMotion } from '../../motion';
 import { isTopmostFloatingLayer } from './floating-layer-stack';
 
 export type FloatingLayerSize = {
@@ -37,6 +37,7 @@ type FloatingLayerDismissHandlers = {
 export type FloatingLayerEnterTarget = {
   element: HTMLElement;
   blurPx?: number | null;
+  translateX?: number;
   translateY?: number;
   durationMs?: number;
   easing?: string;
@@ -68,15 +69,11 @@ export const resolveFloatingLayerEnterOffsetY = (
   ? FLOATING_LAYER_ENTER_DISTANCE_PX
   : -FLOATING_LAYER_ENTER_DISTANCE_PX;
 
-const shouldReduceFloatingLayerMotion = (): boolean =>
-  document.documentElement.classList.contains('reduce-animation')
-  || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
 export const animateFloatingLayerEnter = (
   targets: readonly FloatingLayerEnterTarget[],
   onFinish: () => void = () => {},
 ): (() => void) => {
-  if (targets.length === 0 || shouldReduceFloatingLayerMotion()) {
+  if (targets.length === 0 || shouldReduceMotion()) {
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {
@@ -97,8 +94,8 @@ export const animateFloatingLayerEnter = (
       fromKeyframe.filter = `blur(${target.blurPx ?? 4}px)`;
       toKeyframe.filter = 'blur(0)';
     }
-    if (target.translateY !== undefined) {
-      fromKeyframe.translate = `0 ${target.translateY}px`;
+    if (target.translateX !== undefined || target.translateY !== undefined) {
+      fromKeyframe.translate = `${target.translateX ?? 0}px ${target.translateY ?? 0}px`;
       toKeyframe.translate = 'none';
     }
 
@@ -164,7 +161,7 @@ export const animateFloatingLayerExit = (
     element.style.pointerEvents = 'none';
   }
 
-  if (targets.length === 0 || shouldReduceFloatingLayerMotion()) {
+  if (targets.length === 0 || shouldReduceMotion()) {
     let cancelled = false;
     queueMicrotask(() => {
       if (!cancelled) {

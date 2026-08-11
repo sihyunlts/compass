@@ -1,6 +1,6 @@
 import { Spring } from 'svelte/motion';
 
-import { SPRING_PRECISION } from '../../motion';
+import { SPRING_PRECISION, shouldReduceMotion } from '../../motion';
 
 const BUTTON_PRESSED_SCALE = 0.95;
 const BUTTON_PRESS_SPRING_OPTIONS = {
@@ -8,10 +8,6 @@ const BUTTON_PRESS_SPRING_OPTIONS = {
   damping: 0.8,
   precision: SPRING_PRECISION,
 } as const;
-
-const shouldReduceMotion = (): boolean =>
-  document.documentElement.classList.contains('reduce-animation')
-  || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export const buttonPress = (node: HTMLElement): { destroy: () => void } => {
   const scale = new Spring(1, BUTTON_PRESS_SPRING_OPTIONS);
