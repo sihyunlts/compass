@@ -775,6 +775,7 @@
     onShowInFolder={(target) => presetController.handleShowPresetEntryInFolder(target)}
     onGroup={editorSession.commands.groupDeviceIds}
     onUngroupGroup={editorSession.commands.ungroupGroup}
+    onDisconnectModulation={editorSession.commands.disconnectModulation}
     clipboardAvailable={clipboardAvailable}
   />
 
