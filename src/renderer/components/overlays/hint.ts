@@ -1,6 +1,8 @@
 import {
   animateFloatingLayerEnter,
   animateFloatingLayerExit,
+  FLOATING_LAYER_ENTER_DISTANCE_PX,
+  resolveAdjacentFloatingLayerPosition,
   resolveFloatingLayerEnterOffsetY,
 } from './floating-layer';
 import {
@@ -14,13 +16,23 @@ import {
 let hintIdCounter = 0;
 
 type HintValue = string | null | undefined;
-type HintPlacement = 'auto' | 'above' | 'below';
-type HintInput = HintValue | {
+type HintPlacement = 'auto' | 'above' | 'below' | 'adjacent';
+type HintContentCleanup = () => void;
+type HintContentRenderer = (
+  container: HTMLDivElement,
+) => void | HintContentCleanup;
+type HintEnterOffset = {
+  translateX?: number;
+  translateY?: number;
+};
+export type HintInput = HintValue | {
   text: HintValue;
   placement?: HintPlacement;
   delayMs?: number;
   gapPx?: number;
   dismissOnPointerDown?: boolean;
+  className?: string;
+  renderContent?: HintContentRenderer;
 };
 
 type HintAction = {
@@ -34,7 +46,7 @@ interface VisibleHintOwner {
 
 const DEFAULT_HINT_DELAY_MS = 360;
 const VIEWPORT_PADDING_PX = 8;
-const HINT_GAP_PX = 6;
+const HINT_GAP_PX = 4;
 const FLOATING_LAYER_VIEWPORT_TOP_PROPERTY = '--floating-layer-viewport-top';
 const windowBlurCallbacks = new Set<() => void>();
 let visibleHintOwner: VisibleHintOwner | null = null;
@@ -74,6 +86,8 @@ const normalizeHint = (value: HintInput): {
   delayMs: number;
   gapPx: number;
   dismissOnPointerDown: boolean;
+  className: string;
+  renderContent: HintContentRenderer | null;
 } => {
   const options = typeof value === 'object' && value !== null ? value : null;
   const textValue = options?.text ?? value;
@@ -83,6 +97,12 @@ const normalizeHint = (value: HintInput): {
     delayMs: normalizeNonNegativeOption(options?.delayMs, DEFAULT_HINT_DELAY_MS),
     gapPx: normalizeNonNegativeOption(options?.gapPx, HINT_GAP_PX),
     dismissOnPointerDown: options?.dismissOnPointerDown ?? true,
+    className: typeof options?.className === 'string'
+      ? options.className.trim()
+      : '',
+    renderContent: typeof options?.renderContent === 'function'
+      ? options.renderContent
+      : null,
   };
 };
 
@@ -105,11 +125,14 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
     delayMs: hintDelayMs,
     gapPx: hintGapPx,
     dismissOnPointerDown,
+    className: hintClassName,
+    renderContent: renderHintContent,
   } = normalizeHint(value);
   let hintEl: HTMLDivElement | null = null;
   let exitingHintEl: HTMLDivElement | null = null;
   let cancelEnterAnimation: (() => void) | null = null;
   let cancelExitAnimation: (() => void) | null = null;
+  let cleanupHintContent: HintContentCleanup | null = null;
   let showTimer: number | null = null;
   let previousDescribedBy: string | null = null;
   const hintId = `app-hint-${++hintIdCounter}`;
@@ -128,13 +151,32 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
     showTimer = null;
   };
 
-  const positionHint = (): number | null => {
+  const clearHintContent = (): void => {
+    cleanupHintContent?.();
+    cleanupHintContent = null;
+  };
+
+  const positionHint = (): HintEnterOffset | null => {
     if (!hintEl) {
       return null;
     }
 
     const anchorRect = node.getBoundingClientRect();
     const hintRect = hintEl.getBoundingClientRect();
+    if (hintPlacement === 'adjacent') {
+      const position = resolveAdjacentFloatingLayerPosition(
+        anchorRect,
+        hintRect,
+        { gapPx: hintGapPx },
+      );
+      hintEl.style.transform = `translate3d(${Math.round(position.x)}px, ${Math.round(position.y)}px, 0)`;
+      return {
+        translateX: position.x >= anchorRect.right
+          ? -FLOATING_LAYER_ENTER_DISTANCE_PX
+          : FLOATING_LAYER_ENTER_DISTANCE_PX,
+      };
+    }
+
     const viewportTop = resolveViewportTop(node);
     const maxX = Math.max(VIEWPORT_PADDING_PX, window.innerWidth - hintRect.width - VIEWPORT_PADDING_PX);
     const x = clamp(
@@ -161,7 +203,28 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
       );
 
     hintEl.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0)`;
-    return resolveFloatingLayerEnterOffsetY(opensAbove ? 'above' : 'below');
+    return {
+      translateY: resolveFloatingLayerEnterOffsetY(opensAbove ? 'above' : 'below'),
+    };
+  };
+
+  const updateHintContent = (): void => {
+    if (!hintEl) {
+      return;
+    }
+
+    clearHintContent();
+    hintEl.className = ['app-hint', hintClassName]
+      .filter(Boolean)
+      .join(' ');
+    if (renderHintContent) {
+      hintEl.replaceChildren();
+      const cleanup = renderHintContent(hintEl);
+      cleanupHintContent = typeof cleanup === 'function' ? cleanup : null;
+      return;
+    }
+
+    hintEl.textContent = hintText;
   };
 
   const closeHint = (): void => {
@@ -187,6 +250,7 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
     }
 
     if (closingHintEl) {
+      clearHintContent();
       deactivateFloatingLayer(floatingLayerId);
       cancelExitAnimation?.();
       exitingHintEl?.remove();
@@ -214,6 +278,7 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
 
   const closeHintImmediately = (): void => {
     clearShowTimer();
+    clearHintContent();
     closePendingForDescendant = false;
     deactivateFloatingLayer(floatingLayerId);
     const wasOpen = hintEl !== null;
@@ -263,9 +328,9 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
 
       hintEl = document.createElement('div');
       hintEl.id = hintId;
-      hintEl.className = 'app-hint';
       hintEl.dataset.floatingLayerMotion = 'managed';
       hintEl.role = 'tooltip';
+      hintEl.style.visibility = 'hidden';
       document.body.append(hintEl);
       visibleHintOwner = owner;
       activateFloatingLayer({
@@ -291,12 +356,12 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
       document.addEventListener('pointerdown', handleDocumentPointerDown, true);
     }
 
-    hintEl.textContent = hintText;
-    const enterY = positionHint();
+    updateHintContent();
+    const enterOffset = positionHint();
     const enteringHintEl = hintEl;
-    if (shouldAnimateEnter && enterY !== null) {
+    if (shouldAnimateEnter && enterOffset !== null) {
       cancelEnterAnimation = animateFloatingLayerEnter(
-        [{ element: enteringHintEl, translateY: enterY }],
+        [{ element: enteringHintEl, ...enterOffset }],
         () => {
           if (hintEl === enteringHintEl) {
             cancelEnterAnimation = null;
@@ -304,6 +369,7 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
         },
       );
     }
+    enteringHintEl?.style.removeProperty('visibility');
   };
 
   function handleDocumentPointerDown(event: PointerEvent): void {
@@ -362,13 +428,15 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
       hintDelayMs = normalized.delayMs;
       hintGapPx = normalized.gapPx;
       dismissOnPointerDown = normalized.dismissOnPointerDown;
+      hintClassName = normalized.className;
+      renderHintContent = normalized.renderContent;
       if (!hintText) {
         closeHint();
         return;
       }
 
       if (hintEl) {
-        hintEl.textContent = hintText;
+        updateHintContent();
         positionHint();
       }
     },
