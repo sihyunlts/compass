@@ -36,6 +36,11 @@ interface ApplyPreviewResultInput {
   sourceKey: string;
   launchpadModel: LaunchpadModel;
   announce?: boolean;
+  restartPlayback?: boolean;
+}
+
+interface RunPreviewOptions {
+  restartPlayback?: boolean;
 }
 
 interface PlaybackSessionOptions {
@@ -234,9 +239,13 @@ export class PlaybackSessionController {
     this.previewWindowStatePusher.push(nextPreviewWindowState);
   }
 
-  public async runPreview(): Promise<void> {
+  public async runPreview(options: RunPreviewOptions = {}): Promise<void> {
     if (this.previewGenerationPurpose === 'delivery') {
       return;
+    }
+
+    if (options.restartPlayback) {
+      this.resetPlaybackForPreviewReplacement();
     }
 
     try {
@@ -269,6 +278,7 @@ export class PlaybackSessionController {
         sourceChain,
         sourceKey,
         launchpadModel,
+        restartPlayback: options.restartPlayback,
       });
     } catch (error) {
       if (isPreviewGenerationCancelled(error)) {
@@ -293,7 +303,14 @@ export class PlaybackSessionController {
   public applyPreviewResult(input: ApplyPreviewResultInput): void {
     const { editorSession, previewSession } = this.options;
     const shouldAnnounce = input.announce ?? true;
-    const currentBeat = this.playbackScheduler?.getCurrentBeat() ?? this.state.currentBeat;
+    const shouldRestartPlayback = input.source === 'delivery'
+      || input.restartPlayback === true;
+    if (shouldRestartPlayback && this.state.isPlaying) {
+      this.stopPlayback();
+    }
+    const nextBeat = shouldRestartPlayback
+      ? 0
+      : this.playbackScheduler?.getCurrentBeat() ?? this.state.currentBeat;
     const nextLoopLengthBeats =
       input.bridge?.autoCreateLengthBeats
       ?? editorSession.readBridgeSettings().autoCreateLengthBeats;
@@ -314,9 +331,9 @@ export class PlaybackSessionController {
     };
 
     if (this.playbackScheduler) {
-      this.playbackScheduler.setCurrentBeat(currentBeat);
+      this.playbackScheduler.setCurrentBeat(nextBeat);
     } else {
-      this.state.currentBeat = currentBeat;
+      this.state.currentBeat = nextBeat;
       this.renderPreviewFrame();
     }
 
@@ -528,6 +545,18 @@ export class PlaybackSessionController {
       this.previewVisualStartedAtMs = null;
     }
     this.stopPlayback();
+  }
+
+  private resetPlaybackForPreviewReplacement(): void {
+    if (this.playbackScheduler) {
+      this.playbackScheduler.stop();
+      this.playbackScheduler.setCurrentBeat(0, false);
+      this.state.currentBeat = 0;
+      return;
+    }
+
+    this.state.isPlaying = false;
+    this.state.currentBeat = 0;
   }
 
   private resolveCachedGeneratedPreview(input: PreviewGenerationSource): GeneratorPreview | null {
