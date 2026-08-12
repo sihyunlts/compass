@@ -1177,12 +1177,6 @@
     }
     const focusedRowIsVisible =
       focusedRowId !== null && visibleRowIds.includes(focusedRowId);
-    if (
-      browserSelection.state.selectedRowIds.length === 0
-      && !focusedRowIsVisible
-    ) {
-      selectSingleRow(firstVisibleRowId);
-    }
     if (!focusedRowIsVisible) {
       focusedRowId = browserSelection.state.selectedRowIds.find(
         (rowId) => visibleRowIds.includes(rowId),
