@@ -17,8 +17,13 @@
   import { resolveSegmentCurvePoint } from '../../../core/modulation/curve';
   import { clamp } from '../../../shared/math';
   import type { CurveNode } from '../../../shared/model';
+  import { CURVE_DIVISION_OPTIONS } from '../../../core/curve-divisions';
   import ControlSurfaceFrame from './ControlSurfaceFrame.svelte';
+  import DropdownOptionList from '../primitives/DropdownOptionList.svelte';
+  import FloatingDropdown from '../primitives/FloatingDropdown.svelte';
+  import type { DropdownValue } from '../primitives/dropdown-types';
   import FieldShell from '../fields/FieldShell.svelte';
+  import { i18n } from '../../i18n.svelte';
   import {
     hasExceededControlPointDragThreshold,
     toSoftSnappedValue,
@@ -62,6 +67,7 @@
     valueMax = 1,
     guideValue = 0,
     wrapperClass = '',
+    divisionsControlAction,
     onControlChange,
   } = $props<{
     label?: string;
@@ -74,6 +80,7 @@
     valueMax?: number;
     guideValue?: number | null;
     wrapperClass?: string;
+    divisionsControlAction?: string;
     onControlChange: (change: RendererControlChange) => void;
   }>();
 
@@ -89,6 +96,7 @@
   let lastClickedAt = $state(0);
   let localNodes = $state<CurveNode[]>([]);
   let isKeyboardDeleteEnabled = $state(false);
+  let divisionsMenuPoint = $state<{ x: number; y: number } | null>(null);
 
   const NODE_DOUBLE_CLICK_WINDOW_MS = 300;
 
@@ -120,6 +128,9 @@
   };
 
   const divisions = $derived(Math.max(2, Math.round(curve.divisions)));
+  const divisionDropdownOptions = $derived(
+    CURVE_DIVISION_OPTIONS.map((value) => ({ value, label: String(value) })),
+  );
   const curveGridLineOffsets = $derived.by(() =>
     Array.from(
       { length: Math.max(divisions - 1, 0) },
@@ -451,6 +462,34 @@
     insertNodeAtPoint(point);
   };
 
+  const handleEditorContextMenu = (event: MouseEvent): void => {
+    if (!divisionsControlAction) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    divisionsMenuPoint = {
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+
+  const handleDivisionSelect = (value: DropdownValue): void => {
+    const nextDivisions = Number(value);
+    if (!divisionsControlAction || !Number.isFinite(nextDivisions)) {
+      return;
+    }
+
+    onControlChange({
+      action: divisionsControlAction,
+      deviceId,
+      value: nextDivisions,
+      finalize: true,
+    });
+    divisionsMenuPoint = null;
+  };
+
   $effect(() => {
     if (isDragging) {
       return;
@@ -564,6 +603,7 @@
       bind:this={editorEl}
       style={`--curve-divisions:${divisions};--curve-guide-y:${guideValue === null ? '-100%' : `${toPlotY(guideValue).toFixed(3)}%`};`}
       ondblclick={handleEditorDoubleClick}
+      oncontextmenu={handleEditorContextMenu}
     >
       <svg viewBox="0 0 100 100" preserveAspectRatio="none">
         {#each curveGridLineOffsets as offset (`x:${offset}`)}
@@ -606,6 +646,21 @@
       <div class="curve-editor-playhead" style={`left:${(clampedProgress01 * 100).toFixed(3)}%;`}></div>
     </div>
   </ControlSurfaceFrame>
+
+  <FloatingDropdown
+    open={divisionsMenuPoint !== null}
+    anchorPoint={divisionsMenuPoint}
+    onClose={() => divisionsMenuPoint = null}
+  >
+    <DropdownOptionList
+      options={divisionDropdownOptions}
+      value={divisions}
+      ariaLabel={i18n.t('control.divisions')}
+      heading={i18n.t('control.divisions')}
+      onSelect={handleDivisionSelect}
+      onClose={() => divisionsMenuPoint = null}
+    />
+  </FloatingDropdown>
 
 </div>
 {/snippet}

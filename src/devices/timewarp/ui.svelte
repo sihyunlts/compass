@@ -25,6 +25,7 @@
     valueMax={1}
     guideValue={null}
     wrapperClass="timewarp-curve-control"
+    divisionsControlAction="set-timewarp-divisions"
     {currentProgress01}
     {onControlChange}
   />

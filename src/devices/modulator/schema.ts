@@ -1,4 +1,5 @@
 import type { CurveModulatorNode } from '../../shared/model';
+import { DEFAULT_CURVE_DIVISIONS } from '../../core/curve-divisions';
 import { sanitizeModulationCurve } from '../../core/modulation/curve';
 import { sanitizeModulationTargets } from '../../core/modulation/targets';
 import {
@@ -13,7 +14,7 @@ const DEFAULT_MODULATOR_PARAMS: CurveModulatorNode['params'] = {
   targets: [],
   curve: {
     domain: 'loop01',
-    divisions: 16,
+    divisions: DEFAULT_CURVE_DIVISIONS,
     nodes: [
       { id: 'curve-node-start', t: 0, v: 0 },
       { id: 'curve-node-end', t: 1, v: 0 },
