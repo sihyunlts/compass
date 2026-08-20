@@ -6,11 +6,12 @@ import {
   evaluateCurveSegments,
   roundCurveNumber,
 } from '../curve-segments';
+import {
+  DEFAULT_CURVE_DIVISIONS,
+  sanitizeCurveDivisions,
+} from '../curve-divisions';
 import type { TemporalSampledRemap } from '../core-types';
 
-const MIN_CURVE_DIVISIONS = 2;
-const MAX_CURVE_DIVISIONS = 64;
-const DEFAULT_CURVE_DIVISIONS = 16;
 const CURVE_ZERO_EPSILON = 1e-6;
 const DEFAULT_SAMPLE_MULTIPLIER = 8;
 const MIN_SAMPLE_COUNT = 33;
@@ -25,15 +26,6 @@ const DEFAULT_TIME_WARP_CURVE: Readonly<TimeWarpCurve> = Object.freeze({
 
 const sortNodes = (nodes: CurveNode[]): CurveNode[] =>
   [...nodes].sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
-
-const sanitizeTimeWarpCurveDivisions = (value: unknown): number => {
-  const numeric = Math.round(Number(value));
-  if (!Number.isFinite(numeric)) {
-    return DEFAULT_CURVE_DIVISIONS;
-  }
-
-  return clamp(numeric, MIN_CURVE_DIVISIONS, MAX_CURVE_DIVISIONS);
-};
 
 const sanitizeNodeId = (value: unknown, fallbackIndex: number): string => {
   if (typeof value === 'string' && value.trim()) {
@@ -139,13 +131,13 @@ export const sanitizeTimeWarpCurveNodes = (rawNodes: unknown): CurveNode[] => {
 export const sanitizeTimeWarpCurve = (raw: unknown): TimeWarpCurve => {
   const source = raw && typeof raw === 'object' ? raw as Partial<TimeWarpCurve> : null;
   return {
-    divisions: sanitizeTimeWarpCurveDivisions(source?.divisions),
+    divisions: sanitizeCurveDivisions(source?.divisions),
     nodes: sanitizeTimeWarpCurveNodes(source?.nodes),
   };
 };
 
 const resolveSampleCount = (curve: TimeWarpCurve): number =>
-  Math.max(MIN_SAMPLE_COUNT, sanitizeTimeWarpCurveDivisions(curve.divisions) * DEFAULT_SAMPLE_MULTIPLIER + 1);
+  Math.max(MIN_SAMPLE_COUNT, sanitizeCurveDivisions(curve.divisions) * DEFAULT_SAMPLE_MULTIPLIER + 1);
 
 export const createSampledRemapFromTimeWarpCurve = (
   curve: TimeWarpCurve,

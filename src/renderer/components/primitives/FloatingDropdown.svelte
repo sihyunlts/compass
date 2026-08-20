@@ -6,10 +6,12 @@
   import type { Snippet } from 'svelte';
   import {
     attachFloatingLayerDismissHandlers,
+    DEFAULT_FLOATING_LAYER_MARGIN_PX,
     FLOATING_LAYER_ENTER_SPRING_OPTIONS,
     isEventTargetWithinFloatingLayer,
     resolveAnchoredFloatingLayerPosition,
     resolveFloatingLayerEnterOffsetY,
+    resolveViewportFloatingLayerPosition,
   } from '../overlays/floating-layer';
   import { FloatingLayerPresence } from '../overlays/floating-layer-presence.svelte';
   import {
@@ -22,12 +24,14 @@
   let {
     open = false,
     anchorEl = null,
+    anchorPoint = null,
     class: className = '',
     onClose,
     children,
   } = $props<{
     open?: boolean;
     anchorEl?: HTMLElement | null;
+    anchorPoint?: { x: number; y: number } | null;
     class?: string;
     onClose: (restoreFocus: boolean) => void;
     children?: Snippet;
@@ -54,7 +58,36 @@
     const token = ++positionToken;
     await tick();
 
-    if (!isLayerOpen || token !== positionToken || !dropdownEl || !anchorEl) {
+    if (
+      !isLayerOpen
+      || token !== positionToken
+      || !dropdownEl
+      || (!anchorEl && !anchorPoint)
+    ) {
+      return;
+    }
+
+    if (!anchorEl && anchorPoint) {
+      const pointPosition = resolveViewportFloatingLayerPosition(
+        anchorPoint.x,
+        anchorPoint.y,
+        {
+          width: dropdownEl.offsetWidth,
+          height: dropdownEl.offsetHeight,
+        },
+      );
+      x = pointPosition.x;
+      y = pointPosition.y;
+      maxHeightPx = Math.max(
+        0,
+        window.innerHeight - DEFAULT_FLOATING_LAYER_MARGIN_PX * 2,
+      );
+      void enterY.set(0, { instant: true });
+      isPositioned = true;
+      return;
+    }
+
+    if (!anchorEl) {
       return;
     }
 
@@ -85,10 +118,12 @@
   };
 
   $effect(() => {
-    if (isLayerOpen && anchorEl) {
+    if (isLayerOpen && (anchorEl || anchorPoint)) {
+      const anchorTarget = anchorEl
+        ?? document.elementFromPoint(anchorPoint?.x ?? 0, anchorPoint?.y ?? 0);
       activateFloatingLayer({
         id: floatingLayerId,
-        parentId: resolveFloatingLayerParentId(anchorEl, floatingLayerId),
+        parentId: resolveFloatingLayerParentId(anchorTarget, floatingLayerId),
         containsEventTarget: (eventTarget) =>
           isEventTargetWithinFloatingLayer(eventTarget, dropdownEl)
           || isEventTargetWithinFloatingLayer(eventTarget, anchorEl),

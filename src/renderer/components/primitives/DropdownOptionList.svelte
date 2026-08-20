@@ -8,6 +8,7 @@
     options,
     value = null,
     ariaLabel,
+    heading,
     class: className = '',
     onSelect,
     onClose,
@@ -15,6 +16,7 @@
     options: readonly DropdownOption[];
     value?: DropdownValue | null;
     ariaLabel: string;
+    heading?: string;
     class?: string;
     onSelect: (value: DropdownValue) => void;
     onClose: () => void;
@@ -110,12 +112,10 @@
   });
 </script>
 
-<div
-  bind:this={rootEl}
-  class={rootClass}
-  role="listbox"
-  aria-label={ariaLabel}
->
+{#if heading}
+  <div class="dropdown-option-heading control-field-label" aria-hidden="true">{heading}</div>
+{/if}
+<div bind:this={rootEl} class={rootClass} role="listbox" aria-label={ariaLabel}>
   {#each options as option, index (`${option.value}`)}
     {@const selected = isSelected(option)}
     <div
@@ -145,6 +145,10 @@
 </div>
 
 <style lang="scss">
+  .dropdown-option-heading {
+    padding: var(--gap-2) var(--gap-4) var(--gap-2);
+  }
+
   .dropdown-option-list {
     min-width: 0;
   }

@@ -4,7 +4,6 @@
   import type { GeneratorDeviceNode, ModulationTarget } from '../../shared/model';
   import CurveEditor from '../../renderer/components/controls/CurveEditor.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
-  import SelectField from '../../renderer/components/fields/SelectField.svelte';
   import ValueButton from '../../renderer/components/primitives/ValueButton.svelte';
   import { sanitizeCurveNodes } from '../../core/modulation/curve';
   import { MODULATION_TARGET_SLOT_COUNT } from '../../core/modulation/targets';
@@ -25,10 +24,6 @@
     onModulationTargetSlotSelect?: (slotIndex: number) => void;
   };
 
-  const MODULATION_DIVISION_OPTIONS = [4, 8, 16, 32, 64].map((divisions) => ({
-    value: divisions,
-    label: String(divisions),
-  }));
   type TargetSlotRow =
     | {
         kind: 'target';
@@ -141,14 +136,6 @@
 <div class="device-controls modulation-layout">
   {#if activeTab === 'curve'}
     <div class="modulation-tab-panel modulation-curve-panel">
-      <SelectField
-        label={i18n.t('control.divisions')}
-        value={device.params.curve.divisions}
-        options={MODULATION_DIVISION_OPTIONS}
-        dataAction="set-modulation-divisions"
-        dataId={device.id}
-        {onControlChange}
-      />
       <div class="column-wrapper modulation-main">
         <CurveEditor
           label={modulationReadoutText}
@@ -158,6 +145,7 @@
           sanitizeNodes={sanitizeCurveNodes}
           guideValue={0}
           wrapperClass="modulation-curve-control"
+          divisionsControlAction="set-modulation-divisions"
           {currentProgress01}
           {onControlChange}
         />

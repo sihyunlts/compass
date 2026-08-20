@@ -4,7 +4,8 @@ import {
   parseStructuredControlValue,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
-import { sanitizeCurveDivisions, sanitizeCurveNodes } from '../../core/modulation/curve';
+import { sanitizeCurveDivisions } from '../../core/curve-divisions';
+import { sanitizeCurveNodes } from '../../core/modulation/curve';
 import {
   DEFAULT_MODULATION_TARGET_AMOUNT,
   createModulationTargetId,

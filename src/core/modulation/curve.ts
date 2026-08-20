@@ -9,6 +9,7 @@ import {
   toSegmentCurvePoint,
   type CurvePoint,
 } from '../curve-segments';
+import { sanitizeCurveDivisions } from '../curve-divisions';
 export {
   buildCurveSegments,
   evaluateCurveSegments,
@@ -17,9 +18,6 @@ export {
 } from '../curve-segments';
 export type { CurvePoint, CurveSegment } from '../curve-segments';
 
-const MIN_CURVE_DIVISIONS = 2;
-const MAX_CURVE_DIVISIONS = 64;
-const DEFAULT_CURVE_DIVISIONS = 16;
 const CURVE_ROUNDING_DIGITS = 6;
 const CURVE_ZERO_EPSILON = 1e-6;
 const DEFAULT_CURVE_NODES: ReadonlyArray<CurveNode> = Object.freeze([
@@ -32,14 +30,6 @@ const toNodeSortValue = (node: CurveNode): number =>
 
 const sortNodes = (nodes: CurveNode[]): CurveNode[] =>
   [...nodes].sort((a, b) => toNodeSortValue(a) - toNodeSortValue(b));
-
-export const sanitizeCurveDivisions = (value: unknown): number => {
-  const numeric = Math.round(Number(value));
-  if (!Number.isFinite(numeric)) {
-    return DEFAULT_CURVE_DIVISIONS;
-  }
-  return clamp(numeric, MIN_CURVE_DIVISIONS, MAX_CURVE_DIVISIONS);
-};
 
 const sanitizeNodeId = (value: unknown, fallbackIndex: number): string => {
   if (typeof value === 'string' && value.trim()) {

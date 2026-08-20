@@ -37,7 +37,7 @@
   class:is-fill={fill}
 >
   <span
-    class="field-label"
+    class="field-label control-field-label"
     class:is-hidden={labelVisibility === 'hidden'}
   >
     {label}
@@ -106,9 +106,6 @@
   }
 
   .field-label {
-    color: var(--color-text-secondary);
-    font-size: var(--text-12);
-
     &.is-hidden {
       display: none;
     }
