@@ -186,6 +186,7 @@
     <ModulationIndicator
       states={displayedModulationStates}
       domain={modulationDomain}
+      displayMode="linear"
     />
   </ModulatableControl>
 </FieldShell>

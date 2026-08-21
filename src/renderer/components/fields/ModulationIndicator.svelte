@@ -9,9 +9,11 @@
   let {
     states,
     domain,
+    displayMode = 'auto',
   } = $props<{
     states: readonly ModulationParameterState[];
     domain: ModulationDisplayDomain;
+    displayMode?: 'auto' | 'linear' | 'circular';
   }>();
 
   const finiteStates = $derived(states.filter((state: ModulationParameterState) => (
@@ -24,6 +26,11 @@
     domain.kind === 'open'
       ? domain.softSpan
       : Math.max(domain.max - domain.min, 0.000001),
+  );
+
+  const usesCircularDisplay = $derived(
+    domain.kind === 'circular'
+      && (displayMode === 'auto' || displayMode === 'circular'),
   );
 
   const toCircularPercent = (value: number): number => {
@@ -121,6 +128,12 @@
         100,
       );
     }
+    if (!usesCircularDisplay) {
+      let offset = value - state.baseValue;
+      offset = ((offset + domainSpan / 2) % domainSpan + domainSpan) % domainSpan
+        - domainSpan / 2;
+      return clamp(50 + (offset / domainSpan) * 100, 0, 100);
+    }
     return toCircularPercent(value);
   };
 
@@ -141,13 +154,13 @@
 {#if finiteStates.length > 0}
   <div
     class="modulation-indicator"
-    class:is-linear={domain.kind !== 'circular'}
-    class:is-circular={domain.kind === 'circular'}
-    class:is-open={domain.kind === 'open'}
+    class:is-linear={!usesCircularDisplay}
+    class:is-circular={usesCircularDisplay}
+    class:is-centered={domain.kind === 'open' || (domain.kind === 'circular' && !usesCircularDisplay)}
     role="img"
     aria-label={i18n.t('modulation.connected')}
   >
-    {#if domain.kind === 'circular'}
+    {#if usesCircularDisplay}
       <svg class="modulation-ring" viewBox="0 0 100 100" aria-hidden="true">
         {#each finiteStates as state (`${state.modulatorId}:${state.targetId}`)}
           {@const range = resolveCircularRange(state)}
@@ -218,7 +231,7 @@
       overflow: hidden;
     }
 
-    &.is-open::before {
+    &.is-centered::before {
       content: '';
       position: absolute;
       top: 50%;

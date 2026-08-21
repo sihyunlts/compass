@@ -250,6 +250,8 @@ const buildProjectionGeometryKey = (
 ): string => [
   stroke.polyline.closed ? 'closed' : 'open',
   stroke.polyline.rasterMode ?? 'stroke',
+  stroke.polyline.rasterTieBreakDirection?.x ?? 'no-tie-x',
+  stroke.polyline.rasterTieBreakDirection?.y ?? 'no-tie-y',
   ...stroke.masks.map((mask) => {
     const transform = mask.inverseTransform;
     return [

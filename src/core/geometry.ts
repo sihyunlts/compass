@@ -57,10 +57,25 @@ export const applyAffine = (transform: AffineTransform, point: Vec2): Vec2 => ({
   y: transform.c * point.x + transform.d * point.y + transform.ty,
 });
 
+const TRIGONOMETRIC_SNAP_EPSILON = 1e-12;
+
+const snapTrigonometricValue = (value: number): number => {
+  const nearestInteger = Math.round(value);
+  return Math.abs(value - nearestInteger) <= TRIGONOMETRIC_SNAP_EPSILON
+    ? nearestInteger
+    : value;
+};
+
+const toAngleComponents = (angleDeg: number): { cos: number; sin: number } => {
+  const rad = ((angleDeg % 360) * Math.PI) / 180;
+  return {
+    cos: snapTrigonometricValue(Math.cos(rad)),
+    sin: snapTrigonometricValue(Math.sin(rad)),
+  };
+};
+
 export const toAxisBasis = (angleDeg: number): { axisX: number; axisY: number; perpX: number; perpY: number } => {
-  const rad = (angleDeg * Math.PI) / 180;
-  const axisX = Math.cos(rad);
-  const axisY = Math.sin(rad);
+  const { cos: axisX, sin: axisY } = toAngleComponents(angleDeg);
   return {
     axisX,
     axisY,
@@ -70,9 +85,7 @@ export const toAxisBasis = (angleDeg: number): { axisX: number; axisY: number; p
 };
 
 export const toMirrorTransformAt = (angleDeg: number, center: Vec2): AffineTransform => {
-  const rad = (angleDeg * Math.PI) / 180;
-  const axisX = Math.cos(rad);
-  const axisY = Math.sin(rad);
+  const { cos: axisX, sin: axisY } = toAngleComponents(angleDeg);
   const a = (2 * axisX * axisX) - 1;
   const b = 2 * axisX * axisY;
   const c = b;
@@ -113,9 +126,7 @@ export const toAxisMirrorTransformAt = (
 };
 
 export const toRotateTransformAt = (angleDeg: number, center: Vec2): AffineTransform => {
-  const rad = ((angleDeg % 360) * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
+  const { cos, sin } = toAngleComponents(angleDeg);
   return {
     a: cos,
     b: -sin,
@@ -244,6 +255,16 @@ export const distanceToRasterizedPolylineSquared = (
 export const applyTransformToPolyline = (polyline: Polyline, transform: AffineTransform): Polyline => ({
   ...polyline,
   points: polyline.points.map((pt) => applyAffine(transform, pt)),
+  ...(polyline.rasterTieBreakDirection
+    ? {
+        rasterTieBreakDirection: {
+          x: transform.a * polyline.rasterTieBreakDirection.x
+            + transform.b * polyline.rasterTieBreakDirection.y,
+          y: transform.c * polyline.rasterTieBreakDirection.x
+            + transform.d * polyline.rasterTieBreakDirection.y,
+        },
+      }
+    : {}),
 });
 
 export const clampBounds = (bounds: Bounds): Bounds => ({

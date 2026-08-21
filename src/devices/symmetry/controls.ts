@@ -1,62 +1,82 @@
-import { createMergeKeyResolver } from '../control-helpers';
+import { resolveSymmetryResultCount } from '../../core/symmetry';
+import type { GeneratorDeviceNode } from '../../shared/model';
+import {
+  createMergeKeyResolver,
+  createNumericParameterDefaultResolver,
+  createNumericParameterSetter,
+  readControlParam,
+  resolveNumericControlParam,
+} from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
+import { SYMMETRY_NUMERIC_PARAMETERS } from './schema';
+
+const SYMMETRY_PARAM_KEYS = ['count', 'directionDeg'] as const;
+const SYMMETRY_CENTER_PARAM_KEYS = ['centerX', 'centerY'] as const;
+
+const isSymmetryDevice = (
+  device: GeneratorDeviceNode,
+): device is Extract<GeneratorDeviceNode, { kind: 'symmetry' }> =>
+  device.kind === 'symmetry';
 
 export const symmetryDeviceControls = {
   descriptors: {
-    'set-effect-symmetry-mode': {
-      resolveMergeKey: createMergeKeyResolver('set-effect-symmetry-mode'),
+    'set-symmetry-mode': {
+      resolveMergeKey: createMergeKeyResolver('set-symmetry-mode'),
     },
-    'set-effect-symmetry-axis': {
-      resolveMergeKey: createMergeKeyResolver('set-effect-symmetry-axis'),
+    'set-symmetry-source-scope': {
+      resolveMergeKey: createMergeKeyResolver('set-symmetry-source-scope'),
     },
-    'set-effect-symmetry-anchor': {
-      resolveMergeKey: createMergeKeyResolver('set-effect-symmetry-anchor'),
+    'set-symmetry-param': {
+      resolveMergeKey: createMergeKeyResolver('set-symmetry-param', resolveNumericControlParam),
+      resolveDefaultValue: createNumericParameterDefaultResolver(
+        SYMMETRY_NUMERIC_PARAMETERS,
+        (input) => readControlParam(input, SYMMETRY_PARAM_KEYS),
+      ),
+    },
+    'set-center-picker-param': {
+      resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericControlParam),
+      resolveDefaultValue: createNumericParameterDefaultResolver(
+        SYMMETRY_NUMERIC_PARAMETERS,
+        (input) => readControlParam(input, SYMMETRY_CENTER_PARAM_KEYS),
+      ),
     },
   },
   createHandlers: () => ({
-    'set-effect-symmetry-mode': (device, change) => {
-      if (device.kind !== 'symmetry') {
+    'set-symmetry-mode': (device, change) => {
+      if (
+        !isSymmetryDevice(device)
+        || change.value !== 'reflection' && change.value !== 'rotation'
+      ) {
         return false;
       }
 
-      if (typeof change.value !== 'string') {
-        return false;
-      }
-
-      const mode = change.value;
-      device.params.mode = mode === 'quad-mirror'
-        || mode === 'quad-pinwheel'
-        || mode === 'mirror-half'
-        ? mode
-        : 'mirror-half';
+      device.params.mode = change.value;
+      device.params.count = resolveSymmetryResultCount(
+        device.params.mode,
+        device.params.count,
+      );
       return true;
     },
-    'set-effect-symmetry-axis': (device, change) => {
-      if (device.kind !== 'symmetry') {
+    'set-symmetry-source-scope': (device, change) => {
+      if (
+        !isSymmetryDevice(device)
+        || change.value !== 'sector' && change.value !== 'entire'
+      ) {
         return false;
       }
 
-      if (typeof change.value !== 'string') {
-        return false;
-      }
-
-      device.params.axis = change.value === 'vertical' ? 'vertical' : 'horizontal';
+      device.params.sourceScope = change.value;
       return true;
     },
-    'set-effect-symmetry-anchor': (device, change) => {
-      if (device.kind !== 'symmetry') {
-        return false;
-      }
-
-      if (typeof change.value !== 'string') {
-        return false;
-      }
-
-      const anchor = change.value;
-      device.params.sourceAnchor = anchor === 'br' || anchor === 'tr' || anchor === 'tl'
-        ? anchor
-        : 'bl';
-      return true;
-    },
+    'set-symmetry-param': createNumericParameterSetter({
+      isKind: isSymmetryDevice,
+      rules: SYMMETRY_NUMERIC_PARAMETERS,
+      readParam: (input) => readControlParam(input, SYMMETRY_PARAM_KEYS),
+    }),
+    'set-center-picker-param': createNumericParameterSetter({
+      isKind: isSymmetryDevice,
+      rules: SYMMETRY_NUMERIC_PARAMETERS,
+      readParam: (input) => readControlParam(input, SYMMETRY_CENTER_PARAM_KEYS),
+    }),
   }),
 } satisfies RendererKindControlDefinition;

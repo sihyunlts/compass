@@ -1,6 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import type { RendererControlChange } from '../../../devices/control-types';
   import type { ModulationStateByParameter } from '../../../shared/contracts/preview/modulation';
   import type { NumericParameterRule } from '../../../devices/numeric-parameters';
@@ -14,6 +15,9 @@
     centerX,
     centerY,
     parameter,
+    label,
+    areaLabel,
+    overlay,
     modulationStateByParameter = {},
     onControlChange,
   } = $props<{
@@ -21,6 +25,9 @@
     centerX: number;
     centerY: number;
     parameter?: NumericParameterRule;
+    label?: string;
+    areaLabel?: string;
+    overlay?: Snippet;
     modulationStateByParameter?: ModulationStateByParameter;
     onControlChange: (change: RendererControlChange) => void;
   }>();
@@ -30,6 +37,8 @@
   const resolvedStep = $derived(parameter?.input.step ?? 0.5);
   const range = $derived(resolvedMax - resolvedMin);
   const midpoint = $derived((resolvedMin + resolvedMax) / 2);
+  const resolvedLabel = $derived(label ?? i18n.t('control.center'));
+  const resolvedAreaLabel = $derived(areaLabel ?? i18n.t('control.centerPointArea'));
 
   const resolvedCenterX = $derived(clamp(
     Math.round((centerX - resolvedMin) / resolvedStep) * resolvedStep + resolvedMin,
@@ -57,7 +66,7 @@
 </script>
 
 <FieldShell
-  label={i18n.t('control.center')}
+  label={resolvedLabel}
   class="center-point-control"
   role="group"
   aria-label={i18n.t('control.centerPointPicker')}
@@ -72,7 +81,7 @@
     data-step={resolvedStep}
     data-center-x-state={isCenterX ? 'center' : 'off-center'}
     data-center-y-state={isCenterY ? 'center' : 'off-center'}
-    aria-label={i18n.t('control.centerPointArea')}
+    aria-label={resolvedAreaLabel}
     style={`width:${surfaceHeight}px;--picker-x:${xPercent}%;--picker-y:${yPercent}%;`}
   >
     {#each gridLineOffsets as offset (`x:${offset}`)}
@@ -81,6 +90,11 @@
     {#each gridLineOffsets as offset (`y:${offset}`)}
       <span class="center-picker-grid-line is-horizontal" style={`top:${offset}%;`}></span>
     {/each}
+    {#if overlay}
+      <div class="center-picker-overlay">
+        {@render overlay()}
+      </div>
+    {/if}
   </div>
   <div class="center-picker-inputs">
     <NumberField
@@ -122,18 +136,7 @@
     --picker-guide-x-color: transparent;
     --picker-guide-y-color: transparent;
     background: var(--color-surface);
-
-    &:active {
-      --picker-guide-x-color: var(--color-border-secondary);
-      --picker-guide-y-color: var(--color-border-secondary);
-    }
-    &:active[data-center-x-state='center'] {
-      --picker-guide-x-color: var(--device-control-accent, var(--color-surface-inverse));
-    }
-
-    &:active[data-center-y-state='center'] {
-      --picker-guide-y-color: var(--device-control-accent, var(--color-surface-inverse));
-    }
+    overflow: hidden;
 
     &::before {
       content: '';
@@ -166,6 +169,26 @@
       transform: translate(-50%, -50%);
       z-index: 3;
     }
+  }
+
+  :global(.center-picker-surface[data-center-picker-interaction='active']) {
+    --picker-guide-x-color: var(--color-border-secondary);
+    --picker-guide-y-color: var(--color-border-secondary);
+  }
+
+  :global(.center-picker-surface[data-center-picker-interaction='active'][data-center-x-state='center']) {
+    --picker-guide-x-color: var(--device-control-accent, var(--color-surface-inverse));
+  }
+
+  :global(.center-picker-surface[data-center-picker-interaction='active'][data-center-y-state='center']) {
+    --picker-guide-y-color: var(--device-control-accent, var(--color-surface-inverse));
+  }
+
+  .center-picker-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
   }
 
   .center-picker-grid-line {

@@ -1,12 +1,12 @@
 import {
   invertAffine,
   COMPOSITION_CENTER,
-  toAxisMirrorTransformAt,
   toMirrorTransformAt,
   toRotateTransformAt,
   toScaleTransformAt,
   toTranslationTransform,
 } from '../../core/geometry';
+import { buildSymmetryTransformPlan } from '../../core/symmetry';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import type {
   BeatRange,
@@ -93,52 +93,21 @@ const invertRequirementThroughTransform = (
 const resolveSymmetryInputRoi = (
   effect: SymmetryEffectNode,
   requirement: SpatialRequirement,
-): SpatialRequirement => {
-  if (effect.params.mode === 'mirror-half') {
-    return unionSpatialRequirements(
-      requirement,
-      transformSpatialRequirement(
-        requirement,
-        toAxisMirrorTransformAt(effect.params.axis, COMPOSITION_CENTER),
-      ),
-    );
-  }
-
-  if (effect.params.mode === 'quad-mirror') {
-    const horizontal = transformSpatialRequirement(
-      requirement,
-      toAxisMirrorTransformAt('horizontal', COMPOSITION_CENTER),
-    );
-    const vertical = transformSpatialRequirement(
-      requirement,
-      toAxisMirrorTransformAt('vertical', COMPOSITION_CENTER),
-    );
-    return unionSpatialRequirements(
-      unionSpatialRequirements(requirement, horizontal),
-      unionSpatialRequirements(
-        vertical,
-        transformSpatialRequirement(horizontal, toAxisMirrorTransformAt('vertical', COMPOSITION_CENTER)),
-      ),
-    );
-  }
-
-  const rotate90 = transformSpatialRequirement(
-    requirement,
-    toRotateTransformAt(90, COMPOSITION_CENTER),
-  );
-  const rotate180 = transformSpatialRequirement(
-    requirement,
-    toRotateTransformAt(180, COMPOSITION_CENTER),
-  );
-  const rotate270 = transformSpatialRequirement(
-    requirement,
-    toRotateTransformAt(270, COMPOSITION_CENTER),
-  );
-  return unionSpatialRequirements(
-    unionSpatialRequirements(requirement, rotate90),
-    unionSpatialRequirements(rotate180, rotate270),
-  );
-};
+): SpatialRequirement => buildSymmetryTransformPlan({
+  mode: effect.params.mode,
+  sourceScope: effect.params.sourceScope,
+  count: effect.params.count,
+  directionDeg: effect.params.directionDeg,
+  center: {
+    x: effect.params.centerX,
+    y: effect.params.centerY,
+  },
+}).steps.reduce<SpatialRequirement>((inputRoi, step) => {
+  const transformedRequirement = step.transform
+    ? invertRequirementThroughTransform(requirement, step.transform)
+    : requirement;
+  return unionSpatialRequirements(inputRoi, transformedRequirement);
+}, 'none');
 
 const buildSpatialInputRoi = (
   device: GeneratorEffectNode,

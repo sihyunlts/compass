@@ -1,148 +1,61 @@
 import {
   buildTargetOriginIds,
-  cloneMask,
-  cloneStrokeWithWriteOrder,
   createPendingGeometryApplicationOperator,
   appendPendingGeometryRewriteApplication,
+  isDeviceModulated,
+  resolveModulatedDeviceAtFrame,
   resolveStageExecutionPlan,
   transformStroke,
+  type ModulationEvaluationWindow,
   type PendingGeometryApplicationOperatorInput,
 } from './runtime';
 import {
-  composeAffine,
-  COMPOSITION_CENTER,
-  toAxisMirrorTransformAt,
-  toRotateTransformAt,
-  toTranslationTransform,
-} from '../../core/geometry';
+  buildSymmetryTransformPlan,
+  isPointInSymmetrySector,
+} from '../../core/symmetry';
 import type { SymmetryEffectNode } from '../../shared/model';
-import {
-  type MutableGenerationState,
-} from '../timeline/state';
-import {
-  createIdentityMask,
-} from '../timeline';
+import type { MutableGenerationState } from '../timeline/state';
+import { createIdentityMask } from '../timeline';
 import type { BeatRange } from '../analysis/types';
 import type { GeometryStroke } from '../types';
-
-const isWithinHalfBoundary = (
-  coordinate: number,
-  boundary: number,
-  keepMin: boolean,
-): boolean => keepMin ? coordinate <= boundary : coordinate >= boundary;
-
-const isInQuadrant = (
-  x: number,
-  y: number,
-  anchor: SymmetryEffectNode['params']['sourceAnchor'],
-): boolean => {
-  const keepMinX = anchor === 'bl' || anchor === 'tl';
-  const keepMinY = anchor === 'bl' || anchor === 'br';
-  return isWithinHalfBoundary(x, COMPOSITION_CENTER.x, keepMinX)
-    && isWithinHalfBoundary(y, COMPOSITION_CENTER.y, keepMinY);
-};
-
-const buildMirrorHalfStrokeRewrite = (
-  effect: SymmetryEffectNode,
-  writeOrder: number,
-): (stroke: GeometryStroke) => ReadonlyArray<Omit<GeometryStroke, 'writeId'>> => {
-  const keepMin = effect.params.axis === 'horizontal'
-    ? effect.params.sourceAnchor === 'bl' || effect.params.sourceAnchor === 'tl'
-    : effect.params.sourceAnchor === 'bl' || effect.params.sourceAnchor === 'br';
-  const mirrorTransform = toAxisMirrorTransformAt(effect.params.axis, COMPOSITION_CENTER);
-  const boundary = effect.params.axis === 'horizontal' ? COMPOSITION_CENTER.x : COMPOSITION_CENTER.y;
-
-  return (stroke) => {
-    const sourceHalfMask = createIdentityMask((x, y) => isWithinHalfBoundary(
-      effect.params.axis === 'horizontal' ? x : y,
-      boundary,
-      keepMin,
-    ));
-    const mirroredHalfMask = createIdentityMask((x, y) => isWithinHalfBoundary(
-      effect.params.axis === 'horizontal' ? x : y,
-      boundary,
-      !keepMin,
-    ));
-    const mirroredStroke = transformStroke(stroke, mirrorTransform, writeOrder);
-
-    return [
-      {
-        ...cloneStrokeWithWriteOrder(stroke, writeOrder),
-        masks: [...stroke.masks.map(cloneMask), sourceHalfMask],
-      },
-      {
-        ...mirroredStroke,
-        masks: [...mirroredStroke.masks, mirroredHalfMask],
-      },
-    ];
-  };
-};
-
-const buildQuadMirrorStrokeRewrite = (
-  effect: SymmetryEffectNode,
-  writeOrder: number,
-): (stroke: GeometryStroke) => ReadonlyArray<Omit<GeometryStroke, 'writeId'>> => {
-  const quadrants: ReadonlyArray<SymmetryEffectNode['params']['sourceAnchor']> = ['bl', 'br', 'tr', 'tl'];
-  const sourceKeepMinX = effect.params.sourceAnchor === 'bl' || effect.params.sourceAnchor === 'tl';
-  const sourceKeepMinY = effect.params.sourceAnchor === 'bl' || effect.params.sourceAnchor === 'br';
-
-  return (stroke) => quadrants.map((quadrant) => {
-    const targetKeepMinX = quadrant === 'bl' || quadrant === 'tl';
-    const targetKeepMinY = quadrant === 'bl' || quadrant === 'br';
-
-    let transform = null as ReturnType<typeof toTranslationTransform> | null;
-    if (sourceKeepMinX !== targetKeepMinX) {
-      transform = toAxisMirrorTransformAt('horizontal', COMPOSITION_CENTER);
-    }
-    if (sourceKeepMinY !== targetKeepMinY) {
-      const verticalTransform = toAxisMirrorTransformAt('vertical', COMPOSITION_CENTER);
-      transform = transform
-        ? composeAffine(verticalTransform, transform)
-        : verticalTransform;
-    }
-
-    const quadrantMask = createIdentityMask((x, y) => isInQuadrant(x, y, quadrant));
-    const transformedStroke = transformStroke(stroke, transform, writeOrder);
-    return {
-      ...transformedStroke,
-      masks: [...transformedStroke.masks, quadrantMask],
-    };
-  });
-};
-
-const buildQuadPinwheelStrokeRewrite = (
-  effect: SymmetryEffectNode,
-  writeOrder: number,
-): (stroke: GeometryStroke) => ReadonlyArray<Omit<GeometryStroke, 'writeId'>> => {
-  const quadrants: ReadonlyArray<SymmetryEffectNode['params']['sourceAnchor']> = ['bl', 'br', 'tr', 'tl'];
-  const sourceIndex = quadrants.findIndex((quadrant) => quadrant === effect.params.sourceAnchor);
-
-  return (stroke) => quadrants.map((quadrant, targetIndex) => {
-    const delta = (targetIndex - sourceIndex + quadrants.length) % quadrants.length;
-    const angleDeg = delta * 90;
-    const transform = angleDeg === 0 ? null : toRotateTransformAt(angleDeg, COMPOSITION_CENTER);
-    const quadrantMask = createIdentityMask((x, y) => isInQuadrant(x, y, quadrant));
-    const transformedStroke = transformStroke(stroke, transform, writeOrder);
-    return {
-      ...transformedStroke,
-      masks: [...transformedStroke.masks, quadrantMask],
-    };
-  });
-};
 
 const buildSymmetryStrokeRewrite = (
   effect: SymmetryEffectNode,
   writeOrder: number,
 ): (stroke: GeometryStroke) => ReadonlyArray<Omit<GeometryStroke, 'writeId'>> => {
-  if (effect.params.mode === 'mirror-half') {
-    return buildMirrorHalfStrokeRewrite(effect, writeOrder);
-  }
+  const center = {
+    x: effect.params.centerX,
+    y: effect.params.centerY,
+  };
+  const plan = buildSymmetryTransformPlan({
+    mode: effect.params.mode,
+    sourceScope: effect.params.sourceScope,
+    count: effect.params.count,
+    directionDeg: effect.params.directionDeg,
+    center,
+  });
+  const targetSectorMasks = effect.params.sourceScope === 'sector'
+    ? plan.steps.map((step) => createIdentityMask((x, y) => isPointInSymmetrySector(
+        x,
+        y,
+        center,
+        step.targetAngleDeg,
+        plan.sectorWidthDeg,
+      )))
+    : null;
 
-  if (effect.params.mode === 'quad-mirror') {
-    return buildQuadMirrorStrokeRewrite(effect, writeOrder);
-  }
+  return (stroke) => plan.steps.map((step, index) => {
+    const transformedStroke = transformStroke(stroke, step.transform, writeOrder);
+    const targetSectorMask = targetSectorMasks?.[index];
+    if (!targetSectorMask) {
+      return transformedStroke;
+    }
 
-  return buildQuadPinwheelStrokeRewrite(effect, writeOrder);
+    return {
+      ...transformedStroke,
+      masks: [...transformedStroke.masks, targetSectorMask],
+    };
+  });
 };
 
 const applyPendingSymmetryEffect = (
@@ -150,17 +63,61 @@ const applyPendingSymmetryEffect = (
   effect: SymmetryEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
+  isModulated: boolean,
+  resolveDeviceAtFrame: (
+    frameIndex: number,
+    sampleStepBeats: number,
+    evaluationWindow: ModulationEvaluationWindow,
+  ) => SymmetryEffectNode,
   requiredFrameWindow: BeatRange | 'all',
+  fallbackEvaluationWindow: ModulationEvaluationWindow,
 ): MutableGenerationState => {
   const { baseState } = input;
   const targetOriginIds = buildTargetOriginIds(baseState.timeline, targetGroupId);
-  const rewriteStroke = buildSymmetryStrokeRewrite(effect, writeOrder);
+  const evaluationWindowByTargetOriginId = new Map(
+    Array.from(targetOriginIds, (originId) => {
+      const timelineState = baseState.timelineStateByOriginId.get(originId);
+      const window = input.precedingTemporalCheckpoint?.temporalByOriginId.has(originId)
+        ? timelineState?.temporal.visibilityWindow
+        : timelineState?.playbackWindow;
+      return [
+        originId,
+        window && Number.isFinite(window.start) && Number.isFinite(window.end) && window.end > window.start
+          ? window
+          : fallbackEvaluationWindow,
+      ] as const;
+    }),
+  );
+  const rewriteByEffect = new WeakMap<
+    SymmetryEffectNode,
+    ReturnType<typeof buildSymmetryStrokeRewrite>
+  >();
+  const resolveStrokeRewrite = (
+    effectAtFrame: SymmetryEffectNode,
+  ): ReturnType<typeof buildSymmetryStrokeRewrite> => {
+    const cached = rewriteByEffect.get(effectAtFrame);
+    if (cached) {
+      return cached;
+    }
+
+    const rewrite = buildSymmetryStrokeRewrite(effectAtFrame, writeOrder);
+    rewriteByEffect.set(effectAtFrame, rewrite);
+    return rewrite;
+  };
 
   return appendPendingGeometryRewriteApplication(
     input,
     targetOriginIds,
     requiredFrameWindow,
-    ({ strokes }) => strokes.flatMap((stroke) => rewriteStroke(stroke)),
+    ({ timeline, frameIndex, strokes }) => strokes.flatMap((stroke) => {
+      const evaluationWindow = evaluationWindowByTargetOriginId.get(
+        stroke.polyline.originId,
+      ) ?? fallbackEvaluationWindow;
+      const effectAtFrame = isModulated
+        ? resolveDeviceAtFrame(frameIndex, timeline.sampleStepBeats, evaluationWindow)
+        : effect;
+      return resolveStrokeRewrite(effectAtFrame)(stroke);
+    }),
     { mode: 'cleanup', originIds: targetOriginIds },
   );
 };
@@ -168,13 +125,26 @@ const applyPendingSymmetryEffect = (
 export const symmetryOperator = createPendingGeometryApplicationOperator<'symmetry'>(
   (input, stage, context) => {
     const executionPlan = resolveStageExecutionPlan(context, stage);
+    const isModulated = isDeviceModulated(context.modulationContext, stage.deviceId);
 
     return applyPendingSymmetryEffect(
       input,
       stage.device,
       stage.groupId,
       stage.stageIndex,
+      isModulated,
+      (frameIndex, sampleStepBeats, evaluationWindow) => resolveModulatedDeviceAtFrame(
+        context.modulationContext,
+        stage.device,
+        frameIndex,
+        sampleStepBeats,
+        evaluationWindow,
+      ),
       executionPlan.requiredFrameWindow,
+      {
+        start: 0,
+        end: context.modulationContext.loopLengthBeats,
+      },
     );
   },
 );
