@@ -164,6 +164,7 @@ export class CenterPickerController {
     this.state.pointerId = event.pointerId;
     this.state.surfaceEl = surface;
     this.state.didChange = false;
+    surface.dataset.centerPickerInteraction = 'active';
     surface.setPointerCapture(event.pointerId);
 
     if (this.applyPosition(surface, event.clientX, event.clientY)) {
@@ -201,6 +202,12 @@ export class CenterPickerController {
 
     this.finish(false);
     return true;
+  }
+
+  public handleWindowBlur(): void {
+    if (this.isActive()) {
+      this.finish(true);
+    }
   }
 
   public tryResetFromDoubleClick(target: EventTarget | null): boolean {
@@ -295,6 +302,10 @@ export class CenterPickerController {
   }
 
   private finish(shouldPersist: boolean): void {
+    if (this.state.surfaceEl) {
+      delete this.state.surfaceEl.dataset.centerPickerInteraction;
+    }
+
     if (
       this.state.surfaceEl
       && this.state.pointerId !== null

@@ -48,6 +48,23 @@ type OccupiedCoordinateCandidateCache = Map<string, StrokeOccupiedCoordinateCand
 const occupiedCoordinateCandidatesByStroke = new WeakMap<GeometryStroke, OccupiedCoordinateCandidateCache>();
 const occupiedCoordinateCandidatesByPoints = new WeakMap<GeometryStroke['polyline']['points'], OccupiedCoordinateCandidateCache>();
 const TRAILING_COLOR_AGE_BAND_DISTANCE_BIAS_SQUARED = 0.04;
+const RASTER_TIE_EPSILON = 1e-9;
+
+const roundRasterCoordinate = (
+  value: number,
+  primaryTieDirection: number,
+  secondaryTieDirection: number,
+): number => {
+  const lower = Math.floor(value);
+  if (Math.abs(value - (lower + 0.5)) > RASTER_TIE_EPSILON) {
+    return Math.round(value);
+  }
+
+  const direction = Math.abs(primaryTieDirection) > RASTER_TIE_EPSILON
+    ? primaryTieDirection
+    : secondaryTieDirection;
+  return direction < 0 ? lower : lower + 1;
+};
 
 const toCandidateCacheKey = (
   bounds: OccupiedCoordinateCandidateBounds | null,
@@ -188,9 +205,17 @@ const collectCenterlineCandidateCoordinates = (
 
   const coordinates = new Map<string, { x: number; y: number }>();
 
-  const addCoordinate = (x: number, y: number): void => {
-    const roundedX = Math.round(x);
-    const roundedY = Math.round(y);
+  const addCoordinate = (
+    x: number,
+    y: number,
+    tieBreakDirection?: Readonly<{ x: number; y: number }>,
+  ): void => {
+    const roundedX = tieBreakDirection
+      ? roundRasterCoordinate(x, tieBreakDirection.x, tieBreakDirection.y)
+      : Math.round(x);
+    const roundedY = tieBreakDirection
+      ? roundRasterCoordinate(y, tieBreakDirection.y, tieBreakDirection.x)
+      : Math.round(y);
     const coordinateKey = toRoundedCoordinateKey(roundedX, roundedY);
     if (!coordinateKey) {
       return;
@@ -248,7 +273,11 @@ const collectCenterlineCandidateCoordinates = (
   if (stroke.polyline.closed && points.length > 1) {
     addSegmentCoordinates(points[points.length - 1], points[0]);
   } else if (points.length === 1) {
-    addCoordinate(points[0].x, points[0].y);
+    addCoordinate(
+      points[0].x,
+      points[0].y,
+      stroke.polyline.rasterTieBreakDirection,
+    );
   }
   return Array.from(coordinates.values());
 };
@@ -270,6 +299,8 @@ const resolveStrokeOccupiedCoordinateCandidates = (
     toCandidateCacheKey(outputBounds),
     stroke.polyline.closed ? 'closed' : 'open',
     stroke.polyline.rasterMode ?? 'stroke',
+    stroke.polyline.rasterTieBreakDirection?.x ?? 'no-tie-x',
+    stroke.polyline.rasterTieBreakDirection?.y ?? 'no-tie-y',
   ].join(':');
   const cached = occupiedCoordinateCandidatesByStroke.get(stroke)?.get(cacheKey);
   if (cached) {

@@ -71,7 +71,7 @@
     > :global(.field-control),
     > :global(.dropdown-select),
     > :global(.dropdown-select .dropdown-select-trigger) {
-      width: 6.6rem;
+      width: var(--field-control-width, 6.6rem);
       height: 1.75rem;
     }
 

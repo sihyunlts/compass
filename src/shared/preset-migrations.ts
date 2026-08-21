@@ -13,6 +13,58 @@ const createMigratedPathAnchorId = (
   return `${normalizedDeviceId}-path-anchor-${index + 1}`;
 };
 
+const resolveLegacySymmetrySourceDirection = (
+  params: {
+    mode: 'mirror-half' | 'quad-mirror' | 'quad-pinwheel';
+    axis: 'horizontal' | 'vertical';
+    sourceAnchor: 'bl' | 'br' | 'tr' | 'tl';
+  },
+): number => {
+  const anchor = params.sourceAnchor;
+  if (params.mode === 'mirror-half') {
+    if (params.axis === 'vertical') {
+      return anchor === 'tl' || anchor === 'tr' ? 90 : 270;
+    }
+    return anchor === 'br' || anchor === 'tr' ? 0 : 180;
+  }
+
+  if (anchor === 'br') return 315;
+  if (anchor === 'tr') return 45;
+  if (anchor === 'tl') return 135;
+  return 225;
+};
+
+const migrateLegacySymmetryParams = (
+  params: Record<string, unknown>,
+): Record<string, unknown> | null => {
+  const { mode: legacyMode, axis, sourceAnchor } = params;
+  if (
+    legacyMode !== 'mirror-half'
+      && legacyMode !== 'quad-mirror'
+      && legacyMode !== 'quad-pinwheel'
+    || axis !== 'horizontal' && axis !== 'vertical'
+    || sourceAnchor !== 'bl'
+      && sourceAnchor !== 'br'
+      && sourceAnchor !== 'tr'
+      && sourceAnchor !== 'tl'
+  ) {
+    return null;
+  }
+
+  return {
+    mode: legacyMode === 'quad-pinwheel' ? 'rotation' : 'reflection',
+    sourceScope: 'sector',
+    count: legacyMode === 'mirror-half' ? 2 : 4,
+    directionDeg: resolveLegacySymmetrySourceDirection({
+      mode: legacyMode,
+      axis,
+      sourceAnchor,
+    }),
+    centerX: 4.5,
+    centerY: 4.5,
+  };
+};
+
 const migrateDeviceFromVersion1 = (value: unknown): unknown => {
   if (!isRecord(value)) {
     return value;
@@ -46,6 +98,18 @@ const migrateDeviceFromVersion1 = (value: unknown): unknown => {
         ...currentParams,
         targets,
       },
+    };
+  }
+
+  if (kind === 'symmetry') {
+    const params = migrateLegacySymmetryParams(value.params);
+    if (!params) {
+      return value;
+    }
+    return {
+      ...value,
+      kind,
+      params,
     };
   }
 

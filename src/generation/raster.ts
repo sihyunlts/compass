@@ -16,6 +16,12 @@ import {
 } from './timeline';
 
 const NORMALIZED_GENERATOR_END_BEAT = 1;
+// Unequal components keep common diagonal transforms from erasing the tie
+// direction on either grid axis.
+const CENTERLINE_POINT_TIE_BREAK_DIRECTION = Object.freeze({
+  x: 1,
+  y: Math.SQRT2,
+});
 
 const toInclusiveFrameProgress = (
   beat: number,
@@ -28,6 +34,21 @@ const toInclusiveFrameProgress = (
 const toPolylineArray = (
   polyline: Polyline | null,
 ): Polyline[] => polyline ? [polyline] : [];
+
+const withCenterlinePointTieBreakDirection = (
+  polyline: Polyline,
+): Polyline => (
+  polyline.rasterMode === 'centerline'
+  && polyline.points.length === 1
+  && !polyline.rasterTieBreakDirection
+    ? {
+        ...polyline,
+        // Transform this direction with the point so symmetric copies choose
+        // complementary grid cells when a coordinate lies exactly halfway.
+        rasterTieBreakDirection: CENTERLINE_POINT_TIE_BREAK_DIRECTION,
+      }
+    : polyline
+);
 
 const buildScannerGeneratorPolyline = (
   device: Extract<GeneratorNode, { kind: 'scanner' }>,
@@ -131,7 +152,7 @@ export const rasterizeGeneratorFrame = (
     }
 
     addStrokeToFrame(timeline, frameIndex, {
-      polyline,
+      polyline: withCenterlinePointTieBreakDirection(polyline),
       originGroupId: normalizeOptionalId(device.groupId),
       writeOrder,
     });

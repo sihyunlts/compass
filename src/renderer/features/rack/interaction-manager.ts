@@ -207,6 +207,7 @@ export class RackInteractionManager {
 
   handleWindowBlur(): void {
     this.numericInputInteraction.handleWindowBlur();
+    this.centerPicker.handleWindowBlur();
   }
 
   handleWindowMouseUp(event: MouseEvent): void {

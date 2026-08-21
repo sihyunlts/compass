@@ -1,12 +1,12 @@
 import {
   COMPOSITION_BOUNDS,
   COMPOSITION_CENTER,
-  toAxisMirrorTransformAt,
   toMirrorTransformAt,
   toRotateTransformAt,
   toScaleTransformAt,
   toTranslationTransform,
 } from '../../core/geometry';
+import { buildSymmetryTransformPlan } from '../../core/symmetry';
 import { collectPathControlPoints } from '../../core/generators/path';
 import { isIdentityTimeWarpCurve } from '../../core/timewarp/curve';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
@@ -247,44 +247,27 @@ const buildSpatialEffectAnalysis = (
   }
 
   if (device.kind === 'symmetry') {
-    if (device.params.mode === 'mirror-half') {
-      const horizontalBounds = transformSpatialRequirement(
-        upstream.outputBounds,
-        toAxisMirrorTransformAt(device.params.axis, COMPOSITION_CENTER),
-      );
-      return createOperatorAnalysis({
-        outputBounds: mergeTargetedOutputBounds(
-          device.groupId,
-          upstream.outputBounds,
-          unionSpatialRequirements(upstream.outputBounds, horizontalBounds),
-        ),
-        inputRoi: upstream.outputBounds,
-        framesNeeded: 'current',
-        timeDomain: mergeTargetedTimeDomain(device.groupId, upstream.timeDomain, upstream.timeDomain),
-        isIdentity: false,
-      });
-    }
-
-    const rotate90Bounds = transformSpatialRequirement(
-      upstream.outputBounds,
-      toRotateTransformAt(90, COMPOSITION_CENTER),
-    );
-    const rotate180Bounds = transformSpatialRequirement(
-      upstream.outputBounds,
-      toRotateTransformAt(180, COMPOSITION_CENTER),
-    );
-    const rotate270Bounds = transformSpatialRequirement(
-      upstream.outputBounds,
-      toRotateTransformAt(270, COMPOSITION_CENTER),
-    );
+    const symmetryPlan = buildSymmetryTransformPlan({
+      mode: device.params.mode,
+      sourceScope: device.params.sourceScope,
+      count: device.params.count,
+      directionDeg: device.params.directionDeg,
+      center: {
+        x: device.params.centerX,
+        y: device.params.centerY,
+      },
+    });
+    const transformedBounds = symmetryPlan.steps.reduce<SpatialRequirement>((bounds, step) => {
+      const stepBounds = step.transform
+        ? transformSpatialRequirement(upstream.outputBounds, step.transform)
+        : upstream.outputBounds;
+      return unionSpatialRequirements(bounds, stepBounds);
+    }, 'none');
     return createOperatorAnalysis({
       outputBounds: mergeTargetedOutputBounds(
         device.groupId,
         upstream.outputBounds,
-        unionSpatialRequirements(
-          unionSpatialRequirements(upstream.outputBounds, rotate90Bounds),
-          unionSpatialRequirements(rotate180Bounds, rotate270Bounds),
-        ),
+        transformedBounds,
       ),
       inputRoi: upstream.outputBounds,
       framesNeeded: 'current',

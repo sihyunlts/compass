@@ -121,9 +121,12 @@ export interface SymmetryEffectNode extends GroupedDeviceNode {
   kind: 'symmetry';
   enabled: boolean;
   params: {
-    mode: 'mirror-half' | 'quad-mirror' | 'quad-pinwheel';
-    axis: 'horizontal' | 'vertical';
-    sourceAnchor: 'bl' | 'br' | 'tr' | 'tl';
+    mode: 'reflection' | 'rotation';
+    sourceScope: 'sector' | 'entire';
+    count: number;
+    directionDeg: number;
+    centerX: number;
+    centerY: number;
   };
 }
 
