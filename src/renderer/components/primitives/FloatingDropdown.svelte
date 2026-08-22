@@ -40,6 +40,7 @@
   let dropdownEl = $state<HTMLDivElement | null>(null);
   let x = $state(0);
   let y = $state(0);
+  let anchorWidthPx = $state(0);
   let maxHeightPx = $state(384);
   let isPositioned = $state(false);
   let positionToken = 0;
@@ -68,6 +69,7 @@
     }
 
     if (!anchorEl && anchorPoint) {
+      anchorWidthPx = 0;
       const pointPosition = resolveViewportFloatingLayerPosition(
         anchorPoint.x,
         anchorPoint.y,
@@ -92,6 +94,7 @@
     }
 
     const anchorRect = anchorEl.getBoundingClientRect();
+    anchorWidthPx = anchorRect.width;
     const nextPosition = resolveAnchoredFloatingLayerPosition(anchorRect, {
       width: dropdownEl.offsetWidth,
       height: dropdownEl.offsetHeight,
@@ -189,6 +192,7 @@
     class:is-positioned={isPositioned}
     aria-hidden={!isLayerOpen || !isPositioned}
     style:transform={`translate3d(${x}px, ${y}px, 0)`}
+    style:--floating-dropdown-anchor-width={`${anchorWidthPx}px`}
     style:--floating-dropdown-max-height={`${maxHeightPx}px`}
     style:--floating-dropdown-enter-y={`${enterY.current}px`}
     style:--floating-layer-stack-order={floatingLayerStackOrder}
