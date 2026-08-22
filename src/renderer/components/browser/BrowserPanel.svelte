@@ -452,6 +452,55 @@
   let focusedPresetDraftKey = $state<string | null>(null);
   let browserPagePanelEl = $state<HTMLDivElement | null>(null);
 
+  const BROWSER_PAGE_EDGE_TRANSITION_DISTANCE_PX = 32;
+  const BROWSER_PAGE_EDGE_MASK_DEPTH = 0.8;
+
+  const resolveBrowserPageEdgeStrength = (distance: number): number =>
+    Math.min(
+      1,
+      Math.max(0, distance / BROWSER_PAGE_EDGE_TRANSITION_DISTANCE_PX),
+    );
+
+  const trackBrowserPageEdges = (
+    panel: HTMLDivElement,
+  ): { destroy: () => void } => {
+    const stack = panel.parentElement;
+    const updateEdgeEffects = (): void => {
+      const maxScrollTop = Math.max(0, panel.scrollHeight - panel.clientHeight);
+      const scrollTop = Math.min(maxScrollTop, Math.max(0, panel.scrollTop));
+
+      for (const [edge, distance] of [
+        ['top', scrollTop],
+        ['bottom', maxScrollTop - scrollTop],
+      ] as const) {
+        const strength = resolveBrowserPageEdgeStrength(distance);
+        stack?.style.setProperty(
+          `--browser-page-${edge}-effect-strength`,
+          String(strength),
+        );
+        stack?.style.setProperty(
+          `--browser-page-${edge}-mask-opacity`,
+          String(1 - strength * BROWSER_PAGE_EDGE_MASK_DEPTH),
+        );
+      }
+    };
+
+    const resizeObserver = new ResizeObserver(updateEdgeEffects);
+    resizeObserver.observe(panel);
+    if (panel.firstElementChild) {
+      resizeObserver.observe(panel.firstElementChild);
+    }
+    panel.addEventListener('scroll', updateEdgeEffects, { passive: true });
+    updateEdgeEffects();
+
+    return {
+      destroy: () => {
+        resizeObserver.disconnect();
+        panel.removeEventListener('scroll', updateEdgeEffects);
+      },
+    };
+  };
+
   const settingsButtonHasUpdateIndicator = $derived(
     updateAvailable && activePage !== 'settings',
   );
@@ -1261,6 +1310,11 @@
 </script>
 
 <aside class="browser-panel" class:has-titlebar-spacer={reserveTitlebarSpace}>
+  <div
+    class="browser-page-top-boundary"
+    class:is-window-drag-region={reserveTitlebarSpace}
+    aria-hidden="true"
+  ></div>
   <div class="browser-view">
     <div class="browser-page-switch">
       <div class="browser-page-switch-group">
@@ -1322,14 +1376,17 @@
       </div>
     </div>
 
-    <div
-      bind:this={browserPagePanelEl}
-      class="browser-page-panel"
-      class:is-preset-move-root-target={
-        presetMoveDrag.destination !== null
-        && presetMoveDrag.destination.relativePath.length === 0
-      }
-    >
+    <div class="browser-page-stack">
+      <div
+        use:trackBrowserPageEdges
+        bind:this={browserPagePanelEl}
+        class="browser-page-panel"
+        class:is-preset-move-root-target={
+          presetMoveDrag.destination !== null
+          && presetMoveDrag.destination.relativePath.length === 0
+        }
+      >
+        <div>
       {#if activePage === 'settings'}
         <SidebarSettingsPage
           {launchpadMk2Enabled}
@@ -1509,12 +1566,20 @@
           {/each}
         </ul>
       {/if}
+        </div>
+      </div>
     </div>
   </div>
 </aside>
 
 <style lang="scss">
   .browser-panel {
+    --browser-page-top-inset: var(--gap-10);
+    --browser-page-bottom-extension: var(--gap-10);
+    --browser-page-fade-size: var(--gap-16);
+    --browser-page-blur-offset: var(--gap-4);
+
+    position: relative;
     display: flex;
     flex-direction: column;
     flex: 0 0 var(--browser-panel-width, var(--sidebar-width));
@@ -1526,17 +1591,24 @@
 
     &.has-titlebar-spacer {
       --floating-layer-viewport-top: 48px;
+      --browser-page-top-inset: calc(
+        var(--gap-10) + var(--gap-32) - var(--gap-4)
+      );
     }
 
-    &::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: var(--browser-panel-width, var(--sidebar-width));
-      height: var(--gap-48);
+  }
+
+  .browser-page-top-boundary {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    z-index: 2;
+    -webkit-app-region: no-drag;
+    top: 0;
+    height: var(--browser-page-top-inset);
+
+    &.is-window-drag-region {
       -webkit-app-region: drag;
-      z-index: -1;
     }
   }
 
@@ -1544,7 +1616,7 @@
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
-    margin-top: var(--gap-32);
+    margin-top: calc(var(--gap-32) - var(--gap-4));
     display: flex;
     gap: var(--gap-10);
   }
@@ -1552,10 +1624,6 @@
   .browser-panel:not(.has-titlebar-spacer) {
     .browser-view {
       margin-top: 0;
-    }
-
-    &::before {
-      display: none;
     }
   }
 
@@ -1589,14 +1657,78 @@
     background: var(--color-surface-inverse);
   }
 
-  .browser-page-panel {
+  .browser-page-stack {
+    --browser-page-top-effect-strength: 0;
+    --browser-page-bottom-effect-strength: 0;
+    --browser-page-top-mask-opacity: 1;
+    --browser-page-bottom-mask-opacity: 1;
+
     position: relative;
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
+    margin-top: calc(0px - var(--browser-page-top-inset));
+    margin-bottom: calc(0px - var(--browser-page-bottom-extension));
+
+    &::before,
+    &::after {
+      content: '';
+      position: absolute;
+      left: calc(0px - var(--gap-4));
+      right: calc(0px - var(--gap-4));
+      z-index: 1;
+      pointer-events: none;
+      backdrop-filter: blur(var(--gap-4));
+    }
+
+    &::before {
+      top: 0;
+      height: calc(
+        var(--browser-page-top-inset)
+        + var(--browser-page-fade-size)
+        - var(--browser-page-blur-offset)
+      );
+      mask-image: linear-gradient(
+        to bottom,
+        black 0 calc(
+          var(--browser-page-top-inset) - var(--browser-page-blur-offset)
+        ),
+        transparent
+      );
+      opacity: var(--browser-page-top-effect-strength);
+    }
+
+    &::after {
+      bottom: 0;
+      height: calc(
+        var(--browser-page-fade-size) - var(--browser-page-blur-offset)
+      );
+      mask-image: linear-gradient(
+        to top,
+        black,
+        transparent
+      );
+      opacity: var(--browser-page-bottom-effect-strength);
+    }
+  }
+
+  .browser-page-panel {
+    position: absolute;
+    inset: 0;
+    padding-top: var(--browser-page-top-inset);
+    padding-bottom: var(--browser-page-bottom-extension);
     overflow-y: auto;
     overflow-x: hidden;
-    -webkit-app-region: no-drag;
+    mask-image: linear-gradient(
+      to bottom,
+      rgb(0 0 0 / var(--browser-page-top-mask-opacity))
+        0 var(--browser-page-top-inset),
+      black calc(
+        var(--browser-page-top-inset) + var(--browser-page-fade-size)
+      ),
+      black calc(100% - var(--browser-page-fade-size)),
+      rgb(0 0 0 / var(--browser-page-bottom-mask-opacity))
+    );
 
     &.is-preset-move-root-target {
       background: var(--color-surface-interactive);

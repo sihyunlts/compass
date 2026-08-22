@@ -55,6 +55,13 @@
   const presence = new FloatingLayerPresence();
   const enterY = new Spring(0, FLOATING_LAYER_ENTER_SPRING_OPTIONS);
 
+  const portalToBody = (node: HTMLElement): { destroy: () => void } => {
+    document.body.append(node);
+    return {
+      destroy: () => node.remove(),
+    };
+  };
+
   const updatePosition = async (): Promise<void> => {
     const token = ++positionToken;
     await tick();
@@ -187,6 +194,7 @@
 
 {#if presence.rendered}
   <div
+    use:portalToBody
     bind:this={dropdownEl}
     class={rootClass}
     class:is-positioned={isPositioned}
