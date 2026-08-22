@@ -46,6 +46,7 @@ export const EDITOR_HISTORY_META = {
   insertDevicePreset: { kind: 'insert-device-preset' },
   insertGroupPreset: { kind: 'insert-group-preset' },
   loadRackPreset: { kind: 'load-rack-preset' },
+  deviceToggleEnabled: { kind: 'control-edit', finalize: true },
 } as const satisfies Record<string, ChainMutationMeta>;
 
 const allocateDeviceId = (kind: GeneratorDeviceNode['kind']): string =>
@@ -296,4 +297,24 @@ export const applyGroupEnabledChange = (
       },
     },
   };
+};
+
+export const toggleDevicesEnabled = (
+  chain: GeneratorChain,
+  deviceIds: readonly string[],
+): GeneratorChain | null => {
+  const targetIds = new Set(deviceIds);
+  const targetDevices = chain.devices.filter((device) => targetIds.has(device.id));
+  if (targetDevices.length === 0) {
+    return null;
+  }
+
+  const nextEnabled = targetDevices.every((device) => device.enabled === false);
+  return withDevices(
+    chain,
+    chain.devices.map((device) =>
+      targetIds.has(device.id) && device.enabled !== nextEnabled
+        ? { ...device, enabled: nextEnabled }
+        : device),
+  );
 };

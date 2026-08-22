@@ -47,6 +47,7 @@ import {
   EDITOR_HISTORY_META,
   applyBrowserDeviceAdd,
   applyRackCommit,
+  toggleDevicesEnabled,
 } from './commands';
 import {
   createEditorHistory,
@@ -333,6 +334,7 @@ export class EditorSession {
     cutSelection: (): boolean => this.cutSelection(),
     pasteClipboard: (): boolean => this.pasteClipboard(),
     duplicateSelection: (): boolean => this.duplicateSelection(),
+    toggleSelectedDevicesEnabled: (): boolean => this.toggleSelectedDevicesEnabled(),
     selectAllRackDevices: (): boolean => {
       const rackBinding = this.rackBinding;
       if (!rackBinding) {
@@ -615,6 +617,17 @@ export class EditorSession {
 
   private duplicateSelection(selectionOverride?: RackSelectionSnapshot | null): boolean {
     return duplicateEditorSelection(this.buildClipboardContext(), selectionOverride);
+  }
+
+  private toggleSelectedDevicesEnabled(): boolean {
+    const selectedDeviceIds = this.rackBinding?.getOrderedSelectedDeviceIds() ?? [];
+    const nextChain = toggleDevicesEnabled(this.state.chainState, selectedDeviceIds);
+    if (!nextChain) {
+      return false;
+    }
+
+    this.applyChainMutation(nextChain, EDITOR_HISTORY_META.deviceToggleEnabled);
+    return true;
   }
 
   private deleteDevicesById(
