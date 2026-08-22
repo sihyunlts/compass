@@ -172,11 +172,22 @@ export const mountKeyboardShortcuts = (
       return;
     }
 
-    if (event.key !== 'Delete' && event.key !== 'Backspace') {
+    if (isLocalKeyboardTarget(target, options.interactiveElementSelector)) {
       return;
     }
 
-    if (isLocalKeyboardTarget(target, options.interactiveElementSelector)) {
+    if (event.key === '0' && !event.altKey && !event.shiftKey) {
+      if (!event.repeat) {
+        closeContextMenuIfHandled(
+          options.editorSession.commands.toggleSelectedDevicesEnabled(),
+          options.closeContextMenu,
+          event,
+        );
+      }
+      return;
+    }
+
+    if (event.key !== 'Delete' && event.key !== 'Backspace') {
       return;
     }
 
