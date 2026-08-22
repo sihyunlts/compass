@@ -16,8 +16,20 @@ import type { RendererDeviceSchema } from '../types';
 
 const MAX_COLOR_PERCENT = 400;
 
+export const MAX_COLOR_SLOT_COUNT = 32;
+export const DEFAULT_COLOR_SLOT_PATTERN = [
+  3,
+  32,
+  33,
+  52,
+  53,
+  5,
+  6,
+  7,
+] as const;
+
 export const DEFAULT_COLOR_PARAMS: ColorEffectNode['params'] = {
-  velocities: [3],
+  velocities: [...DEFAULT_COLOR_SLOT_PATTERN],
   noteLengthPercent: 100,
   gapPercent: 0,
 };
@@ -89,10 +101,11 @@ export const sanitizeColorGapPercent = (value: unknown): number => {
 export const normalizeColorDeviceParams = (
   params: Partial<ColorEffectNode['params']> | null | undefined,
 ): ColorEffectNode['params'] => {
+  const velocities = Array.isArray(params?.velocities) && params.velocities.length > 0
+    ? params.velocities.slice(0, MAX_COLOR_SLOT_COUNT)
+    : [...DEFAULT_COLOR_PARAMS.velocities];
   const normalized: ColorEffectNode['params'] = {
-    velocities: Array.isArray(params?.velocities)
-    ? [...params.velocities]
-    : [...DEFAULT_COLOR_PARAMS.velocities],
+    velocities,
     noteLengthPercent: DEFAULT_COLOR_PARAMS.noteLengthPercent,
     gapPercent: DEFAULT_COLOR_PARAMS.gapPercent,
   };

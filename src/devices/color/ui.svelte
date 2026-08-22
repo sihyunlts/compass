@@ -5,7 +5,7 @@
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import { resolveLedSurfaceRgb } from '../../renderer/app/led-surface-color';
   import type { RendererDeviceEditorPropsBase } from '../types';
-  import { COLOR_NUMERIC_PARAMETERS } from './schema';
+  import { COLOR_NUMERIC_PARAMETERS, MAX_COLOR_SLOT_COUNT } from './schema';
   import { i18n } from '../../renderer/i18n.svelte';
 
   const BLACK_RGB = '0 0 0';
@@ -167,6 +167,7 @@
     <NumberField
       label={i18n.t('control.slots')}
       min="1"
+      max={String(MAX_COLOR_SLOT_COUNT)}
       step="1"
       value={device.params.velocities.length}
       dataAction="set-color-slot-count"

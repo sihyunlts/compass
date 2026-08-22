@@ -6,15 +6,35 @@ import {
   parseFiniteControlNumber,
 } from '../control-helpers';
 import type { RendererKindControlDefinition } from '../control-types';
-import { COLOR_NUMERIC_PARAMETERS, DEFAULT_COLOR_PARAMS } from './schema';
+import {
+  COLOR_NUMERIC_PARAMETERS,
+  DEFAULT_COLOR_SLOT_PATTERN,
+  MAX_COLOR_SLOT_COUNT,
+} from './schema';
 
-const DEFAULT_COLOR_SLOT_VELOCITY = DEFAULT_COLOR_PARAMS.velocities[0];
 const MIN_COLOR_SLOT_COUNT = 1;
+
+type ColorDevice = Extract<GeneratorDeviceNode, { kind: 'color' }>;
 
 const isColorDevice = (
   device: GeneratorDeviceNode,
-): device is Extract<GeneratorDeviceNode, { kind: 'color' }> =>
+): device is ColorDevice =>
   device.kind === 'color';
+
+const retainColorSlots = (
+  retainedSlotsByDeviceId: Map<string, number[]>,
+  device: ColorDevice,
+): number[] => {
+  const retainedSlots = [...(retainedSlotsByDeviceId.get(device.id) ?? [])];
+  for (const [index, velocity] of device.params.velocities.entries()) {
+    retainedSlots[index] = velocity;
+  }
+  retainedSlotsByDeviceId.set(device.id, retainedSlots);
+  return retainedSlots;
+};
+
+const resolveDefaultColorSlotVelocity = (slotIndex: number): number =>
+  DEFAULT_COLOR_SLOT_PATTERN[slotIndex % DEFAULT_COLOR_SLOT_PATTERN.length];
 
 const resolveColorSlotIndex = (raw: string | undefined): number | null => {
   const value = raw?.trim();
@@ -56,62 +76,73 @@ export const colorDeviceControls = {
           : null,
     },
   },
-  createHandlers: () => ({
-    'set-color-slot': (device, change) => {
-      if (device.kind !== 'color') {
-        return false;
-      }
+  createHandlers: () => {
+    const retainedSlotsByDeviceId = new Map<string, number[]>();
 
-      const slotIndex = resolveColorSlotIndex(change.paramKey);
-      const paletteIndex = resolveColorSlotIndex(String(change.value));
-      if (slotIndex === null || paletteIndex === null) {
-        return false;
-      }
-      if (slotIndex >= device.params.velocities.length || paletteIndex > 127) {
-        return false;
-      }
-      if (device.params.velocities[slotIndex] === paletteIndex) {
-        return false;
-      }
+    return {
+      'set-color-slot': (device, change) => {
+        if (device.kind !== 'color') {
+          return false;
+        }
 
-      device.params.velocities[slotIndex] = paletteIndex;
-      return true;
-    },
-    'set-color-note-length-percent': createNumericParameterSetter({
-      isKind: isColorDevice,
-      rules: COLOR_NUMERIC_PARAMETERS,
-      readParam: () => 'noteLengthPercent',
-    }),
-    'set-color-gap-percent': createNumericParameterSetter({
-      isKind: isColorDevice,
-      rules: COLOR_NUMERIC_PARAMETERS,
-      readParam: () => 'gapPercent',
-    }),
-    'set-color-slot-count': (device, change) => {
-      if (device.kind !== 'color') {
-        return false;
-      }
+        const slotIndex = resolveColorSlotIndex(change.paramKey);
+        const paletteIndex = resolveColorSlotIndex(String(change.value));
+        if (slotIndex === null || paletteIndex === null) {
+          return false;
+        }
+        if (slotIndex >= device.params.velocities.length || paletteIndex > 127) {
+          return false;
+        }
+        if (device.params.velocities[slotIndex] === paletteIndex) {
+          return false;
+        }
 
-      const value = parseFiniteControlNumber(change.value);
-      if (value === null) {
-        return false;
-      }
-
-      const nextCount = Math.max(MIN_COLOR_SLOT_COUNT, Math.round(value));
-      const currentCount = device.params.velocities.length;
-      if (nextCount === currentCount) {
-        return false;
-      }
-
-      if (nextCount < currentCount) {
-        device.params.velocities.length = nextCount;
+        device.params.velocities[slotIndex] = paletteIndex;
         return true;
-      }
+      },
+      'set-color-note-length-percent': createNumericParameterSetter({
+        isKind: isColorDevice,
+        rules: COLOR_NUMERIC_PARAMETERS,
+        readParam: () => 'noteLengthPercent',
+      }),
+      'set-color-gap-percent': createNumericParameterSetter({
+        isKind: isColorDevice,
+        rules: COLOR_NUMERIC_PARAMETERS,
+        readParam: () => 'gapPercent',
+      }),
+      'set-color-slot-count': (device, change) => {
+        if (device.kind !== 'color') {
+          return false;
+        }
 
-      while (device.params.velocities.length < nextCount) {
-        device.params.velocities.push(DEFAULT_COLOR_SLOT_VELOCITY);
-      }
-      return true;
-    },
-  }),
+        const value = parseFiniteControlNumber(change.value);
+        if (value === null) {
+          return false;
+        }
+
+        const nextCount = Math.min(
+          MAX_COLOR_SLOT_COUNT,
+          Math.max(MIN_COLOR_SLOT_COUNT, Math.round(value)),
+        );
+        const currentCount = device.params.velocities.length;
+        if (nextCount === currentCount) {
+          return false;
+        }
+
+        const retainedSlots = retainColorSlots(retainedSlotsByDeviceId, device);
+        if (nextCount < currentCount) {
+          device.params.velocities.length = nextCount;
+          return true;
+        }
+
+        while (device.params.velocities.length < nextCount) {
+          const slotIndex = device.params.velocities.length;
+          device.params.velocities.push(
+            retainedSlots[slotIndex] ?? resolveDefaultColorSlotVelocity(slotIndex),
+          );
+        }
+        return true;
+      },
+    };
+  },
 } satisfies RendererKindControlDefinition;
