@@ -219,7 +219,7 @@ html.reduce-animation {
   align-items: stretch;
   gap: var(--gap-2);
   width: fit-content;
-  min-width: 6rem;
+  min-width: max(5rem, var(--floating-dropdown-anchor-width, 0px));
   max-width: calc(100vw - var(--gap-16));
   padding: var(--gap-4);
   border: 1px solid var(--color-border-floating);
