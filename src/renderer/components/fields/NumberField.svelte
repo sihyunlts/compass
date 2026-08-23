@@ -100,7 +100,6 @@
     0,
     ...displayedModulationStates
       .map((state: ModulationParameterState) => resolveLinearModulationRangeFillRatio(
-        state.baseValue,
         state.amount,
         modulationDomain,
       )),

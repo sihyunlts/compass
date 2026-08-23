@@ -4,7 +4,10 @@
   import { clamp } from '../../../shared/math';
   import type { ModulationParameterState } from '../../../shared/contracts/preview/modulation';
   import { i18n } from '../../i18n.svelte';
-  import type { ModulationDisplayDomain } from './modulation-display-domain';
+  import {
+    resolveLinearModulationDisplaySpan,
+    type ModulationDisplayDomain,
+  } from './modulation-display-domain';
 
   let {
     states,
@@ -27,7 +30,7 @@
       ? domain.softSpan
       : Math.max(domain.max - domain.min, 0.000001),
   );
-
+  const linearDisplaySpan = $derived(resolveLinearModulationDisplaySpan(domain));
   const usesCircularDisplay = $derived(
     domain.kind === 'circular'
       && (displayMode === 'auto' || displayMode === 'circular'),
@@ -118,34 +121,22 @@
     state: ModulationParameterState,
     value: number,
   ): number => {
-    if (domain.kind === 'bounded') {
-      return clamp(((value - domain.min) / domainSpan) * 100, 0, 100);
-    }
-    if (domain.kind === 'open') {
-      return clamp(
-        50 + ((value - state.baseValue) / domain.softSpan) * 50,
-        0,
-        100,
-      );
-    }
-    if (!usesCircularDisplay) {
-      let offset = value - state.baseValue;
+    let offset = value - state.baseValue;
+    if (domain.kind === 'circular') {
       offset = ((offset + domainSpan / 2) % domainSpan + domainSpan) % domainSpan
         - domainSpan / 2;
-      return clamp(50 + (offset / domainSpan) * 100, 0, 100);
     }
-    return toCircularPercent(value);
+    return clamp(50 + (offset / linearDisplaySpan) * 100, 0, 100);
   };
 
-  const resolveLinearRange = (
-    state: ModulationParameterState,
-  ): { left: number; width: number } => {
-    const amount = Math.abs(state.amount);
-    const start = toLinearPercent(state, state.baseValue - amount);
-    const end = toLinearPercent(state, state.baseValue + amount);
+  const resolveLinearRange = (amount: number): { left: number; width: number } => {
+    const halfWidth = Math.min(
+      (Math.abs(amount) / linearDisplaySpan) * 100,
+      50,
+    );
     return {
-      left: Math.min(start, end),
-      width: Math.abs(end - start),
+      left: 50 - halfWidth,
+      width: halfWidth * 2,
     };
   };
 
@@ -156,7 +147,6 @@
     class="modulation-indicator"
     class:is-linear={!usesCircularDisplay}
     class:is-circular={usesCircularDisplay}
-    class:is-centered={domain.kind === 'open' || (domain.kind === 'circular' && !usesCircularDisplay)}
     role="img"
     aria-label={i18n.t('modulation.connected')}
   >
@@ -184,9 +174,8 @@
       </svg>
     {:else}
       {#each finiteStates as state (`${state.modulatorId}:${state.targetId}`)}
-        {@const basePercent = toLinearPercent(state, state.baseValue)}
         {@const currentPercent = toLinearPercent(state, state.modulatedValue)}
-        {@const range = resolveLinearRange(state)}
+        {@const range = resolveLinearRange(state.amount)}
         <span
           class="modulation-linear-state"
           style={`clip-path:inset(0 ${100 - range.left - range.width}% 0 ${range.left}%);`}
@@ -195,10 +184,7 @@
             class="modulation-linear-range"
             style={`left:${range.left}%;width:${range.width}%;`}
           ></span>
-          <span
-            class="modulation-linear-base"
-            style={`--modulation-base-position:${basePercent}%;`}
-          ></span>
+          <span class="modulation-linear-base"></span>
           <span
             class="modulation-linear-current"
             style={`--modulation-current-position:${currentPercent}%;`}
@@ -231,7 +217,7 @@
       overflow: hidden;
     }
 
-    &.is-centered::before {
+    &.is-linear::before {
       content: '';
       position: absolute;
       top: 50%;
@@ -281,7 +267,7 @@
 
   .modulation-linear-base {
     top: 0;
-    left: var(--modulation-base-position);
+    left: 50%;
     width: var(--modulation-base-indicator-width);
     height: 100%;
     transform: translateX(-50%);
