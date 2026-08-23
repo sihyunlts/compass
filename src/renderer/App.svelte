@@ -699,7 +699,9 @@
           isSidebarResizing={uiState.isSidebarResizing}
           interactiveElementSelector={INTERACTIVE_ELEMENT_SELECTOR}
           onSaveChain={editorSession.commands.saveChain}
-          onScheduleAutoPreview={(delayMs) => editorSession.scheduleAutoPreview(delayMs)}
+          onScheduleAutoPreview={(delayMs) => editorSession.scheduleAutoPreview(delayMs, {
+            restartPlayback: true,
+          })}
           onOpenContextMenu={(x, y, target) => contextMenuComponent?.open(x, y, target)}
           onCloseContextMenu={closeContextMenu}
           onCommit={editorSession.commands.handleRackCommit}
