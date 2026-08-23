@@ -729,6 +729,12 @@
     padding: var(--gap-10) var(--gap-6);
     gap: var(--gap-12);
     background: var(--color-surface);
+    cursor: grab;
+    -webkit-user-drag: none;
+
+    &.is-renaming {
+      cursor: default;
+    }
 
     &-controls {
       display: flex;
@@ -759,6 +765,10 @@
         border-left-color: var(--color-border-secondary);
       }
     }
+  }
+
+  .device-group:global(.is-dragging) .group-rail {
+    cursor: grabbing;
   }
 
   .group-label {

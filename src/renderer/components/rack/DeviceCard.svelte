@@ -480,6 +480,7 @@
       }
 
       .device-title {
+        flex: 0 1 auto;
         writing-mode: sideways-lr;
       }
 
