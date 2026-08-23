@@ -2,7 +2,6 @@
 
 <script lang="ts">
   import FieldShell from '../fields/FieldShell.svelte';
-  import { hint } from '../overlays/hint';
   import { i18n } from '../../i18n.svelte';
 
   const GRID_SIZE = 10;
@@ -58,7 +57,6 @@
           data-tile-index={cell.index}
           aria-pressed={selected.has(cell.index) ? 'true' : 'false'}
           aria-label={cellLabel}
-          use:hint={cellLabel}
         ></button>
       {/each}
     </div>
@@ -92,7 +90,6 @@
     grid-template-rows: repeat(10, minmax(0, 1fr));
     inline-size: var(--mask-tile-grid-size, 0px);
     block-size: var(--mask-tile-grid-size, 0px);
-    gap: var(--gap-2);
     padding: var(--gap-6);
     border-radius: var(--radius-6);
     border: 1px solid var(--color-border-secondary);
@@ -101,15 +98,24 @@
   }
 
   .mask-tile {
+    position: relative;
     appearance: none;
     border: none;
-    border-radius: var(--radius-2);
-    background: var(--color-surface-interactive);
+    background: transparent;
     aspect-ratio: 1 / 1;
     padding: 0;
     cursor: pointer;
 
-    &.is-selected {
+    &::before {
+      content: '';
+      position: absolute;
+      inset: calc(var(--gap-2) / 2);
+      border-radius: var(--radius-2);
+      background: var(--color-surface-interactive);
+      pointer-events: none;
+    }
+
+    &.is-selected::before {
       background: var(--device-control-accent, var(--color-surface-inverse));
     }
   }

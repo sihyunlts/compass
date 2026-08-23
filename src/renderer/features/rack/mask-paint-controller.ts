@@ -184,6 +184,12 @@ export class MaskTilePaintController {
     return true;
   }
 
+  public handleWindowBlur(): void {
+    if (this.isActive()) {
+      this.finish(true);
+    }
+  }
+
   private applyTileChange(
     deviceId: string,
     tileIndex: number,
