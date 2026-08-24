@@ -1,5 +1,5 @@
 export const THEME_PRESETS = [
-  { id: 'default', hue: 265, saturation: 100 },
+  { id: 'default', hue: 265, saturation: 50 },
   { id: 'dune', hue: 45, saturation: 20 },
   { id: 'lagoon', hue: 180, saturation: 50 },
   { id: 'crimson', hue: 0, saturation: 60 },
