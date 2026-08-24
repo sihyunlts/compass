@@ -362,6 +362,7 @@
     display: flex;
     flex-direction: column;
     flex: 0 0 auto;
+    min-width: 6.25rem;
     border: 1px solid var(--color-border-tertiary);
     border-radius: var(--device-card-radius);
     background: var(--color-surface);
@@ -385,14 +386,17 @@
       display: flex;
       align-items: center;
       gap: var(--gap-10);
+      min-width: 0;
       cursor: grab;
       -webkit-user-drag: none;
       outline: none;
 
       &-left {
         display: flex;
+        flex: 1 1 0;
         align-items: center;
         gap: var(--gap-8);
+        min-width: 0;
       }
 
       &-controls {
@@ -414,6 +418,7 @@
       }
 
       .device-title {
+        flex: 1 1 auto;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -423,6 +428,10 @@
         margin-left: auto;
         flex: 0 0 auto;
       }
+    }
+
+    &:not(.is-collapsed) .device-head-left {
+      width: 0;
     }
 
     &.is-dragging {
