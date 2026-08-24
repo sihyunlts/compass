@@ -6,6 +6,7 @@
   import type { GeneratorDeviceNode } from '../../shared/model';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { i18n } from '../../renderer/i18n.svelte';
+  import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
 
   type TimeWarpDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'timewarp' }>;
@@ -14,7 +15,7 @@
   let { device, currentProgress01 = 0, onControlChange }: TimeWarpDeviceEditorProps = $props();
 </script>
 
-<div class="device-controls">
+<DeviceBodyLayout kind="graph">
   <CurveEditor
     label={i18n.t('tab.curve')}
     deviceId={device.id}
@@ -24,17 +25,8 @@
     valueMin={0}
     valueMax={1}
     guideValue={null}
-    wrapperClass="timewarp-curve-control"
     divisionsControlAction="set-timewarp-divisions"
     {currentProgress01}
     {onControlChange}
   />
-</div>
-
-<style lang="scss">
-  :global(.timewarp-curve-control) {
-    flex: 1 1 auto;
-    min-width: 0;
-    min-height: 0;
-  }
-</style>
+</DeviceBodyLayout>

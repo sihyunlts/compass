@@ -315,7 +315,7 @@ class RackSurfaceController {
       return;
     }
 
-    if (target.closest('.modulation-curve-control')) {
+    if (target.closest('.curve-editor-wrap')) {
       return;
     }
 

@@ -9,6 +9,8 @@
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { getDeviceMessageKey } from '../../renderer/device-i18n';
   import { i18n } from '../../renderer/i18n.svelte';
+  import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
+  import DeviceControlColumn from '../../renderer/components/rack/DeviceControlColumn.svelte';
 
   type MaskDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'mask' }>;
@@ -23,8 +25,8 @@
   }: MaskDeviceEditorProps = $props();
 
   const maskModeOptions = $derived([
-    { value: 'include', label: i18n.t('option.showSelection') },
-    { value: 'exclude', label: i18n.t('option.hideSelection') },
+    { value: 'include', label: i18n.t('option.show') },
+    { value: 'exclude', label: i18n.t('option.hide') },
   ]);
   const maskSourceKindOptions = $derived([
     { value: 'tiles', label: i18n.t('option.tiles') },
@@ -54,9 +56,7 @@
   const maskGroupSelectOptions = $derived.by(() => [
     {
       value: '',
-      label: maskGroupOptions.length === 0
-        ? i18n.t('option.noGroups')
-        : i18n.t('option.none'),
+      label: i18n.t('option.none'),
     },
     ...maskGroupOptions.map((groupId) => ({
       value: groupId,
@@ -66,9 +66,7 @@
   const maskGeneratorSelectOptions = $derived.by(() => [
     {
       value: '',
-      label: maskGeneratorOptions.length === 0
-        ? i18n.t('option.noGenerators')
-        : i18n.t('option.none'),
+      label: i18n.t('option.none'),
     },
     ...maskGeneratorOptions.map((generator) => ({
       value: generator.id,
@@ -78,10 +76,10 @@
   ]);
 </script>
 
-<div class="device-controls">
-  <div class="column-wrapper">
+<DeviceBodyLayout kind="content" size="regular">
+  <DeviceControlColumn>
     <SelectField
-      label={i18n.t('control.mode')}
+      label={i18n.t('control.maskSelection')}
       value={device.params.mode}
       options={maskModeOptions}
       dataAction="set-mask-mode"
@@ -89,7 +87,7 @@
       {onControlChange}
     />
     <SelectField
-      label={i18n.t('control.maskSource')}
+      label={i18n.t('control.source')}
       value={device.params.sourceKind}
       options={maskSourceKindOptions}
       dataAction="set-mask-source-kind"
@@ -97,15 +95,15 @@
       {onControlChange}
     />
     <SelectField
-      label={i18n.t('control.sourceVisibility')}
+      label={i18n.t('control.sourceDisplay')}
       value={device.params.sourceVisibility}
       options={maskSourceVisibilityOptions}
       dataAction="set-mask-source-visibility"
       dataId={device.id}
       {onControlChange}
     />
-  </div>
-  <div class="column-wrapper">
+  </DeviceControlColumn>
+  <DeviceControlColumn>
     {#if device.params.sourceKind === 'tiles'}
       <MaskTilePicker
         deviceId={device.id}
@@ -132,5 +130,5 @@
         {onControlChange}
       />
     {/if}
-  </div>
-</div>
+  </DeviceControlColumn>
+</DeviceBodyLayout>

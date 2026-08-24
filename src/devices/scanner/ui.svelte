@@ -6,6 +6,7 @@
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { SCANNER_NUMERIC_PARAMETERS } from './schema';
   import { i18n } from '../../renderer/i18n.svelte';
+  import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
 
   type ScannerDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'scanner' }>;
@@ -14,9 +15,9 @@
   let { device, modulationStateByParameter, onControlChange }: ScannerDeviceEditorProps = $props();
 </script>
 
-<div class="device-controls">
+<DeviceBodyLayout kind="fields">
   <AnglePicker
-    label={i18n.t('control.sweepDirection')}
+    label={i18n.t('control.direction')}
     value={device.params.angleDeg}
     dataAction="set-angle-param"
     dataId={device.id}
@@ -25,4 +26,4 @@
     {modulationStateByParameter}
     {onControlChange}
   />
-</div>
+</DeviceBodyLayout>

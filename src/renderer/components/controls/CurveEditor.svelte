@@ -66,7 +66,6 @@
     valueMin = -1,
     valueMax = 1,
     guideValue = 0,
-    wrapperClass = '',
     divisionsControlAction,
     onControlChange,
   } = $props<{
@@ -79,7 +78,6 @@
     valueMin?: number;
     valueMax?: number;
     guideValue?: number | null;
-    wrapperClass?: string;
     divisionsControlAction?: string;
     onControlChange: (change: RendererControlChange) => void;
   }>();
@@ -666,7 +664,7 @@
 {/snippet}
 
 {#if label}
-  <FieldShell {label} class={wrapperClass}>
+  <FieldShell {label}>
     {@render curveEditor()}
   </FieldShell>
 {:else}

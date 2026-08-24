@@ -8,6 +8,7 @@
   import { clamp } from '../../../shared/math';
   import FieldShell from '../fields/FieldShell.svelte';
   import NumberField from '../fields/NumberField.svelte';
+  import ControlSurfaceFrame from './ControlSurfaceFrame.svelte';
   import { i18n } from '../../i18n.svelte';
 
   let {
@@ -62,7 +63,6 @@
     { length: Math.max(0, Math.round(range) - 1) },
     (_, index) => (((index + 1) / range) * 100).toFixed(3),
   ));
-  let surfaceHeight = $state(0);
 </script>
 
 <FieldShell
@@ -71,31 +71,32 @@
   role="group"
   aria-label={i18n.t('control.centerPointPicker')}
 >
-  <div
-    class="center-picker-surface"
-    bind:clientHeight={surfaceHeight}
-    data-center-picker-surface="true"
-    data-device-id={deviceId}
-    data-min={resolvedMin}
-    data-max={resolvedMax}
-    data-step={resolvedStep}
-    data-center-x-state={isCenterX ? 'center' : 'off-center'}
-    data-center-y-state={isCenterY ? 'center' : 'off-center'}
-    aria-label={resolvedAreaLabel}
-    style={`width:${surfaceHeight}px;--picker-x:${xPercent}%;--picker-y:${yPercent}%;`}
-  >
-    {#each gridLineOffsets as offset (`x:${offset}`)}
-      <span class="center-picker-grid-line is-vertical" style={`left:${offset}%;`}></span>
-    {/each}
-    {#each gridLineOffsets as offset (`y:${offset}`)}
-      <span class="center-picker-grid-line is-horizontal" style={`top:${offset}%;`}></span>
-    {/each}
-    {#if overlay}
-      <div class="center-picker-overlay">
-        {@render overlay()}
-      </div>
-    {/if}
-  </div>
+  <ControlSurfaceFrame>
+    <div
+      class="center-picker-surface"
+      data-center-picker-surface="true"
+      data-device-id={deviceId}
+      data-min={resolvedMin}
+      data-max={resolvedMax}
+      data-step={resolvedStep}
+      data-center-x-state={isCenterX ? 'center' : 'off-center'}
+      data-center-y-state={isCenterY ? 'center' : 'off-center'}
+      aria-label={resolvedAreaLabel}
+      style={`--picker-x:${xPercent}%;--picker-y:${yPercent}%;`}
+    >
+      {#each gridLineOffsets as offset (`x:${offset}`)}
+        <span class="center-picker-grid-line is-vertical" style={`left:${offset}%;`}></span>
+      {/each}
+      {#each gridLineOffsets as offset (`y:${offset}`)}
+        <span class="center-picker-grid-line is-horizontal" style={`top:${offset}%;`}></span>
+      {/each}
+      {#if overlay}
+        <div class="center-picker-overlay">
+          {@render overlay()}
+        </div>
+      {/if}
+    </div>
+  </ControlSurfaceFrame>
   <div class="center-picker-inputs">
     <NumberField
       label="X"

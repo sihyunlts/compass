@@ -1962,8 +1962,7 @@
   });
 </script>
 
-<div class="path-editor-wrap">
-  <ControlSurfaceFrame minSize="10rem">
+<ControlSurfaceFrame>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="path-editor-surface"
@@ -2125,18 +2124,9 @@
         ></span>
       {/if}
     </div>
-  </ControlSurfaceFrame>
-</div>
+</ControlSurfaceFrame>
 
 <style lang="scss">
-  .path-editor-wrap {
-    display: flex;
-    align-items: stretch;
-    flex: 1 1 auto;
-    min-width: 0;
-    min-height: 0;
-  }
-
   .path-editor-surface {
     position: relative;
     aspect-ratio: 1 / 1;

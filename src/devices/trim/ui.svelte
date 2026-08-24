@@ -5,6 +5,7 @@
   import type { GeneratorDeviceNode } from '../../shared/model';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { TRIM_NUMERIC_PARAMETERS } from './schema';
+  import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
 
   type TrimDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'trim' }>;
@@ -18,7 +19,7 @@
   }: TrimDeviceEditorProps = $props();
 </script>
 
-<div class="device-controls">
+<DeviceBodyLayout kind="content" size="regular">
   <TimeWindowEditor
     deviceId={device.id}
     dataAction="set-trim-param"
@@ -30,4 +31,4 @@
     {modulationStateByParameter}
     {onControlChange}
   />
-</div>
+</DeviceBodyLayout>

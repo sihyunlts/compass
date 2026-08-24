@@ -17,6 +17,7 @@
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { i18n } from '../../renderer/i18n.svelte';
   import { getDeviceMessageKey } from '../../renderer/device-i18n';
+  import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
 
   type ModulatorDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'modulator' }>;
@@ -137,26 +138,21 @@
   };
 </script>
 
-<div class="device-controls modulation-layout">
+<DeviceBodyLayout kind="graph">
   {#if activeTab === 'curve'}
-    <div class="modulation-tab-panel modulation-curve-panel">
-      <div class="column-wrapper modulation-main">
-        <CurveEditor
-          label={modulationReadoutText}
-          deviceId={device.id}
-          curve={device.params.curve}
-          controlAction="set-modulation-curve-nodes"
-          sanitizeNodes={sanitizeCurveNodes}
-          guideValue={0}
-          wrapperClass="modulation-curve-control"
-          divisionsControlAction="set-modulation-divisions"
-          {currentProgress01}
-          {onControlChange}
-        />
-      </div>
-    </div>
+    <CurveEditor
+      label={modulationReadoutText}
+      deviceId={device.id}
+      curve={device.params.curve}
+      controlAction="set-modulation-curve-nodes"
+      sanitizeNodes={sanitizeCurveNodes}
+      guideValue={0}
+      divisionsControlAction="set-modulation-divisions"
+      {currentProgress01}
+      {onControlChange}
+    />
   {:else}
-    <div class="modulation-tab-panel modulation-map-panel">
+    <div class="modulation-map-panel">
       <div class="modulation-target-labels" aria-hidden="true">
         <div class="modulation-target-label-group">
           <span>{i18n.t('control.parameter')}</span>
@@ -218,42 +214,21 @@
       </div>
     </div>
   {/if}
-</div>
+</DeviceBodyLayout>
 
 <style lang="scss">
-  .modulation-tab-panel {
-    display: flex;
-    flex: 1 1 auto;
-    gap: var(--gap-10);
-    min-width: 0;
-    min-height: 0;
-  }
-
-  .modulation-main {
-    flex: 1 1 12rem;
-    min-width: 12rem;
-    min-height: 0;
-
-    :global(.modulation-curve-control) {
-      flex: 1 1 auto;
-      min-height: 0;
-    }
-  }
-
   .modulation-map-panel {
-    --modulation-target-group-width: 12.5rem;
     --modulation-target-amount-width: 2.75rem;
 
     display: flex;
     flex-direction: column;
     gap: var(--gap-6);
-    height: 100%;
     overflow: hidden;
   }
 
   .modulation-target-labels {
     display: grid;
-    grid-template-columns: repeat(2, var(--modulation-target-group-width));
+    grid-template-columns: repeat(2, var(--device-graph-column-width));
     column-gap: var(--gap-10);
     flex: 0 0 auto;
     min-width: 0;
@@ -264,7 +239,7 @@
 
   .modulation-target-label-group {
     display: grid;
-    grid-template-columns: minmax(7.5rem, 1fr) var(--modulation-target-amount-width);
+    grid-template-columns: minmax(0, 1fr) var(--modulation-target-amount-width);
     gap: var(--gap-4);
     min-width: 0;
   }
@@ -272,7 +247,7 @@
   .modulation-target-list {
     display: grid;
     grid-auto-flow: column;
-    grid-template-columns: repeat(2, var(--modulation-target-group-width));
+    grid-template-columns: repeat(2, var(--device-graph-column-width));
     grid-template-rows: repeat(5, var(--gap-20));
     column-gap: var(--gap-10);
     row-gap: var(--gap-10);
@@ -287,7 +262,7 @@
   .modulation-target-row {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(7.5rem, 1fr) var(--modulation-target-amount-width);
+    grid-template-columns: minmax(0, 1fr) var(--modulation-target-amount-width);
     gap: var(--gap-4);
     align-items: center;
     width: 100%;

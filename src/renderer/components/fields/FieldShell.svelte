@@ -36,12 +36,9 @@
   class:is-compact={size === 'compact'}
   class:is-fill={fill}
 >
-  <span
-    class="field-label control-field-label"
-    class:is-hidden={labelVisibility === 'hidden'}
-  >
-    {label}
-  </span>
+  {#if labelVisibility === 'visible'}
+    <span class="field-label control-field-label">{label}</span>
+  {/if}
   {#if children}
     {@render children()}
   {/if}
@@ -71,7 +68,7 @@
     > :global(.field-control),
     > :global(.dropdown-select),
     > :global(.dropdown-select .dropdown-select-trigger) {
-      width: var(--field-control-width, 6.6rem);
+      width: var(--field-control-width, 4rem);
       height: 1.75rem;
     }
 
@@ -102,12 +99,6 @@
     &.is-compact > :global(.field-control > input) {
       padding: 0 var(--gap-6);
       font-size: var(--text-12);
-    }
-  }
-
-  .field-label {
-    &.is-hidden {
-      display: none;
     }
   }
 </style>
