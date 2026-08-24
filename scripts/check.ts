@@ -64,7 +64,5 @@ if (testFiles.length > 0) {
 if (isFullRun) {
   run(path.join(repoRoot, 'node_modules', '.bin', `tsc${binSuffix}`), [
     '--noEmit',
-    '--module',
-    'esnext',
   ]);
 }

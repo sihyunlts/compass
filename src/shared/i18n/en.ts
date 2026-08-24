@@ -51,7 +51,6 @@ export const en = {
   'control.colorSlotCount': 'Color slot count',
   'control.curvature': 'Curvature',
   'control.density': 'Density',
-  'control.deleteSelected': 'Delete Selected',
   'control.direction': 'Direction',
   'control.divisions': 'Divisions',
   'control.end': 'End',

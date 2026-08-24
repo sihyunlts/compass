@@ -54,7 +54,6 @@ const colorizeEventStroke = (
     colorAgeBandIndex,
     colorAgeBandCount,
     points: stroke.polyline.points,
-    clipStack: stroke.polyline.clipStack,
   },
   originGroupId: stroke.originGroupId,
   writeOrder,

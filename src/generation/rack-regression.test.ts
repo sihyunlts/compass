@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
@@ -207,7 +206,6 @@ test('rack regression fixtures match their compact generation baselines', async 
       continue;
     }
 
-    assert.equal(existsSync(baselinePath), true, `${rackFileName}: missing baseline`);
     assert.deepEqual(signature, await readBaseline(baselinePath), `${rackFileName}: baseline changed`);
   }
 });

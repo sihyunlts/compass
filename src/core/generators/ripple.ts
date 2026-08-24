@@ -58,6 +58,5 @@ export const buildRipplePolyline = (
     closed: true,
     originId,
     velocity,
-    clipStack: [],
   };
 };

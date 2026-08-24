@@ -48,29 +48,6 @@ export interface SceneTemporalState {
   hasAuthoredTimeline: boolean;
 }
 
-export interface TileUnionClipShape {
-  kind: 'tile-union';
-  tiles: ReadonlyArray<number>;
-}
-
-export interface HalfPlaneClipShape {
-  kind: 'half-plane';
-  point: Vec2;
-  normal: Vec2;
-}
-
-export interface IntersectionClipShape {
-  kind: 'intersection';
-  shapes: ReadonlyArray<ClipShape>;
-}
-
-export type ClipShape = TileUnionClipShape | HalfPlaneClipShape | IntersectionClipShape;
-
-export interface SceneClip {
-  readonly shape: ClipShape;
-  readonly inverseTransform: Readonly<AffineTransform>;
-}
-
 export interface Polyline {
   readonly points: ReadonlyArray<Readonly<Vec2>>;
   readonly closed: boolean;
@@ -80,5 +57,4 @@ export interface Polyline {
   readonly colorAgeBandCount?: number;
   readonly rasterMode?: 'centerline' | 'fill';
   readonly rasterTieBreakDirection?: Readonly<Vec2>;
-  readonly clipStack: ReadonlyArray<SceneClip>;
 }

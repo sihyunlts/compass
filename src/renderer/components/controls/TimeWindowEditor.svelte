@@ -145,7 +145,7 @@
 
     <div class="time-window-handle-layer">
       <input
-        class="time-window-range time-window-range-start"
+        class="time-window-range"
         type="range"
         min={resolvedMin}
         max={resolvedMax}
@@ -156,7 +156,7 @@
         onchange={(event) => emitControlChange(event, 'start', true)}
       />
       <input
-        class="time-window-range time-window-range-end"
+        class="time-window-range"
         type="range"
         min={resolvedMin}
         max={resolvedMax}

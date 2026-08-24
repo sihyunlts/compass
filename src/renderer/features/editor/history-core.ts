@@ -170,10 +170,6 @@ export class ChainHistory {
     return this.toPublicEntry(this.entries[this.cursor + 1]);
   }
 
-  public getCurrentEntry(): ChainHistoryEntry {
-    return this.toPublicEntry(this.entries[this.cursor]);
-  }
-
   public getHistoryItems(): ChainHistoryListItem[] {
     return this.entries.map((entry, index): ChainHistoryListItem => ({
       id: entry.id,

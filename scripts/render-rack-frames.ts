@@ -128,8 +128,7 @@ const parseArgs = (
       case '--help':
       case '-h':
         console.log(usage());
-        process.exit(0);
-        break;
+        return process.exit(0);
       case '--compare':
         options.compare = true;
         break;

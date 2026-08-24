@@ -1861,7 +1861,6 @@
   .browser-empty-state {
     position: absolute;
     inset: 0;
-    margin: 0;
     padding: var(--gap-12);
     display: flex;
     align-items: center;

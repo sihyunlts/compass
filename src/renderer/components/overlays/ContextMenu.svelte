@@ -297,7 +297,7 @@
 {#snippet menuItem(id: string, label: string, handler: () => void)}
 <button
   {id}
-  class="context-menu-item floating-menu-item"
+  class="floating-menu-item"
   type="button"
   role="menuitem"
   onclick={handler}
@@ -330,11 +330,11 @@
       {/if}
       {#if isDeletablePresetTarget}
         {#if canCreatePresetFolder || canRenameTarget}
-          <hr class="context-menu-separator floating-menu-separator" />
+          <hr class="floating-menu-separator" />
         {/if}
         {@render menuItem('context-delete', i18n.t('context.delete'), handleDeleteClick)}
         {#if canShowInFolder}
-          <hr class="context-menu-separator floating-menu-separator" />
+          <hr class="floating-menu-separator" />
         {/if}
       {/if}
       {#if canShowInFolder}
@@ -353,7 +353,7 @@
           i18n.t('modulation.disconnectAll'),
           () => handleDisconnectModulationClick(),
         )}
-        <hr class="context-menu-separator floating-menu-separator" />
+        <hr class="floating-menu-separator" />
         {#each target.connections as connection (`${connection.modulatorId}:${connection.targetId}`)}
           {@render menuItem(
             `context-disconnect-modulation-${connection.modulatorId}-${connection.targetId}`,
@@ -372,7 +372,7 @@
       {#if canRenameTarget}
         {@render menuItem('context-rename', i18n.t('context.rename'), handleRenameClick)}
       {/if}
-      <hr class="context-menu-separator floating-menu-separator" />
+      <hr class="floating-menu-separator" />
       {#if target.kind === 'devices'}
         {@render menuItem('context-delete', i18n.t('context.delete'), handleDeleteClick)}
         {#if target.canGroup}

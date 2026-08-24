@@ -339,7 +339,6 @@ export const buildRainPolylines = (
       originId,
       velocity,
       rasterMode: 'centerline',
-      clipStack: [],
     });
   }
 

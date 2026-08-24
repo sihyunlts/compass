@@ -38,9 +38,7 @@ input {
   padding: var(--gap-4) var(--gap-6);
   max-width: 100%;
   min-width: 0;
-}
 
-input {
   &[type='checkbox'] {
     accent-color: var(--device-control-accent, var(--color-surface-inverse));
 
@@ -71,11 +69,6 @@ input {
       outline: 1px solid var(--color-border-secondary);
       outline-offset: -1px;
       caret-color: transparent;
-    }
-
-    &[data-drag-active='true'] {
-      user-select: none;
-      -webkit-user-select: none;
     }
 
     &[data-keyboard-editing='true'] {
@@ -190,7 +183,7 @@ html.is-theme-adjusting {
     transform: translateX(12px) !important;
   }
 
-  .preview-scrub-loader .loader-bar {
+  .preview-panel-scrub-loader .loader-bar {
     animation: none !important;
     transform: translateX(97%) !important;
   }

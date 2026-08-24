@@ -11,15 +11,6 @@ const getSourceKeyFamily = (sourceKey: string): string | null => {
 export class LatestSourceKeyFamilyCache {
   private readonly latestSourceKeyByFamily = new Map<string, string>();
 
-  public getLatestSourceKey(sourceKey: string): string | null {
-    const family = getSourceKeyFamily(sourceKey);
-    if (!family) {
-      return null;
-    }
-
-    return this.latestSourceKeyByFamily.get(family) ?? null;
-  }
-
   public replaceLatestSourceKey(sourceKey: string): string | null {
     const family = getSourceKeyFamily(sourceKey);
     if (!family) {
