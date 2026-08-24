@@ -7,6 +7,8 @@
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { RAIN_NUMERIC_PARAMETERS } from './schema';
   import { i18n } from '../../renderer/i18n.svelte';
+  import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
+  import DeviceControlColumn from '../../renderer/components/rack/DeviceControlColumn.svelte';
 
   type RainDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'rain' }>;
@@ -15,7 +17,7 @@
   let { device, modulationStateByParameter, onControlChange }: RainDeviceEditorProps = $props();
 </script>
 
-<div class="device-controls">
+<DeviceBodyLayout kind="fields">
   <AnglePicker
     label={i18n.t('control.direction')}
     value={device.params.angleDeg}
@@ -26,7 +28,7 @@
     {modulationStateByParameter}
     {onControlChange}
   />
-  <div class="column-wrapper">
+  <DeviceControlColumn>
     <NumberField
       label={i18n.t('control.seed')}
       parameter={RAIN_NUMERIC_PARAMETERS.seed}
@@ -57,5 +59,5 @@
       {modulationStateByParameter}
       {onControlChange}
     />
-  </div>
-</div>
+  </DeviceControlColumn>
+</DeviceBodyLayout>

@@ -25,7 +25,7 @@ export const MIRROR_NUMERIC_PARAMETERS = defineNumericParameterRules<
     period: 360,
     step: 1,
     display: { unit: '°' },
-    modulationMessageKey: 'control.mirrorAxisAngle',
+    modulationMessageKey: 'control.mirrorAxis',
   }),
 });
 

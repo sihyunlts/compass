@@ -257,7 +257,6 @@
   class:is-dragging={isDragging}
   class:is-renaming={isRenaming}
   data-device-id={device.id}
-  data-device-kind={device.kind}
 >
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -465,7 +464,7 @@
       width: 2rem;
       min-width: 2rem;
 
-      :global(.device-controls.device-controls) {
+      :global(.device-controls) {
         display: none;
       }
 
@@ -514,72 +513,6 @@
 
     .device-editor-scope {
       display: contents;
-    }
-
-    :global(.device-controls) {
-      padding: var(--gap-10);
-      display: flex;
-      gap: var(--gap-10);
-      flex: 1;
-      min-width: 0;
-      min-height: 0;
-    }
-
-    :global(.column-wrapper) {
-      display: flex;
-      flex-direction: column;
-      gap: var(--gap-8);
-      min-height: 0;
-    }
-
-    &[data-device-kind='color'] {
-      :global(.color-slot-row) {
-        display: flex;
-        gap: var(--gap-4);
-        margin-top: var(--gap-4);
-      }
-
-      :global(.color-slot) {
-        width: 1.25rem;
-        height: 1.25rem;
-        border: 1px solid var(--color-surface);
-        border-radius: var(--radius-2);
-        padding: 0;
-      }
-
-      :global(.color-slot.is-selected) {
-        outline: 2px solid var(--color-focus-ring);
-      }
-
-      :global(.color-palette-container) {
-        display: flex;
-        flex: 1 1 auto;
-        gap: var(--gap-8);
-        width: calc((var(--color-palette-grid-size, 0px) * 2) + var(--gap-12));
-      }
-
-      :global(.color-palette-grid) {
-        display: grid;
-        grid-template-columns: repeat(8, minmax(0, 1fr));
-        grid-template-rows: repeat(8, minmax(0, 1fr));
-        gap: var(--gap-2);
-        inline-size: var(--color-palette-grid-size);
-        block-size: var(--color-palette-grid-size);
-      }
-
-      :global(.color-palette-cell) {
-        border: 1px solid var(--color-surface);
-        border-radius: var(--radius-2);
-        padding: 0;
-      }
-
-      :global(.color-palette-cell:disabled) {
-        visibility: hidden;
-      }
-
-      :global(.color-palette-cell.is-selected) {
-        outline: 2px solid var(--color-focus-ring);
-      }
     }
 
   }

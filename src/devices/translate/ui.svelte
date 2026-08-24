@@ -6,6 +6,8 @@
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { TRANSLATE_NUMERIC_PARAMETERS } from './schema';
   import { i18n } from '../../renderer/i18n.svelte';
+  import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
+  import DeviceControlColumn from '../../renderer/components/rack/DeviceControlColumn.svelte';
 
   type TranslateDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'translate' }>;
@@ -14,8 +16,8 @@
   let { device, modulationStateByParameter, onControlChange }: TranslateDeviceEditorProps = $props();
 </script>
 
-<div class="device-controls">
-  <div class="column-wrapper">
+<DeviceBodyLayout kind="fields" size="regular">
+  <DeviceControlColumn>
     <NumberField
       label={i18n.t('control.offsetX')}
       parameter={TRANSLATE_NUMERIC_PARAMETERS.offsetX}
@@ -36,5 +38,5 @@
       {modulationStateByParameter}
       {onControlChange}
     />
-  </div>
-</div>
+  </DeviceControlColumn>
+</DeviceBodyLayout>

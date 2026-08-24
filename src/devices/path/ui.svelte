@@ -6,6 +6,7 @@
   import FieldShell from '../../renderer/components/fields/FieldShell.svelte';
   import SelectField from '../../renderer/components/fields/SelectField.svelte';
   import Switch from '../../renderer/components/primitives/Switch.svelte';
+  import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
   import { i18n } from '../../renderer/i18n.svelte';
   import { clamp } from '../../shared/math';
   import type { RendererDeviceEditorPropsBase } from '../types';
@@ -32,9 +33,9 @@
   ));
 </script>
 
-<div class="device-controls path-layout">
-  {#if activeTab === 'path'}
-    <div class="path-tab-panel">
+<DeviceBodyLayout kind="surface" size="regular">
+  {#snippet surface()}
+    {#if activeTab === 'path'}
       <PathEditor
         deviceId={device.id}
         anchors={device.params.anchors}
@@ -46,22 +47,7 @@
         previewStartAnchorId={device.params.animation.startAnchorId}
         {onControlChange}
       />
-      <FieldShell label={i18n.t('control.pathFill')} class="path-inline-control">
-        <Switch
-          checked={device.params.fill}
-          label={i18n.t('control.pathFill')}
-          disabled={device.params.anchors.length < 3}
-          onCheckedChange={(checked) => onControlChange({
-            action: 'set-path-fill',
-            deviceId: device.id,
-            value: checked,
-            finalize: true,
-          })}
-        />
-      </FieldShell>
-    </div>
-  {:else}
-    <div class="path-tab-panel">
+    {:else}
       <PathEditor
         deviceId={device.id}
         anchors={device.params.anchors}
@@ -84,68 +70,59 @@
           : undefined}
         {onControlChange}
       />
-      <div class="path-animation-controls">
-        <FieldShell label={i18n.t('control.pathAnimate')}>
-          <Switch
-            checked={device.params.animation.enabled}
-            label={i18n.t('control.pathAnimate')}
-            onCheckedChange={(checked) => onControlChange({
-              action: 'set-path-animation-enabled',
-              deviceId: device.id,
-              value: checked,
-              finalize: true,
-            })}
-          />
-        </FieldShell>
-        <SelectField
-          label={i18n.t('control.pathDirection')}
-          value={device.params.animation.direction}
-          options={directionOptions}
-          dataAction="set-path-animation-direction"
-          dataId={device.id}
-          onControlChange={onControlChange}
+    {/if}
+  {/snippet}
+
+  {#snippet settings()}
+    {#if activeTab === 'path'}
+      <FieldShell label={i18n.t('control.pathFill')}>
+        <Switch
+          checked={device.params.fill}
+          label={i18n.t('control.pathFill')}
+          disabled={device.params.anchors.length < 3}
+          onCheckedChange={(checked) => onControlChange({
+            action: 'set-path-fill',
+            deviceId: device.id,
+            value: checked,
+            finalize: true,
+          })}
         />
-        <FieldShell label={i18n.t('control.pathStartPoint')}>
-          <span class="path-start-value">
-            {device.params.closed
-              ? i18n.t('control.pathAnchorValue', {
-                index: Math.max(startAnchorIndex, 0) + 1,
-              })
-              : i18n.t('control.pathEndpointByDirection')}
-          </span>
-        </FieldShell>
-      </div>
-    </div>
-  {/if}
-</div>
+      </FieldShell>
+    {:else}
+      <FieldShell label={i18n.t('control.pathAnimate')}>
+        <Switch
+          checked={device.params.animation.enabled}
+          label={i18n.t('control.pathAnimate')}
+          onCheckedChange={(checked) => onControlChange({
+            action: 'set-path-animation-enabled',
+            deviceId: device.id,
+            value: checked,
+            finalize: true,
+          })}
+        />
+      </FieldShell>
+      <SelectField
+        label={i18n.t('control.pathDirection')}
+        value={device.params.animation.direction}
+        options={directionOptions}
+        dataAction="set-path-animation-direction"
+        dataId={device.id}
+        onControlChange={onControlChange}
+      />
+      <FieldShell label={i18n.t('control.pathStartPoint')}>
+        <span class="path-start-value">
+          {device.params.closed
+            ? i18n.t('control.pathAnchorValue', {
+              index: Math.max(startAnchorIndex, 0) + 1,
+            })
+            : i18n.t('control.pathEndpointByDirection')}
+        </span>
+      </FieldShell>
+    {/if}
+  {/snippet}
+</DeviceBodyLayout>
 
 <style lang="scss">
-  .path-layout,
-  .path-tab-panel {
-    display: flex;
-    align-items: stretch;
-    gap: var(--gap-8);
-    min-width: 0;
-    min-height: 0;
-  }
-
-  .path-tab-panel {
-    flex: 1 1 auto;
-  }
-
-  .path-animation-controls {
-    display: flex;
-    flex: 0 0 7.5rem;
-    flex-direction: column;
-    gap: var(--gap-8);
-    min-width: 7.5rem;
-  }
-
-  :global(.path-inline-control) {
-    flex: 0 0 7.5rem;
-    min-width: 7.5rem;
-  }
-
   .path-start-value {
     color: var(--color-text-primary);
     font-size: var(--text-12);

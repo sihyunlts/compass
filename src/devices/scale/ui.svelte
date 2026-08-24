@@ -4,6 +4,7 @@
   import type { GeneratorDeviceNode } from '../../shared/model';
   import CenterPointPicker from '../../renderer/components/controls/CenterPointPicker.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
+  import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { SCALE_NUMERIC_PARAMETERS } from './schema';
   import { i18n } from '../../renderer/i18n.svelte';
@@ -15,16 +16,18 @@
   let { device, modulationStateByParameter, onControlChange }: ScaleDeviceEditorProps = $props();
 </script>
 
-<div class="device-controls">
-  <CenterPointPicker
-    deviceId={device.id}
-    centerX={device.params.centerX}
-    centerY={device.params.centerY}
-    parameter={SCALE_NUMERIC_PARAMETERS.centerX}
-    {modulationStateByParameter}
-    {onControlChange}
-  />
-  <div class="column-wrapper">
+<DeviceBodyLayout kind="surface">
+  {#snippet surface()}
+    <CenterPointPicker
+      deviceId={device.id}
+      centerX={device.params.centerX}
+      centerY={device.params.centerY}
+      parameter={SCALE_NUMERIC_PARAMETERS.centerX}
+      {modulationStateByParameter}
+      {onControlChange}
+    />
+  {/snippet}
+  {#snippet settings()}
     <NumberField
       label={i18n.t('control.scaleX')}
       parameter={SCALE_NUMERIC_PARAMETERS.scaleX}
@@ -45,5 +48,5 @@
       {modulationStateByParameter}
       {onControlChange}
     />
-  </div>
-</div>
+  {/snippet}
+</DeviceBodyLayout>

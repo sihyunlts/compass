@@ -5,6 +5,7 @@
   import type { GeneratorDeviceNode } from '../../shared/model';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { STRETCH_NUMERIC_PARAMETERS } from './schema';
+  import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
 
   type StretchDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'stretch' }>;
@@ -18,7 +19,7 @@
   }: StretchDeviceEditorProps = $props();
 </script>
 
-<div class="device-controls">
+<DeviceBodyLayout kind="content" size="regular">
   <TimeWindowEditor
     deviceId={device.id}
     dataAction="set-stretch-param"
@@ -30,4 +31,4 @@
     {modulationStateByParameter}
     {onControlChange}
   />
-</div>
+</DeviceBodyLayout>

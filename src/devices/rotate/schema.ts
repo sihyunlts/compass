@@ -26,7 +26,7 @@ export const ROTATE_NUMERIC_PARAMETERS = defineNumericParameterRules<
       unit: '°',
       format: 'rotation',
     },
-    modulationMessageKey: 'control.rotation',
+    modulationMessageKey: 'control.angle',
   }),
 });
 

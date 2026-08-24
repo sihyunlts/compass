@@ -9,7 +9,7 @@
   import NumberField from '../fields/NumberField.svelte';
   import { i18n } from '../../i18n.svelte';
 
-  const SNAP_DIVISION_OPTIONS = [4, 8, 16, 32] as const;
+  const SNAP_DIVISION_OPTIONS = [4, 8, 16, 32, 64] as const;
   type TimeWindowEditorMode = 'stretch' | 'trim';
 
   let {
@@ -19,7 +19,6 @@
     end,
     mode,
     parameter,
-    modeBadgeText = null,
     currentProgress01,
     modulationStateByParameter = {},
     onControlChange,
@@ -30,7 +29,6 @@
     end: number;
     mode: TimeWindowEditorMode;
     parameter?: NumericParameterRule;
-    modeBadgeText?: string | null;
     currentProgress01?: number;
     modulationStateByParameter?: ModulationStateByParameter;
     onControlChange: (change: RendererControlChange) => void;
@@ -97,25 +95,20 @@
 </script>
 
 <div class="time-window-editor">
-  <div class="time-window-toolbar">
-    {#if modeBadgeText}
-      <span class="time-window-badge">{modeBadgeText}</span>
-    {/if}
-    <div
-      class="time-window-snap"
-      role="group"
-      aria-label={i18n.t('control.snapDivisions')}
-    >
-      {#each SNAP_DIVISION_OPTIONS as divisions (divisions)}
-        <button
-          class:selected={snapDivisions === divisions}
-          type="button"
-          onclick={() => setSnapDivisions(divisions)}
-        >
-          {divisions}
-        </button>
-      {/each}
-    </div>
+  <div
+    class="time-window-snap"
+    role="group"
+    aria-label={i18n.t('control.snapDivisions')}
+  >
+    {#each SNAP_DIVISION_OPTIONS as divisions (divisions)}
+      <button
+        class:selected={snapDivisions === divisions}
+        type="button"
+        onclick={() => setSnapDivisions(divisions)}
+      >
+        {divisions}
+      </button>
+    {/each}
   </div>
 
   <div class="time-window-ruler" aria-hidden="true">
@@ -204,38 +197,22 @@
     gap: var(--gap-8);
   }
 
-  .time-window-toolbar,
   .time-window-ruler,
   .time-window-inputs {
     display: flex;
     align-items: flex-start;
   }
 
-  .time-window-toolbar {
-    justify-content: flex-start;
-    align-items: center;
-    gap: var(--gap-8);
-  }
-
-  .time-window-badge {
-    display: inline-flex;
-    align-items: center;
-    height: 1.5rem;
-    padding: 0 var(--gap-8);
-    border-radius: var(--radius-round);
-    background: var(--color-surface-inverse);
-    color: var(--color-text-inverse);
-    font-size: var(--text-12);
-    white-space: nowrap;
-  }
-
   .time-window-snap {
-    display: inline-flex;
+    display: flex;
+    width: 100%;
     gap: var(--gap-4);
+    min-width: 0;
 
     button {
+      flex: 1 1 0;
       border: 0;
-      min-width: 2rem;
+      min-width: 0;
       height: 1.5rem;
       border-radius: var(--radius-4);
       background: var(--color-surface-interactive);

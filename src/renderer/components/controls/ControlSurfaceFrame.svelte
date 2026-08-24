@@ -7,32 +7,25 @@
 
   let {
     fill = 'square',
-    minSize = '0',
     children,
-    class: className = '',
   } = $props<{
     fill?: ControlSurfaceFrameFill;
-    minSize?: string;
-    children?: Snippet;
-    class?: string;
+    children: Snippet;
   }>();
 
   let measuredHeight = $state(0);
-  const rootClass = $derived(`control-surface-frame ${className}`.trim());
   const rootStyle = $derived(
-    `--control-surface-min-size:${minSize};--control-surface-size:${Math.max(0, measuredHeight)}px;`,
+    `--control-surface-size:${Math.max(0, measuredHeight)}px;`,
   );
 </script>
 
 <div
-  class={rootClass}
+  class="control-surface-frame"
   bind:clientHeight={measuredHeight}
   style={rootStyle}
   data-fill={fill}
 >
-  {#if children}
-    {@render children()}
-  {/if}
+  {@render children()}
 </div>
 
 <style lang="scss">
@@ -48,14 +41,12 @@
       justify-content: flex-start;
       flex-basis: 0;
       inline-size: var(--control-surface-size);
-      min-height: var(--control-surface-min-size);
       overflow: hidden;
 
       > :global(*) {
         flex: 0 0 auto;
         inline-size: var(--control-surface-size);
         block-size: var(--control-surface-size);
-        min-height: var(--control-surface-min-size);
       }
     }
 

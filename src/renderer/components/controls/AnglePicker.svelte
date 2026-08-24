@@ -221,7 +221,7 @@
   }
 
   .angle-picker-number-input {
-    width: 4.8rem;
+    width: var(--field-control-width, 4rem);
     height: 1.75rem;
     flex: 0 0 auto;
   }
@@ -230,7 +230,7 @@
     position: absolute;
     right: 0;
     top: 50%;
-    width: 4.8rem;
+    width: var(--field-control-width, 4rem);
     transform: translateY(-50%);
   }
 </style>
