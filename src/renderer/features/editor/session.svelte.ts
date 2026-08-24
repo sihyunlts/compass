@@ -325,7 +325,7 @@ export class EditorSession {
       toggleEditorGroupEnabled(this.buildGroupingContext(), groupId, nextEnabled);
     },
     handleAutoCreateLengthChange: (): void => {
-      handleAutoCreateLengthChange(this.state, (delayMs) => this.scheduleAutoPreview(delayMs));
+      handleAutoCreateLengthChange(this.state, (delayMs) => this.scheduleOutputPreview(delayMs));
     },
     undo: (): boolean => this.undo(),
     redo: (): boolean => this.redo(),
@@ -422,17 +422,23 @@ export class EditorSession {
     ): GroupPresetApplyResult => this.insertGroupPreset(dropZone, preset),
     applyRackPreset: (preset: RackPresetFile): RackPresetApplyResult => this.applyRackPreset(preset),
     setLaunchpadModelEnabled: (nextEnabled: boolean): boolean =>
-      setLaunchpadModelEnabled(this.state, nextEnabled, (delayMs) => this.scheduleAutoPreview(delayMs)),
+      setLaunchpadModelEnabled(this.state, nextEnabled, (delayMs) =>
+        this.scheduleOutputPreview(delayMs)),
     togglePreviewLoopEnabled: (): boolean => togglePreviewLoopEnabled(this.state),
     syncPreviewBpm: (nextBpm: number): boolean => syncPreviewBpm(this.state, nextBpm),
   };
 
-  public scheduleAutoPreview(
-    delayMs = this.autoPreviewDebounceMs,
-    options: { restartPlayback?: boolean } = {},
-  ): void {
+  public scheduleInitialPreview(delayMs = 0): void {
+    this.scheduleAutoPreview(delayMs, false);
+  }
+
+  public scheduleOutputPreview(delayMs = this.autoPreviewDebounceMs): void {
+    this.scheduleAutoPreview(delayMs, true);
+  }
+
+  private scheduleAutoPreview(delayMs: number, restartRequested: boolean): void {
     const restartPlayback = this.autoPreviewShouldRestartPlayback
-      || options.restartPlayback === true;
+      || restartRequested;
     this.cancelAutoPreview();
     this.autoPreviewShouldRestartPlayback = restartPlayback;
     this.autoPreviewTimer = window.setTimeout(() => {
@@ -532,7 +538,7 @@ export class EditorSession {
     applyEditorChainMutation(this.state, this.history, nextChain, meta, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
-      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),
+      scheduleAutoPreview: (delayMs) => this.scheduleOutputPreview(delayMs),
     });
   }
 
@@ -543,9 +549,7 @@ export class EditorSession {
     resetChainHistory(this.state, this.history, nextChain, meta, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
-      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs, {
-        restartPlayback: true,
-      }),
+      scheduleAutoPreview: (delayMs) => this.scheduleOutputPreview(delayMs),
     });
   }
 
@@ -553,7 +557,7 @@ export class EditorSession {
     return undoHistory(this.state, this.history, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
-      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),
+      scheduleAutoPreview: (delayMs) => this.scheduleOutputPreview(delayMs),
     });
   }
 
@@ -561,7 +565,7 @@ export class EditorSession {
     return redoHistory(this.state, this.history, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
-      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),
+      scheduleAutoPreview: (delayMs) => this.scheduleOutputPreview(delayMs),
     });
   }
 
@@ -569,7 +573,7 @@ export class EditorSession {
     return checkoutEditorHistory(this.state, this.history, targetId, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
-      scheduleAutoPreview: (delayMs) => this.scheduleAutoPreview(delayMs),
+      scheduleAutoPreview: (delayMs) => this.scheduleOutputPreview(delayMs),
     });
   }
 
