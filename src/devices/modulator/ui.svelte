@@ -94,17 +94,21 @@
       : null;
   };
 
-  const resolveTargetLabel = (target: ModulationTarget): string => {
+  const resolveTargetDisplay = (target: ModulationTarget) => {
     const selectedTargetDevice = findSelectedTargetDevice(target);
     const deviceLabel = selectedTargetDevice
       ? deviceDisplayNameById[selectedTargetDevice.id]
         ?? i18n.t(getDeviceMessageKey(selectedTargetDevice.kind))
       : i18n.t('control.missingTarget');
     const parameterDefinition = resolveTargetParameterDefinition(target);
-    const paramLabel = parameterDefinition
+    const parameterLabel = parameterDefinition
       ? i18n.t(parameterDefinition.messageKey)
       : target.paramKey;
-    return `${deviceLabel} / ${paramLabel}`;
+    return {
+      deviceLabel,
+      parameterLabel,
+      fullLabel: `${deviceLabel} / ${parameterLabel}`,
+    };
   };
 
   const resolveTargetUnit = (
@@ -171,10 +175,11 @@
           >
             {#if row.kind === 'target'}
               {@const target = row.target}
-              {@const targetLabel = resolveTargetLabel(target)}
+              {@const targetDisplay = resolveTargetDisplay(target)}
               <ValueButton
-                text={targetLabel}
-                label={i18n.t('control.mapTargetNamed', { target: targetLabel })}
+                text={targetDisplay.parameterLabel}
+                label={i18n.t('control.mapTargetNamed', { target: targetDisplay.fullLabel })}
+                hintText={targetDisplay.deviceLabel}
                 pressed={isActiveTargetSlot}
                 outlinePulse={isActiveTargetSlot}
                 clearLabel={i18n.t('control.clearMapping')}

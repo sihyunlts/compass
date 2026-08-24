@@ -12,6 +12,7 @@
     outlinePulse = false,
     disabled = false,
     class: className = '',
+    hintText,
     clearLabel,
     clearTitle,
     onPointerDown,
@@ -25,6 +26,7 @@
     outlinePulse?: boolean;
     disabled?: boolean;
     class?: string;
+    hintText?: string;
     clearLabel?: string;
     clearTitle?: string;
     onPointerDown?: (event: PointerEvent) => void;
@@ -61,6 +63,7 @@
     class="value-button-action"
     aria-label={label}
     aria-pressed={pressed}
+    use:hint={hintText}
     disabled={isDisabled}
     onpointerdown={onPointerDown}
     onclick={onClick}
