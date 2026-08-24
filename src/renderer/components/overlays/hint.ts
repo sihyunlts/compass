@@ -4,6 +4,7 @@ import {
   FLOATING_LAYER_ENTER_DISTANCE_PX,
   resolveAdjacentFloatingLayerPosition,
   resolveFloatingLayerEnterOffsetY,
+  waitForFloatingLayerRender,
 } from './floating-layer';
 import {
   activateFloatingLayer,
@@ -134,6 +135,7 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
   let cancelExitAnimation: (() => void) | null = null;
   let cleanupHintContent: HintContentCleanup | null = null;
   let showTimer: number | null = null;
+  let positionToken = 0;
   let previousDescribedBy: string | null = null;
   const hintId = `app-hint-${++hintIdCounter}`;
   const floatingLayerId = createFloatingLayerId('hint');
@@ -234,6 +236,7 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
       return;
     }
     closePendingForDescendant = false;
+    positionToken += 1;
     const wasOpen = hintEl !== null;
     const closingHintEl = hintEl;
     const cancelEnteringHint = cancelEnterAnimation;
@@ -280,6 +283,7 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
     clearShowTimer();
     clearHintContent();
     closePendingForDescendant = false;
+    positionToken += 1;
     deactivateFloatingLayer(floatingLayerId);
     const wasOpen = hintEl !== null;
     if (wasOpen) {
@@ -357,19 +361,26 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
     }
 
     updateHintContent();
-    const enterOffset = positionHint();
-    const enteringHintEl = hintEl;
-    if (shouldAnimateEnter && enterOffset !== null) {
-      cancelEnterAnimation = animateFloatingLayerEnter(
-        [{ element: enteringHintEl, ...enterOffset }],
-        () => {
-          if (hintEl === enteringHintEl) {
-            cancelEnterAnimation = null;
-          }
-        },
-      );
-    }
-    enteringHintEl?.style.removeProperty('visibility');
+    const token = ++positionToken;
+    void waitForFloatingLayerRender().then(() => {
+      if (token !== positionToken || !hintEl) {
+        return;
+      }
+
+      const enterOffset = positionHint();
+      const enteringHintEl = hintEl;
+      if (shouldAnimateEnter && enterOffset !== null) {
+        cancelEnterAnimation = animateFloatingLayerEnter(
+          [{ element: enteringHintEl, ...enterOffset }],
+          () => {
+            if (hintEl === enteringHintEl) {
+              cancelEnterAnimation = null;
+            }
+          },
+        );
+      }
+      enteringHintEl.style.removeProperty('visibility');
+    });
   };
 
   function handleDocumentPointerDown(event: PointerEvent): void {
@@ -437,7 +448,15 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
 
       if (hintEl) {
         updateHintContent();
-        positionHint();
+        const token = ++positionToken;
+        void waitForFloatingLayerRender().then(() => {
+          if (token !== positionToken || !hintEl) {
+            return;
+          }
+
+          positionHint();
+          hintEl.style.removeProperty('visibility');
+        });
       }
     },
     destroy(): void {

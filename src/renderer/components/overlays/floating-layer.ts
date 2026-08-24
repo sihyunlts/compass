@@ -240,6 +240,13 @@ export const isEventTargetWithinFloatingLayer = (
   layerEl: HTMLElement | null,
 ): boolean => eventTarget instanceof Node && layerEl !== null && layerEl.contains(eventTarget);
 
+export const waitForFloatingLayerRender = (): Promise<void> =>
+  new Promise((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.setTimeout(resolve, 0);
+    });
+  });
+
 export const resolveViewportFloatingLayerPosition = (
   x: number,
   y: number,
