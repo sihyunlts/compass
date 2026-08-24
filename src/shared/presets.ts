@@ -20,6 +20,16 @@ export const PRESET_FILE_SCHEMA_VERSION = 2 as const;
 
 export type PresetFileKind = 'device' | 'group' | 'rack';
 
+export type PresetFileErrorCode =
+  | 'extension-payload-mismatch'
+  | 'file-read-failed'
+  | 'invalid-file-format'
+  | 'invalid-file-path'
+  | 'invalid-read-request'
+  | 'preset-not-found'
+  | 'preset-type-mismatch'
+  | 'unsupported-file-extension';
+
 export const PRESET_FILE_EXTENSIONS = {
   device: '.compassdevice',
   group: '.compassgroup',
@@ -165,6 +175,7 @@ export type ParsedPresetFileResult =
     }
   | {
       ok: false;
+      errorCode: PresetFileErrorCode;
       message: string;
     };
 
@@ -492,6 +503,7 @@ export const parsePresetFileText = (
   if (!extensionType) {
     return {
       ok: false,
+      errorCode: 'unsupported-file-extension',
       message: 'Unsupported file extension.',
     };
   }
@@ -502,6 +514,7 @@ export const parsePresetFileText = (
   } catch {
     return {
       ok: false,
+      errorCode: 'invalid-file-format',
       message: 'Invalid file format.',
     };
   }
@@ -509,6 +522,7 @@ export const parsePresetFileText = (
   if (hasSerializedPresetName(parsed)) {
     return {
       ok: false,
+      errorCode: 'invalid-file-format',
       message: 'Invalid file format.',
     };
   }
@@ -517,6 +531,7 @@ export const parsePresetFileText = (
   if (!parsedPreset) {
     return {
       ok: false,
+      errorCode: 'invalid-file-format',
       message: 'Invalid file format.',
     };
   }
@@ -525,6 +540,7 @@ export const parsePresetFileText = (
   if (preset.presetType !== extensionType) {
     return {
       ok: false,
+      errorCode: 'extension-payload-mismatch',
       message: 'File extension does not match the file payload.',
     };
   }

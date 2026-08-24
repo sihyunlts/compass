@@ -20,7 +20,7 @@ import {
   normalizeAuthoredMetadata,
   type AuthoredMetadata,
 } from '../../../shared/model';
-import { isValidPresetPathSegment } from './preset-paths';
+import { isSafePresetRelativePathSegment } from './preset-paths';
 
 const parseOptionalAuthoredMetadata = (
   value: unknown,
@@ -120,7 +120,7 @@ export const parseUpdateRackFileInfoRequest = (
 };
 
 const isValidRelativePathSegment = (value: unknown): value is string =>
-  typeof value === 'string' && isValidPresetPathSegment(value);
+  typeof value === 'string' && isSafePresetRelativePathSegment(value);
 
 const parseRelativePath = (value: unknown): string[] | null => {
   if (!Array.isArray(value) || !value.every((segment) => isValidRelativePathSegment(segment))) {

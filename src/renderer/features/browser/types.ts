@@ -3,6 +3,7 @@ import type { DeviceBrowserCategoryId } from '../../../devices/browser-categorie
 import type { PresetEntrySelectionItem } from '../../../shared/preset-entry-selection';
 import type {
   PresetBrowserPreview,
+  PresetFileErrorCode,
   PresetFileKind,
 } from '../../../shared/presets';
 
@@ -36,16 +37,30 @@ export interface BrowserTreeDeviceNode {
   children: BrowserTreeNode[];
 }
 
-export interface BrowserTreePresetLeafNode {
+interface BrowserTreePresetLeafNodeBase {
   kind: 'preset';
   id: string;
   label: string;
   presetType: PresetFileKind;
   relativePath: string[];
-  savedAtIso: string;
-  deviceKind?: RendererDeviceKind;
-  preview?: PresetBrowserPreview;
 }
+
+export type BrowserTreePresetLeafNode = BrowserTreePresetLeafNodeBase & (
+  | {
+      loadStatus: 'loaded';
+      savedAtIso: string;
+      deviceKind?: RendererDeviceKind;
+      preview?: PresetBrowserPreview;
+      loadErrorCode?: never;
+    }
+  | {
+      loadStatus: 'error';
+      loadErrorCode: PresetFileErrorCode;
+      savedAtIso?: never;
+      deviceKind?: never;
+      preview?: never;
+    }
+);
 
 export interface PendingPresetFolderDraft {
   mode: 'create' | 'rename';

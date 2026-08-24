@@ -58,6 +58,7 @@
   import type { BrowserDragBadgeContent } from '../../features/browser/drag-badge';
   import { hasAdditiveSelectionModifier } from '../../features/selection/ordered-selection';
   import { createPresetPreviewHintController } from '../../features/browser/preset-preview-hint';
+  import { resolvePresetFileErrorMessage } from '../../features/browser/preset-file-error';
   import { hint, type HintInput } from '../overlays/hint';
 
   interface VisibleTreeRow {
@@ -105,6 +106,13 @@
   ): HintInput => {
     if (node.kind === 'folder') {
       return null;
+    }
+
+    if (node.kind === 'preset' && node.loadStatus === 'error') {
+      return {
+        text: resolvePresetFileErrorMessage(node.loadErrorCode),
+        placement: 'adjacent',
+      };
     }
 
     return presetPreviewHintController.resolveHint(
@@ -635,6 +643,10 @@
       return getDeviceBrowserIcon(node.deviceKind);
     }
 
+    if (node.loadStatus === 'error') {
+      return 'error';
+    }
+
     if (node.presetType === 'device' && node.deviceKind) {
       return getDeviceBrowserIcon(node.deviceKind);
     }
@@ -709,6 +721,9 @@
     if (!dragSignal) {
       return;
     }
+    if (node.loadStatus === 'error') {
+      return;
+    }
     void onPresetFilePointerDown(node, event, itemEl, dragSignal);
   };
 
@@ -717,6 +732,10 @@
   ): void => {
     if (node.kind === 'device') {
       onDeviceAdd(node.deviceKind);
+      return;
+    }
+
+    if (node.loadStatus === 'error') {
       return;
     }
 
@@ -736,6 +755,7 @@
         presetType: node.presetType,
         relativePath: [...node.relativePath],
         entryKind: 'file',
+        canShowInfo: node.loadStatus === 'loaded',
       };
     }
 
@@ -808,6 +828,10 @@
     sourceRowIds: string[];
     badge: BrowserDragBadgeContent;
   } | null => {
+    if (node.kind === 'preset' && node.loadStatus === 'error') {
+      return null;
+    }
+
     const clickedTarget = resolvePresetContextMenuTarget(node);
     if (!isMovablePresetEntry(clickedTarget)) {
       return null;
@@ -829,6 +853,7 @@
       if (
         isMovablePresetEntry(target)
         && target.presetType === clickedTarget.presetType
+        && !(selectedNode.kind === 'preset' && selectedNode.loadStatus === 'error')
       ) {
         candidates.push({ rowId, node: selectedNode, target });
       }
@@ -1459,12 +1484,18 @@
                 class:has-detached-keyboard-focus={
                   detachedKeyboardFocusRowId === row.node.id
                 }
+                class:has-preset-load-error={
+                  row.node.kind === 'preset' && row.node.loadStatus === 'error'
+                }
                 style={`--browser-tree-level:${row.level};`}
                 role="treeitem"
                 aria-level={row.level}
                 aria-posinset={row.posInSet}
                 aria-setsize={row.setSize}
                 aria-selected={isSelected}
+                aria-label={row.node.kind === 'preset' && row.node.loadStatus === 'error'
+                  ? `${resolveTreeNodeLabel(row.node)}: ${resolvePresetFileErrorMessage(row.node.loadErrorCode)}`
+                  : undefined}
                 aria-expanded={canExpandTreeNode(row.node)
                   ? isFolderExpanded(row.node.id)
                   : undefined}
@@ -1823,6 +1854,14 @@
 
     &.is-preset-move-drop-target {
       background: var(--color-surface-active);
+    }
+
+    &.has-preset-load-error {
+      color: var(--color-text-secondary);
+
+      .browser-entry-icon {
+        color: var(--color-text-tertiary);
+      }
     }
 
     &-icon {

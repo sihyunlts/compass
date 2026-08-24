@@ -307,6 +307,7 @@ const buildChildren = (
         label: getFileStem(file.relativePath[file.relativePath.length - 1] ?? '', presetType),
         presetType,
         relativePath: [...file.relativePath],
+        loadStatus: 'loaded',
         savedAtIso: file.payload.savedAtIso,
         ...(preview ? { preview } : {}),
         ...(file.payload.presetType === 'device'
@@ -881,7 +882,11 @@ export const createBrowserCompassBridge = (): CompassApi => ({
     const entry = store.files.find((file) =>
       file.presetType === request.presetType && relativePathEquals(file.relativePath, request.relativePath));
     if (!entry) {
-      return { status: 'error', message: 'Preset does not exist.' };
+      return {
+        status: 'error',
+        errorCode: 'preset-not-found',
+        message: 'Preset does not exist.',
+      };
     }
 
     return {

@@ -6,6 +6,7 @@ import type {
 import type {
   PresetBrowserPreview,
   PresetFile,
+  PresetFileErrorCode,
   PresetFileKind,
   RackPresetFile,
 } from '../../presets';
@@ -142,16 +143,31 @@ export type RenamePresetFolderResponse =
       message: string;
     };
 
-export interface PresetBrowserTreeLeafNode<K extends PresetFileKind = PresetFileKind> {
+interface PresetBrowserTreeLeafNodeBase<K extends PresetFileKind = PresetFileKind> {
   kind: 'preset';
   id: string;
   label: string;
   presetType: K;
   relativePath: string[];
-  savedAtIso: string;
-  deviceKind?: RendererDeviceKind;
-  preview?: PresetBrowserPreview;
 }
+
+export type PresetBrowserTreeLeafNode<K extends PresetFileKind = PresetFileKind> =
+  PresetBrowserTreeLeafNodeBase<K> & (
+    | {
+        loadStatus: 'loaded';
+        savedAtIso: string;
+        deviceKind?: RendererDeviceKind;
+        preview?: PresetBrowserPreview;
+        loadErrorCode?: never;
+      }
+    | {
+        loadStatus: 'error';
+        loadErrorCode: PresetFileErrorCode;
+        savedAtIso?: never;
+        deviceKind?: never;
+        preview?: never;
+      }
+  );
 
 export interface PresetBrowserTreeFolderNode {
   kind: 'folder';
@@ -247,6 +263,7 @@ export type ReadPresetEntryResponse<K extends PresetFileKind = PresetFileKind> =
     }
   | {
       status: 'error';
+      errorCode: PresetFileErrorCode;
       message: string;
       filePath?: string;
     };

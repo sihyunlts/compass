@@ -462,6 +462,7 @@ export class PresetService {
     if (!parsedRequest) {
       return {
         status: 'error',
+        errorCode: 'invalid-read-request',
         message: 'Invalid file read request.',
       };
     }
@@ -471,6 +472,7 @@ export class PresetService {
     if (!filePath) {
       return {
         status: 'error',
+        errorCode: 'invalid-file-path',
         message: 'Invalid file path.',
       };
     }
@@ -478,6 +480,7 @@ export class PresetService {
     if (!hasPresetExtension(filePath, PRESET_FILE_SPECS[parsedRequest.presetType].extension)) {
       return {
         status: 'error',
+        errorCode: 'unsupported-file-extension',
         message: 'Unsupported file extension.',
         filePath,
       };
