@@ -120,17 +120,15 @@
 
 <section class="sidebar-settings-page">
   {#if updateAvailable && updateCheckText}
-    <section class="sidebar-settings-card" aria-live="polite">
-      <div class="sidebar-settings-row">
-        <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">{i18n.t('settings.updateAvailable')}</span>
-          <span class="sidebar-settings-description">{updateCheckText}</span>
-        </div>
-        <Button
-          text={i18n.t('settings.download')}
-          onClick={() => onOpenLatestReleasePage()}
-        />
+    <section class="sidebar-settings-card sidebar-settings-row" aria-live="polite">
+      <div class="sidebar-settings-info">
+        <span class="sidebar-settings-label">{i18n.t('settings.updateAvailable')}</span>
+        <span class="sidebar-settings-description">{updateCheckText}</span>
       </div>
+      <Button
+        text={i18n.t('settings.download')}
+        onClick={() => onOpenLatestReleasePage()}
+      />
     </section>
   {/if}
 
@@ -235,37 +233,33 @@
       </div>
     </div>
 
-    <div class="sidebar-settings-card">
-      <div class="sidebar-settings-row">
-        <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">{i18n.t('settings.reduceAnimation')}</span>
-          <span class="sidebar-settings-description">{i18n.t('settings.reduceAnimationDescription')}</span>
-        </div>
-        <Switch
-          id="reduce-animation"
-          checked={reduceAnimation}
-          label={i18n.t('settings.reduceAnimation')}
-          onCheckedChange={onReduceAnimationToggle}
-        />
+    <div class="sidebar-settings-card sidebar-settings-row">
+      <div class="sidebar-settings-info">
+        <span class="sidebar-settings-label">{i18n.t('settings.reduceAnimation')}</span>
+        <span class="sidebar-settings-description">{i18n.t('settings.reduceAnimationDescription')}</span>
       </div>
+      <Switch
+        id="reduce-animation"
+        checked={reduceAnimation}
+        label={i18n.t('settings.reduceAnimation')}
+        onCheckedChange={onReduceAnimationToggle}
+      />
     </div>
 
-    <div class="sidebar-settings-card">
-      <div class="sidebar-settings-row">
-        <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">{i18n.t('settings.language')}</span>
-          <span class="sidebar-settings-description">
-            {i18n.t('settings.languageGreeting')}
-          </span>
-        </div>
-        <DropdownSelect
-          class="sidebar-settings-theme-select"
-          value={locale}
-          options={localeOptions}
-          ariaLabel={i18n.t('settings.language')}
-          onValueChange={handleLocaleChange}
-        />
+    <div class="sidebar-settings-card sidebar-settings-row">
+      <div class="sidebar-settings-info">
+        <span class="sidebar-settings-label">{i18n.t('settings.language')}</span>
+        <span class="sidebar-settings-description">
+          {i18n.t('settings.languageGreeting')}
+        </span>
       </div>
+      <DropdownSelect
+        class="sidebar-settings-theme-select"
+        value={locale}
+        options={localeOptions}
+        ariaLabel={i18n.t('settings.language')}
+        onValueChange={handleLocaleChange}
+      />
     </div>
   </section>
 
@@ -335,8 +329,6 @@
     background: var(--color-surface);
     border: 1px solid var(--color-border-tertiary);
     border-radius: var(--radius-8);
-    display: flex;
-    flex-direction: column;
   }
 
   .sidebar-settings-row {
