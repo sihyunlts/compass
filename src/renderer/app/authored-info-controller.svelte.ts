@@ -52,7 +52,7 @@ const resolvePresetMetadata = (
   return preset.chain.metadata;
 };
 
-export class AuthoredInfoController {
+class AuthoredInfoController {
   public readonly state: AuthoredInfoControllerState = $state({
     target: null,
     name: '',

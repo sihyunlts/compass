@@ -10,7 +10,7 @@ export const buildRuntimeMapData = (
   return buildRuntimeMapDataFromButtonIndex(runtimeMap.buttonIndex);
 };
 
-export const buildRuntimeMapDataFromButtonIndex = (
+const buildRuntimeMapDataFromButtonIndex = (
   buttonIndex: ButtonIndex,
 ): RuntimeMapData => {
   const buttons = buttonIndex.groups.flatMap((group) => group.buttons);

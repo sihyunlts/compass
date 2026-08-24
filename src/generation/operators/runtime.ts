@@ -6,7 +6,6 @@ export {
 export {
   createPendingFrameApplicationOperator,
   createPendingGeometryApplicationOperator,
-  materializePendingRackOperatorInput,
   materializeAndNormalizeRackState,
   prepareRackOperatorInput,
   replaceTimelineAndRefreshRackState,
@@ -51,9 +50,6 @@ export {
   type ModulationContext,
   type PendingFrameApplicationOperatorInput,
   type RackOperator,
-  type RackOperatorContract,
-  type RackOperatorInput,
-  type RackOperatorInputPolicy,
   type RackStageExecutionContext,
   type RackStageOfKind,
   type SpatialTransformStageKind,

@@ -29,7 +29,7 @@ export interface PendingStrokeRewriteApplication {
   writes: ReadonlyArray<PendingStrokeRewriteFrameWrite>;
 }
 
-export interface MaterializedGeometryRewriteInput {
+interface MaterializedGeometryRewriteInput {
   readonly timeline: GeometryTimeline;
   readonly frameIndex: number;
   readonly strokes: ReadonlyArray<GeometryStroke>;

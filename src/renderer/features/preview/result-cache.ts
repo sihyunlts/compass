@@ -3,8 +3,8 @@ import { clamp } from '../../../shared/math';
 
 import type { LaunchpadModel } from '../../../shared/model';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
+import { LatestSourceKeyFamilyCache } from '../../../shared/source-key-family';
 import { EMPTY_ACTIVE_VELOCITY_BY_PITCH } from './utils';
-import { LatestSourceKeyFamilyCache } from './source-key-cache';
 
 export interface PreviewResultCacheEntry {
   key: string;

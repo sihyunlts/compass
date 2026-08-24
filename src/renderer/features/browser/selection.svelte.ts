@@ -13,7 +13,7 @@ interface BrowserSelectionState {
   anchorRowId: string | null;
 }
 
-export class BrowserSelection {
+class BrowserSelection {
   public readonly state: BrowserSelectionState = $state({
     selectedRowIds: [],
     anchorRowId: null,

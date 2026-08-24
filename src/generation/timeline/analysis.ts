@@ -23,7 +23,7 @@ export interface OccupiedCoordinate {
   colorAgeBandCount?: number;
 }
 
-export interface StrokeOccupiedCoordinateCandidate {
+interface StrokeOccupiedCoordinateCandidate {
   x: number;
   y: number;
   distanceSquared: number;

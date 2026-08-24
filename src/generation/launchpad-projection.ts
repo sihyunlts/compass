@@ -56,7 +56,7 @@ type ResolveStrokeOutputProjection = (
   stroke: GeometryStroke,
 ) => StrokeOutputProjection;
 
-export interface LaunchpadProjectionContext {
+interface LaunchpadProjectionContext {
   outputAdapter: CanonicalOutputAdapter;
   projectTimelineToActivePitchesBySampleIndex(
     timeline: GeometryTimeline,

@@ -4,11 +4,6 @@ import {
 } from './field-result';
 import { toClipNote } from './note-utils';
 
-export {
-  NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-  type GenerateNotesInput,
-} from './note-generation-types';
-
 export const toGeneratorPreview = (
   generated: GeneratedRuntimeFieldResult,
 ): GeneratorPreview => {

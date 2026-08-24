@@ -358,7 +358,7 @@ const upsertPresetFile = <K extends PresetFileKind>(
 
 const createNoopSubscription = (): (() => void) => () => {};
 
-export const createBrowserCompassBridge = (): CompassApi => ({
+const createBrowserCompassBridge = (): CompassApi => ({
   sendGeneratedPreview: async () => {
     throw new Error('Desktop app required to send to Ableton.');
   },

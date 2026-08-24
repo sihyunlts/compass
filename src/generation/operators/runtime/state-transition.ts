@@ -5,7 +5,7 @@ import {
 } from '../../timeline/state';
 import type { GenerationFinalCleanupMode } from '../../types';
 
-export interface GenerationStateTransitionOverrides {
+interface GenerationStateTransitionOverrides {
   timeline?: MutableGenerationState['timeline'];
   timelineStateByOriginId?: MutableGenerationState['timelineStateByOriginId'];
   pendingTemporalWriteOrderByOriginId?: MutableGenerationState['pendingTemporalWriteOrderByOriginId'];

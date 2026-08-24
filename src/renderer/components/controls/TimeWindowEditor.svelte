@@ -284,7 +284,6 @@
     bottom: 0;
     left: var(--window-start, 0%);
     width: calc(var(--window-end, 0%) - var(--window-start, 0%));
-    min-width: 0;
     background: var(--time-window-accent);
     opacity: 0.85;
   }

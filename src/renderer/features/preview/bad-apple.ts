@@ -21,7 +21,7 @@ export interface BadAppleAnimation {
   frames: Uint8Array;
 }
 
-export interface BadApplePreviewFrame {
+interface BadApplePreviewFrame {
   activeCells: PreviewWindowState['activeCells'];
   progress01: number;
 }

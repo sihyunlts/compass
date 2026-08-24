@@ -14,7 +14,7 @@ import type {
 } from '../types';
 import type { CompiledColorAgeKernel } from './types';
 
-export interface ColorTimelineMaterializationInput {
+interface ColorTimelineMaterializationInput {
   sourceTimeline: GeometryTimeline;
   targetOriginIds: ReadonlySet<string>;
   sourceFrameWindow: FrameWindow;
@@ -22,7 +22,7 @@ export interface ColorTimelineMaterializationInput {
   writeOrder: number;
 }
 
-export interface ColorTimelineMaterializationResult {
+interface ColorTimelineMaterializationResult {
   timeline: GeometryTimeline;
   playbackWindowByOriginId: ReadonlyMap<string, {
     start: number;

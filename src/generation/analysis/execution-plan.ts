@@ -30,6 +30,11 @@ const NONE_REQUIREMENT: SpatialRequirement = 'none';
 const NONE_TIME_WINDOW = 'none' as const;
 const ALL_TIME_WINDOW = 'all' as const;
 
+type SpatialEffectNode = Extract<
+  GeneratorEffectNode,
+  { kind: 'translate' | 'rotate' | 'scale' | 'mirror' | 'symmetry' }
+>;
+
 const clampBeatRange = (
   range: BeatRange,
 ): BeatRange => {
@@ -110,9 +115,9 @@ const resolveSymmetryInputRoi = (
 }, 'none');
 
 const buildSpatialInputRoi = (
-  device: GeneratorEffectNode,
+  device: SpatialEffectNode,
   requiredOutputBounds: SpatialRequirement,
-): SpatialRequirement | null => {
+): SpatialRequirement => {
   if (device.kind === 'translate') {
     return invertRequirementThroughTransform(
       requiredOutputBounds,
@@ -149,11 +154,7 @@ const buildSpatialInputRoi = (
     );
   }
 
-  if (device.kind === 'symmetry') {
-    return resolveSymmetryInputRoi(device, requiredOutputBounds);
-  }
-
-  return null;
+  return resolveSymmetryInputRoi(device, requiredOutputBounds);
 };
 
 const buildOperatorExecutionPlan = (
@@ -264,32 +265,15 @@ const buildOperatorExecutionPlan = (
     };
   }
 
-  if (
-    device.kind === 'translate'
-    || device.kind === 'rotate'
-    || device.kind === 'scale'
-    || device.kind === 'mirror'
-    || device.kind === 'symmetry'
-  ) {
-    const spatialInputRoi = buildSpatialInputRoi(device, requiredOutputBounds);
-    return {
-      requiredOutputBounds,
-      generatorOutputBounds,
-      requiredInputRoi: mergeTargetedInputRoi(
-        device.groupId,
-        requiredOutputBounds,
-        spatialInputRoi ?? requiredOutputBounds,
-      ),
-      requiredSourceRoi: NONE_REQUIREMENT,
-      requiredFrameWindow: ALL_TIME_WINDOW,
-      requiredSourceFrameWindow: NONE_TIME_WINDOW,
-    };
-  }
-
+  const spatialInputRoi = buildSpatialInputRoi(device, requiredOutputBounds);
   return {
     requiredOutputBounds,
     generatorOutputBounds,
-    requiredInputRoi: requiredOutputBounds,
+    requiredInputRoi: mergeTargetedInputRoi(
+      device.groupId,
+      requiredOutputBounds,
+      spatialInputRoi,
+    ),
     requiredSourceRoi: NONE_REQUIREMENT,
     requiredFrameWindow: ALL_TIME_WINDOW,
     requiredSourceFrameWindow: NONE_TIME_WINDOW,

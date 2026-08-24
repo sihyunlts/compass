@@ -3,7 +3,7 @@ import { toFrameWindow } from '../../timeline';
 import type { GeometryTimeline } from '../../types';
 import type { TimelineWindow } from '../../timeline/temporal-window';
 
-export const resolveFrameSampleRatio = (
+const resolveFrameSampleRatio = (
   frameIndex: number,
   frameWindow: FrameWindow,
 ): number => {

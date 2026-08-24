@@ -62,16 +62,12 @@
     align-self: flex-start;
     gap: var(--gap-2);
     min-width: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
   }
 
   .device-tab {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--gap-4);
     min-width: 0;
     min-height: 1rem;
     border: 0;

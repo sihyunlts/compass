@@ -6,7 +6,7 @@ export interface PresetEntryContextTarget extends PresetEntrySelectionItem {
   canShowInfo?: boolean;
 }
 
-export interface PresetEntriesContextTarget {
+interface PresetEntriesContextTarget {
   kind: 'preset-entries';
   entries: readonly PresetEntryContextTarget[];
 }
@@ -47,7 +47,7 @@ export type ModulationParameterContextTarget = Extract<
   { kind: 'modulation-parameter' }
 >;
 
-export type RackSelectionContextTarget = Extract<
+type RackSelectionContextTarget = Extract<
   ContextMenuTarget,
   { kind: 'devices' | 'group' }
 >;

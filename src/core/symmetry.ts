@@ -26,7 +26,7 @@ interface SymmetryTransformPlan {
   steps: readonly SymmetryTransformStep[];
 }
 
-export const normalizeSymmetryAngle = (angleDeg: number): number => {
+const normalizeSymmetryAngle = (angleDeg: number): number => {
   const normalized = angleDeg % 360;
   return normalized < 0 ? normalized + 360 : normalized;
 };
