@@ -165,6 +165,10 @@
 
   export function close() {
     openToken += 1;
+    const focusedElement = document.activeElement;
+    if (focusedElement instanceof HTMLElement && menuEl?.contains(focusedElement)) {
+      focusedElement.blur();
+    }
     isOpen = false;
     if (!presence.rendered || presence.exiting) {
       return;
