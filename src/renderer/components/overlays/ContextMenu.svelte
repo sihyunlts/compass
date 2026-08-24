@@ -11,6 +11,7 @@
     attachFloatingLayerDismissHandlers,
     isEventTargetWithinFloatingLayer,
     resolveViewportFloatingLayerPosition,
+    waitForFloatingLayerRender,
   } from './floating-layer';
   import { FloatingLayerPresence } from './floating-layer-presence.svelte';
   import {
@@ -148,6 +149,7 @@
     isOpen = true;
     const token = ++openToken;
     await tick();
+    await waitForFloatingLayerRender();
 
     if (!menuEl || token !== openToken || !isOpen) {
       return;
