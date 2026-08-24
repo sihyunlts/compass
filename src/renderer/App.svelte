@@ -484,7 +484,7 @@
     settingsController.initialize();
     void syncMainWindowAlwaysOnTop();
     playbackSession.renderPreviewFrame();
-    editorSession.scheduleAutoPreview(0);
+    editorSession.scheduleInitialPreview();
 
     return () => {
       disposePreviewWindowControlRequest();
@@ -699,9 +699,7 @@
           isSidebarResizing={uiState.isSidebarResizing}
           interactiveElementSelector={INTERACTIVE_ELEMENT_SELECTOR}
           onSaveChain={editorSession.commands.saveChain}
-          onScheduleAutoPreview={(delayMs) => editorSession.scheduleAutoPreview(delayMs, {
-            restartPlayback: true,
-          })}
+          onScheduleAutoPreview={(delayMs) => editorSession.scheduleOutputPreview(delayMs)}
           onOpenContextMenu={(x, y, target) => contextMenuComponent?.open(x, y, target)}
           onCloseContextMenu={closeContextMenu}
           onCommit={editorSession.commands.handleRackCommit}
