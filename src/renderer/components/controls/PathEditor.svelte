@@ -37,6 +37,10 @@
     hasExceededControlPointDragThreshold,
     toSoftSnappedValue,
   } from './control-point-editor';
+  import {
+    resolveRotationCursor,
+    resolveRotationSnap,
+  } from './rotation-interaction';
 
   type EditorPoint = { x: number; y: number };
   type PathBounds = { minX: number; minY: number; maxX: number; maxY: number };
@@ -141,9 +145,6 @@
   const COORDINATE_RANGE = PATH_COORDINATE_MAX - PATH_COORDINATE_MIN;
   const EDITOR_CENTER = PATH_COORDINATE_MIN + COORDINATE_RANGE / 2;
   const PATH_TRANSFORM_SNAP_DISTANCE_PX = 4;
-  const SOFT_ROTATION_SNAP_RADIANS = Math.PI / 4;
-  const MAX_SOFT_ROTATION_DISTANCE_RADIANS = Math.PI / 60;
-  const LOCKED_ROTATION_SNAP_RADIANS = Math.PI / 12;
   const ROTATION_ZONE_SIZE_PERCENT = 8;
   const TRANSFORM_HANDLE_INSET_PERCENT = 3;
   const MIN_PATH_SCALE_SIZE_PX = 1;
@@ -571,6 +572,10 @@
               : 'nesw-resize',
         rotationPosition,
         rotationZoneInside,
+        rotationCursor: resolveRotationCursor(
+          plot.x - centerPlot.x,
+          plot.y - centerPlot.y,
+        ),
       }];
     });
     const localCorners = [
@@ -1054,38 +1059,27 @@
     snapEnabled: boolean,
   ): void => {
     const requestedRotation = startRotationRadians + angle;
-    let resolvedRotation = requestedRotation;
-    let snapped = false;
-    if (lockToIncrement) {
-      resolvedRotation = Math.round(requestedRotation / LOCKED_ROTATION_SNAP_RADIANS)
-        * LOCKED_ROTATION_SNAP_RADIANS;
-      snapped = true;
-    } else if (snapEnabled) {
-      const rect = editorEl?.getBoundingClientRect();
-      if (rect) {
-        const radiusPx = Math.hypot(
+    const rect = editorEl?.getBoundingClientRect();
+    const radiusPx = rect
+      ? Math.hypot(
           (point.x - center.x) * rect.width / COORDINATE_RANGE,
           (point.y - center.y) * rect.height / COORDINATE_RANGE,
-        );
-        const candidate = Math.round(requestedRotation / SOFT_ROTATION_SNAP_RADIANS)
-          * SOFT_ROTATION_SNAP_RADIANS;
-        const angularDistance = Math.abs(requestedRotation - candidate);
-        if (
-          angularDistance <= MAX_SOFT_ROTATION_DISTANCE_RADIANS
-          && angularDistance * radiusPx <= PATH_TRANSFORM_SNAP_DISTANCE_PX
-        ) {
-          resolvedRotation = candidate;
-          snapped = true;
-        }
-      }
-    }
+        )
+      : Number.POSITIVE_INFINITY;
+    const rotationSnap = resolveRotationSnap({
+      requestedRadians: requestedRotation,
+      radiusPx,
+      lockToIncrement,
+      snapEnabled,
+    });
+    const resolvedRotation = rotationSnap.radians;
     const rawDegrees = resolvedRotation * 180 / Math.PI;
     const resolvedRotationDegrees = ((rawDegrees + 180) % 360 + 360) % 360 - 180;
     const resolvedAngle = resolvedRotation - startRotationRadians;
     alignmentGuides = { x: null, y: null };
     rotationFeedback = {
       degrees: Math.round(resolvedRotationDegrees),
-      snapped,
+      snapped: rotationSnap.snapped,
     };
     emitGeometry(
       localAnchors,
@@ -2067,7 +2061,7 @@
             type="button"
             class={`path-editor-rotation-zone path-editor-interactive is-${handle.rotationPosition}`}
             class:is-inside={handle.rotationZoneInside}
-            style={`left:${handle.x}%;top:${handle.y}%;`}
+            style={`left:${handle.x}%;top:${handle.y}%;cursor:${handle.rotationCursor};`}
             aria-label={i18n.t('control.rotation')}
             onmousedown={beginPathRotation}
           ></button>
@@ -2277,22 +2271,18 @@
     background: transparent;
 
     &.is-north-west {
-      cursor: ne-resize;
       transform: translate(-100%, -100%);
     }
 
     &.is-north-east {
-      cursor: se-resize;
       transform: translate(0, -100%);
     }
 
     &.is-south-east {
-      cursor: sw-resize;
       transform: translate(0, 0);
     }
 
     &.is-south-west {
-      cursor: nw-resize;
       transform: translate(-100%, 0);
     }
 
