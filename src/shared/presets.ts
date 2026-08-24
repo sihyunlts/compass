@@ -56,7 +56,7 @@ export interface GroupPresetFile extends PresetFileBase<'group'> {
   ui?: PresetFileUiMetadata;
 }
 
-export interface PresetFileUiMetadata {
+interface PresetFileUiMetadata {
   collapsedDeviceIds?: string[];
 }
 
@@ -167,7 +167,7 @@ export const withPresetAuthoredMetadata = (
   };
 };
 
-export type ParsedPresetFileResult =
+type ParsedPresetFileResult =
   | {
       ok: true;
       preset: PresetFile;

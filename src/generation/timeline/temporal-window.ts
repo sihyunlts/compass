@@ -33,7 +33,7 @@ export const cloneTimelineWindow = (
   end: window.end,
 });
 
-export const isWindowEmpty = (
+const isWindowEmpty = (
   window: TimelineWindow | null,
 ): boolean => !window || window.end <= window.start + TIMELINE_WINDOW_EPSILON;
 
@@ -206,7 +206,7 @@ export const reverseSampledTimelineTemporalState = (
   };
 };
 
-export const buildPlacementPreservingTimeWarpTransform = (
+const buildPlacementPreservingTimeWarpTransform = (
   placementWindow: TimelineWindow,
   remap: TemporalRemap,
 ): TemporalTransform => ({
@@ -214,7 +214,7 @@ export const buildPlacementPreservingTimeWarpTransform = (
   visibilityWindow: cloneTimelineWindow(placementWindow),
 });
 
-export const buildSourceWindowTimeWarpTransform = (
+const buildSourceWindowTimeWarpTransform = (
   sourceWindow: TimelineWindow,
   placementWindow: TimelineWindow,
   remap: TemporalRemap,

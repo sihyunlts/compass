@@ -2,19 +2,19 @@ import { clamp } from '../../../shared/math';
 import { SPRING_PRECISION, shouldReduceMotion } from '../../motion';
 import { isTopmostFloatingLayer } from './floating-layer-stack';
 
-export type FloatingLayerSize = {
+type FloatingLayerSize = {
   width: number;
   height: number;
 };
 
-export type FloatingLayerPosition = {
+type FloatingLayerPosition = {
   x: number;
   y: number;
 };
 
-export type FloatingLayerVerticalPlacement = 'above' | 'below';
+type FloatingLayerVerticalPlacement = 'above' | 'below';
 
-export type AnchoredFloatingLayerPosition = FloatingLayerPosition & {
+type AnchoredFloatingLayerPosition = FloatingLayerPosition & {
   maxHeight: number;
   verticalPlacement: FloatingLayerVerticalPlacement;
 };
@@ -60,7 +60,7 @@ export const FLOATING_LAYER_ENTER_SPRING_OPTIONS = {
 } as const;
 export const FLOATING_LAYER_ENTER_DURATION_MS = 150;
 export const FLOATING_LAYER_ENTER_EASING = 'cubic-bezier(0, 0.5, 0.5, 1)';
-export const FLOATING_LAYER_EXIT_DURATION_MS = 200;
+const FLOATING_LAYER_EXIT_DURATION_MS = 200;
 export const FLOATING_LAYER_EXIT_EASING = 'cubic-bezier(0.4, 0, 1, 1)';
 
 export const resolveFloatingLayerEnterOffsetY = (

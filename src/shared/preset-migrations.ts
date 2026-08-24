@@ -197,7 +197,7 @@ const PRESET_MIGRATIONS = new Map<number, PresetMigration>([
   }],
 ]);
 
-export interface MigratedPresetValue {
+interface MigratedPresetValue {
   value: Record<string, unknown>;
   migrated: boolean;
 }

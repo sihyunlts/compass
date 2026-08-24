@@ -14,13 +14,7 @@ export type {
   GeneratorDeviceNode,
   GeneratorEffectNode,
   GeneratorNode,
-  GroupedDeviceNode,
-  GroupStateEntry,
   MaskEffectNode,
-  MaskMode,
-  MaskSourceDomain,
-  MaskSourceKind,
-  MaskSourceVisibility,
   MirrorEffectNode,
   ModulationCurve,
   ModulationTarget,
@@ -58,11 +52,9 @@ export {
 } from './device-kind';
 export {
   DEFAULT_GROUP_NAME_TEMPLATE,
-  DEFAULT_RACK_NAME,
   applyNameIndex,
   hasNameIndexToken,
   normalizeCustomName,
-  normalizeRackName,
 } from './naming';
 export type {
   LaunchpadButton,

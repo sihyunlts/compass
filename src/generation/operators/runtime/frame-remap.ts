@@ -96,7 +96,7 @@ export const remapTimeline = (
       }
 
       const sourceFrameIndex = remap.sourceFrameIndexByOutputFrame[frameIndex];
-      if (sourceFrameIndex === null || sourceFrameIndex === undefined) {
+      if (sourceFrameIndex === null) {
         continue;
       }
 

@@ -124,7 +124,7 @@ const createTrackBytes = (
   return trackBytes;
 };
 
-export const encodeGeneratedPreviewMidi = (
+const encodeGeneratedPreviewMidi = (
   preview: GeneratorPreview,
   clipName: string,
 ): Uint8Array<ArrayBuffer> => {

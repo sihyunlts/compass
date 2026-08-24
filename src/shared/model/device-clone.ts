@@ -39,11 +39,6 @@ const cloneTimeWarpCurve = (curve: TimeWarpCurve): TimeWarpCurve => ({
   nodes: cloneCurveNodes(curve.nodes),
 });
 
-const assertUnsupportedDeviceKind = (device: never): never => {
-  const kind = (device as { kind?: unknown }).kind;
-  throw new Error(`Unsupported device kind: ${String(kind ?? 'unknown')}`);
-};
-
 const cloneDeviceNodePayload = (
   device: GeneratorDeviceNode,
 ): GeneratorDeviceNode => {
@@ -250,18 +245,14 @@ const cloneDeviceNodePayload = (
     };
   }
 
-  if (device.kind === 'scale') {
-    return {
-      id: device.id,
-      kind: 'scale',
-      enabled: device.enabled,
-      groupId: device.groupId ?? null,
-      name: device.name ?? null,
-      params: { ...device.params },
-    };
-  }
-
-  return assertUnsupportedDeviceKind(device);
+  return {
+    id: device.id,
+    kind: 'scale',
+    enabled: device.enabled,
+    groupId: device.groupId ?? null,
+    name: device.name ?? null,
+    params: { ...device.params },
+  };
 };
 
 export function cloneDeviceNode<TDevice extends GeneratorDeviceNode>(device: TDevice): TDevice;

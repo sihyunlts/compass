@@ -16,7 +16,7 @@ export const RACK_REGRESSION_FIXTURE_DIR = path.join(
   'regression',
 );
 
-export interface RackPreviewLoadOptions {
+interface RackPreviewLoadOptions {
   loopLengthBeats?: number;
   launchpadModel?: LaunchpadModel;
 }

@@ -14,7 +14,7 @@ export const parseFiniteControlNumber = (value: unknown): number | null => {
   return parseFiniteNumericParameterValue(value);
 };
 
-export type StructuredControlValueParseResult =
+type StructuredControlValueParseResult =
   | { ok: true; value: unknown }
   | { ok: false };
 

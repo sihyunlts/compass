@@ -12,13 +12,13 @@ export interface GeometryStateEvent {
   strokes: ReadonlyArray<GeometryStroke>;
 }
 
-export interface GeometryMotionSnapshot {
+interface GeometryMotionSnapshot {
   probes: Float64Array;
   topologyKey: string;
   isEmpty: boolean;
 }
 
-export interface ExtractGeometryEventTracksInput {
+interface ExtractGeometryEventTracksInput {
   timeline: GeometryTimeline;
   targetOriginIds: ReadonlySet<string>;
   frameWindow: FrameWindow;
@@ -137,7 +137,7 @@ const buildTopologyKey = (
   stroke.masks.length,
 ].join(':')))).sort().join('|');
 
-export const buildGeometryMotionSnapshot = (
+const buildGeometryMotionSnapshot = (
   strokes: ReadonlyArray<GeometryStroke>,
   probeStepLed = DEFAULT_PROBE_STEP_LED,
 ): GeometryMotionSnapshot => {
@@ -306,7 +306,7 @@ const hasProbeOutsideDistance = (
   return false;
 };
 
-export const hasGeometryChangedByAtLeast = (
+const hasGeometryChangedByAtLeast = (
   reference: GeometryMotionSnapshot,
   candidate: GeometryMotionSnapshot,
   distanceLed = DEFAULT_MOTION_UNIT_DISTANCE_LED,

@@ -1,12 +1,12 @@
 import { en, type MessageKey } from './en';
 import { ko } from './ko';
 
-export const APP_LOCALES = ['en', 'ko'] as const;
+const APP_LOCALES = ['en', 'ko'] as const;
 
 export type AppLocale = typeof APP_LOCALES[number];
 export type { MessageKey };
 
-export const DEFAULT_APP_LOCALE: AppLocale = 'en';
+const DEFAULT_APP_LOCALE: AppLocale = 'en';
 
 const catalogs: Readonly<Record<AppLocale, Readonly<Record<MessageKey, string>>>> = {
   en,

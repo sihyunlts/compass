@@ -12,9 +12,7 @@ import {
   getRendererDeviceGroup,
   getRendererDeviceLabel,
   getRendererModulationTargetParamDefinitions,
-  hydrateImportedRendererDeviceNode,
   isRendererDeviceKind,
-  RENDERER_DEVICE_GROUPS,
   RENDERER_DEVICE_KINDS,
   RENDERER_DEVICE_SCHEMAS,
 } from './registry-core';
@@ -182,8 +180,6 @@ export {
   getRendererDeviceGroup,
   getRendererDeviceLabel,
   getRendererModulationTargetParamDefinitions,
-  hydrateImportedRendererDeviceNode,
   isRendererDeviceKind,
-  RENDERER_DEVICE_GROUPS,
   RENDERER_DEVICE_KINDS,
 };

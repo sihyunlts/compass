@@ -1,13 +1,13 @@
-export interface RackControlTarget {
+interface RackControlTarget {
   element: HTMLElement;
   action: string;
   deviceId: string;
   paramKey: string | null;
 }
 
-export const RACK_CONTROL_TARGET_SELECTOR = '[data-control-action][data-device-id]';
-export const RACK_CONTROL_TARGET_WITH_PARAM_SELECTOR = `${RACK_CONTROL_TARGET_SELECTOR}[data-param]`;
-export const RACK_NUMERIC_INPUT_SELECTOR = `input[type="number"]${RACK_CONTROL_TARGET_SELECTOR}`;
+const RACK_CONTROL_TARGET_SELECTOR = '[data-control-action][data-device-id]';
+const RACK_CONTROL_TARGET_WITH_PARAM_SELECTOR = `${RACK_CONTROL_TARGET_SELECTOR}[data-param]`;
+const RACK_NUMERIC_INPUT_SELECTOR = `input[type="number"]${RACK_CONTROL_TARGET_SELECTOR}`;
 const RACK_NUMERIC_INPUT_PROXY_SELECTOR =
   `[data-numeric-input-proxy]${RACK_CONTROL_TARGET_SELECTOR}`;
 const RACK_NUMERIC_INPUT_SCOPE_SELECTOR = '[data-numeric-input-scope]';

@@ -18,7 +18,7 @@ export interface SavePresetFileRequest {
   payload: PresetFile;
 }
 
-export type PresetFileByKind<K extends PresetFileKind> = Extract<
+type PresetFileByKind<K extends PresetFileKind> = Extract<
   PresetFile,
   { presetType: K }
 >;
@@ -151,7 +151,7 @@ interface PresetBrowserTreeLeafNodeBase<K extends PresetFileKind = PresetFileKin
   relativePath: string[];
 }
 
-export type PresetBrowserTreeLeafNode<K extends PresetFileKind = PresetFileKind> =
+type PresetBrowserTreeLeafNode<K extends PresetFileKind = PresetFileKind> =
   PresetBrowserTreeLeafNodeBase<K> & (
     | {
         loadStatus: 'loaded';
@@ -204,7 +204,7 @@ export interface ShowPresetEntryInFolderRequest<K extends PresetFileKind = Prese
   relativePath: string[];
 }
 
-export type DeletePresetEntryRequest<K extends PresetFileKind = PresetFileKind> =
+type DeletePresetEntryRequest<K extends PresetFileKind = PresetFileKind> =
   ShowPresetEntryInFolderRequest<K>;
 
 export interface DeletePresetEntriesRequest {

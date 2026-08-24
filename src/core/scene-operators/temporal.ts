@@ -12,7 +12,7 @@ export interface TemporalTransform {
   marksAuthoredTimeline?: boolean;
 }
 
-export interface SceneTemporalCompositionOptions {
+interface SceneTemporalCompositionOptions {
   inputWindow?: TemporalVisibilityWindow;
   sampleCount?: number;
 }

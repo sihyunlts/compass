@@ -1,4 +1,4 @@
-export interface CompiledColorAgeSlot {
+interface CompiledColorAgeSlot {
   slotIndex: number;
   velocity: number;
 }

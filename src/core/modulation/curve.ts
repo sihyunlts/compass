@@ -13,10 +13,8 @@ import { sanitizeCurveDivisions } from '../curve-divisions';
 export {
   buildCurveSegments,
   evaluateCurveSegments,
-  evaluateNormalizedCurveAt,
-  toSegmentCurveBend,
 } from '../curve-segments';
-export type { CurvePoint, CurveSegment } from '../curve-segments';
+export type { CurveSegment } from '../curve-segments';
 
 const CURVE_ROUNDING_DIGITS = 6;
 const CURVE_ZERO_EPSILON = 1e-6;

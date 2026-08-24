@@ -118,6 +118,4 @@ export const getDeviceBrowserCategoryAccentColorVar = (
 export {
   getDeviceBrowserCategory,
   getDeviceBrowserIcon,
-  type DeviceBrowserCategoryDefinition,
-  type DeviceBrowserCategoryId,
 };

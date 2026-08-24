@@ -11,12 +11,12 @@ import {
   formatNumericParameterValue,
 } from '../../../devices/numeric-parameters';
 import type { GeneratorChain } from '../../../shared/model';
+import { LatestSourceKeyFamilyCache } from '../../../shared/source-key-family';
 import {
   createModulationParameterKey,
   type ModulationParameterState,
   type ModulationStateByParameter,
 } from '../../../shared/contracts/preview/modulation';
-import { LatestSourceKeyFamilyCache } from './source-key-cache';
 import {
   activateModulationDisplayTarget,
   createModulationDisplayTargetKey,
@@ -31,7 +31,7 @@ import { buildDeviceDisplayNameById } from '../rack/display-names';
 const EMPTY_MODULATION_READOUT_BY_ID: Readonly<Record<string, string>> = Object.freeze({});
 const EMPTY_MODULATION_STATE_BY_PARAMETER: ModulationStateByParameter = Object.freeze({});
 
-export interface ModulationCacheResult {
+interface ModulationCacheResult {
   readoutById: Readonly<Record<string, string>>;
   stateByParameter: ModulationStateByParameter;
 }

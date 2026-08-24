@@ -1,4 +1,4 @@
-export interface OrderedSelectionState {
+interface OrderedSelectionState {
   selectedIds: readonly string[];
   anchorId: string | null;
 }

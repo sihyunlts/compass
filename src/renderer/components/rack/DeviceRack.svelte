@@ -651,10 +651,7 @@
     border-color: var(--color-border-secondary);
   }
 
-  .device-group.is-rack.is-selected .group-rail-left {
-    background: var(--color-surface-interactive);
-  }
-
+  .device-group.is-rack.is-selected .group-rail-left,
   .device-group.is-rack.is-selected .group-rail-right {
     background: var(--color-surface-interactive);
   }
@@ -675,10 +672,7 @@
   .device-group.is-rack :global(.device-card) {
     --device-card-radius: 0;
     border-radius: 0;
-    border-top: none;
-    border-bottom: none;
-    border-right: none;
-    border-left: none;
+    border: 0;
   }
 
   .device-group.is-rack .device-group-body > .device-slot + .device-slot :global(.device-card) {

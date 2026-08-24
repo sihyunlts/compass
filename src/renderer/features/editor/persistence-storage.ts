@@ -182,7 +182,7 @@ export interface ThemeSettings {
 }
 
 /** Clamps theme values to the ranges exposed by the interface controls. */
-export const sanitizeThemeSettings = (
+const sanitizeThemeSettings = (
   settings: Partial<ThemeSettings>,
 ): ThemeSettings => ({
   hue: sanitizeNumberInRange(
