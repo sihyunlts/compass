@@ -1968,7 +1968,7 @@
   });
 </script>
 
-<div class="path-editor-wrap" class:is-readonly={readonly}>
+<div class="path-editor-wrap">
   <ControlSurfaceFrame minSize="10rem">
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div

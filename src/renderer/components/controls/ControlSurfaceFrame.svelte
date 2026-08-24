@@ -45,11 +45,9 @@
     max-height: 100%;
 
     &[data-fill='square'] {
-      align-items: flex-start;
       justify-content: flex-start;
       flex-basis: 0;
       inline-size: var(--control-surface-size);
-      min-width: 0;
       min-height: var(--control-surface-min-size);
       overflow: hidden;
 

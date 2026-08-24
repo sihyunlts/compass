@@ -267,7 +267,6 @@
 <div
   bind:this={controlEl}
   class={rootClass}
-  class:has-modulation={finiteStates.length > 0}
   style={`--modulation-control-corner-scale:${resolvedCornerScale};`}
 >
   {#if children}
@@ -333,7 +332,6 @@
               data-control-action="set-modulation-target-amount"
               data-device-id={state.modulatorId}
               data-param={state.targetId}
-              data-modulation-amount-control="true"
               onpointerdown={() => activateModulationDisplayTarget(parameterKey, state)}
               oninput={(event) => emitAmountChange(event, state, false)}
               onchange={(event) => emitAmountChange(event, state, true)}

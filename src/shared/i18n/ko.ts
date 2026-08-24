@@ -53,7 +53,6 @@ export const ko = {
   'control.colorSlotCount': '색상 슬롯 수',
   'control.curvature': '곡률',
   'control.density': '밀도',
-  'control.deleteSelected': '선택 항목 삭제',
   'control.direction': '방향',
   'control.divisions': '분할',
   'control.end': '끝',

@@ -59,7 +59,6 @@ const config: ForgeConfig = {
     },
     icon: 'assets/compass',
   },
-  rebuildConfig: {},
   makers: [
     new MakerSquirrel({
       setupExe: `${ARTIFACT_NAME}-Setup.exe`,

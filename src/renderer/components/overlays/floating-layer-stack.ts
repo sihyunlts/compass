@@ -139,15 +139,6 @@ const resolveTopmostFloatingLayer = (): FloatingLayerStackEntry | null =>
   Array.from(activeFloatingLayers.values())
     .sort((left, right) => right.order - left.order)[0] ?? null;
 
-export const dismissTopmostFloatingLayer = (): boolean => {
-  const topmost = resolveTopmostFloatingLayer();
-  if (!topmost) {
-    return false;
-  }
-  topmost.onDismissRequest();
-  return true;
-};
-
 export const dismissAllFloatingLayers = (): void => {
   const entries = Array.from(activeFloatingLayers.values())
     .sort((left, right) => right.order - left.order);

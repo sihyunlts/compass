@@ -116,7 +116,7 @@
   };
 </script>
 
-<FieldShell {label} class="angle-picker">
+<FieldShell {label}>
   <ModulatableControl
     class="angle-picker-control"
     states={modulationStates}

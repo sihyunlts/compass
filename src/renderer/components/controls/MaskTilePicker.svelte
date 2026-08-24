@@ -93,7 +93,6 @@
     padding: var(--gap-6);
     border-radius: var(--radius-6);
     border: 1px solid var(--color-border-secondary);
-    user-select: none;
     touch-action: none;
   }
 

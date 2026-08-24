@@ -103,10 +103,6 @@ const clonePendingStroke = (
   polyline: {
     ...stroke.polyline,
     points: stroke.polyline.points.map((point) => ({ ...point })),
-    clipStack: stroke.polyline.clipStack.map((clip) => ({
-      ...clip,
-      inverseTransform: { ...clip.inverseTransform },
-    })),
   },
   originGroupId: stroke.originGroupId,
   writeOrder: stroke.writeOrder,

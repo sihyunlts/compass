@@ -103,11 +103,10 @@
   <FloatingDropdown
     open={isOpen}
     anchorEl={rootEl}
-    class="rack-file-actions-menu"
     onClose={closeMenu}
   >
     <div
-      class="rack-file-actions-list floating-menu-list"
+      class="floating-menu-list"
       role="menu"
       aria-label={i18n.t('rack.actions')}
     >

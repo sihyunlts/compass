@@ -58,10 +58,6 @@ export class RackSelection {
     return getOrderedSelectedIds(this.state.selectedDeviceIds, orderedIds);
   }
 
-  getSelectedGroupIds(): string[] {
-    return [...this.state.selectedGroupIds];
-  }
-
   getSelectedGroupContexts(devices: readonly GeneratorDeviceNode[]): GroupSelectionContext[] {
     const contexts: GroupSelectionContext[] = [];
 

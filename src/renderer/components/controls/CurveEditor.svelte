@@ -601,7 +601,7 @@
     <div
       class="curve-editor"
       bind:this={editorEl}
-      style={`--curve-divisions:${divisions};--curve-guide-y:${guideValue === null ? '-100%' : `${toPlotY(guideValue).toFixed(3)}%`};`}
+      style={`--curve-guide-y:${guideValue === null ? '-100%' : `${toPlotY(guideValue).toFixed(3)}%`};`}
       ondblclick={handleEditorDoubleClick}
       oncontextmenu={handleEditorContextMenu}
     >

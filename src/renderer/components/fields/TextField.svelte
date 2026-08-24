@@ -37,7 +37,7 @@
 
 <label class="text-field">
   {#if label}
-    <span class="text-field-label">{label}</span>
+    <span>{label}</span>
   {/if}
   <input
     {id}
@@ -63,7 +63,6 @@
 
     input {
       width: 100%;
-      box-sizing: border-box;
       color: var(--color-text-primary);
       padding: var(--gap-6) var(--gap-8);
       font-size: var(--text-13);
@@ -75,7 +74,4 @@
     }
   }
 
-  .text-field-label {
-    color: var(--color-text-secondary);
-  }
 </style>

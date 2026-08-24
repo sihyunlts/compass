@@ -287,7 +287,6 @@ export const buildPathPolyline = (
       originId,
       velocity,
       rasterMode: 'centerline',
-      clipStack: [],
     };
   }
 
@@ -297,6 +296,5 @@ export const buildPathPolyline = (
     originId,
     velocity,
     ...(params.fill ? { rasterMode: 'fill' as const } : {}),
-    clipStack: [],
   };
 };

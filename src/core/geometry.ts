@@ -100,31 +100,6 @@ export const toMirrorTransformAt = (angleDeg: number, center: Vec2): AffineTrans
   };
 };
 
-export const toAxisMirrorTransformAt = (
-  axis: 'horizontal' | 'vertical',
-  center: Vec2,
-): AffineTransform => {
-  if (axis === 'horizontal') {
-    return {
-      a: -1,
-      b: 0,
-      c: 0,
-      d: 1,
-      tx: 2 * center.x,
-      ty: 0,
-    };
-  }
-
-  return {
-    a: 1,
-    b: 0,
-    c: 0,
-    d: -1,
-    tx: 0,
-    ty: 2 * center.y,
-  };
-};
-
 export const toRotateTransformAt = (angleDeg: number, center: Vec2): AffineTransform => {
   const { cos, sin } = toAngleComponents(angleDeg);
   return {

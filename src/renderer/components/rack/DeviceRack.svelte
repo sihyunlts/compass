@@ -626,7 +626,6 @@
       position: absolute;
       left: 50%;
       top: 50%;
-      margin: 0;
       transform: translate(-50%, -50%);
       color: var(--color-text-secondary);
       font-size: var(--text-13);

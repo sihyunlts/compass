@@ -37,7 +37,7 @@
 
 <label class="text-area-field">
   {#if label}
-    <span class="text-area-field-label">{label}</span>
+    <span>{label}</span>
   {/if}
   <textarea
     {id}
@@ -64,7 +64,6 @@
       width: 100%;
       min-height: 5.5rem;
       max-height: 8rem;
-      box-sizing: border-box;
       resize: none;
       border: 0;
       border-radius: var(--radius-4);
@@ -82,7 +81,4 @@
     }
   }
 
-  .text-area-field-label {
-    color: var(--color-text-secondary);
-  }
 </style>

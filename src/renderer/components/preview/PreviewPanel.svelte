@@ -75,7 +75,6 @@
   <div class="preview-panel-controls">
     <Button
       id="preview-play"
-      class="preview-panel-control-button"
       variant="icon"
       label={resolvePlayButtonLabel()}
       title={resolvePlayButtonHint()}
@@ -84,7 +83,6 @@
     />
     <Button
       id="preview-loop-toggle"
-      class="preview-panel-control-button"
       variant="icon"
       label={resolveLoopButtonLabel()}
       title={resolveLoopButtonHint()}
@@ -95,7 +93,6 @@
     {#if canPopout}
       <Button
         id="preview-popout"
-        class="preview-panel-control-button preview-popout-toggle"
         variant="icon"
         label={i18n.t('preview.openPopout')}
         title={i18n.t('preview.openPopout')}

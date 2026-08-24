@@ -135,7 +135,6 @@ const buildTopologyKey = (
   stroke.polyline.closed ? 'closed' : 'open',
   stroke.polyline.rasterMode ?? 'stroke',
   stroke.masks.length,
-  stroke.polyline.clipStack.length,
 ].join(':')))).sort().join('|');
 
 export const buildGeometryMotionSnapshot = (
