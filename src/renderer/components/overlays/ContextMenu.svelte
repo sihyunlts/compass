@@ -120,6 +120,7 @@
     (
       target?.kind === 'preset-entry'
       && target.entryKind === 'file'
+      && target.canShowInfo !== false
     )
     || target?.kind === 'group'
     || (target?.kind === 'devices' && target.deviceIds.length === 1));

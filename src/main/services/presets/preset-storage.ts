@@ -729,6 +729,7 @@ export class PresetStorage {
       if (parsed.ok === false) {
         return {
           status: 'error',
+          errorCode: parsed.errorCode,
           message: parsed.message,
           filePath,
         };
@@ -736,6 +737,7 @@ export class PresetStorage {
       if (parsed.preset.presetType !== presetType) {
         return {
           status: 'error',
+          errorCode: 'preset-type-mismatch',
           message: `Expected a ${presetType} file.`,
           filePath,
         };
@@ -750,6 +752,7 @@ export class PresetStorage {
     } catch (error) {
       return {
         status: 'error',
+        errorCode: 'file-read-failed',
         message: error instanceof Error && error.message.trim()
           ? error.message.trim()
           : 'Failed to read file.',

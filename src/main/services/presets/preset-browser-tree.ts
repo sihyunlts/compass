@@ -155,17 +155,26 @@ export class PresetBrowserTreeBuilder {
       }
 
       const readResult = await this.storage.readPresetFileByType(presetType, filePath);
+      const leafNode = {
+        kind: 'preset' as const,
+        id: `preset:${presetType}:${nextRelativePath.join('/')}`,
+        presetType,
+        label: path.parse(entry.name).name,
+        relativePath: nextRelativePath,
+      };
       if (readResult.status === 'error') {
+        entries.push({
+          ...leafNode,
+          loadStatus: 'error',
+          loadErrorCode: readResult.errorCode,
+        });
         continue;
       }
       const preview = resolvePresetBrowserPreview(readResult.payload);
 
       entries.push({
-        kind: 'preset',
-        id: `preset:${presetType}:${nextRelativePath.join('/')}`,
-        presetType,
-        label: path.parse(entry.name).name,
-        relativePath: nextRelativePath,
+        ...leafNode,
+        loadStatus: 'loaded',
         savedAtIso: readResult.payload.savedAtIso,
         ...(preview ? { preview } : {}),
         ...(readResult.payload.presetType === 'device'

@@ -3,6 +3,7 @@ import type { PresetEntrySelectionItem } from '../../../shared/preset-entry-sele
 export interface PresetEntryContextTarget extends PresetEntrySelectionItem {
   kind: 'preset-entry';
   isSystemFolder?: boolean;
+  canShowInfo?: boolean;
 }
 
 export interface PresetEntriesContextTarget {

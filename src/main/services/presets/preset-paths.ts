@@ -23,6 +23,12 @@ export const isValidPresetPathSegment = (value: string): boolean => {
     && !/[\\/:*?"<>|]/.test(normalized);
 };
 
+export const isSafePresetRelativePathSegment = (value: string): boolean =>
+  value.length > 0
+  && value !== '.'
+  && value !== '..'
+  && !/[\\/\0]/.test(value);
+
 export const resolvePresetSaveDirectory = (
   baseDirectory: string,
   request: SavePresetFileRequest,

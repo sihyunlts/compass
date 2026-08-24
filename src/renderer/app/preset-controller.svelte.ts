@@ -38,6 +38,7 @@ import type {
   PendingPresetFolderDraft,
   PresetEntrySelectionTarget,
 } from '../features/browser/types';
+import { resolvePresetFileErrorMessage } from '../features/browser/preset-file-error';
 import type {
   ContextMenuTarget,
   PresetDeleteContextTarget,
@@ -189,12 +190,25 @@ const mapPresetTreeNode = (
     };
   }
 
+  if (node.loadStatus === 'error') {
+    return {
+      kind: 'preset',
+      id: node.id,
+      label: node.label,
+      presetType: node.presetType,
+      relativePath: [...node.relativePath],
+      loadStatus: 'error',
+      loadErrorCode: node.loadErrorCode,
+    };
+  }
+
   return {
     kind: 'preset',
     id: node.id,
     label: node.label,
     presetType: node.presetType,
     relativePath: [...node.relativePath],
+    loadStatus: 'loaded',
     savedAtIso: node.savedAtIso,
     deviceKind: node.deviceKind,
     ...(node.preview
@@ -650,6 +664,10 @@ export class PresetController {
   }
 
   public async handlePresetEntryOpen(entry: BrowserTreePresetLeafNode): Promise<void> {
+    if (entry.loadStatus === 'error') {
+      return;
+    }
+
     await this.runPresetAction(async () => {
       await this.loadPresetFromBrowserEntry(entry);
     }, 'status.presetLoadFailed');
@@ -658,7 +676,7 @@ export class PresetController {
   public async loadRackPresetForPreview(
     entry: BrowserTreePresetLeafNode,
   ): Promise<RackPresetFile | null> {
-    if (entry.presetType !== 'rack') {
+    if (entry.loadStatus === 'error' || entry.presetType !== 'rack') {
       return null;
     }
 
@@ -675,7 +693,11 @@ export class PresetController {
     itemEl: HTMLElement,
     dragSignal: AbortSignal,
   ): Promise<void> {
-    if (sourceEvent.button !== 0 || !sourceEvent.isPrimary) {
+    if (
+      entry.loadStatus === 'error'
+      || sourceEvent.button !== 0
+      || !sourceEvent.isPrimary
+    ) {
       return;
     }
 
@@ -687,7 +709,10 @@ export class PresetController {
         return;
       }
       if (response.status === 'error') {
-        this.showError('status.presetLoadFailed', response.message);
+        this.showError(
+          'status.presetLoadFailed',
+          resolvePresetFileErrorMessage(response.errorCode),
+        );
         return;
       }
 
@@ -1154,7 +1179,10 @@ export class PresetController {
       fileName: payload.file.name,
     });
     if (parsed.ok === false) {
-      this.showError('status.fileLoadFailed', parsed.message);
+      this.showError(
+        'status.fileLoadFailed',
+        resolvePresetFileErrorMessage(parsed.errorCode),
+      );
       return;
     }
 
@@ -1256,7 +1284,10 @@ export class PresetController {
       this.toReadPresetEntryRequest(entry),
     );
     if (response.status === 'error') {
-      this.showError('status.presetLoadFailed', response.message);
+      this.showError(
+        'status.presetLoadFailed',
+        resolvePresetFileErrorMessage(response.errorCode),
+      );
       return;
     }
 
