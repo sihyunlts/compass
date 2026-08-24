@@ -50,6 +50,9 @@ export class NumericInputInteraction {
 
   private readonly dragState = createNumericInputDragState();
 
+  // A lock can be granted after its drag ended, so ownership must outlive drag state cleanup.
+  private readonly pointerLockTargets = new WeakSet<Element>();
+
   private overwriteOnTypeInput: HTMLInputElement | null = null;
 
   private lastNumberClickInput: HTMLInputElement | null = null;
@@ -218,10 +221,21 @@ export class NumericInputInteraction {
   }
 
   handlePointerLockChange(): void {
+    const lockedElement = document.pointerLockElement;
     const pointerElement = this.dragState.pointerEl;
     const wasPointerLocked = this.dragState.isPointerLocked;
-    const isPointerLocked = !!pointerElement
-      && document.pointerLockElement === pointerElement;
+    const isPointerLocked = lockedElement !== null
+      && lockedElement === pointerElement;
+
+    if (
+      lockedElement
+      && this.pointerLockTargets.has(lockedElement)
+      && !isPointerLocked
+    ) {
+      document.exitPointerLock();
+      return;
+    }
+
     this.dragState.isPointerLocked = isPointerLocked;
 
     if (wasPointerLocked && !isPointerLocked && this.isActive()) {
@@ -290,8 +304,11 @@ export class NumericInputInteraction {
       return;
     }
 
+    this.pointerLockTargets.add(pointerElement);
     try {
-      pointerElement.requestPointerLock();
+      void pointerElement.requestPointerLock().catch(() => {
+        // Pointer lock is optional; drag still works without it.
+      });
     } catch {
       // Pointer lock is optional; drag still works without it.
     }
