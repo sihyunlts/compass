@@ -12,6 +12,7 @@ import type {
   UpdateRackFileInfoRequest,
 } from '../../../shared/contracts/ipc/presets';
 import {
+  isPresetEntrySource,
   isPresetFileKind,
   parsePresetFile,
   type PresetFileKind,
@@ -130,48 +131,59 @@ const parseRelativePath = (value: unknown): string[] | null => {
   return [...value];
 };
 
-export const parseReadPresetEntryRequest = (
+const parsePresetEntryPath = (
   value: unknown,
 ): ReadPresetEntryRequest | null => {
   if (
     typeof value !== 'object'
     || value === null
     || !isPresetFileKind((value as { presetType?: unknown }).presetType)
+    || !isPresetEntrySource((value as { source?: unknown }).source)
   ) {
     return null;
   }
 
   const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
-  if (!relativePath || relativePath.length === 0) {
+  if (!relativePath) {
     return null;
   }
 
   return {
     presetType: (value as { presetType: PresetFileKind }).presetType,
+    source: (value as ReadPresetEntryRequest).source,
     relativePath,
   };
+};
+
+const parseUserPresetEntryPath = (
+  value: unknown,
+): (ReadPresetEntryRequest & { source: 'user' }) | null => {
+  const path = parsePresetEntryPath(value);
+  return path?.source === 'user' ? { ...path, source: 'user' } : null;
+};
+
+export const parseReadPresetEntryRequest = (
+  value: unknown,
+): ReadPresetEntryRequest | null => {
+  const path = parsePresetEntryPath(value);
+  return path && path.relativePath.length > 0 ? path : null;
 };
 
 export const parsePresetEntryRequest = (
   value: unknown,
 ): ShowPresetEntryInFolderRequest | null => {
-  if (
-    typeof value !== 'object'
-    || value === null
-    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
-  ) {
+  const path = parseUserPresetEntryPath(value);
+  if (!path) {
     return null;
   }
 
-  const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
   const entryKind = (value as { entryKind?: unknown }).entryKind;
-  if (!relativePath || (entryKind !== 'file' && entryKind !== 'directory')) {
+  if (entryKind !== 'file' && entryKind !== 'directory') {
     return null;
   }
 
   return {
-    presetType: (value as { presetType: PresetFileKind }).presetType,
-    relativePath,
+    ...path,
     entryKind,
   };
 };
@@ -223,50 +235,32 @@ export const parseMovePresetEntriesRequest = (
     return null;
   }
 
-  const destination = (value as {
-    destination: {
-      presetType?: unknown;
-      relativePath?: unknown;
-    };
-  }).destination;
-  if (!isPresetFileKind(destination.presetType)) {
-    return null;
-  }
-
-  const relativePath = parseRelativePath(destination.relativePath);
-  if (!relativePath) {
+  const destination = parseUserPresetEntryPath(
+    (value as { destination: unknown }).destination,
+  );
+  if (!destination) {
     return null;
   }
 
   return {
     entries: entriesRequest.entries,
-    destination: {
-      presetType: destination.presetType,
-      relativePath,
-    },
+    destination,
   };
 };
 
 export const parseCreatePresetFolderRequest = (
   value: unknown,
 ): CreatePresetFolderRequest | null => {
+  const path = parseUserPresetEntryPath(value);
   if (
-    typeof value !== 'object'
-    || value === null
-    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
+    !path
     || typeof (value as { folderName?: unknown }).folderName !== 'string'
   ) {
     return null;
   }
 
-  const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
-  if (!relativePath) {
-    return null;
-  }
-
   return {
-    presetType: (value as { presetType: PresetFileKind }).presetType,
-    relativePath,
+    ...path,
     folderName: (value as { folderName: string }).folderName,
   };
 };
@@ -274,23 +268,17 @@ export const parseCreatePresetFolderRequest = (
 export const parseRenamePresetFileRequest = (
   value: unknown,
 ): RenamePresetFileRequest | null => {
+  const path = parseUserPresetEntryPath(value);
   if (
-    typeof value !== 'object'
-    || value === null
-    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
+    !path
     || typeof (value as { fileName?: unknown }).fileName !== 'string'
+    || path.relativePath.length === 0
   ) {
     return null;
   }
 
-  const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
-  if (!relativePath || relativePath.length === 0) {
-    return null;
-  }
-
   return {
-    presetType: (value as { presetType: PresetFileKind }).presetType,
-    relativePath,
+    ...path,
     fileName: (value as { fileName: string }).fileName,
   };
 };
@@ -298,19 +286,12 @@ export const parseRenamePresetFileRequest = (
 export const parseUpdatePresetFileInfoRequest = (
   value: unknown,
 ): UpdatePresetFileInfoRequest | null => {
+  const path = parseUserPresetEntryPath(value);
   if (
-    typeof value !== 'object'
-    || value === null
-    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
+    !path
     || typeof (value as { fileName?: unknown }).fileName !== 'string'
+    || path.relativePath.length === 0
   ) {
-    return null;
-  }
-
-  const relativePath = parseRelativePath(
-    (value as { relativePath?: unknown }).relativePath,
-  );
-  if (!relativePath || relativePath.length === 0) {
     return null;
   }
 
@@ -322,8 +303,7 @@ export const parseUpdatePresetFileInfoRequest = (
   }
 
   return {
-    presetType: (value as { presetType: PresetFileKind }).presetType,
-    relativePath,
+    ...path,
     fileName: (value as { fileName: string }).fileName,
     ...(parsedMetadata.metadata ? { metadata: parsedMetadata.metadata } : {}),
   };
@@ -332,23 +312,17 @@ export const parseUpdatePresetFileInfoRequest = (
 export const parseRenamePresetFolderRequest = (
   value: unknown,
 ): RenamePresetFolderRequest | null => {
+  const path = parseUserPresetEntryPath(value);
   if (
-    typeof value !== 'object'
-    || value === null
-    || !isPresetFileKind((value as { presetType?: unknown }).presetType)
+    !path
     || typeof (value as { folderName?: unknown }).folderName !== 'string'
+    || path.relativePath.length === 0
   ) {
     return null;
   }
 
-  const relativePath = parseRelativePath((value as { relativePath?: unknown }).relativePath);
-  if (!relativePath || relativePath.length === 0) {
-    return null;
-  }
-
   return {
-    presetType: (value as { presetType: PresetFileKind }).presetType,
-    relativePath,
+    ...path,
     folderName: (value as { folderName: string }).folderName,
   };
 };

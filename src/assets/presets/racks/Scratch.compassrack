@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 2,
+  "presetType": "rack",
+  "savedAtIso": "2026-08-24T11:11:32.211Z",
+  "chain": {
+    "metadata": {
+      "author": "sihyunlights",
+      "description": "It must hurt to get scratched like this."
+    },
+    "devices": [
+      {
+        "id": "generator-2",
+        "kind": "rain",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "seed": 1,
+          "angleDeg": 270,
+          "density": 4,
+          "speed": 1
+        }
+      },
+      {
+        "id": "effect-2",
+        "kind": "rotate",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "angleDeg": -180
+        }
+      },
+      {
+        "id": "effect-3",
+        "kind": "modulator",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "targets": [
+            {
+              "id": "mod-target-ayvor7-ms1gdujn",
+              "slotIndex": 0,
+              "deviceId": "effect-2",
+              "paramKey": "angleDeg",
+              "amount": 180
+            }
+          ],
+          "curve": {
+            "domain": "loop01",
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "curve-node-start",
+                "t": 0,
+                "v": 0
+              },
+              {
+                "id": "curve-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "effect-1",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            5,
+            6,
+            7
+          ],
+          "noteLengthPercent": 200,
+          "gapPercent": 0
+        }
+      },
+      {
+        "id": "effect-62",
+        "kind": "timewarp",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "curve": {
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "timewarp-node-start",
+                "t": 0,
+                "v": 0,
+                "nextCurveBend": 0.02077
+              },
+              {
+                "id": "timewarp-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

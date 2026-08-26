@@ -76,6 +76,8 @@
     label: string;
     entryKind: 'directory';
     presetType: PresetFileKind;
+    source: 'user';
+    icon?: string;
     relativePath: string[];
     children: [];
     isPending: true;
@@ -149,6 +151,7 @@
     label: draft.draftName,
     entryKind: 'directory',
     presetType: draft.presetType,
+    source: draft.source,
     relativePath: [...draft.relativePath, draft.draftName.trim()],
     children: [],
     isPending: true,
@@ -442,10 +445,7 @@
     onPendingPresetFolderDraftCancel?: () => void;
     onPresetEntriesMove?: (
       entries: readonly PresetEntryContextTarget[],
-      destination: {
-        presetType: PresetFileKind;
-        relativePath: readonly string[];
-      },
+      destination: BrowserPresetMoveDestination,
     ) => void | Promise<void>;
     onPresetEntrySelectionHandled?: (token: number) => void;
   }>();
@@ -636,7 +636,7 @@
     if (node.kind === 'folder') {
       return node.treeKind === 'device'
         ? getDeviceBrowserCategoryIcon(node.categoryId)
-        : 'folder';
+        : node.icon ?? 'folder';
     }
 
     if (node.kind === 'device') {
@@ -753,6 +753,7 @@
       return {
         kind: 'preset-entry',
         presetType: node.presetType,
+        source: node.source,
         relativePath: [...node.relativePath],
         entryKind: 'file',
         canShowInfo: node.loadStatus === 'loaded',
@@ -769,6 +770,7 @@
       return {
         kind: 'preset-entry',
         presetType: 'device',
+        source: 'user',
         relativePath: [...node.presetRelativePath],
         entryKind: 'directory',
         isSystemFolder: true,
@@ -779,8 +781,10 @@
       return {
         kind: 'preset-entry',
         presetType: node.presetType,
+        source: node.source,
         relativePath: [...node.relativePath],
         entryKind: 'directory',
+        isSystemFolder: node.source === 'bundled',
       };
     }
 
@@ -816,10 +820,22 @@
 
   const isMovablePresetEntry = (
     target: PresetEntryContextTarget | null,
-  ): target is PresetEntryContextTarget =>
+  ): boolean =>
     target !== null
+    && target.source === 'user'
     && !target.isSystemFolder
     && target.relativePath.length > 0;
+
+  const isPresetDragEntry = (
+    target: PresetEntryContextTarget | null,
+  ): target is PresetEntryContextTarget =>
+    isMovablePresetEntry(target)
+    || (
+      target !== null
+      && target.source === 'bundled'
+      && target.entryKind === 'file'
+      && target.relativePath.length > 0
+    );
 
   const resolvePresetMoveEntries = (
     node: VisibleBrowserTreeNode,
@@ -833,7 +849,7 @@
     }
 
     const clickedTarget = resolvePresetContextMenuTarget(node);
-    if (!isMovablePresetEntry(clickedTarget)) {
+    if (!isPresetDragEntry(clickedTarget)) {
       return null;
     }
 
@@ -851,7 +867,8 @@
         ? resolvePresetContextMenuTarget(selectedNode)
         : null;
       if (
-        isMovablePresetEntry(target)
+        isPresetDragEntry(target)
+        && target.source === clickedTarget.source
         && target.presetType === clickedTarget.presetType
         && !(selectedNode.kind === 'preset' && selectedNode.loadStatus === 'error')
       ) {
@@ -893,6 +910,7 @@
     ) {
       return {
         presetType: 'device',
+        source: 'user',
         relativePath: [...node.presetRelativePath],
         rowId: node.id,
       };
@@ -900,6 +918,7 @@
     if (node.kind === 'folder' && node.treeKind === 'preset') {
       return {
         presetType: node.presetType,
+        source: node.source,
         relativePath: [...node.relativePath],
         rowId: node.id,
       };
@@ -911,11 +930,13 @@
   const isValidPresetMoveDestination = (
     destination: BrowserPresetMoveDestination,
     entries: readonly PresetEntryContextTarget[],
-  ): boolean => canMovePresetEntriesTo(
-    entries,
-    destination,
-    presetOccupiedPaths,
-  );
+  ): boolean =>
+    entries.every((entry) => entry.source === 'user')
+    && canMovePresetEntriesTo(
+      entries,
+      destination,
+      presetOccupiedPaths,
+    );
 
   const resolvePresetMoveRootDestination = (
     presetType: PresetFileKind | null,
@@ -923,6 +944,7 @@
     presetType
       ? {
           presetType,
+          source: 'user',
           relativePath: [],
           rowId: null,
         }
@@ -942,6 +964,16 @@
     if (rowElement) {
       const rowId = rowElement.dataset.browserRowId;
       const row = rowId ? visibleTreeRowById.get(rowId) : null;
+      if (
+        row
+        && (
+          row.node.kind === 'preset'
+          || (row.node.kind === 'folder' && row.node.treeKind === 'preset')
+        )
+        && row.node.source === 'bundled'
+      ) {
+        return null;
+      }
       const directDestination = row
         ? resolvePresetMoveDestinationForNode(row.node)
         : null;
@@ -1003,9 +1035,14 @@
       return;
     }
 
+    if (clickedTarget.source === 'bundled' && clickedTarget.entryKind !== 'file') {
+      event.preventDefault();
+      return;
+    }
+
     event.preventDefault();
     detachedKeyboardFocusRowId = null;
-    if (!browserSelection.includes(node.id)) {
+    if (!browserSelection.includes(node.id) || clickedTarget.source === 'bundled') {
       selectSingleRow(node.id);
     }
     focusedRowId = node.id;
@@ -1025,6 +1062,7 @@
     onOpenContextMenu(event.clientX, event.clientY, {
       kind: 'preset-entry',
       presetType,
+      source: 'user',
       relativePath: [],
       entryKind: 'directory',
     });

@@ -73,19 +73,25 @@
     (
       target?.kind === 'preset-entry'
       && target.relativePath.length > 0
+      && target.source === 'user'
       && !target.isSystemFolder
     )
     || (
       target?.kind === 'preset-entries'
       && target.entries.length > 0
       && target.entries.every(
-        (entry) => entry.relativePath.length > 0 && !entry.isSystemFolder,
+        (entry) =>
+          entry.relativePath.length > 0
+          && entry.source === 'user'
+          && !entry.isSystemFolder,
       )
     ));
   const canCreatePresetFolder = $derived.by(() =>
-    target?.kind === 'preset-entry' && target.entryKind === 'directory');
+    target?.kind === 'preset-entry'
+    && target.entryKind === 'directory'
+    && target.source === 'user');
   const canShowInFolder = $derived.by(() =>
-    target?.kind === 'preset-entry');
+    target?.kind === 'preset-entry' && target.source === 'user');
   const canPasteForTarget = $derived.by(() =>
     isRackSelectionContextTarget(target)
     && clipboardAvailable);
@@ -108,7 +114,8 @@
       : []);
   const canRenameTarget = $derived.by(() => {
     if (target?.kind === 'preset-entry') {
-      return !target.isSystemFolder
+      return target.source === 'user'
+        && !target.isSystemFolder
         && (target.entryKind === 'file' || target.relativePath.length > 0);
     }
     if (!isRackSelectionContextTarget(target)) {

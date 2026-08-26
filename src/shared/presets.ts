@@ -20,6 +20,11 @@ export const PRESET_FILE_SCHEMA_VERSION = 2 as const;
 
 export type PresetFileKind = 'device' | 'group' | 'rack';
 
+export type PresetEntrySource = 'user' | 'bundled';
+
+export const isPresetEntrySource = (value: unknown): value is PresetEntrySource =>
+  value === 'user' || value === 'bundled';
+
 export type PresetFileErrorCode =
   | 'extension-payload-mismatch'
   | 'file-read-failed'

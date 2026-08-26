@@ -185,6 +185,8 @@ const mapPresetTreeNode = (
       id: node.id,
       label: node.label,
       presetType: node.presetType,
+      source: node.source,
+      ...(node.icon ? { icon: node.icon } : {}),
       relativePath: [...node.relativePath],
       children: node.children.map((child) => mapPresetTreeNode(child)),
     };
@@ -196,6 +198,7 @@ const mapPresetTreeNode = (
       id: node.id,
       label: node.label,
       presetType: node.presetType,
+      source: node.source,
       relativePath: [...node.relativePath],
       loadStatus: 'error',
       loadErrorCode: node.loadErrorCode,
@@ -207,6 +210,7 @@ const mapPresetTreeNode = (
     id: node.id,
     label: node.label,
     presetType: node.presetType,
+    source: node.source,
     relativePath: [...node.relativePath],
     loadStatus: 'loaded',
     savedAtIso: node.savedAtIso,
@@ -437,9 +441,14 @@ export class PresetController {
     rawName: string,
     metadata: AuthoredMetadata | undefined,
   ): Promise<boolean> {
+    if (entry.source !== 'user') {
+      return false;
+    }
+
     const normalizedMetadata = normalizeAuthoredMetadata(metadata);
     const response = await this.options.bridgeClient.updatePresetFileInfo({
       presetType: entry.presetType,
+      source: entry.source,
       relativePath: [...entry.relativePath],
       fileName: rawName,
       ...(normalizedMetadata ? { metadata: normalizedMetadata } : {}),
@@ -682,6 +691,7 @@ export class PresetController {
 
     const response = await this.options.bridgeClient.readPresetEntry({
       presetType: 'rack',
+      source: entry.source,
       relativePath: [...entry.relativePath],
     });
     return response.status === 'loaded' ? response.payload : null;
@@ -747,10 +757,19 @@ export class PresetController {
   }
 
   public openPresetDeleteDialog(target: PresetDeleteTarget): void {
+    if (
+      target.kind === 'preset-entry'
+        ? target.source !== 'user'
+        : target.entries.some((entry) => entry.source !== 'user')
+    ) {
+      return;
+    }
+
     if (target.kind === 'preset-entry') {
       this.state.pendingPresetDeleteTarget = {
         kind: 'preset-entry',
         presetType: target.presetType,
+        source: target.source,
         relativePath: [...target.relativePath],
         entryKind: target.entryKind,
       };
@@ -760,6 +779,7 @@ export class PresetController {
         ? {
             kind: 'preset-entry',
             presetType: normalizedEntries[0].presetType,
+            source: normalizedEntries[0].source,
             relativePath: [...normalizedEntries[0].relativePath],
             entryKind: normalizedEntries[0].entryKind,
           }
@@ -768,6 +788,7 @@ export class PresetController {
           entries: normalizedEntries.map((entry) => ({
             kind: 'preset-entry',
             presetType: entry.presetType,
+            source: entry.source,
             relativePath: [...entry.relativePath],
             entryKind: entry.entryKind,
           })),
@@ -777,7 +798,11 @@ export class PresetController {
   }
 
   public beginPresetFolderCreate(target: ContextMenuTarget): void {
-    if (target.kind !== 'preset-entry' || target.entryKind !== 'directory') {
+    if (
+      target.kind !== 'preset-entry'
+      || target.entryKind !== 'directory'
+      || target.source !== 'user'
+    ) {
       return;
     }
 
@@ -785,6 +810,7 @@ export class PresetController {
       mode: 'create',
       entryKind: 'directory',
       presetType: target.presetType,
+      source: target.source,
       relativePath: [...target.relativePath],
       draftName: '',
       temporaryId: `pending-preset-folder:${this.nextPendingPresetFolderId}`,
@@ -797,6 +823,7 @@ export class PresetController {
     if (
       target.kind !== 'preset-entry'
       || target.relativePath.length === 0
+      || target.source !== 'user'
     ) {
       return;
     }
@@ -805,6 +832,7 @@ export class PresetController {
       mode: 'rename',
       entryKind: target.entryKind,
       presetType: target.presetType,
+      source: target.source,
       relativePath: [...target.relativePath],
       draftName: target.entryKind === 'file'
         ? this.resolvePresetFileDraftName(target)
@@ -850,6 +878,7 @@ export class PresetController {
       ? this.resolvePresetFileDraftName({
           kind: 'preset-entry',
           presetType: draft.presetType,
+          source: draft.source,
           relativePath: draft.relativePath,
           entryKind: 'file',
         })
@@ -866,17 +895,20 @@ export class PresetController {
     const response = draft.mode === 'create'
       ? await this.options.bridgeClient.createPresetFolder({
           presetType: draft.presetType,
+          source: draft.source,
           relativePath: [...draft.relativePath],
           folderName: entryName,
         } satisfies CreatePresetFolderRequest)
       : draft.entryKind === 'file'
         ? await this.options.bridgeClient.renamePresetFile({
             presetType: draft.presetType,
+            source: draft.source,
             relativePath: [...draft.relativePath],
             fileName: entryName,
           } satisfies RenamePresetFileRequest)
       : await this.options.bridgeClient.renamePresetFolder({
           presetType: draft.presetType,
+          source: draft.source,
           relativePath: [...draft.relativePath],
           folderName: entryName,
         } satisfies RenamePresetFolderRequest);
@@ -930,18 +962,28 @@ export class PresetController {
     entries: readonly PresetEntryContextTarget[],
     destination: {
       presetType: PresetEntryContextTarget['presetType'];
+      source: PresetEntryContextTarget['source'];
       relativePath: readonly string[];
     },
   ): Promise<void> {
+    if (
+      destination.source !== 'user'
+      || entries.some((entry) => entry.source !== 'user')
+    ) {
+      return;
+    }
+
     await this.runPresetAction(async () => {
       const response = await this.options.bridgeClient.movePresetEntries({
         entries: entries.map((entry) => ({
           presetType: entry.presetType,
+          source: 'user',
           relativePath: [...entry.relativePath],
           entryKind: entry.entryKind,
         })),
         destination: {
           presetType: destination.presetType,
+          source: 'user',
           relativePath: [...destination.relativePath],
         },
       });
@@ -979,6 +1021,7 @@ export class PresetController {
       const response = await this.options.bridgeClient.deletePresetEntries({
         entries: entries.map((entry) => ({
           presetType: entry.presetType,
+          source: 'user',
           relativePath: [...entry.relativePath],
           entryKind: entry.entryKind,
         })),
@@ -1027,8 +1070,13 @@ export class PresetController {
   }
 
   public async handleShowPresetEntryInFolder(target: PresetEntryTarget): Promise<void> {
+    if (target.source !== 'user') {
+      return;
+    }
+
     const response = await this.options.bridgeClient.showPresetEntryInFolder({
       presetType: target.presetType,
+      source: target.source,
       relativePath: [...target.relativePath],
       entryKind: target.entryKind,
     });
@@ -1273,6 +1321,7 @@ export class PresetController {
   ): Parameters<CompassApi['readPresetEntry']>[0] {
     return {
       presetType: entry.presetType,
+      source: entry.source,
       relativePath: [...entry.relativePath],
     };
   }

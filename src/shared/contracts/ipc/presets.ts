@@ -5,6 +5,7 @@ import type {
 } from '../../preset-entry-selection';
 import type {
   PresetBrowserPreview,
+  PresetEntrySource,
   PresetFile,
   PresetFileErrorCode,
   PresetFileKind,
@@ -71,9 +72,14 @@ export type UpdateRackFileInfoResponse =
       filePath?: string;
     };
 
-export interface RenamePresetFileRequest<K extends PresetFileKind = PresetFileKind> {
+interface UserPresetEntryRequest<K extends PresetFileKind = PresetFileKind> {
   presetType: K;
+  source: 'user';
   relativePath: string[];
+}
+
+export interface RenamePresetFileRequest<K extends PresetFileKind = PresetFileKind>
+  extends UserPresetEntryRequest<K> {
   fileName: string;
 }
 
@@ -89,9 +95,8 @@ export type RenamePresetFileResponse =
       message: string;
     };
 
-export interface UpdatePresetFileInfoRequest<K extends PresetFileKind = PresetFileKind> {
-  presetType: K;
-  relativePath: string[];
+export interface UpdatePresetFileInfoRequest<K extends PresetFileKind = PresetFileKind>
+  extends UserPresetEntryRequest<K> {
   fileName: string;
   metadata?: AuthoredMetadata;
 }
@@ -109,9 +114,8 @@ export type UpdatePresetFileInfoResponse =
       message: string;
     };
 
-export interface CreatePresetFolderRequest<K extends PresetFileKind = PresetFileKind> {
-  presetType: K;
-  relativePath: string[];
+export interface CreatePresetFolderRequest<K extends PresetFileKind = PresetFileKind>
+  extends UserPresetEntryRequest<K> {
   folderName: string;
 }
 
@@ -125,9 +129,8 @@ export type CreatePresetFolderResponse =
       message: string;
     };
 
-export interface RenamePresetFolderRequest<K extends PresetFileKind = PresetFileKind> {
-  presetType: K;
-  relativePath: string[];
+export interface RenamePresetFolderRequest<K extends PresetFileKind = PresetFileKind>
+  extends UserPresetEntryRequest<K> {
   folderName: string;
 }
 
@@ -148,6 +151,7 @@ interface PresetBrowserTreeLeafNodeBase<K extends PresetFileKind = PresetFileKin
   id: string;
   label: string;
   presetType: K;
+  source: PresetEntrySource;
   relativePath: string[];
 }
 
@@ -174,6 +178,8 @@ export interface PresetBrowserTreeFolderNode {
   id: string;
   label: string;
   presetType: PresetFileKind;
+  source: PresetEntrySource;
+  icon?: string;
   relativePath: string[];
   children: PresetBrowserTreeNode[];
 }
@@ -195,13 +201,13 @@ export type ListPresetBrowserTreeResponse =
 
 export interface ReadPresetEntryRequest<K extends PresetFileKind = PresetFileKind> {
   presetType: K;
+  source: PresetEntrySource;
   relativePath: string[];
 }
 
 export interface ShowPresetEntryInFolderRequest<K extends PresetFileKind = PresetFileKind>
-  extends PresetEntrySelectionItem {
-  presetType: K;
-  relativePath: string[];
+  extends UserPresetEntryRequest<K> {
+  entryKind: PresetEntrySelectionItem['entryKind'];
 }
 
 type DeletePresetEntryRequest<K extends PresetFileKind = PresetFileKind> =
@@ -211,16 +217,16 @@ export interface DeletePresetEntriesRequest {
   entries: DeletePresetEntryRequest[];
 }
 
-export interface DeletedPresetEntry extends DeletePresetEntryRequest {
+export interface DeletedPresetEntry extends PresetEntrySelectionItem {
   filePath: string;
 }
 
 export interface MovePresetEntriesRequest {
   entries: DeletePresetEntryRequest[];
-  destination: ReadPresetEntryRequest;
+  destination: UserPresetEntryRequest;
 }
 
-export interface MovedPresetEntry extends DeletePresetEntryRequest {
+export interface MovedPresetEntry extends PresetEntrySelectionItem {
   sourcePath: string;
   filePath: string;
 }
@@ -257,7 +263,7 @@ export type MovePresetEntriesResponse =
 export type ReadPresetEntryResponse<K extends PresetFileKind = PresetFileKind> =
   | {
       status: 'loaded';
-      filePath: string;
+      filePath: string | null;
       payload: PresetFileByKind<K>;
       needsSave: boolean;
     }

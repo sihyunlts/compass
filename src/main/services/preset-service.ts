@@ -2,6 +2,7 @@ import { shell, type BaseWindow } from 'electron';
 import { watch, type FSWatcher } from 'node:fs';
 
 import { isDeviceBrowserSystemDirectoryPath } from '../../devices/browser-categories';
+import { readBundledRackPreset } from '../../shared/bundled-rack-presets';
 import type {
   CreatePresetFolderResponse,
   DeletedPresetEntry,
@@ -465,6 +466,13 @@ export class PresetService {
         errorCode: 'invalid-read-request',
         message: 'Invalid file read request.',
       };
+    }
+
+    if (parsedRequest.source === 'bundled') {
+      return readBundledRackPreset(
+        parsedRequest.presetType,
+        parsedRequest.relativePath,
+      );
     }
 
     const rootDirectory = await this.storage.resolvePresetDirectory(parsedRequest.presetType);
