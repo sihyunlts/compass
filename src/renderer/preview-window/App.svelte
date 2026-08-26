@@ -9,6 +9,7 @@
   import { resolveCompassBridge } from '../app/browser-bridge';
   import { createPreviewSession } from '../features/preview/session.svelte';
   import Button from '../components/primitives/Button.svelte';
+  import HardwarePreviewControls from '../components/preview/HardwarePreviewControls.svelte';
   import PreviewSurface from '../components/preview/PreviewSurface.svelte';
   import { i18n } from '../i18n.svelte';
 
@@ -21,6 +22,12 @@
 
   const isPlaying = $derived(previewState?.isPlaying === true);
   const isLoopEnabled = $derived(previewState?.isLoopEnabled === true);
+  const hardwareOutput = $derived(previewState?.hardwareOutput ?? {
+    outputs: [],
+    selectedOutputId: null,
+    isAccessing: false,
+    error: null,
+  });
   const playButtonIcon = $derived(isPlaying ? 'pause' : 'play_arrow');
   const playButtonLabel = $derived(
     isPlaying ? i18n.t('preview.pauseAria') : i18n.t('preview.playAria'),
@@ -71,6 +78,19 @@
     bridgeClient.sendPreviewWindowControlRequest({
       action: 'seek',
       scrubValue: Number(input.value),
+    });
+  };
+
+  const handleRefreshHardwareOutputs = (): void => {
+    bridgeClient.sendPreviewWindowControlRequest({
+      action: 'refresh-hardware-outputs',
+    });
+  };
+
+  const handleSelectHardwareOutput = (outputId: string | null): void => {
+    bridgeClient.sendPreviewWindowControlRequest({
+      action: 'select-hardware-output',
+      outputId,
     });
   };
 
@@ -126,6 +146,14 @@
         icon="repeat"
         pressed={isLoopEnabled}
         onClick={handleLoopToggle}
+      />
+      <HardwarePreviewControls
+        outputs={hardwareOutput.outputs}
+        selectedOutputId={hardwareOutput.selectedOutputId}
+        isAccessing={hardwareOutput.isAccessing}
+        error={hardwareOutput.error}
+        onRefreshOutputs={handleRefreshHardwareOutputs}
+        onSelectOutput={handleSelectHardwareOutput}
       />
     </div>
 

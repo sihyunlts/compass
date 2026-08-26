@@ -23,8 +23,11 @@ export interface BadAppleAnimation {
 
 interface BadApplePreviewFrame {
   activeCells: PreviewWindowState['activeCells'];
+  activeVelocityByPitch: ReadonlyMap<number, number>;
   progress01: number;
 }
+
+const WHITE_VELOCITY = 3;
 
 const readMagic = (bytes: Uint8Array): string =>
   String.fromCharCode(...bytes.subarray(0, MAGIC.length));
@@ -64,6 +67,12 @@ const decodeBadAppleAnimation = (buffer: ArrayBuffer): BadAppleAnimation => {
 };
 
 let animationPromise: Promise<BadAppleAnimation> | null = null;
+let latestResolvedFrame: {
+  animation: BadAppleAnimation;
+  launchpadModel: LaunchpadModel;
+  frameIndex: number;
+  frame: BadApplePreviewFrame;
+} | null = null;
 
 /** Loads the pre-rasterized monochrome frames without bundling the source video. */
 export const loadBadAppleAnimation = (): Promise<BadAppleAnimation> => {
@@ -105,8 +114,16 @@ export const resolveBadApplePreviewFrame = (
     return null;
   }
   const frameIndex = elapsedFrames;
+  if (
+    latestResolvedFrame?.animation === animation
+    && latestResolvedFrame.launchpadModel === launchpadModel
+    && latestResolvedFrame.frameIndex === frameIndex
+  ) {
+    return latestResolvedFrame.frame;
+  }
   const cells = resolvePreviewCellModels(launchpadModel);
   const activeCells: PreviewWindowState['activeCells'] = [];
+  const activeVelocityByPitch = new Map<number, number>();
 
   for (let pixelIndex = 0; pixelIndex < cells.length; pixelIndex += 1) {
     if (!isPixelLit(animation, frameIndex, pixelIndex)) {
@@ -117,10 +134,19 @@ export const resolveBadApplePreviewFrame = (
       continue;
     }
     activeCells.push({ pitch, rgb: WHITE_RGB });
+    activeVelocityByPitch.set(pitch, WHITE_VELOCITY);
   }
 
-  return {
+  const frame: BadApplePreviewFrame = {
     activeCells,
+    activeVelocityByPitch,
     progress01: elapsedFrames / animation.frameCount,
   };
+  latestResolvedFrame = {
+    animation,
+    launchpadModel,
+    frameIndex,
+    frame,
+  };
+  return frame;
 };

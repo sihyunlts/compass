@@ -1,4 +1,5 @@
 import type { GeneratorChain, LaunchpadModel } from '../../model';
+import type { HardwareMidiOutputState } from './hardware-output';
 
 export const PREVIEW_SCRUB_MAX = 1000;
 
@@ -19,4 +20,5 @@ export interface PreviewWindowState {
   bpm: number;
   isPlaying: boolean;
   isLoopEnabled: boolean;
+  hardwareOutput: HardwareMidiOutputState;
 }

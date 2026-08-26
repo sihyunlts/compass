@@ -3,6 +3,7 @@ import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
 import type { ModulationStateByParameter } from '../../../shared/contracts/preview/modulation';
 import type { GeneratorPreview } from '../../../shared/contracts/preview/generator-preview';
 import type { PreviewWindowState } from '../../../shared/contracts/preview/window-state';
+import type { HardwareMidiOutputState } from '../../../shared/contracts/preview/hardware-output';
 import { createModulationReadoutCache } from './modulation-cache';
 import {
   createPreviewResultCache,
@@ -39,9 +40,16 @@ interface PreviewFrameInput {
   isPlaying: boolean;
   isLoopEnabled: boolean;
   resolveLedRgb: (velocity: number) => string;
-  resolveActiveCells?: (
-    activeCells: PreviewWindowState['activeCells'],
-  ) => PreviewWindowState['activeCells'];
+  resolveFrame?: (frame: ResolvedPreviewFrame) => ResolvedPreviewFrame;
+  onResolvedVelocityFrame?: (
+    activeVelocityByPitch: ReadonlyMap<number, number>,
+  ) => void;
+  hardwareOutput: HardwareMidiOutputState;
+}
+
+interface ResolvedPreviewFrame {
+  activeVelocityByPitch: ReadonlyMap<number, number>;
+  activeCells: PreviewWindowState['activeCells'];
 }
 
 interface PreviewSessionState {
@@ -109,14 +117,18 @@ export class PreviewSession {
       this.resolveRenderSource(input);
     const sourceTimelineEndBeat = previewResult?.sourceTimelineEndBeat ?? 1;
     const beat = clamp(input.currentBeat, 0, sourceTimelineEndBeat);
-    const activeVelocityByPitch = this.previewResultCache.resolveActiveVelocityByPitchAtBeat(
+    const rackActiveVelocityByPitch = this.previewResultCache.resolveActiveVelocityByPitchAtBeat(
       previewResult,
       beat,
     );
-
-    const rackActiveCells = toActiveCells(activeVelocityByPitch, input.resolveLedRgb);
+    const rackFrame: ResolvedPreviewFrame = {
+      activeVelocityByPitch: rackActiveVelocityByPitch,
+      activeCells: toActiveCells(rackActiveVelocityByPitch, input.resolveLedRgb),
+    };
+    const resolvedFrame = input.resolveFrame?.(rackFrame) ?? rackFrame;
+    input.onResolvedVelocityFrame?.(resolvedFrame.activeVelocityByPitch);
     const previewWindowState: PreviewWindowState = {
-      activeCells: input.resolveActiveCells?.(rackActiveCells) ?? rackActiveCells,
+      activeCells: resolvedFrame.activeCells,
       previewRevision,
       chain: sourceChain,
       launchpadModel: input.launchpadModel,
@@ -128,6 +140,7 @@ export class PreviewSession {
       bpm: input.bpm,
       isPlaying: input.isPlaying,
       isLoopEnabled: input.isLoopEnabled,
+      hardwareOutput: input.hardwareOutput,
     };
 
     this.syncPreviewSurface(
