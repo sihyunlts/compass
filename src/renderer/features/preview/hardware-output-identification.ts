@@ -273,18 +273,73 @@ export const createHardwareOutputMessages = (
   return [[profile.noteOnStatus, pitch, velocity]];
 };
 
+interface ProbePortLease {
+  referenceCount: number;
+  readonly openPromise: Promise<MIDIPort>;
+  readonly shouldClose: boolean;
+}
+
+const probePortLeases = new WeakMap<MIDIPort, ProbePortLease>();
+
+const releaseProbePort = async (
+  port: MIDIPort,
+  lease: ProbePortLease,
+): Promise<void> => {
+  lease.referenceCount -= 1;
+  if (lease.referenceCount > 0) {
+    return;
+  }
+  probePortLeases.delete(port);
+  if (!lease.shouldClose) {
+    return;
+  }
+  try {
+    await port.close();
+  } catch {
+    // Failing to close one probe port must not block the remaining cleanup.
+  }
+};
+
+const acquireProbePort = async (port: MIDIPort): Promise<() => Promise<void>> => {
+  let lease = probePortLeases.get(port);
+  if (!lease) {
+    const shouldClose = port.connection === 'closed';
+    lease = {
+      referenceCount: 0,
+      openPromise: port.open(),
+      shouldClose,
+    };
+    probePortLeases.set(port, lease);
+  }
+  lease.referenceCount += 1;
+  try {
+    await lease.openPromise;
+  } catch (error) {
+    await releaseProbePort(port, lease);
+    throw error;
+  }
+  return () => releaseProbePort(port, lease);
+};
+
+const releaseProbePorts = async (
+  releases: readonly (() => Promise<void>)[],
+): Promise<void> => {
+  await Promise.all(releases.map(async (release) => release()));
+};
+
 /** Identifies compatible grid controllers by their Universal Device Inquiry response. */
 export const identifyHardwareOutput = async (
   midiAccess: MIDIAccess,
   output: MIDIOutput,
 ): Promise<IdentifiedHardwareOutput | null> => {
   const inputs: MIDIInput[] = [];
+  const releaseProbePortCallbacks: Array<() => Promise<void>> = [];
   for (const input of midiAccess.inputs.values()) {
     if (input.state !== 'connected') {
       continue;
     }
     try {
-      await input.open();
+      releaseProbePortCallbacks.push(await acquireProbePort(input));
       inputs.push(input);
     } catch {
       // A different connected input can still carry the inquiry response.
@@ -295,8 +350,9 @@ export const identifyHardwareOutput = async (
   }
 
   try {
-    await output.open();
+    releaseProbePortCallbacks.push(await acquireProbePort(output));
   } catch {
+    await releaseProbePorts(releaseProbePortCallbacks);
     return null;
   }
 
@@ -316,7 +372,7 @@ export const identifyHardwareOutput = async (
       for (const input of inputs) {
         input.removeEventListener('midimessage', handleMessage);
       }
-      resolve(result);
+      void releaseProbePorts(releaseProbePortCallbacks).then(() => resolve(result));
     };
     const handleMessage = (event: MIDIMessageEvent): void => {
       if (identifiedOutput && isCoreFwProbeResponse(event.data)) {

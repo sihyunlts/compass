@@ -6,6 +6,7 @@ import {
   createMainWindow,
   getMainWindow,
   getPreviewWindow,
+  isCompassRendererUrl,
 } from './main/app-window';
 import { installApplicationMenu } from './main/application-menu';
 import { LiveTempoListener } from './main/bridge/live-tempo-listener';
@@ -24,12 +25,41 @@ const isCompassWindow = (webContents: WebContents | null): boolean =>
     (window) => window?.webContents === webContents,
   );
 
+const canUseMidi = (
+  webContents: WebContents | null,
+  permission: string,
+  requestingUrl: string,
+  isMainFrame: boolean,
+): boolean => MIDI_PERMISSIONS.has(permission)
+  && isMainFrame
+  && isCompassWindow(webContents)
+  && isCompassRendererUrl(requestingUrl);
+
 const configureMidiPermissions = (): void => {
   const appSession = session.defaultSession;
-  appSession.setPermissionCheckHandler((webContents, permission) =>
-    MIDI_PERMISSIONS.has(permission) && isCompassWindow(webContents));
-  appSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    callback(MIDI_PERMISSIONS.has(permission) && isCompassWindow(webContents));
+  appSession.setPermissionCheckHandler((
+    webContents,
+    permission,
+    requestingOrigin,
+    details,
+  ) => canUseMidi(
+    webContents,
+    permission,
+    details.requestingUrl ?? requestingOrigin,
+    details.isMainFrame,
+  ));
+  appSession.setPermissionRequestHandler((
+    webContents,
+    permission,
+    callback,
+    details,
+  ) => {
+    callback(canUseMidi(
+      webContents,
+      permission,
+      details.requestingUrl,
+      details.isMainFrame,
+    ));
   });
 };
 

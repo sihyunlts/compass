@@ -1,5 +1,6 @@
 import { BrowserWindow } from 'electron';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { IPC_CHANNELS } from '../shared/contracts/ipc/channels';
 
@@ -13,6 +14,19 @@ const MAIN_RENDERER_FILE_PATH = path.join(
   __dirname,
   `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`,
 );
+
+export const isCompassRendererUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+      return url.origin === new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin;
+    }
+    return url.protocol === 'file:'
+      && path.resolve(fileURLToPath(url)) === path.resolve(MAIN_RENDERER_FILE_PATH);
+  } catch {
+    return false;
+  }
+};
 
 const loadMainRenderer = (window: BrowserWindow): Promise<void> => {
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
