@@ -7,6 +7,7 @@ import type {
   PathTransform,
 } from '../../shared/model';
 import { clonePathAnchors } from '../../shared/model';
+import { affineLinearDeterminant } from '../../core/geometry';
 import {
   applyImportedDeviceMeta,
   isImportRecord,
@@ -41,7 +42,7 @@ export const sanitizePathTransform = (value: unknown): PathTransform => {
     tx: toFiniteNumber(value.tx, Number.NaN),
     ty: toFiniteNumber(value.ty, Number.NaN),
   };
-  const determinant = transform.a * transform.d - transform.b * transform.c;
+  const determinant = affineLinearDeterminant(transform);
   if (
     !Object.values(transform).every(Number.isFinite)
     || Math.abs(determinant) < 1e-12
