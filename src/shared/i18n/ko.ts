@@ -2,6 +2,7 @@ import type { MessageKey } from './en';
 
 export const ko = {
   'app.cancel': '취소',
+  'app.close': '닫기',
   'app.loading': '불러오는 중...',
   'app.open': '열기',
   'app.version': '버전',

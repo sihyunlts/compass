@@ -1,5 +1,9 @@
 import { LIVE_BRIDGE_TARGET } from '../../shared/bridge/protocol';
 import {
+  buildBundledRackPresetCollectionNode,
+  readBundledRackPreset,
+} from '../../shared/bundled-rack-presets';
+import {
   isDeviceBrowserSystemDirectoryPath,
 } from '../../devices/browser-categories';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
@@ -19,6 +23,7 @@ import {
 import type {
   PresetBrowserTreeFolderNode,
   PresetBrowserTreeNode,
+  ReadPresetEntryRequest,
   ReadPresetEntryResponse,
   SavePresetFileRequest,
 } from '../../shared/contracts/ipc/presets';
@@ -290,6 +295,7 @@ const buildChildren = (
       id: `preset:${presetType}:${folderPath.join('/')}`,
       label: folderPath[folderPath.length - 1] ?? '',
       presetType,
+      source: 'user',
       relativePath: [...folderPath],
       children: buildChildren(store, presetType, folderPath),
     }));
@@ -306,6 +312,7 @@ const buildChildren = (
         id: `preset:${presetType}:${file.relativePath.join('/')}`,
         label: getFileStem(file.relativePath[file.relativePath.length - 1] ?? '', presetType),
         presetType,
+        source: 'user',
         relativePath: [...file.relativePath],
         loadStatus: 'loaded',
         savedAtIso: file.payload.savedAtIso,
@@ -748,8 +755,11 @@ const createBrowserCompassBridge = (): CompassApi => ({
         id: `preset-root:${presetType}`,
         label: ROOT_LABELS[presetType],
         presetType,
+        source: 'user' as const,
         relativePath: [] as string[],
-        children: buildChildren(store, presetType, []),
+        children: presetType === 'rack'
+          ? [buildBundledRackPresetCollectionNode(), ...buildChildren(store, presetType, [])]
+          : buildChildren(store, presetType, []),
       })),
       occupiedPaths: collectStorePaths(store),
     };
@@ -885,10 +895,16 @@ const createBrowserCompassBridge = (): CompassApi => ({
       })),
     };
   },
-  readPresetEntry: async <K extends PresetFileKind>(request: {
-    presetType: K;
-    relativePath: string[];
-  }): Promise<ReadPresetEntryResponse<K>> => {
+  readPresetEntry: async <K extends PresetFileKind>(
+    request: ReadPresetEntryRequest<K>,
+  ): Promise<ReadPresetEntryResponse<K>> => {
+    if (request.source === 'bundled') {
+      return readBundledRackPreset(
+        request.presetType,
+        request.relativePath,
+      );
+    }
+
     const store = readStore();
     const entry = store.files.find((file) =>
       file.presetType === request.presetType && relativePathEquals(file.relativePath, request.relativePath));

@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 2,
+  "presetType": "rack",
+  "savedAtIso": "2026-08-24T11:10:50.077Z",
+  "chain": {
+    "metadata": {
+      "author": "sihyunlights",
+      "description": "The power of Path."
+    },
+    "devices": [
+      {
+        "id": "generator-3",
+        "kind": "path",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "anchors": [
+            {
+              "id": "path-anchor-4kivgf-msac72bw",
+              "x": 3.48,
+              "y": 6.36
+            },
+            {
+              "id": "path-anchor-2tkmx5-msac71or",
+              "x": 3.2,
+              "y": 5.399
+            },
+            {
+              "id": "path-anchor-xdt8ir-msac6rc2",
+              "x": 5.679,
+              "y": 6.76
+            },
+            {
+              "id": "path-anchor-gvhxir-msac6pyj",
+              "x": 2.799,
+              "y": 7.6
+            },
+            {
+              "id": "path-anchor-8u7b74-msac6n8u",
+              "x": 1.68,
+              "y": 3.758
+            },
+            {
+              "id": "path-anchor-1hb4z0-msac6jp2",
+              "x": 7.879,
+              "y": 7.161
+            },
+            {
+              "id": "path-anchor-bfruek-msac6hs3",
+              "x": 2.118,
+              "y": 8.839
+            },
+            {
+              "id": "path-anchor-2ok18w-msac4os9",
+              "x": 0.161,
+              "y": 2.118
+            },
+            {
+              "id": "path-anchor-a092yu-msac501t",
+              "x": 6.882,
+              "y": 0.161
+            },
+            {
+              "id": "path-anchor-pj8bwp-msac58t3",
+              "x": 8.839,
+              "y": 6.882
+            },
+            {
+              "id": "path-anchor-r4ijk8-msac5adl",
+              "x": 1.4,
+              "y": 2.799
+            },
+            {
+              "id": "path-anchor-c7wavp-msac5c7b",
+              "x": 6.201,
+              "y": 1.4
+            },
+            {
+              "id": "path-anchor-5dc4ku-msac5d1v",
+              "x": 7.32,
+              "y": 5.242
+            },
+            {
+              "id": "path-anchor-6xq66w-msac5dxd",
+              "x": 3.601,
+              "y": 3.2
+            },
+            {
+              "id": "path-anchor-nt90mh-msac5gro",
+              "x": 5.52,
+              "y": 2.64
+            },
+            {
+              "id": "path-anchor-9idjgm-msac5rc8",
+              "x": 5.8,
+              "y": 3.601
+            }
+          ],
+          "closed": false,
+          "fill": false,
+          "transform": {
+            "a": 1,
+            "b": 0,
+            "c": 0,
+            "d": 1,
+            "tx": 0,
+            "ty": 0
+          },
+          "animation": {
+            "enabled": true,
+            "direction": "reverse",
+            "startAnchorId": "path-anchor-2ok18w-msac4os9"
+          }
+        }
+      },
+      {
+        "id": "effect-4",
+        "kind": "scale",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "scaleX": 1.5,
+          "scaleY": 1.5
+        }
+      },
+      {
+        "id": "effect-1",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            13,
+            6,
+            7
+          ],
+          "noteLengthPercent": 400,
+          "gapPercent": 250
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

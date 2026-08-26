@@ -1,5 +1,6 @@
 export const en = {
   'app.cancel': 'Cancel',
+  'app.close': 'Close',
   'app.loading': 'Loading...',
   'app.open': 'Open',
   'app.version': 'Version',

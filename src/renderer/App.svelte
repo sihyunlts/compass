@@ -818,6 +818,7 @@
     description={authoredInfoState.description}
     savedAtIso={authoredInfoState.savedAtIso}
     busy={authoredInfoState.isPending}
+    readOnly={authoredInfoController.readOnly}
     onNameChange={(value) => {
       authoredInfoState.name = value;
     }}

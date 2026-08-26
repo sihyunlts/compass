@@ -3,6 +3,7 @@ import {
 } from '../../../shared/preset-entry-move';
 import { arePresetPathsEqual } from '../../../shared/preset-entry-selection';
 import type { PresetEntryContextTarget } from '../context-menu/types';
+import type { PresetEntrySource } from '../../../shared/presets';
 import { DragAutoScroller } from '../drag-auto-scroll';
 import {
   hideBrowserDragBadge,
@@ -12,6 +13,7 @@ import {
 
 export interface BrowserPresetMoveDestination
   extends PresetEntryMoveDestination {
+  source: PresetEntrySource;
   relativePath: string[];
   rowId: string | null;
 }

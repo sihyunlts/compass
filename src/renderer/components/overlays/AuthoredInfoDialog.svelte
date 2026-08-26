@@ -16,6 +16,7 @@
     description,
     savedAtIso = null,
     busy = false,
+    readOnly = false,
     onNameChange,
     onAuthorChange,
     onDescriptionChange,
@@ -29,6 +30,7 @@
     description: string;
     savedAtIso?: string | null;
     busy?: boolean;
+    readOnly?: boolean;
     onNameChange: (value: string) => void;
     onAuthorChange: (value: string) => void;
     onDescriptionChange: (value: string) => void;
@@ -58,10 +60,11 @@
     ? i18n.t('info.lastSavedValue', { time: savedAtText })
     : null}
   confirmLabel={i18n.t('info.save')}
-  cancelLabel={i18n.t('app.cancel')}
+  showConfirm={!readOnly}
+  cancelLabel={readOnly ? i18n.t('app.close') : i18n.t('app.cancel')}
   {busy}
   wide
-  defaultAction="confirm"
+  defaultAction={readOnly ? 'cancel' : 'confirm'}
   {onConfirm}
   {onCancel}
 >
@@ -72,6 +75,7 @@
         label={i18n.t('info.name')}
         placeholder={i18n.t('info.namePlaceholder')}
         disabled={busy}
+        readonly={readOnly}
         onValueChange={onNameChange}
       />
       <TextField
@@ -80,6 +84,7 @@
         placeholder={i18n.t('info.authorPlaceholder')}
         maxLength={AUTHORED_METADATA_AUTHOR_MAX_LENGTH}
         disabled={busy}
+        readonly={readOnly}
         onValueChange={onAuthorChange}
       />
     </div>
@@ -91,6 +96,7 @@
         maxLength={AUTHORED_METADATA_DESCRIPTION_MAX_LENGTH}
         rows={1}
         disabled={busy}
+        readonly={readOnly}
         onValueChange={onDescriptionChange}
       />
     </div>

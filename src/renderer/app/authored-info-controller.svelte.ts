@@ -79,6 +79,11 @@ class AuthoredInfoController {
     return i18n.t('info.presetTitle');
   }
 
+  public get readOnly(): boolean {
+    return this.state.target?.kind === 'preset'
+      && this.state.target.entry.source === 'bundled';
+  }
+
   public openRack = (): void => {
     this.loadToken += 1;
     const { presetController, editorSession } = this.options;
@@ -115,6 +120,10 @@ class AuthoredInfoController {
   public confirm = async (): Promise<void> => {
     const target = this.state.target;
     if (!target || this.state.isPending) {
+      return;
+    }
+    if (this.readOnly) {
+      this.close();
       return;
     }
 
@@ -192,6 +201,7 @@ class AuthoredInfoController {
     try {
       response = await this.options.bridgeClient.readPresetEntry({
         presetType: entry.presetType,
+        source: entry.source,
         relativePath: [...entry.relativePath],
       });
     } catch {
@@ -208,7 +218,8 @@ class AuthoredInfoController {
       return;
     }
     if (
-      response.payload.presetType === 'rack'
+      response.filePath !== null
+      && response.payload.presetType === 'rack'
       && response.filePath === this.options.presetController.state.currentRackFilePath
     ) {
       this.openRack();

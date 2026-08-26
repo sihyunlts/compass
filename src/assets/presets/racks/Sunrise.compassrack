@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 2,
+  "presetType": "rack",
+  "savedAtIso": "2026-08-24T11:10:43.577Z",
+  "chain": {
+    "metadata": {
+      "author": "sihyunlights",
+      "description": "Simple but wonderful."
+    },
+    "devices": [
+      {
+        "id": "generator-34",
+        "kind": "ripple",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-58",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            33,
+            32,
+            53,
+            49,
+            51
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 300
+        }
+      },
+      {
+        "id": "effect-60",
+        "kind": "translate",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "offsetX": 0,
+          "offsetY": 0
+        }
+      },
+      {
+        "id": "effect-59",
+        "kind": "modulator",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "targets": [
+            {
+              "id": "mod-target-ks497m-msofbdsu",
+              "slotIndex": 0,
+              "deviceId": "effect-60",
+              "paramKey": "offsetY",
+              "amount": 10
+            }
+          ],
+          "curve": {
+            "domain": "loop01",
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "curve-node-start",
+                "t": 0,
+                "v": -1
+              },
+              {
+                "id": "curve-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

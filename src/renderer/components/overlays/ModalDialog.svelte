@@ -71,6 +71,7 @@
     description: string | null;
     footerNote: string | null;
     confirmLabel: string;
+    showConfirm: boolean;
     secondaryLabel: string | null;
     cancelLabel: string;
   };
@@ -82,6 +83,7 @@
     description = null,
     footerNote = null,
     confirmLabel = 'OK',
+    showConfirm = true,
     secondaryLabel = null,
     cancelLabel = 'Cancel',
     busy = false,
@@ -97,6 +99,7 @@
     description?: string | null;
     footerNote?: string | null;
     confirmLabel?: string;
+    showConfirm?: boolean;
     secondaryLabel?: string | null;
     cancelLabel?: string;
     busy?: boolean;
@@ -113,6 +116,7 @@
     description: null,
     footerNote: null,
     confirmLabel: 'OK',
+    showConfirm: true,
     secondaryLabel: null,
     cancelLabel: 'Cancel',
   });
@@ -136,6 +140,7 @@
       description,
       footerNote,
       confirmLabel,
+      showConfirm,
       secondaryLabel,
       cancelLabel,
     };
@@ -232,7 +237,9 @@
 
   const handleSubmit = (event: SubmitEvent): void => {
     event.preventDefault();
-    handleConfirm();
+    if (displayedText.showConfirm) {
+      handleConfirm();
+    }
   };
 
   const handleSecondary = (): void => {
@@ -440,14 +447,16 @@
               onClick={handleSecondary}
             />
           {/if}
-          <Button
-            class="modal-dialog-action-button"
-            type="submit"
-            variant={defaultAction === 'confirm' ? 'primary' : 'secondary'}
-            data-modal-action="confirm"
-            disabled={busy}
-            text={displayedText.confirmLabel}
-          />
+          {#if displayedText.showConfirm}
+            <Button
+              class="modal-dialog-action-button"
+              type="submit"
+              variant={defaultAction === 'confirm' ? 'primary' : 'secondary'}
+              data-modal-action="confirm"
+              disabled={busy}
+              text={displayedText.confirmLabel}
+            />
+          {/if}
         </footer>
       </form>
     </div>

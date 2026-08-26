@@ -1,6 +1,9 @@
 import path from 'node:path';
 
 import { compareDeviceBrowserCategoryDirectoryNames } from '../../../devices/browser-categories';
+import {
+  buildBundledRackPresetCollectionNode,
+} from '../../../shared/bundled-rack-presets';
 import type {
   PresetBrowserTreeFolderNode,
   PresetBrowserTreeNode,
@@ -68,19 +71,23 @@ export class PresetBrowserTreeBuilder {
     includeTree = true,
   ): Promise<PresetBrowserTreeFolderNode> {
     const rootDirectory = await this.storage.resolvePresetDirectory(presetType);
+    const userChildren = await this.buildChildren(
+      presetType,
+      rootDirectory,
+      [],
+      occupiedPaths,
+      includeTree,
+    );
     return {
       kind: 'folder',
       id: `preset-root:${presetType}`,
       label: PRESET_ROOT_SECTION_LABELS[presetType],
       presetType,
+      source: 'user',
       relativePath: [],
-      children: await this.buildChildren(
-        presetType,
-        rootDirectory,
-        [],
-        occupiedPaths,
-        includeTree,
-      ),
+      children: includeTree && presetType === 'rack'
+        ? [buildBundledRackPresetCollectionNode(), ...userChildren]
+        : userChildren,
     };
   }
 
@@ -131,6 +138,7 @@ export class PresetBrowserTreeBuilder {
           id: `preset:${presetType}:${nextRelativePath.join('/')}`,
           label: directory.name,
           presetType,
+          source: 'user',
           relativePath: nextRelativePath,
           children,
         });
@@ -159,6 +167,7 @@ export class PresetBrowserTreeBuilder {
         kind: 'preset' as const,
         id: `preset:${presetType}:${nextRelativePath.join('/')}`,
         presetType,
+        source: 'user' as const,
         label: path.parse(entry.name).name,
         relativePath: nextRelativePath,
       };
