@@ -67,6 +67,7 @@ const previewWindowControlRequestListeners = createListenerSet<PreviewWindowCont
 const mainWindowCloseRequestListeners = createListenerSet<void>();
 const mainWindowRackFileMenuRequestListeners = createListenerSet<RackFileMenuAction>();
 const presetBrowserTreeChangedListeners = createListenerSet<void>();
+const appFocusListeners = createListenerSet<boolean>();
 
 ipcRenderer.on(IPC_CHANNELS.liveTempoUpdate, (_event, payload: LiveTempoUpdate) => {
   liveTempoListeners.emit(payload);
@@ -113,6 +114,10 @@ ipcRenderer.on(IPC_CHANNELS.presetBrowserTreeChanged, () => {
   presetBrowserTreeChangedListeners.emit();
 });
 
+ipcRenderer.on(IPC_CHANNELS.appFocusUpdate, (_event, isFocused: boolean) => {
+  appFocusListeners.emit(isFocused === true);
+});
+
 const api: CompassApi = {
   sendGeneratedPreview: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.sendGeneratedPreview, request),
@@ -120,6 +125,10 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.requestAppVersion),
   setApplicationLocale: (locale) =>
     ipcRenderer.invoke(IPC_CHANNELS.setApplicationLocale, locale),
+  requestAppFocus: () =>
+    ipcRenderer.invoke(IPC_CHANNELS.requestAppFocus) as Promise<boolean>,
+  subscribeAppFocus: (listener) =>
+    appFocusListeners.subscribe(listener),
   checkForUpdates: () =>
     ipcRenderer.invoke(IPC_CHANNELS.checkForUpdates),
   openLatestReleasePage: () =>

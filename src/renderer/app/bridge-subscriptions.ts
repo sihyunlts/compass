@@ -7,6 +7,7 @@ interface BridgeSubscriptionOptions {
   playbackSession: PlaybackSessionController;
   onVersionResolved?: (version: string) => void;
   onUpdateCheckResolved?: (result: UpdateCheckResponse) => void;
+  onAppFocusChange?: (isFocused: boolean) => void;
 }
 
 const runBestEffort = (task: Promise<unknown>): void => {
@@ -27,7 +28,16 @@ export const mountBridgeSubscriptions = (
     options.bridgeClient.subscribePreviewWindowVisibility((isOpen) => {
       options.playbackSession.setPreviewPopoutOpen(isOpen === true);
     });
+  let appFocusUnsubscribe: (() => void) | null =
+    options.bridgeClient.subscribeAppFocus((isFocused) => {
+      options.onAppFocusChange?.(isFocused);
+    });
 
+  runBestEffort(
+    options.bridgeClient.requestAppFocus().then((isFocused) => {
+      options.onAppFocusChange?.(isFocused);
+    }),
+  );
   runBestEffort(
     options.bridgeClient.requestAppVersion().then((version) => {
       options.onVersionResolved?.(version);
@@ -53,6 +63,10 @@ export const mountBridgeSubscriptions = (
     if (previewWindowVisibilityUnsubscribe) {
       previewWindowVisibilityUnsubscribe();
       previewWindowVisibilityUnsubscribe = null;
+    }
+    if (appFocusUnsubscribe) {
+      appFocusUnsubscribe();
+      appFocusUnsubscribe = null;
     }
   };
 };

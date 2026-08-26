@@ -44,7 +44,9 @@ export type RackFileMenuAction = 'new' | 'save' | 'save-as';
 export type PreviewWindowControlRequest =
   | { action: 'toggle-playback' }
   | { action: 'toggle-loop' }
-  | { action: 'seek'; scrubValue: number };
+  | { action: 'seek'; scrubValue: number }
+  | { action: 'refresh-hardware-outputs' }
+  | { action: 'select-hardware-output'; outputId: string | null };
 
 export const parsePreviewWindowControlRequest = (
   value: unknown,
@@ -54,13 +56,27 @@ export const parsePreviewWindowControlRequest = (
   }
 
   const action = (value as { action?: unknown }).action;
-  if (action === 'toggle-playback' || action === 'toggle-loop') {
+  if (
+    action === 'toggle-playback'
+    || action === 'toggle-loop'
+    || action === 'refresh-hardware-outputs'
+  ) {
     return { action };
   }
 
   const scrubValue = (value as { scrubValue?: unknown }).scrubValue;
   if (action === 'seek' && typeof scrubValue === 'number' && Number.isFinite(scrubValue)) {
     return { action, scrubValue };
+  }
+
+  const outputId = (value as { outputId?: unknown }).outputId;
+  if (action === 'select-hardware-output') {
+    if (typeof outputId === 'string') {
+      return { action, outputId };
+    }
+    if (outputId === null) {
+      return { action, outputId: null };
+    }
   }
 
   return null;
@@ -72,6 +88,8 @@ export interface CompassApi {
   ) => Promise<SendGeneratedPreviewResponse>;
   requestAppVersion: () => Promise<string>;
   setApplicationLocale: (locale: AppLocale) => Promise<void>;
+  requestAppFocus: () => Promise<boolean>;
+  subscribeAppFocus: (listener: (isFocused: boolean) => void) => () => void;
   checkForUpdates: () => Promise<UpdateCheckResponse>;
   openLatestReleasePage: () => Promise<void>;
   requestLiveTempo: () => Promise<RequestLiveTempoResponse>;

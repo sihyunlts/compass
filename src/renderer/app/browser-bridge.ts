@@ -364,6 +364,17 @@ const createBrowserCompassBridge = (): CompassApi => ({
   },
   requestAppVersion: async () => __APP_VERSION__,
   setApplicationLocale: async () => {},
+  requestAppFocus: async () => document.hasFocus(),
+  subscribeAppFocus: (listener) => {
+    const handleFocus = (): void => listener(true);
+    const handleBlur = (): void => listener(false);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
+    };
+  },
   checkForUpdates: async () => {
     const currentVersion = __APP_VERSION__;
 

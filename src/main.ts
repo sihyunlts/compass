@@ -1,10 +1,11 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, session, type WebContents } from 'electron';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
 import {
   createMainWindow,
   getMainWindow,
+  getPreviewWindow,
 } from './main/app-window';
 import { installApplicationMenu } from './main/application-menu';
 import { LiveTempoListener } from './main/bridge/live-tempo-listener';
@@ -15,6 +16,22 @@ import { UpdateCheckService } from './main/services/update-check-service';
 import { IPC_CHANNELS } from './shared/contracts/ipc/channels';
 
 const WINDOWS_APP_USER_MODEL_ID = 'com.sihyunlights.compass';
+const MIDI_PERMISSIONS = new Set(['midi', 'midiSysex']);
+
+const isCompassWindow = (webContents: WebContents | null): boolean =>
+  webContents !== null
+  && [getMainWindow(), getPreviewWindow()].some(
+    (window) => window?.webContents === webContents,
+  );
+
+const configureMidiPermissions = (): void => {
+  const appSession = session.defaultSession;
+  appSession.setPermissionCheckHandler((webContents, permission) =>
+    MIDI_PERMISSIONS.has(permission) && isCompassWindow(webContents));
+  appSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    callback(MIDI_PERMISSIONS.has(permission) && isCompassWindow(webContents));
+  });
+};
 
 const handleSquirrelStartupEvent = (): boolean => {
   if (process.platform !== 'win32') {
@@ -53,6 +70,21 @@ const sendToAllWindows = <T>(channel: string, payload: T): void => {
       window.webContents.send(channel, payload);
     }
   }
+};
+
+let appFocusBroadcastTimer: NodeJS.Timeout | null = null;
+
+const broadcastAppFocus = (): void => {
+  if (appFocusBroadcastTimer) {
+    clearTimeout(appFocusBroadcastTimer);
+  }
+  appFocusBroadcastTimer = setTimeout(() => {
+    appFocusBroadcastTimer = null;
+    sendToAllWindows(
+      IPC_CHANNELS.appFocusUpdate,
+      BrowserWindow.getFocusedWindow() !== null,
+    );
+  }, 0);
 };
 
 const focusOrCreateMainWindow = (): void => {
@@ -96,8 +128,11 @@ const startApplication = (): void => {
   registerIpcHandlers(generatorService, presetService, updateCheckService);
 
   app.on('second-instance', focusOrCreateMainWindow);
+  app.on('browser-window-focus', broadcastAppFocus);
+  app.on('browser-window-blur', broadcastAppFocus);
 
   app.whenReady().then(() => {
+    configureMidiPermissions();
     installApplicationMenu();
 
     liveTempoListener.start((update) => {
@@ -116,6 +151,10 @@ const startApplication = (): void => {
   });
 
   app.on('will-quit', () => {
+    if (appFocusBroadcastTimer) {
+      clearTimeout(appFocusBroadcastTimer);
+      appFocusBroadcastTimer = null;
+    }
     presetService.stopWatchingBrowserTree();
     liveTempoListener.stop();
   });

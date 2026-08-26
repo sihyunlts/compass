@@ -8,6 +8,7 @@ export interface PersistedRendererState {
   bridge?: BridgeSettings;
   preview?: {
     bpm?: number;
+    hardwareOutputId?: string | null;
     loopEnabled?: boolean;
   };
   ui?: {
@@ -58,6 +59,9 @@ const pickPersistedPreview = (
 
   return {
     ...(preview.bpm !== undefined ? { bpm: preview.bpm } : {}),
+    ...(preview.hardwareOutputId !== undefined
+      ? { hardwareOutputId: preview.hardwareOutputId }
+      : {}),
     ...(preview.loopEnabled !== undefined ? { loopEnabled: preview.loopEnabled } : {}),
   };
 };

@@ -82,6 +82,11 @@ export const registerIpcHandlers = (
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.requestAppFocus,
+    () => BrowserWindow.getFocusedWindow() !== null,
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.checkForUpdates,
     () => updateCheckService.checkForUpdates(),
   );

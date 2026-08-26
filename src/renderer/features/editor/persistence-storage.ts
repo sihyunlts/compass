@@ -124,6 +124,21 @@ export const savePreviewLoopEnabled = (enabled: boolean): void => {
   });
 };
 
+/** Loads the last MIDI output selection; null clears the previous choice for this launch. */
+export const loadHardwareOutputId = (): string | undefined => {
+  const outputId = readPersistedRendererState().preview?.hardwareOutputId;
+  return typeof outputId === 'string' ? outputId : undefined;
+};
+
+/** Persists the selected MIDI output; null clears the remembered device. */
+export const saveHardwareOutputId = (outputId: string | null): void => {
+  writePersistedRendererState({
+    preview: {
+      hardwareOutputId: outputId,
+    },
+  });
+};
+
 /** Loads sidebar width and clamps it to the supported layout range. */
 export const loadSidebarWidth = (): number =>
   sanitizeSidebarWidth(readPersistedRendererState().ui?.sidebarWidthPx ?? DEFAULT_SIDEBAR_WIDTH_PX);

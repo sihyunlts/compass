@@ -2,7 +2,12 @@
   import { clamp } from '../../../shared/math';
   import { PREVIEW_SCRUB_MAX } from '../../../shared/contracts/preview/window-state';
   import type { PreviewSurfaceViewModel } from '../../features/preview/view-model';
+  import type {
+    HardwareMidiError,
+    HardwareMidiOutput,
+  } from '../../../shared/contracts/preview/hardware-output';
   import Button from '../primitives/Button.svelte';
+  import HardwarePreviewControls from './HardwarePreviewControls.svelte';
   import PreviewSurface from './PreviewSurface.svelte';
   import { i18n } from '../../i18n.svelte';
 
@@ -17,6 +22,12 @@
     onLoopToggle,
     scrubValue = $bindable(),
     onScrubInput,
+    hardwareOutputs,
+    selectedHardwareOutputId,
+    isHardwareOutputAccessing,
+    hardwareOutputError,
+    onRefreshHardwareOutputs,
+    onSelectHardwareOutput,
   } = $props<{
     surfaceModel: PreviewSurfaceViewModel;
     onPopout: () => void | Promise<void>;
@@ -28,6 +39,12 @@
     onLoopToggle: () => void;
     scrubValue: number;
     onScrubInput: () => void;
+    hardwareOutputs: HardwareMidiOutput[];
+    selectedHardwareOutputId: string | null;
+    isHardwareOutputAccessing: boolean;
+    hardwareOutputError: HardwareMidiError | null;
+    onRefreshHardwareOutputs: () => void | Promise<void>;
+    onSelectHardwareOutput: (outputId: string | null) => void | Promise<void>;
   }>();
 
   const resolvePlayIcon = (): string => (isPlaying ? 'pause' : 'play_arrow');
@@ -100,6 +117,14 @@
         onClick={handlePopout}
       />
     {/if}
+    <HardwarePreviewControls
+      outputs={hardwareOutputs}
+      selectedOutputId={selectedHardwareOutputId}
+      isAccessing={isHardwareOutputAccessing}
+      error={hardwareOutputError}
+      onRefreshOutputs={onRefreshHardwareOutputs}
+      onSelectOutput={onSelectHardwareOutput}
+    />
   </div>
 </section>
 

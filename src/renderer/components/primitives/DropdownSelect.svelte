@@ -14,7 +14,12 @@
     valueLabel,
     showHint = false,
     disabled = false,
+    variant = 'default',
+    icon,
+    pressed,
+    heading,
     class: className = '',
+    onOpen,
     onValueChange,
     ...rest
   } = $props<{
@@ -24,7 +29,12 @@
     valueLabel?: string;
     showHint?: boolean;
     disabled?: boolean;
+    variant?: 'default' | 'icon';
+    icon?: string;
+    pressed?: boolean;
+    heading?: string;
     class?: string;
+    onOpen?: () => void | Promise<void>;
     onValueChange: (value: DropdownValue) => void;
   } & Record<string, unknown>>();
 
@@ -41,7 +51,16 @@
     options.some((option: DropdownOption) => !option.disabled),
   );
   const isDisabled = $derived(disabled || !hasEnabledOptions);
+  const isIconTrigger = $derived(variant === 'icon');
   const rootClass = $derived(`dropdown-select ${className}`.trim());
+
+  const open = (): void => {
+    if (isOpen) {
+      return;
+    }
+    isOpen = true;
+    void onOpen?.();
+  };
 
   const close = (restoreFocus: boolean): void => {
     isOpen = false;
@@ -61,7 +80,7 @@
     }
 
     event.preventDefault();
-    isOpen = true;
+    open();
   };
 </script>
 
@@ -71,17 +90,24 @@
     bind:this={triggerEl}
     type="button"
     class="dropdown-select-trigger"
+    class:is-icon-trigger={isIconTrigger}
+    class:is-active={pressed === true}
     aria-label={ariaLabel}
     aria-haspopup="listbox"
     aria-expanded={isOpen}
+    aria-pressed={isIconTrigger ? pressed : undefined}
     disabled={isDisabled}
     use:hint={showHint ? ariaLabel : undefined}
     use:buttonPress
-    onclick={() => isOpen = !isOpen}
+    onclick={() => isOpen ? close(false) : open()}
     onkeydown={handleTriggerKeyDown}
   >
-    <span class="dropdown-select-label">{triggerText}</span>
-    <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
+    {#if !isIconTrigger}
+      <span class="dropdown-select-label">{triggerText}</span>
+    {/if}
+    <span class="material-symbols-rounded" aria-hidden="true">
+      {isIconTrigger ? icon : 'expand_more'}
+    </span>
   </button>
 
   <FloatingDropdown
@@ -93,6 +119,7 @@
       {options}
       {value}
       ariaLabel={ariaLabel}
+      {heading}
       onSelect={handleSelect}
       onClose={() => close(true)}
     />
@@ -145,6 +172,19 @@
       font-size: var(--text-18);
       line-height: 1;
       font-variation-settings: 'FILL' 1, 'wght' 400;
+    }
+
+    &.is-icon-trigger {
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+      border-radius: var(--radius-6);
+
+      &.is-active {
+        background: var(--color-surface-inverse);
+        color: var(--color-text-inverse);
+      }
     }
   }
 

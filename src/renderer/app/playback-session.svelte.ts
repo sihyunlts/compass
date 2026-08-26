@@ -1,6 +1,7 @@
 import type { BridgeSettings } from '../../shared/bridge/types';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { GeneratorPreview } from '../../shared/contracts/preview/generator-preview';
+import type { HardwareMidiOutputState } from '../../shared/contracts/preview/hardware-output';
 import {
   PREVIEW_SCRUB_MAX,
   type PreviewWindowState,
@@ -49,12 +50,14 @@ interface PlaybackSessionOptions {
   previewSession: PreviewSession;
   headerIndicator: HeaderIndicatorController;
   resolveLedRgb: (velocity: number) => string;
+  resolveHardwareOutputState: () => HardwareMidiOutputState;
   resolvePreviewVisual?: (input: {
     rackActiveCells: PreviewWindowState['activeCells'];
     elapsedMs: number;
     launchpadModel: LaunchpadModel;
   }) => {
     activeCells: PreviewWindowState['activeCells'];
+    activeVelocityByPitch: ReadonlyMap<number, number>;
     progress01: number;
   } | null;
   onPreviewVisualStart?: () => void;
@@ -124,6 +127,8 @@ export class PlaybackSessionController {
 
   private previewVisualPhase: PreviewVisualPhase = 'disabled';
 
+  private hardwareFrameSink: ((frame: ReadonlyMap<number, number>) => void) | null = null;
+
   public constructor(private readonly options: PlaybackSessionOptions) {
     const maxFps = options.previewWindowStateMaxFps ?? DEFAULT_PREVIEW_WINDOW_STATE_MAX_FPS;
     this.previewWindowStatePusher = createPreviewWindowStatePusher({
@@ -191,8 +196,12 @@ export class PlaybackSessionController {
       bpm: uiState.previewBpm,
       isPlaying: this.state.isPlaying,
       isLoopEnabled: uiState.isPreviewLoopEnabled,
+      hardwareOutput: this.options.resolveHardwareOutputState(),
       resolveLedRgb,
-      resolveActiveCells: (rackActiveCells) => {
+      onResolvedVelocityFrame: (frame) => {
+        this.hardwareFrameSink?.(frame);
+      },
+      resolveFrame: (rackFrame) => {
         if (
           !this.state.isPlaying
           || (
@@ -201,11 +210,11 @@ export class PlaybackSessionController {
           )
           || !this.options.resolvePreviewVisual
         ) {
-          return rackActiveCells;
+          return rackFrame;
         }
 
         const previewVisual = this.options.resolvePreviewVisual({
-          rackActiveCells,
+          rackActiveCells: rackFrame.activeCells,
           elapsedMs: this.resolvePreviewVisualElapsedMs(),
           launchpadModel: uiState.launchpadModel,
         });
@@ -213,14 +222,17 @@ export class PlaybackSessionController {
           if (this.previewVisualPhase === 'active') {
             this.previewVisualPhase = 'consumed';
           }
-          return rackActiveCells;
+          return rackFrame;
         }
         previewVisualProgress01 = clamp(previewVisual.progress01, 0, 1);
         if (this.previewVisualPhase === 'waiting') {
           this.previewVisualPhase = 'active';
           this.options.onPreviewVisualStart?.();
         }
-        return previewVisual.activeCells;
+        return {
+          activeCells: previewVisual.activeCells,
+          activeVelocityByPitch: previewVisual.activeVelocityByPitch,
+        };
       },
     });
     if (previewVisualProgress01 !== null) {
@@ -298,6 +310,13 @@ export class PlaybackSessionController {
     input: PreviewGenerationSource,
   ): Promise<GeneratorPreview> {
     return this.resolveGeneratedPreview(input, 'delivery');
+  }
+
+  public setHardwareFrameSink(
+    sink: ((frame: ReadonlyMap<number, number>) => void) | null,
+  ): void {
+    this.hardwareFrameSink = sink;
+    this.renderPreviewFrame();
   }
 
   public applyPreviewResult(input: ApplyPreviewResultInput): void {

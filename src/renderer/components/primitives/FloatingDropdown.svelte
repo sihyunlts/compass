@@ -170,6 +170,24 @@
     });
   });
 
+  $effect(() => {
+    if (!isLayerOpen || !dropdownEl) {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      void updatePosition();
+    });
+    resizeObserver.observe(dropdownEl);
+    if (anchorEl) {
+      resizeObserver.observe(anchorEl);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  });
+
   onMount(() => {
     const detachDismissHandlers = attachFloatingLayerDismissHandlers({
       layerId: floatingLayerId,

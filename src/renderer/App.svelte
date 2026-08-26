@@ -9,8 +9,10 @@
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
   import { DEVICE_BROWSER_TREE } from './features/editor/device-browser-categories';
   import {
+    loadHardwareOutputId,
     loadMainWindowAlwaysOnTop,
     sanitizeSidebarWidth,
+    saveHardwareOutputId,
     saveMainWindowAlwaysOnTop,
   } from './features/editor/persistence-storage';
   import BrowserPanel from './components/browser/BrowserPanel.svelte';
@@ -40,6 +42,7 @@
   import { createHeaderIndicator } from './app/header-indicator.svelte';
   import { mountKeyboardShortcuts } from './app/keyboard-shortcuts';
   import { createPlaybackSession } from './app/playback-session.svelte';
+  import { createHardwarePreviewController } from './app/hardware-preview-controller.svelte';
   import { createResultDeliveryFlow } from './app/result-delivery-flow';
   import { setKaguyaThemeEnabled } from './app/theme';
   import {
@@ -172,12 +175,33 @@
   });
   const resolvePaletteRgb = (velocity: number): string =>
     settingsController.resolvePaletteRgb(velocity, '0 0 0');
+  const hardwarePreview = createHardwarePreviewController({
+    preferredOutputId: loadHardwareOutputId(),
+    onPreferredOutputChange: saveHardwareOutputId,
+    onOutputConnected: (outputName, reason) => {
+      const messageKey = reason === 'automatic'
+        ? 'preview.hardware.autoConnected'
+        : reason === 'restored'
+          ? 'preview.hardware.restored'
+          : 'preview.hardware.connected';
+      headerIndicator.show(i18n.t(messageKey, { name: outputName }));
+    },
+    onOutputDisconnected: (outputName, reason) => {
+      headerIndicator.show(i18n.t(
+        reason === 'manual'
+          ? 'preview.hardware.disconnected'
+          : 'preview.hardware.connectionLost',
+        { name: outputName },
+      ));
+    },
+  });
   const playbackSession = createPlaybackSession({
     bridgeClient,
     editorSession,
     previewSession,
     headerIndicator,
     resolveLedRgb: (velocity) => settingsController.resolvePaletteRgb(velocity, DEFAULT_LED_RGB),
+    resolveHardwareOutputState: () => hardwarePreview.createOutputStateSnapshot(),
     resolvePreviewVisual: ({ elapsedMs, launchpadModel }) => {
       if (
         presetState.currentRackDisplayName.trim().toLowerCase() !== 'bad apple'
@@ -192,6 +216,7 @@
     },
   });
   settingsController.attachPlaybackSession(playbackSession);
+  playbackSession.setHardwareFrameSink((frame) => hardwarePreview.syncFrame(frame));
   let isRackRevertDialogOpen = $state(false);
   const resultDeliveryFlow = createResultDeliveryFlow({
     bridgeClient,
@@ -233,6 +258,14 @@
 
   $effect(() => {
     void uiState.chainRevision;
+    untrack(() => playbackSession.renderPreviewFrame());
+  });
+
+  $effect(() => {
+    void hardwarePreview.state.outputs;
+    void hardwarePreview.state.selectedOutputId;
+    void hardwarePreview.state.isAccessing;
+    void hardwarePreview.state.error;
     untrack(() => playbackSession.renderPreviewFrame());
   });
 
@@ -419,6 +452,7 @@
     });
     editorSession.initialize();
     playbackSession.initialize();
+    void hardwarePreview.refreshOutputs();
     void presetController.loadTree();
     if (uiState.headerIndicatorText.trim()) {
       headerIndicator.show(uiState.headerIndicatorText);
@@ -432,6 +466,9 @@
       onUpdateCheckResolved: (result) => {
         settingsController.setUpdateCheckResult(result);
       },
+      onAppFocusChange: (isFocused) => {
+        hardwarePreview.setAppFocused(isFocused);
+      },
     });
     const disposeKeyboardShortcuts = mountKeyboardShortcuts({
       editorSession,
@@ -440,7 +477,10 @@
       onNewRack: () => presetController.handleNewRack(),
       onSaveRack: () => presetController.handleSaveRack(),
       onSaveRackAs: () => presetController.handleSaveRackAs(),
-      onBeforeUnload: disposeBridgeSubscriptions,
+      onBeforeUnload: () => {
+        disposeBridgeSubscriptions();
+        hardwarePreview.dispose();
+      },
     });
     const disposeMainWindowCloseRequest = bridgeClient.subscribeMainWindowCloseRequest(() => {
       void presetController.handleMainWindowCloseRequest();
@@ -476,6 +516,16 @@
           return;
         }
 
+        if (request.action === 'refresh-hardware-outputs') {
+          void hardwarePreview.refreshOutputs();
+          return;
+        }
+
+        if (request.action === 'select-hardware-output') {
+          void hardwarePreview.selectOutput(request.outputId);
+          return;
+        }
+
         uiState.previewScrubValue = request.scrubValue;
         playbackSession.seekPreview(uiState.previewScrubValue);
       },
@@ -494,6 +544,7 @@
       disposeKeyboardShortcuts();
       disposeBridgeSubscriptions();
       resultDeliveryFlow.dispose();
+      hardwarePreview.dispose();
       playbackSession.dispose();
       headerIndicator.dispose();
       settingsController.dispose();
@@ -731,6 +782,12 @@
             onLoopToggle={() => playbackSession.togglePreviewLoop()}
             bind:scrubValue={uiState.previewScrubValue}
             onScrubInput={() => playbackSession.seekPreview(uiState.previewScrubValue)}
+            hardwareOutputs={hardwarePreview.state.outputs}
+            selectedHardwareOutputId={hardwarePreview.state.selectedOutputId}
+            isHardwareOutputAccessing={hardwarePreview.state.isAccessing}
+            hardwareOutputError={hardwarePreview.state.error}
+            onRefreshHardwareOutputs={() => hardwarePreview.refreshOutputs()}
+            onSelectHardwareOutput={(outputId) => hardwarePreview.selectOutput(outputId)}
           />
         {/if}
       </section>
