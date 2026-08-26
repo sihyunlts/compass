@@ -8,8 +8,8 @@ import {
 import {
   boundedNumericParameter,
   defineNumericParameterRules,
+  finiteNumericParameter,
   hydrateImportedNumericParameters,
-  positiveNumericParameter,
 } from '../numeric-parameters';
 import type { RendererDeviceSchema } from '../types';
 
@@ -37,16 +37,14 @@ export const SCALE_NUMERIC_PARAMETERS = defineNumericParameterRules<
     step: 0.5,
     modulationMessageKey: 'control.centerY',
   }),
-  scaleX: positiveNumericParameter({
+  scaleX: finiteNumericParameter({
     defaultValue: DEFAULT_SCALE_PARAMS.scaleX,
-    min: 0.000001,
     step: 0.1,
     display: { unit: '×' },
     modulationMessageKey: 'control.scaleX',
   }),
-  scaleY: positiveNumericParameter({
+  scaleY: finiteNumericParameter({
     defaultValue: DEFAULT_SCALE_PARAMS.scaleY,
-    min: 0.000001,
     step: 0.1,
     display: { unit: '×' },
     modulationMessageKey: 'control.scaleY',

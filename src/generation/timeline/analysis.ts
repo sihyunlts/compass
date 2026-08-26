@@ -4,7 +4,10 @@ import {
   distanceToPolylineSquared,
   distanceToRasterizedPolylineSquared,
 } from '../../core/geometry';
-import { toRoundedCoordinateKey } from '../coordinates';
+import {
+  coordinateKeySetContainsPoint,
+  toRoundedCoordinateKey,
+} from '../coordinates';
 import type {
   GeometryMask,
   GeometryStroke,
@@ -414,8 +417,5 @@ export const createCoordinateMask = (
     roundedKeys.add(`${coordinate.x},${coordinate.y}`);
   }
 
-  return (x, y) => {
-    const coordinateKey = toRoundedCoordinateKey(x, y);
-    return coordinateKey !== null && roundedKeys.has(coordinateKey);
-  };
+  return (x, y) => coordinateKeySetContainsPoint(roundedKeys, x, y);
 };

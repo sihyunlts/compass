@@ -32,24 +32,147 @@ export const composeAffine = (after: AffineTransform, before: AffineTransform): 
   ty: after.c * before.tx + after.d * before.ty + after.ty,
 });
 
-export const invertAffine = (transform: AffineTransform): AffineTransform | null => {
-  const det = transform.a * transform.d - transform.b * transform.c;
-  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) {
+const AFFINE_INVERSE_RELATIVE_EPSILON = 1e-12;
+
+interface LinearTransform {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+}
+
+export const affineLinearDeterminant = (
+  transform: LinearTransform,
+): number => transform.a * transform.d - transform.b * transform.c;
+
+const resolveMaxLinearComponent = (
+  transform: LinearTransform,
+): number | null => {
+  const maxComponent = Math.max(
+    Math.abs(transform.a),
+    Math.abs(transform.b),
+    Math.abs(transform.c),
+    Math.abs(transform.d),
+  );
+  return Number.isFinite(maxComponent) ? maxComponent : null;
+};
+
+const isFiniteLinearTransform = (
+  transform: LinearTransform,
+): boolean => Number.isFinite(transform.a)
+  && Number.isFinite(transform.b)
+  && Number.isFinite(transform.c)
+  && Number.isFinite(transform.d);
+
+const invertLinear = (
+  transform: LinearTransform,
+): LinearTransform | null => {
+  const scale = resolveMaxLinearComponent(transform);
+  if (scale === null || scale === 0) {
     return null;
   }
 
-  const invA = transform.d / det;
-  const invB = -transform.b / det;
-  const invC = -transform.c / det;
-  const invD = transform.a / det;
-  return {
-    a: invA,
-    b: invB,
-    c: invC,
-    d: invD,
-    tx: -(invA * transform.tx + invB * transform.ty),
-    ty: -(invC * transform.tx + invD * transform.ty),
+  const normalized = {
+    a: transform.a / scale,
+    b: transform.b / scale,
+    c: transform.c / scale,
+    d: transform.d / scale,
   };
+  const normalizedDeterminant = affineLinearDeterminant(normalized);
+  if (Math.abs(normalizedDeterminant) < AFFINE_INVERSE_RELATIVE_EPSILON) {
+    return null;
+  }
+
+  const denominator = normalizedDeterminant * scale;
+  const inverse = {
+    a: normalized.d / denominator,
+    b: -normalized.b / denominator,
+    c: -normalized.c / denominator,
+    d: normalized.a / denominator,
+  };
+  return isFiniteLinearTransform(inverse) ? inverse : null;
+};
+
+export const invertAffine = (transform: AffineTransform): AffineTransform | null => {
+  const inverse = invertLinear(transform);
+  if (!inverse) {
+    return null;
+  }
+
+  const tx = -(inverse.a * transform.tx + inverse.b * transform.ty);
+  const ty = -(inverse.c * transform.tx + inverse.d * transform.ty);
+  return Number.isFinite(tx) && Number.isFinite(ty)
+    ? { ...inverse, tx, ty }
+    : null;
+};
+
+const pseudoInvertLinear = (
+  transform: LinearTransform,
+): LinearTransform | null => {
+  const inverse = invertLinear(transform);
+  if (inverse) {
+    return inverse;
+  }
+
+  const scale = resolveMaxLinearComponent(transform);
+  if (scale === null) {
+    return null;
+  }
+  if (scale === 0) {
+    return { a: 0, b: 0, c: 0, d: 0 };
+  }
+
+  const normalized = {
+    a: transform.a / scale,
+    b: transform.b / scale,
+    c: transform.c / scale,
+    d: transform.d / scale,
+  };
+  const normalizedMagnitudeSquared = normalized.a * normalized.a
+    + normalized.b * normalized.b
+    + normalized.c * normalized.c
+    + normalized.d * normalized.d;
+  const denominator = scale * normalizedMagnitudeSquared;
+  const pseudoInverse = {
+    a: normalized.a / denominator,
+    b: normalized.c / denominator,
+    c: normalized.b / denominator,
+    d: normalized.d / denominator,
+  };
+  return isFiniteLinearTransform(pseudoInverse) ? pseudoInverse : null;
+};
+
+export const resolveFixedPointAffinePullback = (
+  transform: AffineTransform,
+): AffineTransform | null => {
+  const inverse = invertAffine(transform);
+  if (inverse) {
+    return inverse;
+  }
+
+  // Deferred masks need one stable source-space sample even when a transform
+  // collapses an axis. Use the closest fixed point as the canonical preimage
+  // so singular and invertible spatial transforms keep the same vector path.
+  const linearPullback = pseudoInvertLinear(transform);
+  const fixedPointResolver = pseudoInvertLinear({
+    a: 1 - transform.a,
+    b: -transform.b,
+    c: -transform.c,
+    d: 1 - transform.d,
+  });
+  if (!linearPullback || !fixedPointResolver) {
+    return null;
+  }
+
+  const fixedX = fixedPointResolver.a * transform.tx
+    + fixedPointResolver.b * transform.ty;
+  const fixedY = fixedPointResolver.c * transform.tx
+    + fixedPointResolver.d * transform.ty;
+  const tx = fixedX - linearPullback.a * fixedX - linearPullback.b * fixedY;
+  const ty = fixedY - linearPullback.c * fixedX - linearPullback.d * fixedY;
+  return Number.isFinite(tx) && Number.isFinite(ty)
+    ? { ...linearPullback, tx, ty }
+    : null;
 };
 
 export const applyAffine = (transform: AffineTransform, point: Vec2): Vec2 => ({
@@ -132,9 +255,7 @@ export const toScaleTransformAt = (
   if (!Number.isFinite(center.x)
     || !Number.isFinite(center.y)
     || !Number.isFinite(scaleX)
-    || !Number.isFinite(scaleY)
-    || scaleX <= 0
-    || scaleY <= 0) {
+    || !Number.isFinite(scaleY)) {
     return null;
   }
 

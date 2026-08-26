@@ -2,7 +2,7 @@ import type { AffineTransform } from '../../../core/core-types';
 import {
   applyTransformToPolyline,
   composeAffine,
-  invertAffine,
+  resolveFixedPointAffinePullback,
 } from '../../../core/geometry';
 import {
   deleteOrigins,
@@ -109,14 +109,14 @@ const transformMask = (
     return cloneMask(mask);
   }
 
-  const inverse = invertAffine(transform);
-  if (!inverse) {
+  const pullback = resolveFixedPointAffinePullback(transform);
+  if (!pullback) {
     return cloneMask(mask);
   }
 
   return {
     contains: mask.contains,
-    inverseTransform: composeAffine(mask.inverseTransform, inverse),
+    inverseTransform: composeAffine(mask.inverseTransform, pullback),
   };
 };
 

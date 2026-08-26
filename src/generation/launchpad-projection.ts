@@ -28,7 +28,10 @@ import {
   type GeometryTimeline,
   type GenerationTimelineWindow,
 } from './types';
-import { toRoundedCoordinateKey } from './coordinates';
+import {
+  coordinateKeySetContainsPoint,
+  toRoundedCoordinateKey,
+} from './coordinates';
 
 interface CoordinateGroup {
   x: number;
@@ -165,10 +168,7 @@ const buildViewportCoordinateKeyByTileId = (
 const createMaskFromCoordinateKeys = (
   coordinateKeys: ReadonlySet<string>,
 ): CanonicalSpatialMask => ({
-  contains: (x, y) => {
-    const coordinateKey = toRoundedCoordinateKey(x, y);
-    return coordinateKey !== null && coordinateKeys.has(coordinateKey);
-  },
+  contains: (x, y) => coordinateKeySetContainsPoint(coordinateKeys, x, y),
 });
 
 const hasNoteOutput = (
