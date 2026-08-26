@@ -31,6 +31,17 @@ type HardwareOutputDisconnectionReason = 'device' | 'manual';
 const sanitizeMidiByte = (value: number): number =>
   Math.max(0, Math.min(127, Math.round(value)));
 
+const closeMidiPort = async (port: MIDIPort | null): Promise<void> => {
+  if (!port || port.connection === 'closed') {
+    return;
+  }
+  try {
+    await port.close();
+  } catch {
+    // Selection can continue even if the platform cannot release a stale port.
+  }
+};
+
 const removeRedundantLaunchpadEndpointAlias = (name: string): string => {
   const words = name.split(/\s+/u);
   if (words[0]?.toLowerCase() !== 'launchpad') {
@@ -183,10 +194,15 @@ export class HardwarePreviewController {
     connectionReason?: HardwareOutputConnectionReason,
   ): Promise<void> {
     const selectionRevision = ++this.selectionRevision;
+    const previousOutput = this.resolveSelectedOutput();
     this.pendingOutputId = outputId;
     this.turnOffSentLeds();
     this.state.selectedOutputId = null;
     this.selectedOutputProfile = DEFAULT_HARDWARE_OUTPUT_PROFILE;
+    await closeMidiPort(previousOutput);
+    if (selectionRevision !== this.selectionRevision) {
+      return;
+    }
     if (!outputId) {
       this.state.error = null;
       this.pendingOutputId = null;
@@ -212,6 +228,12 @@ export class HardwarePreviewController {
     try {
       await output.open();
       if (selectionRevision !== this.selectionRevision) {
+        if (
+          this.pendingOutputId !== output.id
+          && this.state.selectedOutputId !== output.id
+        ) {
+          await closeMidiPort(output);
+        }
         return;
       }
       this.selectedOutputProfile = outputProfile;
@@ -228,12 +250,19 @@ export class HardwarePreviewController {
       }
     } catch {
       if (selectionRevision !== this.selectionRevision) {
+        if (
+          this.pendingOutputId !== output.id
+          && this.state.selectedOutputId !== output.id
+        ) {
+          await closeMidiPort(output);
+        }
         return;
       }
       this.state.selectedOutputId = null;
       this.selectedOutputProfile = DEFAULT_HARDWARE_OUTPUT_PROFILE;
       this.state.error = 'output-open-failed';
       this.pendingOutputId = null;
+      await closeMidiPort(output);
     }
   }
 
@@ -286,7 +315,10 @@ export class HardwarePreviewController {
     this.cancelAutomaticDetection();
     this.selectionRevision += 1;
     this.pendingOutputId = null;
+    const selectedOutput = this.resolveSelectedOutput();
     this.turnOffSentLeds();
+    this.state.selectedOutputId = null;
+    void closeMidiPort(selectedOutput);
     if (this.midiAccess) {
       this.midiAccess.onstatechange = null;
     }
@@ -364,8 +396,10 @@ export class HardwarePreviewController {
   }
 
   private setMidiAccess(midiAccess: MIDIAccess): void {
-    if (this.midiAccess) {
+    if (this.midiAccess && this.midiAccess !== midiAccess) {
+      const selectedOutput = this.resolveSelectedOutput();
       this.midiAccess.onstatechange = null;
+      void closeMidiPort(selectedOutput);
     }
     this.midiAccess = midiAccess;
     midiAccess.onstatechange = (event) => {
@@ -520,6 +554,9 @@ export class HardwarePreviewController {
 
   private syncOutputs(): boolean {
     const selectedOutputName = this.resolveSelectedOutputName();
+    const selectedOutput = this.state.selectedOutputId
+      ? this.midiAccess?.outputs.get(this.state.selectedOutputId) ?? null
+      : null;
     const outputs = this.midiAccess
       ? Array.from(this.midiAccess.outputs.values())
           .filter((output) => output.state === 'connected')
@@ -543,6 +580,7 @@ export class HardwarePreviewController {
     ) {
       this.sentVelocityByPitch.clear();
       this.state.selectedOutputId = null;
+      void closeMidiPort(selectedOutput);
       this.selectedOutputProfile = DEFAULT_HARDWARE_OUTPUT_PROFILE;
       this.state.error = 'output-disconnected';
       if (selectedOutputName) {
