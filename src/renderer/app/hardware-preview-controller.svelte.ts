@@ -402,8 +402,8 @@ export class HardwarePreviewController {
       void closeMidiPort(selectedOutput);
     }
     this.midiAccess = midiAccess;
-    midiAccess.onstatechange = (event) => {
-      this.handleMidiStateChange(event);
+    midiAccess.onstatechange = () => {
+      this.handleMidiStateChange();
     };
   }
 
@@ -454,12 +454,14 @@ export class HardwarePreviewController {
     await this.detectAndSelectOutput();
   }
 
-  private handleMidiStateChange(event: MIDIConnectionEvent): void {
+  private handleMidiStateChange(): void {
+    const previousOutputs = this.state.outputs;
     const outputListChanged = this.syncOutputs();
-    const port = event.port;
-    const output = port?.type === 'output'
-      ? this.midiAccess?.outputs.get(port.id) ?? null
-      : null;
+    const connectedOutputAdded = this.state.outputs.some(
+      (output) => !previousOutputs.some(
+        (previousOutput) => previousOutput.id === output.id,
+      ),
+    );
     if (this.probingOutputId) {
       if (outputListChanged && !this.state.selectedOutputId) {
         this.shouldRetryAutomaticDetection = true;
@@ -468,7 +470,7 @@ export class HardwarePreviewController {
     }
 
     if (
-      output?.state === 'connected'
+      connectedOutputAdded
       && !this.state.selectedOutputId
       && !this.pendingOutputId
     ) {
