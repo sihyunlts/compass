@@ -7,6 +7,7 @@ import {
 } from '../import-hydration';
 import {
   boundedNumericParameter,
+  DISCRETE_DRAG_PIXELS_PER_STEP,
   defineNumericParameterRules,
   finiteNumericParameter,
   hydrateImportedNumericParameters,
@@ -28,6 +29,7 @@ export const SCALE_NUMERIC_PARAMETERS = defineNumericParameterRules<
     min: 0,
     max: 9,
     step: 0.5,
+    dragPixelsPerStep: DISCRETE_DRAG_PIXELS_PER_STEP,
     modulationMessageKey: 'control.centerX',
   }),
   centerY: boundedNumericParameter({
@@ -35,6 +37,7 @@ export const SCALE_NUMERIC_PARAMETERS = defineNumericParameterRules<
     min: 0,
     max: 9,
     step: 0.5,
+    dragPixelsPerStep: DISCRETE_DRAG_PIXELS_PER_STEP,
     modulationMessageKey: 'control.centerY',
   }),
   scaleX: finiteNumericParameter({

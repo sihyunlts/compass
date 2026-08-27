@@ -5,8 +5,11 @@ interface NumericParameterInput {
   min?: number;
   max?: number;
   step: number;
+  dragPixelsPerStep?: number;
   dragMode?: 'circular';
 }
+
+export const DISCRETE_DRAG_PIXELS_PER_STEP = 8;
 
 export type NumericParameterUnit = '°' | '%' | '×';
 
@@ -88,6 +91,7 @@ interface NumericParameterOptions {
   step: number;
   min?: number;
   max?: number;
+  dragPixelsPerStep?: number;
   dragMode?: 'circular';
   display?: NumericParameterDisplay;
   modulationMessageKey?: MessageKey;
@@ -123,6 +127,12 @@ const validateNumericParameterOptions = (
     throw new Error('Numeric parameter input maximum must be finite.');
   }
   if (
+    options.dragPixelsPerStep !== undefined
+    && (!Number.isFinite(options.dragPixelsPerStep) || options.dragPixelsPerStep <= 0)
+  ) {
+    throw new Error('Numeric parameter drag pixels per step must be positive.');
+  }
+  if (
     options.min !== undefined
     && options.max !== undefined
     && options.min > options.max
@@ -142,6 +152,7 @@ const createNumericParameterRule = (
       min: options.min,
       max: options.max,
       step: options.step,
+      dragPixelsPerStep: options.dragPixelsPerStep,
       dragMode: options.dragMode,
     }),
     display: Object.freeze({

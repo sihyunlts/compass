@@ -5,7 +5,11 @@
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import { resolveLedSurfaceRgb } from '../../renderer/app/led-surface-color';
   import type { RendererDeviceEditorPropsBase } from '../types';
-  import { COLOR_NUMERIC_PARAMETERS, MAX_COLOR_SLOT_COUNT } from './schema';
+  import {
+    COLOR_NUMERIC_PARAMETERS,
+    COLOR_SLOT_COUNT_DRAG_PIXELS_PER_STEP,
+    MAX_COLOR_SLOT_COUNT,
+  } from './schema';
   import { i18n } from '../../renderer/i18n.svelte';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
   import DeviceControlColumn from '../../renderer/components/rack/DeviceControlColumn.svelte';
@@ -113,6 +117,7 @@
       min="1"
       max={String(MAX_COLOR_SLOT_COUNT)}
       step="1"
+      dragPixelsPerStep={COLOR_SLOT_COUNT_DRAG_PIXELS_PER_STEP}
       value={device.params.velocities.length}
       dataAction="set-color-slot-count"
       dataId={device.id}

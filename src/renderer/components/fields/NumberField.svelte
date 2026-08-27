@@ -41,6 +41,7 @@
     step,
     min,
     max,
+    dragPixelsPerStep,
     ariaLabel,
     layout = 'stacked',
     size = 'default',
@@ -63,6 +64,7 @@
     step?: number | string;
     min?: number | string;
     max?: number | string;
+    dragPixelsPerStep?: number;
     ariaLabel?: string;
     layout?: FieldShellLayout;
     size?: FieldShellSize;
@@ -79,6 +81,9 @@
   const resolvedStep = $derived(step ?? parameter?.input.step);
   const resolvedMin = $derived(min ?? parameter?.input.min);
   const resolvedMax = $derived(max ?? parameter?.input.max);
+  const resolvedDragPixelsPerStep = $derived(
+    dragPixelsPerStep ?? parameter?.input.dragPixelsPerStep,
+  );
   const resolvedUnit = $derived(unit ?? parameter?.display.unit);
   const resolvedAriaLabel = $derived(ariaLabel ?? label);
   const modulationDomain = $derived(resolveModulationDisplayDomain({
@@ -166,6 +171,7 @@
       data-device-id={dataId}
       data-param={dataParam}
       data-drag-mode={parameter?.input.dragMode}
+      data-drag-pixels-per-step={resolvedDragPixelsPerStep}
       aria-label={resolvedAriaLabel}
       {readonly}
       {disabled}
