@@ -30,7 +30,6 @@ interface SettingsControllerState {
   themeSaturation: number;
   paletteRevision: number;
   paletteDescriptionOverride: string;
-  paletteDescriptionTone: 'neutral' | 'error';
   aboutDescriptionOverride: string;
   aboutDescriptionTone: 'neutral' | 'error';
 }
@@ -57,7 +56,6 @@ class SettingsController {
     themeSaturation: this.initialTheme.saturation,
     paletteRevision: 0,
     paletteDescriptionOverride: '',
-    paletteDescriptionTone: 'neutral',
     aboutDescriptionOverride: '',
     aboutDescriptionTone: 'neutral',
   });
@@ -83,8 +81,8 @@ class SettingsController {
   public initialize(): void {
     try {
       this.paletteController.initialize();
-    } catch (error) {
-      this.showPaletteError(i18n.t('settings.paletteInitializationFailed'), error);
+    } catch {
+      this.showPaletteError(i18n.t('settings.paletteInitializationFailed'));
     }
   }
 
@@ -107,8 +105,8 @@ class SettingsController {
       let content: string;
       try {
         content = await file.text();
-      } catch (error) {
-        this.showPaletteError(i18n.t('settings.paletteReadFailed'), error);
+      } catch {
+        this.showPaletteError(i18n.t('settings.paletteReadFailed'));
         return;
       }
 
@@ -118,14 +116,15 @@ class SettingsController {
           content,
         });
       } catch (error) {
-        this.showPaletteError(this.resolvePaletteUploadErrorSummary(error), error);
+        this.showPaletteError(this.resolvePaletteUploadErrorSummary(error));
         return;
       }
 
       this.playbackSession?.renderPreviewFrame();
-      this.showPaletteDescription(i18n.t('settings.paletteLoaded', { name: file.name }));
-    } catch (error) {
-      this.showPaletteError(i18n.t('settings.paletteLoadFailed'), error);
+      this.clearPaletteFeedbackTimer();
+      this.state.paletteDescriptionOverride = '';
+    } catch {
+      this.showPaletteError(i18n.t('settings.paletteLoadFailed'));
     } finally {
       if (input) {
         input.value = '';
@@ -231,24 +230,17 @@ class SettingsController {
     message: string,
   ): void {
     this.state.paletteDescriptionOverride = message;
-    this.state.paletteDescriptionTone = 'neutral';
     this.clearPaletteFeedbackTimer();
     this.paletteFeedbackTimer = window.setTimeout(() => {
       this.paletteFeedbackTimer = null;
       if (this.state.paletteDescriptionOverride === message) {
         this.state.paletteDescriptionOverride = '';
-        this.state.paletteDescriptionTone = 'neutral';
       }
     }, 2500);
   }
 
-  private showPaletteError(summary: string, error: unknown): void {
-    const detail = error instanceof Error && error.message.trim()
-      ? error.message.trim()
-      : i18n.t('settings.unknownError');
-    const message = detail === summary ? summary : `${summary} | ${detail}`;
-    this.state.paletteDescriptionOverride = message;
-    this.state.paletteDescriptionTone = 'error';
+  private showPaletteError(summary: string): void {
+    this.state.paletteDescriptionOverride = summary;
     this.clearPaletteFeedbackTimer();
   }
 

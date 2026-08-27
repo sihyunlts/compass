@@ -178,13 +178,8 @@
   const hardwarePreview = createHardwarePreviewController({
     preferredOutputId: loadHardwareOutputId(),
     onPreferredOutputChange: saveHardwareOutputId,
-    onOutputConnected: (outputName, reason) => {
-      const messageKey = reason === 'automatic'
-        ? 'preview.hardware.autoConnected'
-        : reason === 'restored'
-          ? 'preview.hardware.restored'
-          : 'preview.hardware.connected';
-      headerIndicator.show(i18n.t(messageKey, { name: outputName }));
+    onOutputConnected: (outputName) => {
+      headerIndicator.show(i18n.t('preview.hardware.connected', { name: outputName }));
     },
     onOutputDisconnected: (outputName, reason) => {
       headerIndicator.show(i18n.t(
@@ -594,7 +589,6 @@
       presetEntrySelectionTarget={presetState.presetEntrySelectionTarget}
       launchpadMk2Enabled={uiState.launchpadModel === 'mk2'}
       {paletteDescription}
-      paletteDescriptionTone={settingsState.paletteDescriptionTone}
       paletteRevision={settingsState.paletteRevision}
       {resolvePaletteRgb}
       appVersionText={settingsState.appVersionText}

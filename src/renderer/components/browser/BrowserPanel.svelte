@@ -350,7 +350,6 @@
     launchpadMk2Enabled = false,
     locale = 'en',
     paletteDescription = 'Default palette',
-    paletteDescriptionTone = 'neutral',
     paletteRevision = 0,
     resolvePaletteRgb = () => '0 0 0',
     appVersionText = '',
@@ -401,7 +400,6 @@
     launchpadMk2Enabled?: boolean;
     locale?: AppLocale;
     paletteDescription?: string;
-    paletteDescriptionTone?: 'neutral' | 'error';
     paletteRevision?: number;
     resolvePaletteRgb?: (velocity: number) => string;
     appVersionText?: string;
@@ -1459,7 +1457,6 @@
           {themeHue}
           {themeSaturation}
           {paletteDescription}
-          {paletteDescriptionTone}
           {appVersionText}
           {updateCheckText}
           {updateAvailable}

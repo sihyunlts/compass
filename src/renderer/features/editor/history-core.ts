@@ -160,7 +160,7 @@ export class ChainHistory {
     if (!this.canUndo()) {
       return null;
     }
-    return this.toPublicEntry(this.entries[this.cursor - 1]);
+    return this.toPublicEntry(this.entries[this.cursor]);
   }
 
   public getRedoEntry(): ChainHistoryEntry | null {
