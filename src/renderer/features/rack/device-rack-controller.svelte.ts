@@ -6,6 +6,7 @@ import type {
   BrowserPresetInsertSource,
   BrowserNonRackPresetInsertSource,
   RackInteractionCommit,
+  RackOutputPreviewMode,
   RackPresetFileDrop,
   RackScrollMetrics,
 } from './types';
@@ -33,8 +34,12 @@ interface DeviceRackControllerOptions {
   resolveMiniMapLayoutSignature: () => string;
   openContextMenu: (clientX: number, clientY: number, target: ContextMenuTarget) => void;
   closeContextMenu: () => void;
-  saveChain: (chain: GeneratorChain, meta: ChainMutationMeta) => void;
-  scheduleAutoPreview: (delayMs?: number) => void;
+  commitOutputChain: (
+    chain: GeneratorChain,
+    meta: ChainMutationMeta,
+    previewMode?: RackOutputPreviewMode,
+  ) => void;
+  requestTransientPreview: (delayMs?: number) => void;
   commitRackInteraction: (commit: RackInteractionCommit) => void;
   commitPresetInsertDrop: (
     source: BrowserNonRackPresetInsertSource,
@@ -86,8 +91,9 @@ class DeviceRackController {
       getInteractiveElementSelector: () => this.options.getInteractiveElementSelector(),
       resolveMiniMapLayoutSignature: () => this.options.resolveMiniMapLayoutSignature(),
       closeContextMenu: () => this.options.closeContextMenu(),
-      saveChain: (chain, meta) => this.options.saveChain(chain, meta),
-      scheduleAutoPreview: (delayMs) => this.options.scheduleAutoPreview(delayMs),
+      commitOutputChain: (chain, meta, previewMode) =>
+        this.options.commitOutputChain(chain, meta, previewMode),
+      requestTransientPreview: (delayMs) => this.options.requestTransientPreview(delayMs),
       commitRackInteraction: (commit) => this.options.commitRackInteraction(commit),
       commitPresetInsertDrop: (source, dropZone) =>
         this.options.commitPresetInsertDrop(source, dropZone),

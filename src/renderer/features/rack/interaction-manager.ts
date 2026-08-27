@@ -14,6 +14,7 @@ import {
   resetNumericControlToDefault,
 } from './chain-controls';
 import type { RendererControlChange } from '../../../devices/control-types';
+import type { RackOutputPreviewMode } from './types';
 
 /**
  * Coordinates non-selection rack interactions in the main renderer.
@@ -25,8 +26,12 @@ type ChainDevice = GeneratorChain['devices'][number];
 interface RackInteractionManagerOptions {
   chainDevices: HTMLElement;
   getChainState: () => GeneratorChain;
-  saveChain: (chain: GeneratorChain, meta: ChainMutationMeta) => void;
-  scheduleAutoPreview: (delayMs?: number) => void;
+  commitOutputChain: (
+    chain: GeneratorChain,
+    meta: ChainMutationMeta,
+    previewMode?: RackOutputPreviewMode,
+  ) => void;
+  requestTransientPreview: (delayMs?: number) => void;
   closeContextMenu: () => void;
 }
 
@@ -36,9 +41,13 @@ export class RackInteractionManager {
 
   private readonly getChainState: () => GeneratorChain;
 
-  private readonly saveChain: (chain: GeneratorChain, meta: ChainMutationMeta) => void;
+  private readonly commitOutputChain: (
+    chain: GeneratorChain,
+    meta: ChainMutationMeta,
+    previewMode?: RackOutputPreviewMode,
+  ) => void;
 
-  private readonly scheduleAutoPreview: (delayMs?: number) => void;
+  private readonly requestTransientPreview: (delayMs?: number) => void;
 
   private readonly closeContextMenu: () => void;
 
@@ -53,8 +62,8 @@ export class RackInteractionManager {
   constructor(options: RackInteractionManagerOptions) {
     this.chainDevices = options.chainDevices;
     this.getChainState = options.getChainState;
-    this.saveChain = options.saveChain;
-    this.scheduleAutoPreview = options.scheduleAutoPreview;
+    this.commitOutputChain = options.commitOutputChain;
+    this.requestTransientPreview = options.requestTransientPreview;
     this.closeContextMenu = options.closeContextMenu;
     this.chainControlHandlers = createChainControlHandlers({
       findDeviceById: this.findDeviceById.bind(this),
@@ -66,9 +75,9 @@ export class RackInteractionManager {
       getCardElement: this.getCardElement.bind(this),
       blurActiveTextEditingElement: this.blurActiveTextEditingElement.bind(this),
       closeContextMenu: this.closeContextMenu,
-      scheduleAutoPreview: this.scheduleAutoPreview,
+      requestTransientPreview: this.requestTransientPreview,
       persistChange: () => {
-        this.saveChain(this.getChainState(), {
+        this.commitChainChange({
           kind: 'center-picker-edit',
           finalize: true,
         });
@@ -84,9 +93,9 @@ export class RackInteractionManager {
       findDeviceById: this.findDeviceById.bind(this),
       blurActiveTextEditingElement: this.blurActiveTextEditingElement.bind(this),
       closeContextMenu: this.closeContextMenu,
-      scheduleAutoPreview: this.scheduleAutoPreview,
+      requestTransientPreview: this.requestTransientPreview,
       commitChange: () => {
-        this.saveChain(this.getChainState(), {
+        this.commitChainChange({
           kind: 'mask-tile-edit',
           finalize: true,
         });
@@ -125,7 +134,7 @@ export class RackInteractionManager {
         mergeKey,
         finalize: change.finalize,
       },
-      isLiveNumericDrag ? 0 : undefined,
+      isLiveNumericDrag ? 'immediate' : undefined,
     );
     return true;
   }
@@ -288,12 +297,11 @@ export class RackInteractionManager {
 
   private commitChainChange(
     meta: ChainMutationMeta,
-    delayMs?: number,
+    previewMode?: RackOutputPreviewMode,
   ): void {
     const chain = this.getChainState();
     reconcileGeneratorChainModulators(chain);
-    this.saveChain(chain, meta);
-    this.scheduleAutoPreview(delayMs);
+    this.commitOutputChain(chain, meta, previewMode);
   }
 
   private getCardElement(id: string): HTMLElement | null {

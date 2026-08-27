@@ -12,7 +12,7 @@ interface MaskTilePaintControllerOptions {
   findDeviceById: (id: string) => ChainDevice | null;
   blurActiveTextEditingElement: () => void;
   closeContextMenu: () => void;
-  scheduleAutoPreview: (delayMs?: number) => void;
+  requestTransientPreview: (delayMs?: number) => void;
   commitChange: () => void;
 }
 
@@ -98,7 +98,7 @@ export class MaskTilePaintController {
 
   private readonly closeContextMenu: () => void;
 
-  private readonly scheduleAutoPreview: (delayMs?: number) => void;
+  private readonly requestTransientPreview: (delayMs?: number) => void;
 
   private readonly commitChange: () => void;
 
@@ -108,7 +108,7 @@ export class MaskTilePaintController {
     this.findDeviceById = options.findDeviceById;
     this.blurActiveTextEditingElement = options.blurActiveTextEditingElement;
     this.closeContextMenu = options.closeContextMenu;
-    this.scheduleAutoPreview = options.scheduleAutoPreview;
+    this.requestTransientPreview = options.requestTransientPreview;
     this.commitChange = options.commitChange;
   }
 
@@ -141,7 +141,7 @@ export class MaskTilePaintController {
     if (this.applyTileChange(hit.deviceId, hit.tileIndex, this.state.paintMode)) {
       this.state.touched.add(hit.tileIndex);
       this.state.didChange = true;
-      this.scheduleAutoPreview();
+      this.requestTransientPreview();
     }
 
     event.preventDefault();
@@ -161,7 +161,7 @@ export class MaskTilePaintController {
     if (this.applyTileChange(this.state.deviceId, hit.tileIndex, this.state.paintMode)) {
       this.state.touched.add(hit.tileIndex);
       this.state.didChange = true;
-      this.scheduleAutoPreview();
+      this.requestTransientPreview();
     }
     return true;
   }
@@ -171,7 +171,7 @@ export class MaskTilePaintController {
       return false;
     }
 
-    this.finish(true);
+    this.finish();
     return true;
   }
 
@@ -180,13 +180,13 @@ export class MaskTilePaintController {
       return false;
     }
 
-    this.finish(false);
+    this.finish();
     return true;
   }
 
   public handleWindowBlur(): void {
     if (this.isActive()) {
-      this.finish(true);
+      this.finish();
     }
   }
 
@@ -218,7 +218,7 @@ export class MaskTilePaintController {
     return true;
   }
 
-  private finish(shouldPersist: boolean): void {
+  private finish(): void {
     if (
       this.state.gridEl
       && this.state.pointerId !== null
@@ -227,7 +227,7 @@ export class MaskTilePaintController {
       this.state.gridEl.releasePointerCapture(this.state.pointerId);
     }
 
-    if (shouldPersist && this.state.didChange) {
+    if (this.state.didChange) {
       this.commitChange();
     }
 

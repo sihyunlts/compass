@@ -64,7 +64,7 @@ class ResultDeliveryFlowController {
       editorSession.applyBridgeSettings(bridge, { persist: true });
       const launchpadModel = uiState.launchpadModel;
       const sourceChain = cloneChainForIpc(uiState.chainState);
-      const sourceKey = createPreviewSourceKey(uiState.chainRevision, sourceChain);
+      const sourceKey = createPreviewSourceKey(uiState.previewSourceRevision, sourceChain);
       const preview = await playbackSession.generatePreviewForDelivery({
         sourceChain,
         sourceKey,

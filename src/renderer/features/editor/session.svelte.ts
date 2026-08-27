@@ -24,6 +24,7 @@ import {
 import type {
   BrowserNonRackPresetInsertSource,
   BrowserInsertSource,
+  RackOutputPreviewMode,
   RackInteractionCommit,
 } from '../rack/types';
 import type { RackDropZone } from '../rack/drop-ops';
@@ -55,12 +56,11 @@ import {
   type EditorHistory,
 } from './editor-history';
 import {
-  applyChainMutation as applyEditorChainMutation,
+  commitChainMutation as commitEditorChainMutation,
   checkoutHistory as checkoutEditorHistory,
   initializeHistoryBridge,
   redoHistory,
   resetChainHistory,
-  saveChainWithHistory,
   syncHistoryState,
   undoHistory,
 } from './history-bridge';
@@ -119,6 +119,7 @@ export interface EditorSessionState {
   sidebarPage: BrowserPage;
   chainState: GeneratorChain;
   chainRevision: number;
+  previewSourceRevision: number;
   launchpadModel: LaunchpadModel;
   headerIndicatorText: string;
   paletteName: string;
@@ -229,8 +230,12 @@ export class EditorSession {
     toggleCollapse: (id: string): void => {
       toggleCollapse(this.state, id);
     },
-    saveChain: (chain: GeneratorChain, meta: ChainMutationMeta): void => {
-      this.persistChainMutation(chain, meta);
+    commitOutputChain: (
+      chain: GeneratorChain,
+      meta: ChainMutationMeta,
+      previewMode: RackOutputPreviewMode = 'debounced',
+    ): void => {
+      this.commitOutputMutation(chain, meta, previewMode);
     },
     addBrowserDevice: (kind: RendererDeviceKind): void => {
       if (!isRendererDeviceKind(kind)) {
@@ -325,7 +330,7 @@ export class EditorSession {
       toggleEditorGroupEnabled(this.buildGroupingContext(), groupId, nextEnabled);
     },
     handleAutoCreateLengthChange: (): void => {
-      handleAutoCreateLengthChange(this.state, (delayMs) => this.scheduleOutputPreview(delayMs));
+      handleAutoCreateLengthChange(this.state, (delayMs) => this.requestOutputPreview(delayMs));
     },
     undo: (): boolean => this.undo(),
     redo: (): boolean => this.redo(),
@@ -423,7 +428,7 @@ export class EditorSession {
     applyRackPreset: (preset: RackPresetFile): RackPresetApplyResult => this.applyRackPreset(preset),
     setLaunchpadModelEnabled: (nextEnabled: boolean): boolean =>
       setLaunchpadModelEnabled(this.state, nextEnabled, (delayMs) =>
-        this.scheduleOutputPreview(delayMs)),
+        this.requestOutputPreview(delayMs)),
     togglePreviewLoopEnabled: (): boolean => togglePreviewLoopEnabled(this.state),
     syncPreviewBpm: (nextBpm: number): boolean => syncPreviewBpm(this.state, nextBpm),
   };
@@ -432,7 +437,8 @@ export class EditorSession {
     this.scheduleAutoPreview(delayMs, false);
   }
 
-  public scheduleOutputPreview(delayMs = this.autoPreviewDebounceMs): void {
+  public requestOutputPreview(delayMs = this.autoPreviewDebounceMs): void {
+    this.state.previewSourceRevision += 1;
     this.scheduleAutoPreview(delayMs, true);
   }
 
@@ -525,21 +531,26 @@ export class EditorSession {
     nextChain: GeneratorChain,
     meta: ChainMutationMeta,
   ): void {
-    saveChainWithHistory(this.state, this.history, nextChain, meta, {
+    commitEditorChainMutation(this.state, this.history, nextChain, meta, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
     });
+  }
+
+  private commitOutputMutation(
+    nextChain: GeneratorChain,
+    meta: ChainMutationMeta,
+    previewMode: RackOutputPreviewMode = 'immediate',
+  ): void {
+    this.persistChainMutation(nextChain, meta);
+    this.requestOutputPreview(previewMode === 'immediate' ? 0 : undefined);
   }
 
   private applyChainMutation(
     nextChain: GeneratorChain,
     meta: ChainMutationMeta,
   ): void {
-    applyEditorChainMutation(this.state, this.history, nextChain, meta, {
-      bumpChainRevision: () => this.bumpChainRevision(),
-      persistChainState: () => this.persistChainState(),
-      scheduleAutoPreview: (delayMs) => this.scheduleOutputPreview(delayMs),
-    });
+    this.commitOutputMutation(nextChain, meta);
   }
 
   private replaceChainAndResetHistory(
@@ -549,32 +560,41 @@ export class EditorSession {
     resetChainHistory(this.state, this.history, nextChain, meta, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
-      scheduleAutoPreview: (delayMs) => this.scheduleOutputPreview(delayMs),
     });
+    this.requestOutputPreview(0);
   }
 
   private undo(): boolean {
-    return undoHistory(this.state, this.history, {
+    const restored = undoHistory(this.state, this.history, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
-      scheduleAutoPreview: (delayMs) => this.scheduleOutputPreview(delayMs),
     });
+    if (restored) {
+      this.requestOutputPreview(0);
+    }
+    return restored;
   }
 
   private redo(): boolean {
-    return redoHistory(this.state, this.history, {
+    const restored = redoHistory(this.state, this.history, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
-      scheduleAutoPreview: (delayMs) => this.scheduleOutputPreview(delayMs),
     });
+    if (restored) {
+      this.requestOutputPreview(0);
+    }
+    return restored;
   }
 
   private checkoutHistory(targetId: string): boolean {
-    return checkoutEditorHistory(this.state, this.history, targetId, {
+    const restored = checkoutEditorHistory(this.state, this.history, targetId, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
-      scheduleAutoPreview: (delayMs) => this.scheduleOutputPreview(delayMs),
     });
+    if (restored) {
+      this.requestOutputPreview(0);
+    }
+    return restored;
   }
 
   private resolveContextSelection(target: ContextMenuTarget): RackSelectionSnapshot | null {
