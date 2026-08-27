@@ -124,6 +124,9 @@
     modulationContextDeviceId={dataId}
     modulationContextParamKey={dataParam}
     domain={modulationDomain}
+    step={resolvedStep}
+    display={parameter?.display}
+    dragPixelsPerStep={parameter?.input.dragPixelsPerStep}
     amountPanelGapPx={6}
     {onControlChange}
   >
@@ -162,6 +165,7 @@
         data-device-id={dataId}
         data-param={dataParam}
         data-drag-mode={parameter?.input.dragMode}
+        data-drag-pixels-per-step={parameter?.input.dragPixelsPerStep}
         aria-label={numberLabel}
         oninput={(event: Event) => emitControlChange(event, false)}
         onchange={(event: Event) => emitControlChange(event, true)}

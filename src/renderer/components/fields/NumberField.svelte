@@ -8,10 +8,9 @@
     type ModulationStateByParameter,
   } from '../../../shared/contracts/preview/modulation';
   import {
-    formatNumericParameterDisplayValue,
-    formatNumericParameterValue,
+    formatNumericParameterDisplay,
+    type NumericParameterDisplay,
     type NumericParameterRule,
-    type NumericParameterUnit,
   } from '../../../devices/numeric-parameters';
   import type {
     FieldShellLabelVisibility,
@@ -37,7 +36,7 @@
     dataId,
     dataParam,
     parameter,
-    unit,
+    display,
     step,
     min,
     max,
@@ -60,7 +59,7 @@
     dataId: string;
     dataParam?: string;
     parameter?: NumericParameterRule;
-    unit?: NumericParameterUnit;
+    display?: NumericParameterDisplay;
     step?: number | string;
     min?: number | string;
     max?: number | string;
@@ -84,7 +83,8 @@
   const resolvedDragPixelsPerStep = $derived(
     dragPixelsPerStep ?? parameter?.input.dragPixelsPerStep,
   );
-  const resolvedUnit = $derived(unit ?? parameter?.display.unit);
+  const resolvedDisplay = $derived(display ?? parameter?.display);
+  const resolvedUnit = $derived(resolvedDisplay?.unit);
   const resolvedAriaLabel = $derived(ariaLabel ?? label);
   const modulationDomain = $derived(resolveModulationDisplayDomain({
     min: resolvedMin,
@@ -120,9 +120,9 @@
   );
   const displayValue = $derived.by(() => {
     const valueText = String(value);
-    return parameter
-      ? formatNumericParameterDisplayValue(parameter, value, valueText)
-      : formatNumericParameterValue(valueText, resolvedUnit);
+    return resolvedDisplay
+      ? formatNumericParameterDisplay(resolvedDisplay, value, valueText)
+      : valueText;
   });
 
   const emitChange = (event: Event, finalize: boolean): void => {
@@ -158,6 +158,9 @@
     modulationContextParamKey={dataParam ?? ''}
     domain={modulationDomain}
     cornerScale={modulationCornerScale}
+    step={resolvedStep}
+    display={resolvedDisplay}
+    dragPixelsPerStep={resolvedDragPixelsPerStep}
     {onControlChange}
   >
     <input

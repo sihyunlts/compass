@@ -9,7 +9,6 @@
   import { MODULATION_TARGET_SLOT_COUNT } from '../../core/modulation/targets';
   import type {
     ModulationParameterDefinition,
-    NumericParameterUnit,
   } from '../numeric-parameters';
   import {
     getRendererModulationTargetParamDefinitions,
@@ -112,11 +111,6 @@
     };
   };
 
-  const resolveTargetUnit = (
-    target: ModulationTarget,
-  ): NumericParameterUnit | undefined =>
-    resolveTargetParameterDefinition(target)?.unit;
-
   const clearTargetSlot = (slotIndex: number): void => {
     onControlChange({
       action: 'clear-modulation-target-slot',
@@ -172,6 +166,7 @@
             {#if row.kind === 'target'}
               {@const target = row.target}
               {@const targetDisplay = resolveTargetDisplay(target)}
+              {@const targetParameter = resolveTargetParameterDefinition(target)}
               <ValueButton
                 text={targetDisplay.parameterLabel}
                 label={i18n.t('control.mapTargetNamed', { target: targetDisplay.fullLabel })}
@@ -189,8 +184,9 @@
                 size="compact"
                 labelVisibility="hidden"
                 fill={true}
-                step="0.1"
-                unit={resolveTargetUnit(target)}
+                step={targetParameter?.step ?? 0.1}
+                display={targetParameter?.display}
+                dragPixelsPerStep={targetParameter?.dragPixelsPerStep}
                 value={target.amount}
                 dataAction="set-modulation-target-amount"
                 dataId={device.id}
@@ -218,7 +214,7 @@
 
 <style lang="scss">
   .modulation-map-panel {
-    --modulation-target-amount-width: 2.75rem;
+    --modulation-target-amount-width: 3.25rem;
 
     display: flex;
     flex-direction: column;

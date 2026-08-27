@@ -3,6 +3,10 @@
 <script lang="ts">
   import { onMount, tick, type Snippet } from 'svelte';
   import type { RendererControlChange } from '../../../devices/control-types';
+  import {
+    formatNumericParameterDisplay,
+    type NumericParameterDisplay,
+  } from '../../../devices/numeric-parameters';
   import type { ModulationParameterState } from '../../../shared/contracts/preview/modulation';
   import { i18n } from '../../i18n.svelte';
   import { activateModulationDisplayTarget } from '../../features/preview/modulation-display-selection.svelte';
@@ -26,6 +30,9 @@
     modulationContextParamKey,
     domain,
     cornerScale = 1,
+    step = 0.1,
+    display,
+    dragPixelsPerStep,
     amountPanelGapPx = 4,
     amountHintGapPx = 8,
     children,
@@ -38,6 +45,9 @@
     modulationContextParamKey: string;
     domain: ModulationDisplayDomain;
     cornerScale?: number;
+    step?: number | string;
+    display?: NumericParameterDisplay;
+    dragPixelsPerStep?: number;
     amountPanelGapPx?: number;
     amountHintGapPx?: number;
     children?: Snippet;
@@ -71,7 +81,9 @@
   const amountHint = (state: ModulationParameterState): string =>
     i18n.t('modulation.amountFor', {
       modulator: state.modulatorLabel,
-      amount: state.amount,
+      amount: display
+        ? formatNumericParameterDisplay(display, state.amount, String(state.amount))
+        : state.amount,
     });
   const resolveFloatingAnchor = (): HTMLElement | null =>
     controlEl?.querySelector<HTMLElement>('[data-modulation-floating-anchor]')
@@ -319,7 +331,8 @@
             <input
               class="modulation-amount-input"
               type="number"
-              step="0.1"
+              step={step}
+              data-drag-pixels-per-step={dragPixelsPerStep}
               value={state.amount}
               aria-label={amountHint(state)}
               use:hint={{
