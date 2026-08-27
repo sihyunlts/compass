@@ -146,7 +146,11 @@
           floatingLayerStackOrder = stackOrder;
         },
       });
+      const shouldResetPosition = presence.exiting || !isPositioned;
       presence.show();
+      if (shouldResetPosition) {
+        isPositioned = false;
+      }
       void updatePosition();
       return;
     }

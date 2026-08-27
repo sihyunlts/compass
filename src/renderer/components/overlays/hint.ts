@@ -136,6 +136,7 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
   let cleanupHintContent: HintContentCleanup | null = null;
   let showTimer: number | null = null;
   let positionToken = 0;
+  let pendingHandoffSource: VisibleHintOwner | null = null;
   let previousDescribedBy: string | null = null;
   const hintId = `app-hint-${++hintIdCounter}`;
   const floatingLayerId = createFloatingLayerId('hint');
@@ -235,6 +236,9 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
       closePendingForDescendant = true;
       return;
     }
+    const handoffSource = pendingHandoffSource;
+    pendingHandoffSource = null;
+    handoffSource?.closeImmediately();
     closePendingForDescendant = false;
     positionToken += 1;
     const wasOpen = hintEl !== null;
@@ -281,6 +285,9 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
 
   const closeHintImmediately = (): void => {
     clearShowTimer();
+    const handoffSource = pendingHandoffSource;
+    pendingHandoffSource = null;
+    handoffSource?.closeImmediately();
     clearHintContent();
     closePendingForDescendant = false;
     positionToken += 1;
@@ -380,6 +387,9 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
         );
       }
       enteringHintEl.style.removeProperty('visibility');
+      const handoffSource = pendingHandoffSource;
+      pendingHandoffSource = null;
+      handoffSource?.closeImmediately();
     });
   };
 
@@ -404,7 +414,7 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
       return;
     }
     if (hintText && visibleHintOwner && visibleHintOwner !== owner) {
-      visibleHintOwner.closeImmediately();
+      pendingHandoffSource = visibleHintOwner;
       openHint(false);
       return;
     }
