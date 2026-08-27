@@ -99,10 +99,10 @@ const hashPreviewSource = (chain: GeneratorChain): string => {
 };
 
 export const createPreviewSourceKey = (
-  chainRevision: number,
+  sourceRevision: number,
   chain: GeneratorChain,
 ): string =>
-  `chain:${chainRevision}:${hashPreviewSource(chain)}`;
+  `chain:${sourceRevision}:${hashPreviewSource(chain)}`;
 
 export class PlaybackSessionController {
   public readonly state: PlaybackSessionState = $state({
@@ -263,7 +263,7 @@ export class PlaybackSessionController {
     try {
       const { editorSession } = this.options;
       const uiState = editorSession.state;
-      const sourceRevision = uiState.chainRevision;
+      const sourceRevision = uiState.previewSourceRevision;
       const launchpadModel = uiState.launchpadModel;
       const loopLengthBeats = uiState.previewLoopLengthBeats;
       const sourceChain = cloneChainForIpc(uiState.chainState);
@@ -276,7 +276,7 @@ export class PlaybackSessionController {
       }, 'preview');
 
       if (
-        uiState.chainRevision !== sourceRevision
+        uiState.previewSourceRevision !== sourceRevision
         || uiState.previewLoopLengthBeats !== loopLengthBeats
         || uiState.launchpadModel !== launchpadModel
       ) {

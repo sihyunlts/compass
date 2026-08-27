@@ -15,6 +15,7 @@
     BrowserNonRackPresetInsertSource,
     BrowserPresetInsertSource,
     RackInteractionCommit,
+    RackOutputPreviewMode,
     RackPresetFileDrop,
     RackScrollMetrics,
   } from '../../features/rack/types';
@@ -54,8 +55,8 @@
     resolvePaletteRgb,
     isSidebarResizing = false,
     interactiveElementSelector,
-    onSaveChain,
-    onScheduleAutoPreview,
+    onCommitOutputChain,
+    onRequestTransientPreview,
     onOpenContextMenu,
     onCloseContextMenu,
     onCommit,
@@ -84,8 +85,12 @@
     resolvePaletteRgb: (velocity: number) => string;
     isSidebarResizing: boolean;
     interactiveElementSelector: string;
-    onSaveChain: (chain: GeneratorChain, meta: ChainMutationMeta) => void;
-    onScheduleAutoPreview: (delayMs?: number) => void;
+    onCommitOutputChain: (
+      chain: GeneratorChain,
+      meta: ChainMutationMeta,
+      previewMode?: RackOutputPreviewMode,
+    ) => void;
+    onRequestTransientPreview: (delayMs?: number) => void;
     onOpenContextMenu: (clientX: number, clientY: number, target: ContextMenuTarget) => void;
     onCloseContextMenu: () => void;
     onCommit: (commit: RackInteractionCommit) => void;
@@ -282,8 +287,9 @@
     resolveMiniMapLayoutSignature: () => miniMapLayoutSignature,
     openContextMenu: (clientX, clientY, target) => onOpenContextMenu(clientX, clientY, target),
     closeContextMenu: () => onCloseContextMenu(),
-    saveChain: (chain, meta) => onSaveChain(chain, meta),
-    scheduleAutoPreview: (delayMs) => onScheduleAutoPreview(delayMs),
+    commitOutputChain: (chain, meta, previewMode) =>
+      onCommitOutputChain(chain, meta, previewMode),
+    requestTransientPreview: (delayMs) => onRequestTransientPreview(delayMs),
     commitRackInteraction: (commit) => onCommit(commit),
     commitPresetInsertDrop: (source, dropZone) => onPresetInsertDrop(source, dropZone),
     commitRackPresetDrop: (source) => onRackPresetDrop(source),

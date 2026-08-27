@@ -18,6 +18,7 @@ export const createInitialEditorState = (): EditorSessionState => {
     sidebarPage: 'devices',
     chainState: createDefaultChainSettings(),
     chainRevision: 1,
+    previewSourceRevision: 1,
     launchpadModel: loadLaunchpadModel(),
     headerIndicatorText: '',
     paletteName: '',

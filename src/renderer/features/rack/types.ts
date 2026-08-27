@@ -15,6 +15,8 @@ export interface RackScrollMetrics {
   clientWidth: number;
 }
 
+export type RackOutputPreviewMode = 'debounced' | 'immediate';
+
 export interface RackPresetFileDrop {
   file: File;
   filePath: string | null;

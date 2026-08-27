@@ -6,6 +6,7 @@ import type {
   BrowserPresetInsertSource,
   BrowserNonRackPresetInsertSource,
   RackInteractionCommit,
+  RackOutputPreviewMode,
   RackScrollMetrics,
 } from './types';
 import type { ChainMutationMeta } from '../editor/history-core';
@@ -25,8 +26,12 @@ interface RackSurfaceControllerOptions {
   getInteractiveElementSelector: () => string;
   resolveMiniMapLayoutSignature: () => string;
   closeContextMenu: () => void;
-  saveChain: (chain: GeneratorChain, meta: ChainMutationMeta) => void;
-  scheduleAutoPreview: (delayMs?: number) => void;
+  commitOutputChain: (
+    chain: GeneratorChain,
+    meta: ChainMutationMeta,
+    previewMode?: RackOutputPreviewMode,
+  ) => void;
+  requestTransientPreview: (delayMs?: number) => void;
   commitRackInteraction: (commit: RackInteractionCommit) => void;
   commitPresetInsertDrop: (
     source: BrowserNonRackPresetInsertSource,
@@ -105,8 +110,8 @@ class RackSurfaceController {
     this.interactionManager = new RackInteractionManager({
       chainDevices: elements.chainDevices,
       getChainState: this.options.getChainState,
-      saveChain: this.options.saveChain,
-      scheduleAutoPreview: this.options.scheduleAutoPreview,
+      commitOutputChain: this.options.commitOutputChain,
+      requestTransientPreview: this.options.requestTransientPreview,
       closeContextMenu: this.options.closeContextMenu,
     });
 

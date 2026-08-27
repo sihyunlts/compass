@@ -29,41 +29,33 @@ export const initializeHistoryBridge = (
   options.requestSyncAfterRender();
 };
 
-export const saveChainWithHistory = (
+interface ChainCommitOptions {
+  bumpChainRevision: () => void;
+  persistChainState: () => void;
+}
+
+const replaceCommittedChain = (
   state: EditorSessionState,
-  history: EditorHistory,
   chain: GeneratorChain,
-  meta: ChainMutationMeta,
-  options: {
-    bumpChainRevision: () => void;
-    persistChainState: () => void;
-  },
-): void => {
+  options: ChainCommitOptions,
+): GeneratorChain => {
   const normalizedChain = sanitizeGeneratorChain(chain);
   state.chainState = normalizedChain;
   options.bumpChainRevision();
   options.persistChainState();
-  history.push(normalizedChain, meta);
-  syncHistoryState(state, history);
+  return normalizedChain;
 };
 
-export const applyChainMutation = (
+export const commitChainMutation = (
   state: EditorSessionState,
   history: EditorHistory,
-  nextChain: GeneratorChain,
+  chain: GeneratorChain,
   meta: ChainMutationMeta,
-  options: {
-    bumpChainRevision: () => void;
-    persistChainState: () => void;
-    scheduleAutoPreview: (delayMs?: number) => void;
-  },
+  options: ChainCommitOptions,
 ): void => {
-  state.chainState = sanitizeGeneratorChain(nextChain);
-  options.persistChainState();
-  options.bumpChainRevision();
-  history.push(state.chainState, meta);
+  const normalizedChain = replaceCommittedChain(state, chain, options);
+  history.push(normalizedChain, meta);
   syncHistoryState(state, history);
-  options.scheduleAutoPreview(0);
 };
 
 export const resetChainHistory = (
@@ -71,46 +63,28 @@ export const resetChainHistory = (
   history: EditorHistory,
   nextChain: GeneratorChain,
   meta: ChainMutationMeta,
-  options: {
-    bumpChainRevision: () => void;
-    persistChainState: () => void;
-    scheduleAutoPreview: (delayMs?: number) => void;
-  },
+  options: ChainCommitOptions,
 ): void => {
-  state.chainState = sanitizeGeneratorChain(nextChain);
-  options.persistChainState();
-  options.bumpChainRevision();
-  history.reset(state.chainState, meta);
+  const normalizedChain = replaceCommittedChain(state, nextChain, options);
+  history.reset(normalizedChain, meta);
   syncHistoryState(state, history);
-  options.scheduleAutoPreview(0);
 };
 
 const restoreChainFromHistory = (
   state: EditorSessionState,
   history: EditorHistory,
   chain: GeneratorChain,
-  options: {
-    bumpChainRevision: () => void;
-    persistChainState: () => void;
-    scheduleAutoPreview: (delayMs?: number) => void;
-  },
+  options: ChainCommitOptions,
 ): void => {
-  state.chainState = sanitizeGeneratorChain(chain);
-  options.persistChainState();
-  options.bumpChainRevision();
-  history.replaceCurrent(state.chainState);
+  const normalizedChain = replaceCommittedChain(state, chain, options);
+  history.replaceCurrent(normalizedChain);
   syncHistoryState(state, history);
-  options.scheduleAutoPreview(0);
 };
 
 export const undoHistory = (
   state: EditorSessionState,
   history: EditorHistory,
-  options: {
-    bumpChainRevision: () => void;
-    persistChainState: () => void;
-    scheduleAutoPreview: (delayMs?: number) => void;
-  },
+  options: ChainCommitOptions,
 ): boolean => {
   const restored = history.undo();
   syncHistoryState(state, history);
@@ -125,11 +99,7 @@ export const undoHistory = (
 export const redoHistory = (
   state: EditorSessionState,
   history: EditorHistory,
-  options: {
-    bumpChainRevision: () => void;
-    persistChainState: () => void;
-    scheduleAutoPreview: (delayMs?: number) => void;
-  },
+  options: ChainCommitOptions,
 ): boolean => {
   const restored = history.redo();
   syncHistoryState(state, history);
@@ -145,11 +115,7 @@ export const checkoutHistory = (
   state: EditorSessionState,
   history: EditorHistory,
   target: string | number,
-  options: {
-    bumpChainRevision: () => void;
-    persistChainState: () => void;
-    scheduleAutoPreview: (delayMs?: number) => void;
-  },
+  options: ChainCommitOptions,
 ): boolean => {
   const restored = history.checkout(target);
   syncHistoryState(state, history);

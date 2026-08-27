@@ -19,7 +19,7 @@ interface CenterPickerControllerOptions {
   getCardElement: (id: string) => HTMLElement | null;
   blurActiveTextEditingElement: () => void;
   closeContextMenu: () => void;
-  scheduleAutoPreview: (delayMs?: number) => void;
+  requestTransientPreview: (delayMs?: number) => void;
   persistChange: () => void;
   commitReset: () => void;
 }
@@ -118,7 +118,7 @@ export class CenterPickerController {
 
   private readonly closeContextMenu: () => void;
 
-  private readonly scheduleAutoPreview: (delayMs?: number) => void;
+  private readonly requestTransientPreview: (delayMs?: number) => void;
 
   private readonly persistChange: () => void;
 
@@ -131,7 +131,7 @@ export class CenterPickerController {
     this.getCardElement = options.getCardElement;
     this.blurActiveTextEditingElement = options.blurActiveTextEditingElement;
     this.closeContextMenu = options.closeContextMenu;
-    this.scheduleAutoPreview = options.scheduleAutoPreview;
+    this.requestTransientPreview = options.requestTransientPreview;
     this.persistChange = options.persistChange;
     this.commitReset = options.commitReset;
   }
@@ -169,7 +169,7 @@ export class CenterPickerController {
 
     if (this.applyPosition(surface, event.clientX, event.clientY)) {
       this.state.didChange = true;
-      this.scheduleAutoPreview();
+      this.requestTransientPreview();
     }
     return true;
   }
@@ -181,7 +181,7 @@ export class CenterPickerController {
 
     if (this.applyPosition(this.state.surfaceEl, event.clientX, event.clientY)) {
       this.state.didChange = true;
-      this.scheduleAutoPreview();
+      this.requestTransientPreview();
     }
     return true;
   }
@@ -191,7 +191,7 @@ export class CenterPickerController {
       return false;
     }
 
-    this.finish(true);
+    this.finish();
     return true;
   }
 
@@ -200,13 +200,13 @@ export class CenterPickerController {
       return false;
     }
 
-    this.finish(false);
+    this.finish();
     return true;
   }
 
   public handleWindowBlur(): void {
     if (this.isActive()) {
-      this.finish(true);
+      this.finish();
     }
   }
 
@@ -301,7 +301,7 @@ export class CenterPickerController {
     return isCenterPointDevice(device) ? device : null;
   }
 
-  private finish(shouldPersist: boolean): void {
+  private finish(): void {
     if (this.state.surfaceEl) {
       delete this.state.surfaceEl.dataset.centerPickerInteraction;
     }
@@ -314,7 +314,7 @@ export class CenterPickerController {
       this.state.surfaceEl.releasePointerCapture(this.state.pointerId);
     }
 
-    if (shouldPersist && this.state.didChange) {
+    if (this.state.didChange) {
       this.persistChange();
     }
 

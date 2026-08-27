@@ -749,8 +749,8 @@
           {resolvePaletteRgb}
           isSidebarResizing={uiState.isSidebarResizing}
           interactiveElementSelector={INTERACTIVE_ELEMENT_SELECTOR}
-          onSaveChain={editorSession.commands.saveChain}
-          onScheduleAutoPreview={(delayMs) => editorSession.scheduleOutputPreview(delayMs)}
+          onCommitOutputChain={editorSession.commands.commitOutputChain}
+          onRequestTransientPreview={(delayMs) => editorSession.requestOutputPreview(delayMs)}
           onOpenContextMenu={(x, y, target) => contextMenuComponent?.open(x, y, target)}
           onCloseContextMenu={closeContextMenu}
           onCommit={editorSession.commands.handleRackCommit}
