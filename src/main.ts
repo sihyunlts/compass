@@ -17,7 +17,7 @@ import { UpdateCheckService } from './main/services/update-check-service';
 import { IPC_CHANNELS } from './shared/contracts/ipc/channels';
 
 const WINDOWS_APP_USER_MODEL_ID = 'com.sihyunlights.compass';
-const MIDI_PERMISSIONS = new Set(['midi', 'midiSysex']);
+const COMPASS_PERMISSIONS = new Set(['midi', 'midiSysex', 'pointerLock']);
 
 const isCompassWindow = (webContents: WebContents | null): boolean =>
   webContents !== null
@@ -25,24 +25,24 @@ const isCompassWindow = (webContents: WebContents | null): boolean =>
     (window) => window?.webContents === webContents,
   );
 
-const canUseMidi = (
+const canUseCompassPermission = (
   webContents: WebContents | null,
   permission: string,
   requestingUrl: string,
   isMainFrame: boolean,
-): boolean => MIDI_PERMISSIONS.has(permission)
+): boolean => COMPASS_PERMISSIONS.has(permission)
   && isMainFrame
   && isCompassWindow(webContents)
   && isCompassRendererUrl(requestingUrl);
 
-const configureMidiPermissions = (): void => {
+const configureCompassPermissions = (): void => {
   const appSession = session.defaultSession;
   appSession.setPermissionCheckHandler((
     webContents,
     permission,
     requestingOrigin,
     details,
-  ) => canUseMidi(
+  ) => canUseCompassPermission(
     webContents,
     permission,
     details.requestingUrl ?? requestingOrigin,
@@ -54,7 +54,7 @@ const configureMidiPermissions = (): void => {
     callback,
     details,
   ) => {
-    callback(canUseMidi(
+    callback(canUseCompassPermission(
       webContents,
       permission,
       details.requestingUrl,
@@ -162,7 +162,7 @@ const startApplication = (): void => {
   app.on('browser-window-blur', broadcastAppFocus);
 
   app.whenReady().then(() => {
-    configureMidiPermissions();
+    configureCompassPermissions();
     installApplicationMenu();
 
     liveTempoListener.start((update) => {
