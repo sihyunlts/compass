@@ -33,7 +33,6 @@
 
   .reverse-description {
     font-size: var(--text-12);
-    line-height: normal;
     white-space: pre-line;
   }
 </style>

@@ -78,10 +78,8 @@
     font-size: var(--text-12);
     line-height: 1;
     white-space: nowrap;
-    cursor: pointer;
 
     &:disabled {
-      cursor: default;
       color: color-mix(in oklch, var(--color-text-secondary) 55%, transparent);
     }
 

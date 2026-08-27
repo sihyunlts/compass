@@ -412,6 +412,7 @@
     position: relative;
     height: 1.5rem;
     border-radius: var(--radius-4);
+    cursor: default;
 
     &::after {
       content: '';
@@ -436,6 +437,11 @@
       background: transparent;
       border-radius: var(--radius-4);
       z-index: 1;
+      cursor: grab;
+
+      &:active {
+        cursor: grabbing;
+      }
     }
 
     &:focus-visible {

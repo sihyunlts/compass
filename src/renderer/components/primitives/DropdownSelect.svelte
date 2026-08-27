@@ -147,7 +147,6 @@
     background: var(--color-surface-interactive);
     color: var(--color-text-primary);
     font-size: var(--text-13);
-    cursor: pointer;
     transition:
       background-color 80ms linear,
       color 80ms linear;
@@ -158,7 +157,6 @@
     }
 
     &:disabled {
-      cursor: default;
       opacity: 0.6;
     }
 

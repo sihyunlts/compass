@@ -1840,7 +1840,6 @@
     padding: 0;
     background: transparent;
     color: var(--color-text-secondary);
-    cursor: pointer;
 
     .material-symbols-rounded {
       font-size: var(--text-16);

@@ -390,6 +390,10 @@
       -webkit-user-drag: none;
       outline: none;
 
+      &:active {
+        cursor: grabbing;
+      }
+
       &-left {
         display: flex;
         flex: 1 1 0;
@@ -413,7 +417,6 @@
       .device-title-input {
         min-width: 0;
         font-size: var(--text-13);
-        line-height: 1.2;
       }
 
       .device-title {
@@ -505,7 +508,6 @@
       max-width: 100%;
       font: inherit;
       font-size: var(--text-13);
-      line-height: 1.2;
       color: inherit;
       caret-color: currentColor;
       cursor: text;

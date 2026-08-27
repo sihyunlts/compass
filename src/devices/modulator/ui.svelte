@@ -230,7 +230,6 @@
     min-width: 0;
     color: var(--color-text-secondary);
     font-size: var(--text-12);
-    line-height: normal;
   }
 
   .modulation-target-label-group {

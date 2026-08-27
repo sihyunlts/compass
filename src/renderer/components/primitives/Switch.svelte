@@ -59,7 +59,6 @@
     border: 0;
     border-radius: var(--radius-round);
     background: var(--color-surface-emphasis);
-    cursor: pointer;
     transition: background-color 200ms ease;
     -webkit-app-region: no-drag;
 
@@ -72,7 +71,6 @@
     }
 
     &:disabled {
-      cursor: default;
       opacity: 0.6;
     }
   }

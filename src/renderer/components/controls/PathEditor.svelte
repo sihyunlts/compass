@@ -2228,6 +2228,10 @@
     background: var(--color-surface-inverse);
     cursor: grab;
 
+    &:active {
+      cursor: grabbing;
+    }
+
     &.is-selected,
     &.is-drawing-endpoint,
     &.is-merge-target,
@@ -2248,6 +2252,10 @@
     border: 1px solid var(--color-text-secondary);
     background: var(--color-surface-interactive);
     cursor: grab;
+
+    &:active {
+      cursor: grabbing;
+    }
   }
 
   .path-editor-rotation-zone {
