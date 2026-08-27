@@ -8,6 +8,7 @@ import {
 } from '../import-hydration';
 import {
   boundedNumericParameter,
+  DISCRETE_DRAG_PIXELS_PER_STEP,
   defineNumericParameterRules,
   hydrateImportedNumericParameters,
   normalizeNumericParameterValue,
@@ -17,6 +18,7 @@ import type { RendererDeviceSchema } from '../types';
 const MAX_COLOR_PERCENT = 400;
 
 export const MAX_COLOR_SLOT_COUNT = 32;
+export const COLOR_SLOT_COUNT_DRAG_PIXELS_PER_STEP = DISCRETE_DRAG_PIXELS_PER_STEP;
 export const DEFAULT_COLOR_SLOT_PATTERN = [
   3,
   32,

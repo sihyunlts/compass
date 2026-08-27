@@ -14,6 +14,7 @@ import {
   boundedNumericParameter,
   customNumericParameter,
   cyclicNumericParameter,
+  DISCRETE_DRAG_PIXELS_PER_STEP,
   defineNumericParameterRules,
 } from '../numeric-parameters';
 import type { RendererDeviceSchema } from '../types';
@@ -35,6 +36,7 @@ export const SYMMETRY_NUMERIC_PARAMETERS = defineNumericParameterRules<
     min: MIN_SYMMETRY_RESULT_COUNT,
     max: MAX_SYMMETRY_RESULT_COUNT,
     step: 1,
+    dragPixelsPerStep: DISCRETE_DRAG_PIXELS_PER_STEP,
     normalize: (value, params) => resolveSymmetryResultCount(
       params.mode === 'rotation' ? 'rotation' : 'reflection',
       value,
@@ -53,6 +55,7 @@ export const SYMMETRY_NUMERIC_PARAMETERS = defineNumericParameterRules<
     min: 0,
     max: 9,
     step: 0.5,
+    dragPixelsPerStep: DISCRETE_DRAG_PIXELS_PER_STEP,
     modulationMessageKey: 'control.centerX',
   }),
   centerY: boundedNumericParameter({
@@ -60,6 +63,7 @@ export const SYMMETRY_NUMERIC_PARAMETERS = defineNumericParameterRules<
     min: 0,
     max: 9,
     step: 0.5,
+    dragPixelsPerStep: DISCRETE_DRAG_PIXELS_PER_STEP,
     modulationMessageKey: 'control.centerY',
   }),
 });

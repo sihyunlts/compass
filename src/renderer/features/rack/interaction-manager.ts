@@ -181,7 +181,11 @@ export class RackInteractionManager {
     }
 
     if (this.numericInputInteraction.isPointer(event.pointerId)) {
-      this.numericInputInteraction.handlePointerMove(event.clientX, event.clientY);
+      this.numericInputInteraction.handlePointerMove(
+        event.clientX,
+        event.clientY,
+        event.shiftKey,
+      );
       return true;
     }
 

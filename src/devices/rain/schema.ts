@@ -9,6 +9,7 @@ import {
   boundedIntegerParameter,
   boundedNumericParameter,
   cyclicNumericParameter,
+  DISCRETE_DRAG_PIXELS_PER_STEP,
   defineNumericParameterRules,
   hydrateImportedNumericParameters,
 } from '../numeric-parameters';
@@ -43,6 +44,7 @@ export const RAIN_NUMERIC_PARAMETERS = defineNumericParameterRules<
     min: 0,
     max: 32,
     step: 1,
+    dragPixelsPerStep: DISCRETE_DRAG_PIXELS_PER_STEP,
     modulationMessageKey: 'control.density',
   }),
   speed: boundedNumericParameter({

@@ -26,6 +26,7 @@ interface NumericInputInteractionOptions {
 }
 
 const NUMERIC_RESET_DOUBLE_CLICK_WINDOW_MS = 400;
+const SHIFT_DRAG_SENSITIVITY_MULTIPLIER = 0.25;
 
 const createNumericInputDragState = (): NumericInputDragState => ({
   pointerId: null,
@@ -122,7 +123,10 @@ export class NumericInputInteraction {
     const initialValue = Number.isFinite(currentValue) ? currentValue : (min ?? 0);
     const hasFiniteRange = min !== null && max !== null && max > min;
     const wrapMode = input.dataset.dragMode === 'circular' && hasFiniteRange;
-    const sensitivity = hasFiniteRange ? Math.max((max - min) / 480, step) : step;
+    const dragPixelsPerStep = this.resolveDragPixelsPerStep(input);
+    const sensitivity = dragPixelsPerStep !== null
+      ? step / dragPixelsPerStep
+      : hasFiniteRange ? Math.max((max - min) / 480, step) : step;
 
     this.dragState.pointerId = event.pointerId;
     this.dragState.inputEl = input;
@@ -152,7 +156,7 @@ export class NumericInputInteraction {
     return true;
   }
 
-  handlePointerMove(clientX: number, clientY: number): void {
+  handlePointerMove(clientX: number, clientY: number, isFineDrag = false): void {
     const input = this.dragState.inputEl;
     if (!input || this.dragState.isPointerLocked) {
       return;
@@ -162,7 +166,7 @@ export class NumericInputInteraction {
     const deltaX = clientX - this.dragState.lastPointerX;
     this.dragState.lastPointerX = clientX;
     this.dragState.lastPointerY = clientY;
-    this.applyDragDelta(deltaX, deltaY);
+    this.applyDragDelta(deltaX, deltaY, isFineDrag);
   }
 
   handleLockedMouseMove(event: MouseEvent): void {
@@ -170,7 +174,7 @@ export class NumericInputInteraction {
       return;
     }
 
-    this.applyDragDelta(event.movementX, -event.movementY);
+    this.applyDragDelta(event.movementX, -event.movementY, event.shiftKey);
   }
 
   handlePointerUp(at: number): void {
@@ -284,6 +288,11 @@ export class NumericInputInteraction {
     return Math.max(0, stepText.length - dotIndex - 1);
   }
 
+  private resolveDragPixelsPerStep(input: HTMLInputElement): number | null {
+    const parsed = Number(input.dataset.dragPixelsPerStep);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+
   private formatDraggedValue(value: number, decimals: number): string {
     return decimals > 0 ? value.toFixed(decimals) : String(Math.round(value));
   }
@@ -349,7 +358,7 @@ export class NumericInputInteraction {
     return Number(clamped.toFixed(this.dragState.decimals));
   }
 
-  private applyDragDelta(deltaX: number, deltaY: number): void {
+  private applyDragDelta(deltaX: number, deltaY: number, isFineDrag: boolean): void {
     const input = this.dragState.inputEl;
     if (!input) {
       return;
@@ -359,7 +368,10 @@ export class NumericInputInteraction {
       this.dragState.didMove = true;
     }
 
-    this.dragState.dragRawValue += (deltaY + deltaX * 0.5) * this.dragState.sensitivity;
+    const sensitivityMultiplier = isFineDrag ? SHIFT_DRAG_SENSITIVITY_MULTIPLIER : 1;
+    this.dragState.dragRawValue += (deltaY + deltaX * 0.5)
+      * this.dragState.sensitivity
+      * sensitivityMultiplier;
 
     const nextValue = this.snapDraggedValue(this.dragState.dragRawValue);
     const nextText = this.formatDraggedValue(nextValue, this.dragState.decimals);
