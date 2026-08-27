@@ -217,7 +217,6 @@
       border-radius: var(--radius-4);
       background: var(--color-surface-interactive);
       color: var(--color-text-secondary);
-      cursor: pointer;
 
       &.selected {
         background: var(--time-window-accent);

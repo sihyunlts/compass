@@ -134,7 +134,6 @@
       background: transparent;
       color: inherit;
       font-size: var(--text-13);
-      cursor: pointer;
       white-space: nowrap;
       -webkit-app-region: no-drag;
       transition:
@@ -142,7 +141,6 @@
         color 80ms linear;
 
       &:disabled {
-        cursor: default;
         opacity: 0.6;
       }
 

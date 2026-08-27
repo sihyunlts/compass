@@ -731,6 +731,10 @@
     cursor: grab;
     -webkit-user-drag: none;
 
+    &:active {
+      cursor: grabbing;
+    }
+
     &.is-renaming {
       cursor: default;
     }
@@ -773,7 +777,6 @@
   .group-label {
     writing-mode: sideways-lr;
     font-size: var(--text-12);
-    line-height: 1.2;
     pointer-events: none;
   }
 

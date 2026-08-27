@@ -126,6 +126,5 @@
   .path-start-value {
     color: var(--color-text-primary);
     font-size: var(--text-12);
-    line-height: 1.3;
   }
 </style>

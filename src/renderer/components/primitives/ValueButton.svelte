@@ -98,7 +98,6 @@
     background: var(--color-surface-interactive);
     color: var(--color-text-primary);
     font-size: var(--text-12);
-    line-height: normal;
     outline: 1px solid transparent;
     outline-offset: -1px;
     text-align: left;
@@ -139,13 +138,8 @@
     background: transparent;
     color: inherit;
     font: inherit;
-    line-height: inherit;
     text-align: inherit;
-    cursor: pointer;
 
-    &:disabled {
-      cursor: default;
-    }
   }
 
   .value-button-text {
@@ -172,15 +166,10 @@
     border-radius: var(--radius-2);
     background: transparent;
     color: var(--color-text-secondary);
-    cursor: pointer;
 
     &:hover {
       background: var(--color-surface-active);
       color: var(--color-text-primary);
-    }
-
-    &:disabled {
-      cursor: default;
     }
 
     .material-symbols-rounded {

@@ -25,6 +25,22 @@ body[data-focus-nav='tab'] :focus-visible {
   outline-offset: 2px;
 }
 
+/* Interactive form controls share the same affordance as native buttons. */
+:where(
+  button,
+  input[type='checkbox'],
+  input[type='radio'],
+  input[type='range'],
+  input[type='file'],
+  select
+) {
+  cursor: pointer;
+}
+
+:where(button, input, select):disabled {
+  cursor: default;
+}
+
 /* Remove default text margins */
 h1, h2, h3, h4, h5, h6, p {
   margin: var(--gap-0);

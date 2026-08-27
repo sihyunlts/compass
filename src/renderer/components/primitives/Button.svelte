@@ -71,14 +71,12 @@
     color: var(--color-text-primary);
     padding: var(--gap-6) var(--gap-8);
     font-size: var(--text-13);
-    cursor: pointer;
     white-space: nowrap;
     transition:
       background-color 80ms linear,
       color 80ms linear;
 
     &:disabled {
-      cursor: default;
       color: var(--button-disabled-color);
     }
 

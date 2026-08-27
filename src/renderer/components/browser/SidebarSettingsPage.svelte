@@ -92,6 +92,11 @@
   };
 
   let themeAdjustingTimer: number | null = null;
+  let paletteFileInputEl = $state<HTMLInputElement | null>(null);
+
+  const openPaletteFilePicker = (): void => {
+    paletteFileInputEl?.click();
+  };
 
   const handleThemeInput = (
     onChange: (value: number) => void,
@@ -164,14 +169,18 @@
             text={i18n.t('settings.reset')}
             onClick={() => onPaletteReset()}
           />
-          <div class="sidebar-settings-file-input">
-            <div class="sidebar-settings-file-button">{i18n.t('settings.load')}</div>
-            <input
-              id="palette-file-input"
-              type="file"
-              onchange={(event) => onPaletteFileChange(event)}
-            />
-          </div>
+          <Button
+            id="palette-load"
+            text={i18n.t('settings.load')}
+            onClick={openPaletteFilePicker}
+          />
+          <input
+            bind:this={paletteFileInputEl}
+            id="palette-file-input"
+            class="sidebar-settings-file-input"
+            type="file"
+            onchange={(event) => onPaletteFileChange(event)}
+          />
         </div>
       </div>
     </div>
@@ -351,6 +360,7 @@
 
   .sidebar-settings-description {
     font-size: var(--text-12);
+    line-height: 1.3;
     color: var(--color-text-secondary);
     word-break: break-word;
 
@@ -407,26 +417,10 @@
   }
 
   .sidebar-settings-file-input {
-    position: relative;
-    display: inline-block;
-
-    input[type='file'] {
-      position: absolute;
-      left: 0;
-      top: 0;
-      opacity: 0;
-      width: 100%;
-      height: 100%;
-      cursor: pointer;
-    }
-  }
-
-  .sidebar-settings-file-button {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
     pointer-events: none;
-    background: var(--color-surface-interactive);
-    padding: var(--gap-6) var(--gap-8);
-    border-radius: var(--radius-6);
-    font-size: var(--text-13);
-    white-space: nowrap;
   }
 </style>
