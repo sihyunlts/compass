@@ -104,10 +104,12 @@ const getModulationParameterDefinitions = (
   Object.entries(getNumericParameterRules(kind) ?? {}).flatMap(([key, rule]) => (
     rule.modulationMessageKey
       ? [{
-          key,
-          messageKey: rule.modulationMessageKey,
-          unit: rule.display.unit,
-        }]
+        key,
+        messageKey: rule.modulationMessageKey,
+        step: rule.input.step,
+        display: rule.display,
+        dragPixelsPerStep: rule.input.dragPixelsPerStep,
+      }]
       : []
   ));
 

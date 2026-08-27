@@ -13,7 +13,7 @@ export const DISCRETE_DRAG_PIXELS_PER_STEP = 8;
 
 export type NumericParameterUnit = '°' | '%' | '×';
 
-interface NumericParameterDisplay {
+export interface NumericParameterDisplay {
   unit?: NumericParameterUnit;
   format?: 'rotation';
 }
@@ -41,20 +41,28 @@ const formatRotationValue = (value: number, valueText: string): string => {
     : `${sign}${directionText}°`;
 };
 
+export const formatNumericParameterDisplay = (
+  display: Readonly<NumericParameterDisplay>,
+  value: number,
+  valueText = String(value),
+): string => (
+  display.format === 'rotation'
+    ? formatRotationValue(value, valueText)
+    : formatNumericParameterValue(valueText, display.unit)
+);
+
 export const formatNumericParameterDisplayValue = (
   rule: NumericParameterRule,
   value: number,
   valueText = String(value),
-): string => (
-  rule.display.format === 'rotation'
-    ? formatRotationValue(value, valueText)
-    : formatNumericParameterValue(valueText, rule.display.unit)
-);
+): string => formatNumericParameterDisplay(rule.display, value, valueText);
 
 export interface ModulationParameterDefinition {
   key: string;
   messageKey: MessageKey;
-  unit?: NumericParameterUnit;
+  step: number;
+  display: Readonly<NumericParameterDisplay>;
+  dragPixelsPerStep?: number;
 }
 
 interface NumericParameterWriteContext {
