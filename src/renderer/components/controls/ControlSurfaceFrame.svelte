@@ -7,13 +7,20 @@
 
   let {
     fill = 'square',
+    measuredSize = $bindable(0),
     children,
   } = $props<{
     fill?: ControlSurfaceFrameFill;
+    measuredSize?: number;
     children: Snippet;
   }>();
 
   let measuredHeight = $state(0);
+  $effect(() => {
+    if (measuredSize !== measuredHeight) {
+      measuredSize = measuredHeight;
+    }
+  });
   const rootStyle = $derived(
     `--control-surface-size:${Math.max(0, measuredHeight)}px;`,
   );

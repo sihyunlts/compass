@@ -63,6 +63,7 @@
     { length: Math.max(0, Math.round(range) - 1) },
     (_, index) => (((index + 1) / range) * 100).toFixed(3),
   ));
+  let surfaceSize = $state(0);
 </script>
 
 <FieldShell
@@ -71,7 +72,7 @@
   role="group"
   aria-label={i18n.t('control.centerPointPicker')}
 >
-  <ControlSurfaceFrame>
+  <ControlSurfaceFrame bind:measuredSize={surfaceSize}>
     <div
       class="center-picker-surface"
       data-center-picker-surface="true"
@@ -97,7 +98,7 @@
       {/if}
     </div>
   </ControlSurfaceFrame>
-  <div class="center-picker-inputs">
+  <div class="center-picker-inputs" style={`inline-size:${surfaceSize}px;`}>
     <NumberField
       label="X"
       layout="inline"

@@ -66,6 +66,13 @@
       align-items: flex-start;
     }
 
+    &[data-layout='surface'] {
+      display: grid;
+      grid-template-columns: max-content var(--device-control-width);
+      align-self: flex-start;
+      inline-size: max-content;
+    }
+
     &[data-layout='graph'] {
       inline-size: calc(
         var(--device-graph-content-width)
