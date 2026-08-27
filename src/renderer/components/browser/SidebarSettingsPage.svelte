@@ -24,7 +24,6 @@
     themeHue,
     themeSaturation,
     paletteDescription,
-    paletteDescriptionTone = 'neutral',
     appVersionText = '',
     updateCheckText = '',
     updateAvailable = false,
@@ -50,7 +49,6 @@
     themeHue: number;
     themeSaturation: number;
     paletteDescription: string;
-    paletteDescriptionTone?: 'neutral' | 'error';
     appVersionText?: string;
     updateCheckText?: string;
     updateAvailable?: boolean;
@@ -153,7 +151,6 @@
           <span class="sidebar-settings-label">{i18n.t('settings.colorPalette')}</span>
           <span
             class="sidebar-settings-description"
-            class:is-error={paletteDescriptionTone === 'error'}
             role="status"
             aria-live="polite"
           >
