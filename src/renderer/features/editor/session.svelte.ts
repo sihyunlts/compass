@@ -564,37 +564,32 @@ export class EditorSession {
     this.requestOutputPreview(0);
   }
 
-  private undo(): boolean {
-    const restored = undoHistory(this.state, this.history, {
-      bumpChainRevision: () => this.bumpChainRevision(),
-      persistChainState: () => this.persistChainState(),
-    });
+  private finishHistoryRestore(restored: boolean): boolean {
     if (restored) {
       this.requestOutputPreview(0);
     }
     return restored;
+  }
+
+  private undo(): boolean {
+    return this.finishHistoryRestore(undoHistory(this.state, this.history, {
+      bumpChainRevision: () => this.bumpChainRevision(),
+      persistChainState: () => this.persistChainState(),
+    }));
   }
 
   private redo(): boolean {
-    const restored = redoHistory(this.state, this.history, {
+    return this.finishHistoryRestore(redoHistory(this.state, this.history, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
-    });
-    if (restored) {
-      this.requestOutputPreview(0);
-    }
-    return restored;
+    }));
   }
 
   private checkoutHistory(targetId: string): boolean {
-    const restored = checkoutEditorHistory(this.state, this.history, targetId, {
+    return this.finishHistoryRestore(checkoutEditorHistory(this.state, this.history, targetId, {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
-    });
-    if (restored) {
-      this.requestOutputPreview(0);
-    }
-    return restored;
+    }));
   }
 
   private resolveContextSelection(target: ContextMenuTarget): RackSelectionSnapshot | null {

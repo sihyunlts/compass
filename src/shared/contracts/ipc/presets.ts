@@ -155,7 +155,7 @@ interface PresetBrowserTreeLeafNodeBase<K extends PresetFileKind = PresetFileKin
   relativePath: string[];
 }
 
-type PresetBrowserTreeLeafNode<K extends PresetFileKind = PresetFileKind> =
+export type PresetBrowserTreeLeafNode<K extends PresetFileKind = PresetFileKind> =
   PresetBrowserTreeLeafNodeBase<K> & (
     | {
         loadStatus: 'loaded';

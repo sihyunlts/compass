@@ -10,27 +10,13 @@ import {
   updateOrderedSelection,
   type OrderedSelectionUpdate,
 } from '../selection/ordered-selection';
+import { buildOrderedGroupIds } from './layout';
 
 /** Selected group metadata used by group-level actions. */
 export interface GroupSelectionContext {
   groupId: string;
   memberDeviceIds: string[];
 }
-
-const resolveOrderedGroupIds = (devices: readonly GeneratorDeviceNode[]): string[] => {
-  const groupIds: string[] = [];
-
-  for (const device of devices) {
-    const groupId = normalizeOptionalId(device.groupId);
-    if (!groupId || groupIds.includes(groupId)) {
-      continue;
-    }
-
-    groupIds.push(groupId);
-  }
-
-  return groupIds;
-};
 
 const resolveGroupMemberIds = (
   devices: readonly GeneratorDeviceNode[],
@@ -144,7 +130,7 @@ export class RackSelection {
       validDeviceIds,
     ));
 
-    const validGroupIds = resolveOrderedGroupIds(devices);
+    const validGroupIds = buildOrderedGroupIds(devices);
     const nextSelectedGroupIds = this.state.selectedGroupIds
       .filter((id) => validGroupIds.includes(id));
     if (nextSelectedGroupIds.length !== this.state.selectedGroupIds.length) {

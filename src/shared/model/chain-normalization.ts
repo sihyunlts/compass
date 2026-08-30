@@ -94,7 +94,7 @@ const hydrateImportedGroupStateById = (
   return next;
 };
 
-const collectActiveGroupIds = (
+export const collectActiveGroupIds = (
   devices: readonly GeneratorDeviceNode[],
 ): Set<string> => {
   const ids = new Set<string>();
