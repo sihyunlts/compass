@@ -1,7 +1,6 @@
 export {
   isFrameWithinWindow,
   resolveFrameWindow,
-  resolveStageExecutionPlan,
 } from './runtime/frame-window';
 export {
   createPendingFrameApplicationOperator,

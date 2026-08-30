@@ -193,13 +193,6 @@ export const boundedIntegerParameter = (
   (value) => clamp(Math.trunc(value), options.min, options.max),
 );
 
-export const positiveNumericParameter = (
-  options: NumericParameterOptions,
-): NumericParameterRule => createNumericParameterRule(
-  options,
-  (value) => (value > 0 ? value : null),
-);
-
 export const cyclicNumericParameter = (
   options: CyclicNumericParameterOptions,
 ): NumericParameterRule => {

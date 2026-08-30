@@ -4,7 +4,6 @@ import {
   appendPendingGeometryRewriteApplication,
   isDeviceModulated,
   resolveModulatedDeviceAtFrame,
-  resolveStageExecutionPlan,
   transformStroke,
   type ModulationEvaluationWindow,
   type PendingGeometryApplicationOperatorInput,
@@ -110,7 +109,6 @@ const applyPendingSpatialTransform = (
 export const spatialTransformOperator = createPendingGeometryApplicationOperator<SpatialTransformStageKind>(
   (input, stage, context) => {
     const device = stage.device;
-    const executionPlan = resolveStageExecutionPlan(context, stage);
     const isModulated = isDeviceModulated(context.modulationContext, stage.deviceId);
 
     return applyPendingSpatialTransform(
@@ -126,7 +124,7 @@ export const spatialTransformOperator = createPendingGeometryApplicationOperator
         sampleStepBeats,
         evaluationWindow,
       ) as GeneratorEffectNode,
-      executionPlan.requiredFrameWindow,
+      'all',
       {
         start: 0,
         end: context.modulationContext.loopLengthBeats,

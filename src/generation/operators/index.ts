@@ -1,5 +1,5 @@
 import type { GeneratorChain } from '../../shared/model';
-import type { OperatorExecutionPlan } from '../analysis/types';
+import type { SpatialRequirement } from '../analysis/types';
 import type { CompiledRackPlan, CompiledRackStage, RackStageDeviceKind } from '../plan/types';
 import { resolveCompiledRackSampleStepBeats } from '../plan/sampling';
 import { createEmptyGenerationState, type MutableGenerationState } from '../timeline/state';
@@ -135,7 +135,7 @@ export const executeCompiledRackPlan = (
   modulationChain: GeneratorChain,
   loopLengthBeats: number,
   outputAdapter: CanonicalOutputAdapter,
-  executionPlanByDeviceId: ReadonlyMap<string, OperatorExecutionPlan>,
+  generatorOutputBounds: SpatialRequirement,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): MutableGenerationState => {
@@ -146,7 +146,7 @@ export const executeCompiledRackPlan = (
     sampleStepBeats,
     outputAdapter,
     modulationContext,
-    executionPlanByDeviceId,
+    generatorOutputBounds,
     mutedGroupIds,
     mutedGeneratorIds,
     timelineBySourceKey: new Map<string, GeometryTimeline>(),

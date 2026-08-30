@@ -44,7 +44,7 @@ export interface PendingGeometryApplicationOperatorInput {
   precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
 }
 
-export const materializePendingRackOperatorInput = (
+const materializePendingRackOperatorInput = (
   state: MutableGenerationState,
   context: RackStageExecutionContext,
 ): MaterializedGenerationState => {

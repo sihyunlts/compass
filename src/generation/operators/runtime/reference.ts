@@ -18,7 +18,7 @@ export const createRackStageExecutionContext = (
   compiledPlan: referenceContext.compiledPlan,
   outputAdapter: referenceContext.outputAdapter,
   modulationContext: referenceContext.modulationContext,
-  executionPlanByDeviceId: referenceContext.executionPlanByDeviceId,
+  generatorOutputBounds: referenceContext.generatorOutputBounds,
   mutedGroupIds: referenceContext.mutedGroupIds,
   mutedGeneratorIds: referenceContext.mutedGeneratorIds,
   referenceContext,

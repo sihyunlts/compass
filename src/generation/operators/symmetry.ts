@@ -4,7 +4,6 @@ import {
   appendPendingGeometryRewriteApplication,
   isDeviceModulated,
   resolveModulatedDeviceAtFrame,
-  resolveStageExecutionPlan,
   transformStroke,
   type ModulationEvaluationWindow,
   type PendingGeometryApplicationOperatorInput,
@@ -124,7 +123,6 @@ const applyPendingSymmetryEffect = (
 
 export const symmetryOperator = createPendingGeometryApplicationOperator<'symmetry'>(
   (input, stage, context) => {
-    const executionPlan = resolveStageExecutionPlan(context, stage);
     const isModulated = isDeviceModulated(context.modulationContext, stage.deviceId);
 
     return applyPendingSymmetryEffect(
@@ -140,7 +138,7 @@ export const symmetryOperator = createPendingGeometryApplicationOperator<'symmet
         sampleStepBeats,
         evaluationWindow,
       ),
-      executionPlan.requiredFrameWindow,
+      'all',
       {
         start: 0,
         end: context.modulationContext.loopLengthBeats,

@@ -13,7 +13,6 @@ import {
   createPendingFrameApplicationOperator,
   replaceTimelineAndRefreshRackState,
   resolveFrameWindow,
-  resolveStageExecutionPlan,
   type PendingFrameApplicationOperatorInput,
   type RackStageExecutionContext,
 } from './runtime';
@@ -68,14 +67,13 @@ const applyColorEffect = (
 export const colorOperator = createPendingFrameApplicationOperator<'color'>(
   (input, stage, context) => {
     const device = stage.device;
-    const executionPlan = resolveStageExecutionPlan(context, stage);
 
     return applyColorEffect(
       input,
       device,
       stage.groupId,
       stage.stageIndex,
-      executionPlan.requiredFrameWindow,
+      'all',
       context.mutedGroupIds,
       context.mutedGeneratorIds,
       context,

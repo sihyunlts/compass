@@ -61,19 +61,6 @@ const rendererDeviceSchemas = Object.fromEntries(
   RENDERER_DEVICE_SCHEMAS.map((schema) => [schema.kind, schema]),
 ) as RendererDeviceSchemaByKind;
 
-const collectRendererDeviceKindsByGroup = (
-  group: RendererDeviceGroup,
-): readonly RendererDeviceKind[] => Object.freeze(
-  RENDERER_DEVICE_SCHEMAS
-    .filter((schema) => schema.group === group)
-    .map((schema) => schema.kind),
-);
-
-export const RENDERER_DEVICE_GROUPS = {
-  generator: collectRendererDeviceKindsByGroup('generator'),
-  effect: collectRendererDeviceKindsByGroup('effect'),
-} as const satisfies Record<RendererDeviceGroup, readonly RendererDeviceKind[]>;
-
 export const RENDERER_DEVICE_KINDS = Object.freeze(
   RENDERER_DEVICE_SCHEMAS.map((schema) => schema.kind),
 ) as readonly RendererDeviceKind[];

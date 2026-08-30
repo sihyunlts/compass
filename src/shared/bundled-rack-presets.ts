@@ -16,7 +16,7 @@ import {
   type RackPresetFile,
 } from './presets';
 
-export const BUNDLED_RACK_PRESET_COLLECTION = {
+const BUNDLED_RACK_PRESET_COLLECTION = {
   id: 'sihyunlights',
   label: 'sihyunlights',
   icon: 'wand_stars',
@@ -27,7 +27,7 @@ interface BundledRackPresetDefinition {
   text: string;
 }
 
-export type BundledRackPresetEntry =
+type BundledRackPresetEntry =
   | {
       loadStatus: 'loaded';
       id: string;

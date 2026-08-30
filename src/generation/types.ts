@@ -1,9 +1,5 @@
 import type { AffineTransform, Polyline, SceneTemporalState } from '../core/core-types';
-import type {
-  CanonicalAnalysisResult,
-  CanonicalExecutionPlan,
-} from './analysis/types';
-import type { CompiledRackPlan } from './plan/types';
+import type { SpatialRequirement } from './analysis/types';
 
 export interface GeometryMask {
   readonly contains: (x: number, y: number) => boolean;
@@ -58,9 +54,10 @@ export interface CanonicalFieldResult {
   mutedGroupIds: ReadonlySet<string>;
   mutedGeneratorIds: ReadonlySet<string>;
   timelineStateByOriginId: ReadonlyMap<string, GenerationOriginTimelineState>;
-  analysis: CanonicalAnalysisResult;
-  executionPlan: CanonicalExecutionPlan;
-  compiledPlan: CompiledRackPlan;
+}
+
+export interface GenerationExecutionContext {
+  generatorOutputBounds: SpatialRequirement;
 }
 
 export interface CanonicalSpatialMask {
