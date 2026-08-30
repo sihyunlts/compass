@@ -5,15 +5,11 @@ import {
   COMPOSITION_BOUNDS,
   distanceToRasterizedPolylineSquared,
 } from '../core/geometry';
-import {
-  NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-  type RuntimeMapData,
-} from '../domain/note-generation-types';
+import type { RuntimeMapData } from '../domain/note-generation-types';
 import { sortClipNotes } from '../domain/note-utils';
 import type { ClipNoteWithOrigin } from '../devices/color/color-program';
 import type { LaunchpadButton } from '../shared/model';
 import { createSpatialBounds } from './analysis/bounds';
-import type { CanonicalExecutionRequest } from './analysis/types';
 import {
   collectStrokeOccupiedCoordinateCandidates,
   createOccupiedCoordinate,
@@ -629,15 +625,9 @@ export const projectActivePitchesToNotes = (
   return notes;
 };
 
-export const createLaunchpadExecutionRequest = (): CanonicalExecutionRequest => ({
-  outputBounds: createSpatialBounds(
+export const createLaunchpadGeneratorOutputBounds = () => createSpatialBounds(
     COMPOSITION_BOUNDS.minX - DEFAULT_EVALUATION_PADDING,
     COMPOSITION_BOUNDS.maxX + DEFAULT_EVALUATION_PADDING,
     COMPOSITION_BOUNDS.minY - DEFAULT_EVALUATION_PADDING,
     COMPOSITION_BOUNDS.maxY + DEFAULT_EVALUATION_PADDING,
-  ),
-  timeDomain: {
-    start: 0,
-    end: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-  },
-});
+  );

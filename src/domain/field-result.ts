@@ -9,13 +9,8 @@ import { buildCanonicalFieldResult } from '../generation/engine';
 import {
   createLaunchpadProjectionContext,
   projectActivePitchesToNotes,
-  createLaunchpadExecutionRequest,
+  createLaunchpadGeneratorOutputBounds,
 } from '../generation/launchpad-projection';
-import type {
-  CanonicalAnalysisResult,
-  CanonicalExecutionPlan,
-} from '../generation/analysis/types';
-import type { CompiledRackPlan } from '../generation/plan/types';
 import type {
   LedFrameVelocityEntry,
 } from '../generation/types';
@@ -26,9 +21,6 @@ export interface GeneratedRuntimeFieldResult {
   sourceTimelineEndBeat: number;
   sampleStepBeats: number;
   ledFramesBySampleIndex: ReadonlyArray<ReadonlyArray<LedFrameVelocityEntry>>;
-  analysis: CanonicalAnalysisResult;
-  executionPlan: CanonicalExecutionPlan;
-  compiledPlan: CompiledRackPlan | null;
 }
 
 const DEFAULT_SAMPLE_STEP_BEATS = 1 / NOTE_SAMPLES_PER_BEAT;
@@ -55,25 +47,6 @@ const createEmptyFieldResult = (): GeneratedRuntimeFieldResult => ({
   sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   sampleStepBeats: DEFAULT_SAMPLE_STEP_BEATS,
   ledFramesBySampleIndex: [[]],
-  analysis: {
-    byDeviceId: new Map(),
-    finalOutputBounds: 'none',
-    finalTimeDomain: {
-      start: 0,
-      end: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-    },
-  },
-  executionPlan: {
-    byDeviceId: new Map(),
-    finalRequest: {
-      outputBounds: 'none',
-      timeDomain: {
-        start: 0,
-        end: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-      },
-    },
-  },
-  compiledPlan: null,
 });
 
 const buildGeneratedFieldResultWithRuntimeMap = ({
@@ -90,12 +63,13 @@ const buildGeneratedFieldResultWithRuntimeMap = ({
   }
 
   const projectionContext = createLaunchpadProjectionContext(runtimeMap);
-  const executionRequest = createLaunchpadExecutionRequest();
   const generated = buildCanonicalFieldResult(
     chain,
     loopLengthBeats,
     projectionContext.outputAdapter,
-    executionRequest,
+    {
+      generatorOutputBounds: createLaunchpadGeneratorOutputBounds(),
+    },
   );
   const activeByPitchFrames = projectionContext.projectTimelineToActivePitchesBySampleIndex(
     generated.timeline,
@@ -114,9 +88,6 @@ const buildGeneratedFieldResultWithRuntimeMap = ({
     sourceTimelineEndBeat: loopLengthBeats,
     sampleStepBeats,
     ledFramesBySampleIndex,
-    analysis: generated.analysis,
-    executionPlan: generated.executionPlan,
-    compiledPlan: generated.compiledPlan,
   };
 };
 

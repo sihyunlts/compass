@@ -1,10 +1,8 @@
 import {
   createRackOperator,
   replaceTimelineAndRefreshRackState,
-  resolveFrameWindow,
   resolveModulatedDeviceAtFrame,
   seedGeneratedOriginTimelineState,
-  resolveStageExecutionPlan,
   type GeneratorStageKind,
   type RackStageExecutionContext,
   type RackStageOfKind,
@@ -36,14 +34,9 @@ const applyGeneratorDevice = (
     end: generatorPatternEndBeat,
   };
   ensureTimelineFrameCount(nextTimeline, generatorPatternEndBeat);
-  const executionPlan = resolveStageExecutionPlan(context, stage);
-  const frameWindow = resolveFrameWindow(
-    executionPlan.requiredFrameWindow,
-    nextTimeline.sampleStepBeats,
-    toFrameCount(generatorPatternEndBeat, nextTimeline.sampleStepBeats),
-  );
+  const frameCount = toFrameCount(generatorPatternEndBeat, nextTimeline.sampleStepBeats);
 
-  for (let frameIndex = frameWindow.startFrame; frameIndex < frameWindow.endFrameExclusive; frameIndex += 1) {
+  for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
     rasterizeGeneratorFrame(
       nextTimeline,
       frameIndex,
@@ -55,7 +48,7 @@ const applyGeneratorDevice = (
         generatorEvaluationWindow,
       ),
       stage.stageIndex,
-      executionPlan.generatorOutputBounds,
+      context.generatorOutputBounds,
     );
   }
 

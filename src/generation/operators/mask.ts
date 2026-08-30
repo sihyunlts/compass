@@ -2,7 +2,6 @@ import { doesDeviceToggleTimelineParity } from '../../devices/timeline-parity';
 import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import type { GeneratorChain, MaskEffectNode } from '../../shared/model';
 import { normalizeOptionalId } from '../../shared/normalize-id';
-import type { OperatorExecutionPlan } from '../analysis/types';
 import {
   collectOccupiedCoordinates,
   createCoordinateMask,
@@ -23,7 +22,6 @@ import {
   createPendingFrameApplicationOperator,
   appendPendingStrokeRewriteApplication,
   resolveFrameWindow,
-  resolveStageExecutionPlan,
   type MaskSourceReferenceContext,
   type PendingFrameApplicationOperatorInput,
 } from './runtime';
@@ -130,7 +128,6 @@ const applyMaskEffect = (
   writeOrder: number,
   consumingDeviceId: string,
   outputAdapter: CanonicalOutputAdapter,
-  executionPlan: OperatorExecutionPlan,
   referenceContext: MaskSourceReferenceContext,
 ): MutableGenerationState => {
   const { baseState, sourceState } = input;
@@ -140,7 +137,7 @@ const applyMaskEffect = (
     referenceContext,
   );
   const targetFrameWindow = resolveFrameWindow(
-    executionPlan.requiredFrameWindow,
+    'all',
     sourceState.timeline.sampleStepBeats,
     sourceTimeline.frames.length,
   );
@@ -184,7 +181,6 @@ const applyMaskEffect = (
 export const maskOperator = createPendingFrameApplicationOperator<'mask'>(
   (input, stage, context) => {
     const device = stage.device;
-    const executionPlan = resolveStageExecutionPlan(context, stage);
 
     return applyMaskEffect(
       input,
@@ -194,7 +190,6 @@ export const maskOperator = createPendingFrameApplicationOperator<'mask'>(
       stage.stageIndex,
       stage.deviceId,
       context.outputAdapter,
-      executionPlan,
       context.referenceContext,
     );
   },

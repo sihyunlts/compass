@@ -11,36 +11,3 @@ export interface SpatialBounds {
 }
 
 export type SpatialRequirement = SpatialBounds | 'all' | 'none';
-
-export interface OperatorAnalysis {
-  outputBounds: SpatialRequirement;
-  inputRoi: SpatialRequirement;
-  framesNeeded: 'current' | 'timeline' | 'unknown';
-  timeDomain: BeatRange;
-  isIdentity: boolean;
-}
-
-export interface CanonicalAnalysisResult {
-  byDeviceId: Map<string, OperatorAnalysis>;
-  finalOutputBounds: SpatialRequirement;
-  finalTimeDomain: BeatRange;
-}
-
-export interface CanonicalExecutionRequest {
-  outputBounds: SpatialRequirement;
-  timeDomain: BeatRange;
-}
-
-export interface OperatorExecutionPlan {
-  requiredOutputBounds: SpatialRequirement;
-  generatorOutputBounds: SpatialRequirement;
-  requiredInputRoi: SpatialRequirement;
-  requiredSourceRoi: SpatialRequirement;
-  requiredFrameWindow: BeatRange | 'all';
-  requiredSourceFrameWindow: BeatRange | 'all' | 'none';
-}
-
-export interface CanonicalExecutionPlan {
-  byDeviceId: Map<string, OperatorExecutionPlan>;
-  finalRequest: CanonicalExecutionRequest;
-}

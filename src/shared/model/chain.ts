@@ -6,7 +6,7 @@ export interface RippleParams {
   curvature: number;
 }
 
-export interface GroupedDeviceNode {
+interface GroupedDeviceNode {
   groupId?: string | null;
   name?: string | null;
   metadata?: AuthoredMetadata;
@@ -170,10 +170,10 @@ export interface TrimEffectNode extends GroupedDeviceNode {
   };
 }
 
-export type MaskMode = 'include' | 'exclude';
-export type MaskSourceKind = 'tiles' | 'group' | 'generator';
-export type MaskSourceDomain = 'scene' | 'activation';
-export type MaskSourceVisibility = 'hide' | 'show';
+type MaskMode = 'include' | 'exclude';
+type MaskSourceKind = 'tiles' | 'group' | 'generator';
+type MaskSourceDomain = 'scene' | 'activation';
+type MaskSourceVisibility = 'hide' | 'show';
 
 export interface MaskEffectNode extends GroupedDeviceNode {
   id: string;
@@ -280,7 +280,7 @@ export type GeneratorDeviceNode =
   | GeneratorEffectNode
   | CurveModulatorNode;
 
-export interface GroupStateEntry {
+interface GroupStateEntry {
   enabled: boolean;
   name?: string | null;
   metadata?: AuthoredMetadata;
