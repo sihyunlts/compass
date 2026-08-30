@@ -3,21 +3,10 @@ import {
   type GeneratorChain,
   type GeneratorDeviceNode,
 } from '../../../shared/model';
-import { reconcileChainGroupStateById } from '../../../shared/model/chain-normalization';
-
-const collectActiveGroupIds = (
-  devices: readonly GeneratorDeviceNode[],
-): Set<string> => {
-  const ids = new Set<string>();
-  for (const device of devices) {
-    const groupId = normalizeOptionalId(device.groupId);
-    if (!groupId) {
-      continue;
-    }
-    ids.add(groupId);
-  }
-  return ids;
-};
+import {
+  collectActiveGroupIds,
+  reconcileChainGroupStateById,
+} from '../../../shared/model/chain-normalization';
 
 export const reconcileGroupStateById = (
   prev: GeneratorChain['groupStateById'],
