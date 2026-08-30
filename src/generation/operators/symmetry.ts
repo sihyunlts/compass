@@ -2,6 +2,7 @@ import {
   buildTargetOriginIds,
   createPendingGeometryApplicationOperator,
   appendPendingGeometryRewriteApplication,
+  buildModulationEvaluationWindowByOriginId,
   isDeviceModulated,
   resolveModulatedDeviceAtFrame,
   transformStroke,
@@ -73,19 +74,10 @@ const applyPendingSymmetryEffect = (
 ): MutableGenerationState => {
   const { baseState } = input;
   const targetOriginIds = buildTargetOriginIds(baseState.timeline, targetGroupId);
-  const evaluationWindowByTargetOriginId = new Map(
-    Array.from(targetOriginIds, (originId) => {
-      const timelineState = baseState.timelineStateByOriginId.get(originId);
-      const window = input.precedingTemporalCheckpoint?.temporalByOriginId.has(originId)
-        ? timelineState?.temporal.visibilityWindow
-        : timelineState?.playbackWindow;
-      return [
-        originId,
-        window && Number.isFinite(window.start) && Number.isFinite(window.end) && window.end > window.start
-          ? window
-          : fallbackEvaluationWindow,
-      ] as const;
-    }),
+  const evaluationWindowByTargetOriginId = buildModulationEvaluationWindowByOriginId(
+    input,
+    targetOriginIds,
+    fallbackEvaluationWindow,
   );
   const rewriteByEffect = new WeakMap<
     SymmetryEffectNode,
