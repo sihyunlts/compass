@@ -16,7 +16,12 @@ import {
 } from '../src/generation/rack-preview-debug';
 import { resolveLedSurfaceRgb } from '../src/renderer/app/led-surface-color';
 import type { GeneratorPreview } from '../src/shared/contracts/preview/generator-preview';
-import type { LaunchpadButton, LaunchpadModel } from '../src/shared/model';
+import {
+  buildLaunchpadPreviewGridCells,
+  LAUNCHPAD_PREVIEW_GRID_COLUMNS,
+  LAUNCHPAD_PREVIEW_GRID_ROWS,
+} from '../src/shared/launchpad-preview-grid';
+import type { LaunchpadModel } from '../src/shared/model';
 import {
   createPaletteRgbResolver,
 } from '../src/shared/palette-colors';
@@ -25,8 +30,6 @@ type Rgb = readonly [number, number, number];
 
 const DEFAULT_FRAME_COUNT = 32;
 const FRAMES_PER_ROW = 32;
-const PREVIEW_COLS = 10;
-const PREVIEW_ROWS = 10;
 const CELL_SIZE = 12;
 const CELL_GAP = 2;
 const FRAME_GAP = 14;
@@ -55,12 +58,6 @@ interface RenderRackInput {
   rackPath: string;
   preview: GeneratorPreview;
   sampledFrames: SampledRackFrame[];
-}
-
-interface PreviewCell {
-  row: number;
-  col: number;
-  pitches: number[];
 }
 
 interface RenderLayout {
@@ -193,67 +190,9 @@ const resolveDefaultOutputPath = (
   return path.join(process.cwd(), 'tmp', `${baseName}-frames.png`);
 };
 
-const cellKey = (row: number, col: number): string => `${row}:${col}`;
-
-const buttonToPreviewCell = (
-  button: LaunchpadButton,
-): { row: number; col: number } | null => {
-  switch (button.zone) {
-    case 'grid':
-      return { row: 9 - button.y, col: button.x };
-    case 'left':
-      if (button.id === 'left-top') {
-        return { row: 0, col: 0 };
-      }
-      return { row: 9 - button.y, col: 0 };
-    case 'right':
-      return { row: 9 - button.y, col: 9 };
-    case 'top':
-      return { row: 0, col: button.x };
-    case 'bottom':
-      return { row: 9, col: button.x };
-    case 'logo':
-      return { row: 0, col: 9 };
-    default:
-      return null;
-  }
-};
-
 const buildPreviewCells = (
   model: LaunchpadModel,
-): PreviewCell[] => {
-  const pitchesByCell = new Map<string, number[]>();
-  for (const button of getLaunchpadRuntimeMap(model).buttons) {
-    if (button.output.kind !== 'note') {
-      continue;
-    }
-
-    const cell = buttonToPreviewCell(button);
-    if (!cell) {
-      continue;
-    }
-
-    const key = cellKey(cell.row, cell.col);
-    const pitches = pitchesByCell.get(key);
-    if (pitches) {
-      pitches.push(button.output.number);
-      continue;
-    }
-    pitchesByCell.set(key, [button.output.number]);
-  }
-
-  const cells: PreviewCell[] = [];
-  for (let row = 0; row < PREVIEW_ROWS; row += 1) {
-    for (let col = 0; col < PREVIEW_COLS; col += 1) {
-      cells.push({
-        row,
-        col,
-        pitches: pitchesByCell.get(cellKey(row, col)) ?? [],
-      });
-    }
-  }
-  return cells;
-};
+) => buildLaunchpadPreviewGridCells(getLaunchpadRuntimeMap(model).buttons);
 
 const clampRgbChannel = (
   value: number,
@@ -432,8 +371,11 @@ const buildLayout = (
   racks: ReadonlyArray<RenderRackInput>,
   model: LaunchpadModel,
 ): RenderLayout => {
-  const frameWidth = (PREVIEW_COLS * CELL_SIZE) + ((PREVIEW_COLS - 1) * CELL_GAP);
-  const frameHeight = FRAME_LABEL_HEIGHT + (PREVIEW_ROWS * CELL_SIZE) + ((PREVIEW_ROWS - 1) * CELL_GAP);
+  const frameWidth = (LAUNCHPAD_PREVIEW_GRID_COLUMNS * CELL_SIZE)
+    + ((LAUNCHPAD_PREVIEW_GRID_COLUMNS - 1) * CELL_GAP);
+  const frameHeight = FRAME_LABEL_HEIGHT
+    + (LAUNCHPAD_PREVIEW_GRID_ROWS * CELL_SIZE)
+    + ((LAUNCHPAD_PREVIEW_GRID_ROWS - 1) * CELL_GAP);
   const maxFrameCount = Math.max(...racks.map((rack) => rack.sampledFrames.length));
   const framesPerRow = Math.max(1, Math.min(FRAMES_PER_ROW, maxFrameCount));
   const isCompare = racks.length > 1;

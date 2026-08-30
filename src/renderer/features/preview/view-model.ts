@@ -4,10 +4,8 @@ import {
 } from '../../../domain';
 import type { LaunchpadButton, LaunchpadModel } from '../../../shared/model';
 import type { PreviewWindowState } from '../../../shared/contracts/preview/window-state';
+import { buildLaunchpadPreviewGridCells } from '../../../shared/launchpad-preview-grid';
 import { resolveLedSurfaceRgb } from '../../app/led-surface-color';
-
-const PREVIEW_COLS = 10;
-const PREVIEW_ROWS = 10;
 
 export interface PreviewSurfaceCellModel {
   key: string;
@@ -23,8 +21,6 @@ export interface PreviewSurfaceViewModel {
 }
 
 const previewCellCache = new Map<LaunchpadModel, ReadonlyArray<PreviewSurfaceCellModel>>();
-
-const cellKey = (row: number, col: number): string => `${row}:${col}`;
 
 export const resolvePreviewCenterCornerCutClassName = (
   previewCellKey: string,
@@ -42,30 +38,6 @@ export const resolvePreviewCenterCornerCutClassName = (
     return 'is-center-corner-top-left';
   }
   return '';
-};
-
-const buttonToPreviewCell = (
-  button: LaunchpadButton,
-): { row: number; col: number } | null => {
-  switch (button.zone) {
-    case 'grid':
-      return { row: 9 - button.y, col: button.x };
-    case 'left':
-      if (button.id === 'left-top') {
-        return { row: 0, col: 0 };
-      }
-      return { row: 9 - button.y, col: 0 };
-    case 'right':
-      return { row: 9 - button.y, col: 9 };
-    case 'top':
-      return { row: 0, col: button.x };
-    case 'bottom':
-      return { row: 9, col: button.x };
-    case 'logo':
-      return { row: 0, col: 9 };
-    default:
-      return null;
-  }
 };
 
 const isCornerPlaceholderCell = (
@@ -90,9 +62,6 @@ const isEdgeButtonCell = (
   || button.zone === 'bottom'
   || button.zone === 'logo');
 
-const toNoteNumber = (button: LaunchpadButton): number | null =>
-  button.output.kind === 'note' ? button.output.number : null;
-
 export const resolvePreviewCellModels = (
   model?: LaunchpadModel,
 ): ReadonlyArray<PreviewSurfaceCellModel> => {
@@ -102,48 +71,14 @@ export const resolvePreviewCellModels = (
     return cached;
   }
 
-  const buttons = getLaunchpadRuntimeMap(resolvedModel).buttons;
-  const buttonsByCell = new Map<string, LaunchpadButton[]>();
-
-  for (const button of buttons) {
-    if (button.output.kind !== 'note') {
-      continue;
-    }
-
-    const cell = buttonToPreviewCell(button);
-    if (!cell) {
-      continue;
-    }
-
-    const key = cellKey(cell.row, cell.col);
-    const list = buttonsByCell.get(key);
-    if (list) {
-      list.push(button);
-      continue;
-    }
-    buttonsByCell.set(key, [button]);
-  }
-
-  const cells: PreviewSurfaceCellModel[] = [];
-  for (let row = 0; row < PREVIEW_ROWS; row += 1) {
-    for (let col = 0; col < PREVIEW_COLS; col += 1) {
-      const key = cellKey(row, col);
-      const cellButtons = buttonsByCell.get(key) ?? [];
-      const pitches: number[] = [];
-      for (const button of cellButtons) {
-        const note = toNoteNumber(button);
-        if (note !== null) {
-          pitches.push(note);
-        }
-      }
-      cells.push({
-        key,
-        pitches,
-        isEdgeButton: isEdgeButtonCell(cellButtons),
-        isCornerPlaceholder: isCornerPlaceholderCell(cellButtons),
-      });
-    }
-  }
+  const cells = buildLaunchpadPreviewGridCells(
+    getLaunchpadRuntimeMap(resolvedModel).buttons,
+  ).map<PreviewSurfaceCellModel>((cell) => ({
+    key: cell.key,
+    pitches: [...cell.pitches],
+    isEdgeButton: isEdgeButtonCell(cell.buttons),
+    isCornerPlaceholder: isCornerPlaceholderCell(cell.buttons),
+  }));
 
   previewCellCache.set(resolvedModel, cells);
   return cells;

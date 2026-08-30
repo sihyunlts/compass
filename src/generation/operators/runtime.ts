@@ -17,6 +17,9 @@ export {
   type ModulationEvaluationWindow,
 } from './runtime/modulation';
 export {
+  buildModulationEvaluationWindowByOriginId,
+} from './runtime/modulation-evaluation';
+export {
   appendPendingGeometryRewriteApplication,
   appendPendingStrokeRewriteApplication,
   buildPendingStrokeRewriteFrameWrites,
