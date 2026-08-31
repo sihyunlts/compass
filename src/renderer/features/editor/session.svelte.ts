@@ -111,6 +111,7 @@ import {
   type RackSelectionSnapshot,
 } from './selectors';
 import type { ChainHistoryKind } from './history-core';
+import type { ScheduledPreviewGenerationReason } from '../preview/generation-reason';
 
 const DEFAULT_AUTO_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_HISTORY_MAX_ENTRIES = 100;
@@ -167,7 +168,7 @@ export interface EditorRackBinding {
 }
 
 interface AutoPreviewRequest {
-  restartPlayback: boolean;
+  reason: ScheduledPreviewGenerationReason;
 }
 
 interface EditorSessionOptions {
@@ -191,7 +192,7 @@ export class EditorSession {
 
   private autoPreviewTimer: number | null = null;
 
-  private autoPreviewShouldRestartPlayback = false;
+  private pendingAutoPreviewReason: ScheduledPreviewGenerationReason | null = null;
 
   private rackBinding: EditorRackBinding | null = null;
 
@@ -434,29 +435,37 @@ export class EditorSession {
   };
 
   public scheduleInitialPreview(delayMs = 0): void {
-    this.scheduleAutoPreview(delayMs, false);
+    this.scheduleAutoPreview(delayMs, 'initial');
   }
 
   public requestOutputPreview(delayMs = this.autoPreviewDebounceMs): void {
-    this.state.previewSourceRevision += 1;
-    this.scheduleAutoPreview(delayMs, true);
+    this.requestRegeneratedPreview('output-change', delayMs);
   }
 
-  private scheduleAutoPreview(delayMs: number, restartRequested: boolean): void {
-    const restartPlayback = this.autoPreviewShouldRestartPlayback
-      || restartRequested;
+  private requestRegeneratedPreview(
+    reason: Exclude<ScheduledPreviewGenerationReason, 'initial'>,
+    delayMs: number,
+  ): void {
+    this.state.previewSourceRevision += 1;
+    this.scheduleAutoPreview(delayMs, reason);
+  }
+
+  private scheduleAutoPreview(
+    delayMs: number,
+    reason: ScheduledPreviewGenerationReason,
+  ): void {
     this.cancelAutoPreview();
-    this.autoPreviewShouldRestartPlayback = restartPlayback;
+    this.pendingAutoPreviewReason = reason;
     this.autoPreviewTimer = window.setTimeout(() => {
       this.autoPreviewTimer = null;
-      const shouldRestartPlayback = this.autoPreviewShouldRestartPlayback;
-      this.autoPreviewShouldRestartPlayback = false;
-      if (!this.onAutoPreview) {
+      const pendingReason = this.pendingAutoPreviewReason;
+      this.pendingAutoPreviewReason = null;
+      if (!this.onAutoPreview || !pendingReason) {
         return;
       }
 
       void Promise.resolve(this.onAutoPreview({
-        restartPlayback: shouldRestartPlayback,
+        reason: pendingReason,
       })).catch(() => {
         // Preview scheduling failures should not break editor mutations.
       });
@@ -464,13 +473,11 @@ export class EditorSession {
   }
 
   public cancelAutoPreview(): void {
-    if (this.autoPreviewTimer === null) {
-      return;
+    if (this.autoPreviewTimer !== null) {
+      window.clearTimeout(this.autoPreviewTimer);
+      this.autoPreviewTimer = null;
     }
-
-    window.clearTimeout(this.autoPreviewTimer);
-    this.autoPreviewTimer = null;
-    this.autoPreviewShouldRestartPlayback = false;
+    this.pendingAutoPreviewReason = null;
   }
 
   private requestSyncAfterRender(): void {
@@ -561,7 +568,7 @@ export class EditorSession {
       bumpChainRevision: () => this.bumpChainRevision(),
       persistChainState: () => this.persistChainState(),
     });
-    this.requestOutputPreview(0);
+    this.requestRegeneratedPreview('rack-load', 0);
   }
 
   private finishHistoryRestore(restored: boolean): boolean {

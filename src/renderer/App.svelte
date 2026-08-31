@@ -93,9 +93,7 @@
   const editorSession = createEditorSession({
     autoPreviewDebounceMs: AUTO_PREVIEW_DEBOUNCE_MS,
     historyMaxEntries: HISTORY_MAX_ENTRIES,
-    onAutoPreview: ({ restartPlayback }) => playbackSession.runPreview({
-      restartPlayback,
-    }),
+    onAutoPreview: ({ reason }) => playbackSession.runPreview(reason),
     onSyncAfterRender: () => syncRackAfterRender(),
   });
   const previewSession = createPreviewSession();

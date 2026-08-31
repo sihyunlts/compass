@@ -75,7 +75,7 @@ class ResultDeliveryFlowController {
       playbackSession.applyPreviewResult({
         preview,
         bridge,
-        source: 'delivery',
+        reason: 'delivery',
         sourceChain,
         sourceKey,
         launchpadModel,
