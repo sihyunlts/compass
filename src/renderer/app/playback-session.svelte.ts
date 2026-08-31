@@ -20,6 +20,11 @@ import {
 } from './playback-runtime';
 import { sanitizePreviewBpm } from '../features/editor/persistence-storage';
 import { createPreviewGenerationWorkerClient } from '../features/preview/generation-worker-client';
+import {
+  PREVIEW_GENERATION_POLICY,
+  type PreviewGenerationReason,
+  type ScheduledPreviewGenerationReason,
+} from '../features/preview/generation-reason';
 import type { HeaderIndicatorController } from './header-indicator.svelte';
 import { i18n } from '../i18n.svelte';
 
@@ -32,16 +37,11 @@ interface PlaybackSessionState {
 interface ApplyPreviewResultInput {
   preview: GeneratorPreview;
   bridge: BridgeSettings | null;
-  source: 'preview' | 'delivery';
+  reason: PreviewGenerationReason;
   sourceChain: GeneratorChain;
   sourceKey: string;
   launchpadModel: LaunchpadModel;
   announce?: boolean;
-  restartPlayback?: boolean;
-}
-
-interface RunPreviewOptions {
-  restartPlayback?: boolean;
 }
 
 interface PlaybackSessionOptions {
@@ -165,9 +165,8 @@ export class PlaybackSessionController {
           this.previewVisualPhase === 'waiting'
           || this.previewVisualPhase === 'active'
         ) {
-          this.previewVisualPhase = 'consumed';
+          this.consumePreviewVisual();
         }
-        this.previewVisualStartedAtMs = null;
       },
     });
     if (this.previewVisualPhase === 'armed') {
@@ -220,7 +219,7 @@ export class PlaybackSessionController {
         });
         if (!previewVisual) {
           if (this.previewVisualPhase === 'active') {
-            this.previewVisualPhase = 'consumed';
+            this.consumePreviewVisual();
           }
           return rackFrame;
         }
@@ -251,13 +250,13 @@ export class PlaybackSessionController {
     this.previewWindowStatePusher.push(nextPreviewWindowState);
   }
 
-  public async runPreview(options: RunPreviewOptions = {}): Promise<void> {
+  public async runPreview(reason: ScheduledPreviewGenerationReason): Promise<void> {
     if (this.previewGenerationPurpose === 'delivery') {
       return;
     }
 
-    if (options.restartPlayback) {
-      this.resetPlaybackForPreviewReplacement();
+    if (reason !== 'initial') {
+      this.resetPlaybackForPreviewReplacement(reason);
     }
 
     try {
@@ -273,7 +272,7 @@ export class PlaybackSessionController {
         sourceKey,
         loopLengthBeats,
         launchpadModel,
-      }, 'preview');
+      }, reason);
 
       if (
         uiState.previewSourceRevision !== sourceRevision
@@ -286,11 +285,10 @@ export class PlaybackSessionController {
       this.applyPreviewResult({
         preview,
         bridge: null,
-        source: 'preview',
+        reason,
         sourceChain,
         sourceKey,
         launchpadModel,
-        restartPlayback: options.restartPlayback,
       });
     } catch (error) {
       if (isPreviewGenerationCancelled(error)) {
@@ -322,8 +320,7 @@ export class PlaybackSessionController {
   public applyPreviewResult(input: ApplyPreviewResultInput): void {
     const { editorSession, previewSession } = this.options;
     const shouldAnnounce = input.announce ?? true;
-    const shouldRestartPlayback = input.source === 'delivery'
-      || input.restartPlayback === true;
+    const shouldRestartPlayback = PREVIEW_GENERATION_POLICY[input.reason].restartPlayback;
     if (shouldRestartPlayback && this.state.isPlaying) {
       this.stopPlayback();
     }
@@ -358,7 +355,7 @@ export class PlaybackSessionController {
 
     if (input.preview.noteCount > 0) {
       if (shouldAnnounce) {
-        if (input.source === 'preview') {
+        if (input.reason !== 'delivery') {
           this.options.headerIndicator.show(
             i18n.t('status.notesGenerated', { count: input.preview.noteCount }),
           );
@@ -403,9 +400,7 @@ export class PlaybackSessionController {
   }
 
   public prepareForDelivery(): void {
-    if (this.previewVisualPhase !== 'disabled') {
-      this.previewVisualPhase = 'consumed';
-    }
+    this.consumePreviewVisual();
     this.stopPlayback();
   }
 
@@ -510,14 +505,14 @@ export class PlaybackSessionController {
 
   private async resolveGeneratedPreview(
     input: PreviewGenerationSource,
-    purpose: 'preview' | 'delivery',
+    reason: PreviewGenerationReason,
   ): Promise<GeneratorPreview> {
     const cachedPreview = this.resolveCachedGeneratedPreview(input);
     if (cachedPreview) {
       return cachedPreview;
     }
 
-    const requestId = this.beginPreviewGeneration(purpose);
+    const requestId = this.beginPreviewGeneration(reason);
     try {
       await waitForNextAnimationFrame();
       const preview = await this.previewGenerator.generate({
@@ -545,29 +540,31 @@ export class PlaybackSessionController {
     }
   }
 
-  private beginPreviewGeneration(purpose: 'preview' | 'delivery'): number {
+  private beginPreviewGeneration(reason: PreviewGenerationReason): number {
+    const purpose = reason === 'delivery' ? 'delivery' : 'preview';
     this.previewGenerationRequestId += 1;
     this.previewGenerationPurpose = purpose;
     this.state.isPreviewGenerating = true;
     if (purpose === 'delivery') {
-      this.pausePlaybackPreservingPreviewVisual();
+      this.consumePreviewVisual();
+      this.stopPlayback();
     }
     return this.previewGenerationRequestId;
   }
 
-  private pausePlaybackPreservingPreviewVisual(): void {
-    if (
-      this.previewVisualPhase === 'waiting'
-      || this.previewVisualPhase === 'active'
-    ) {
-      this.previewVisualPhase = 'armed';
-      this.previewVisualStartedAtMs = null;
+  private resetPlaybackForPreviewReplacement(
+    reason: Exclude<ScheduledPreviewGenerationReason, 'initial'>,
+  ): void {
+    const previewVisualPolicy = PREVIEW_GENERATION_POLICY[reason].previewVisual;
+    if (previewVisualPolicy === 'rearm') {
+      if (this.previewVisualPhase !== 'disabled') {
+        this.previewVisualPhase = 'armed';
+        this.previewVisualStartedAtMs = null;
+      }
+    } else {
+      this.consumePreviewVisual();
     }
     this.stopPlayback();
-  }
-
-  private resetPlaybackForPreviewReplacement(): void {
-    this.pausePlaybackPreservingPreviewVisual();
     if (this.playbackScheduler) {
       this.playbackScheduler.setCurrentBeat(0, false);
       this.state.currentBeat = 0;
@@ -576,6 +573,13 @@ export class PlaybackSessionController {
 
     this.state.isPlaying = false;
     this.state.currentBeat = 0;
+  }
+
+  private consumePreviewVisual(): void {
+    if (this.previewVisualPhase !== 'disabled') {
+      this.previewVisualPhase = 'consumed';
+    }
+    this.previewVisualStartedAtMs = null;
   }
 
   private resolveCachedGeneratedPreview(input: PreviewGenerationSource): GeneratorPreview | null {
