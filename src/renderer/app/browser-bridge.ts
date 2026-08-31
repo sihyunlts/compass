@@ -363,6 +363,64 @@ const upsertPresetFile = <K extends PresetFileKind>(
   return true;
 };
 
+type BrowserPresetFilePathChange = {
+  fileIndex: number;
+  nextRelativePath: string[];
+  hasCollision: boolean;
+};
+
+const prepareBrowserPresetFilePathChange = (
+  store: BrowserPresetStore,
+  presetType: PresetFileKind,
+  relativePath: readonly string[],
+  rawFileName: string,
+  fallbackFileName = 'Preset',
+): BrowserPresetFilePathChange | null => {
+  const currentFileName = relativePath[relativePath.length - 1] ?? fallbackFileName;
+  const fileName = ensurePresetExtension(
+    sanitizeFileStem(
+      rawFileName,
+      getFileStem(currentFileName, presetType),
+    ),
+    presetType,
+  );
+  const nextRelativePath = [...relativePath.slice(0, -1), fileName];
+  const fileIndex = store.files.findIndex((file) =>
+    file.presetType === presetType
+    && relativePathEquals(file.relativePath, relativePath));
+  if (fileIndex === -1) {
+    return null;
+  }
+
+  const hasCollision = store.files.some((file, index) =>
+    index !== fileIndex
+    && file.presetType === presetType
+    && relativePathCollides(file.relativePath, nextRelativePath))
+    || store.folders[presetType].some((path) =>
+      relativePathCollides(path, nextRelativePath));
+
+  return { fileIndex, nextRelativePath, hasCollision };
+};
+
+const applyBrowserPresetInfoChange = (
+  store: BrowserPresetStore,
+  pathChange: BrowserPresetFilePathChange,
+  metadata: unknown,
+  savedAtIso: string,
+): void => {
+  const current = store.files[pathChange.fileIndex];
+  store.files[pathChange.fileIndex] = {
+    ...current,
+    relativePath: pathChange.nextRelativePath,
+    payload: withPresetAuthoredMetadata(
+      current.payload,
+      normalizeAuthoredMetadata(metadata),
+      savedAtIso,
+    ),
+    needsSave: false,
+  };
+};
+
 const createNoopSubscription = (): (() => void) => () => {};
 
 const createBrowserCompassBridge = (): CompassApi => ({
@@ -500,28 +558,18 @@ const createBrowserCompassBridge = (): CompassApi => ({
       };
     }
 
-    const fileName = ensurePresetExtension(
-      sanitizeFileStem(
-        request.fileName,
-        getFileStem(parsed.relativePath[parsed.relativePath.length - 1] ?? 'Rack', 'rack'),
-      ),
-      'rack',
-    );
-    const nextRelativePath = [...parsed.relativePath.slice(0, -1), fileName];
     const store = readStore();
-    const fileIndex = store.files.findIndex((file) =>
-      file.presetType === 'rack' && relativePathEquals(file.relativePath, parsed.relativePath));
-    if (fileIndex === -1) {
+    const pathChange = prepareBrowserPresetFilePathChange(
+      store,
+      'rack',
+      parsed.relativePath,
+      request.fileName,
+      'Rack',
+    );
+    if (!pathChange) {
       return { status: 'error', message: 'Rack file does not exist.', filePath: request.filePath };
     }
-    if (
-      store.files.some((file, index) =>
-        index !== fileIndex
-        && file.presetType === 'rack'
-        && relativePathCollides(file.relativePath, nextRelativePath))
-      || store.folders.rack.some((path) =>
-        relativePathCollides(path, nextRelativePath))
-    ) {
+    if (pathChange.hasCollision) {
       return {
         status: 'error',
         message: 'An item or folder with that name already exists.',
@@ -530,40 +578,26 @@ const createBrowserCompassBridge = (): CompassApi => ({
     }
 
     const savedAtIso = new Date().toISOString();
-    store.files[fileIndex] = {
-      ...store.files[fileIndex],
-      relativePath: nextRelativePath,
-      payload: withPresetAuthoredMetadata(
-        store.files[fileIndex].payload,
-        normalizeAuthoredMetadata(request.metadata),
-        savedAtIso,
-      ),
-      needsSave: false,
-    };
+    applyBrowserPresetInfoChange(store, pathChange, request.metadata, savedAtIso);
     writeStore(store);
     return {
       status: 'updated',
-      filePath: toVirtualPresetPath('rack', nextRelativePath),
+      filePath: toVirtualPresetPath('rack', pathChange.nextRelativePath),
       savedAtIso,
     };
   },
   renamePresetFile: async (request) => {
-    const fileName = ensurePresetExtension(
-      sanitizeFileStem(
-        request.fileName,
-        getFileStem(request.relativePath[request.relativePath.length - 1] ?? 'Preset', request.presetType),
-      ),
-      request.presetType,
-    );
-    const nextRelativePath = [...request.relativePath.slice(0, -1), fileName];
     const store = readStore();
-    const fileIndex = store.files.findIndex((file) =>
-      file.presetType === request.presetType
-      && relativePathEquals(file.relativePath, request.relativePath));
-    if (fileIndex === -1) {
+    const pathChange = prepareBrowserPresetFilePathChange(
+      store,
+      request.presetType,
+      request.relativePath,
+      request.fileName,
+    );
+    if (!pathChange) {
       return { status: 'error', message: 'Preset file does not exist.' };
     }
-    if (relativePathEquals(request.relativePath, nextRelativePath)) {
+    if (relativePathEquals(request.relativePath, pathChange.nextRelativePath)) {
       return {
         status: 'renamed',
         relativePath: request.relativePath,
@@ -571,76 +605,45 @@ const createBrowserCompassBridge = (): CompassApi => ({
         filePath: toVirtualPresetPath(request.presetType, request.relativePath),
       };
     }
-    if (
-      store.files.some((file, index) =>
-        index !== fileIndex
-        && file.presetType === request.presetType
-        && relativePathCollides(file.relativePath, nextRelativePath))
-      || store.folders[request.presetType].some((path) =>
-        relativePathCollides(path, nextRelativePath))
-    ) {
+    if (pathChange.hasCollision) {
       return { status: 'error', message: 'An item or folder with that name already exists.' };
     }
 
-    store.files[fileIndex] = {
-      ...store.files[fileIndex],
-      relativePath: nextRelativePath,
+    store.files[pathChange.fileIndex] = {
+      ...store.files[pathChange.fileIndex],
+      relativePath: pathChange.nextRelativePath,
     };
     writeStore(store);
     return {
       status: 'renamed',
-      relativePath: nextRelativePath,
+      relativePath: pathChange.nextRelativePath,
       sourcePath: toVirtualPresetPath(request.presetType, request.relativePath),
-      filePath: toVirtualPresetPath(request.presetType, nextRelativePath),
+      filePath: toVirtualPresetPath(request.presetType, pathChange.nextRelativePath),
     };
   },
   updatePresetFileInfo: async (request) => {
-    const fileName = ensurePresetExtension(
-      sanitizeFileStem(
-        request.fileName,
-        getFileStem(
-          request.relativePath[request.relativePath.length - 1] ?? 'Preset',
-          request.presetType,
-        ),
-      ),
-      request.presetType,
-    );
-    const nextRelativePath = [...request.relativePath.slice(0, -1), fileName];
     const store = readStore();
-    const fileIndex = store.files.findIndex((file) =>
-      file.presetType === request.presetType
-      && relativePathEquals(file.relativePath, request.relativePath));
-    if (fileIndex === -1) {
+    const pathChange = prepareBrowserPresetFilePathChange(
+      store,
+      request.presetType,
+      request.relativePath,
+      request.fileName,
+    );
+    if (!pathChange) {
       return { status: 'error', message: 'Preset file does not exist.' };
     }
-    if (
-      store.files.some((file, index) =>
-        index !== fileIndex
-        && file.presetType === request.presetType
-        && relativePathCollides(file.relativePath, nextRelativePath))
-      || store.folders[request.presetType].some((path) =>
-        relativePathCollides(path, nextRelativePath))
-    ) {
+    if (pathChange.hasCollision) {
       return { status: 'error', message: 'An item or folder with that name already exists.' };
     }
 
     const savedAtIso = new Date().toISOString();
     const sourcePath = toVirtualPresetPath(request.presetType, request.relativePath);
-    const filePath = toVirtualPresetPath(request.presetType, nextRelativePath);
-    store.files[fileIndex] = {
-      ...store.files[fileIndex],
-      relativePath: nextRelativePath,
-      payload: withPresetAuthoredMetadata(
-        store.files[fileIndex].payload,
-        normalizeAuthoredMetadata(request.metadata),
-        savedAtIso,
-      ),
-      needsSave: false,
-    };
+    const filePath = toVirtualPresetPath(request.presetType, pathChange.nextRelativePath);
+    applyBrowserPresetInfoChange(store, pathChange, request.metadata, savedAtIso);
     writeStore(store);
     return {
       status: 'updated',
-      relativePath: nextRelativePath,
+      relativePath: pathChange.nextRelativePath,
       sourcePath,
       filePath,
       savedAtIso,

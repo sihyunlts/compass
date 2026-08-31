@@ -2,6 +2,7 @@ import {
   getDeviceBrowserCategory,
   getDeviceBrowserIcon,
 } from '../../../devices/browser-categories';
+import type { GeneratorDeviceNode } from '../../../shared/model';
 import { DragAutoScroller } from '../drag-auto-scroll';
 import {
   hideBrowserDragBadge,
@@ -51,6 +52,7 @@ export type ActiveDragInfo =
 
 type RackDragControllerOptions = {
   chainDevices: HTMLElement;
+  getDevices: () => readonly GeneratorDeviceNode[];
   browserDragBadge: HTMLElement;
   isBlocked: () => boolean;
   closeContextMenu: () => void;
@@ -152,7 +154,10 @@ export class RackDragController {
     this.isBlocked = options.isBlocked;
     this.closeContextMenu = options.closeContextMenu;
     this.onDragUpdate = options.onDragUpdate;
-    this.dropTargetResolver = new RackDropTargetResolver(options.chainDevices);
+    this.dropTargetResolver = new RackDropTargetResolver({
+      chainDevices: options.chainDevices,
+      getDevices: options.getDevices,
+    });
     this.autoScroller = new DragAutoScroller({
       getContainer: () => this.chainDevices,
       edgePx: DRAG_AUTO_SCROLL_EDGE_PX,

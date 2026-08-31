@@ -1,3 +1,5 @@
+import type { RendererControlChange } from '../../../devices/control-types';
+
 interface RackControlTarget {
   element: HTMLElement;
   action: string;
@@ -126,3 +128,19 @@ export const isRackNumericInput = (
   && target.type === 'number'
   && readRackControlTarget(target) !== null
 );
+
+export const buildNumericInputControlChange = (
+  event: Event,
+  change: Omit<RendererControlChange, 'value' | 'step'> & { step?: number },
+): RendererControlChange | null => {
+  const input = event.currentTarget;
+  if (!(input instanceof HTMLInputElement)) {
+    return null;
+  }
+
+  return {
+    ...change,
+    value: input.value,
+    step: change.step ?? Number(input.step),
+  };
+};

@@ -1,3 +1,4 @@
+import { getRendererDeviceGroup } from '../../../devices';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import type { GeneratorDeviceNode } from '../../../shared/model';
 
@@ -71,6 +72,12 @@ export const buildOrderedGroupIds = (
 
   return groupIds;
 };
+
+export const buildGeneratorDeviceIds = (
+  devices: readonly GeneratorDeviceNode[],
+): string[] => devices
+  .filter((device) => getRendererDeviceGroup(device.kind) === 'generator')
+  .map((device) => device.id);
 
 export const buildRackContentItems = (
   devices: readonly GeneratorDeviceNode[],

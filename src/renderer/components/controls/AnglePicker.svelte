@@ -16,6 +16,7 @@
   import ModulationIndicator from '../fields/ModulationIndicator.svelte';
   import { resolveModulationDisplayDomain } from '../fields/modulation-display-domain';
   import { resolveDisplayedModulationStates } from '../../features/preview/modulation-display-selection.svelte';
+  import { buildNumericInputControlChange } from '../../features/rack/control-target';
 
   let {
     label,
@@ -100,19 +101,15 @@
   );
 
   const emitControlChange = (event: Event, finalize: boolean): void => {
-    const input = event.currentTarget;
-    if (!(input instanceof HTMLInputElement)) {
-      return;
-    }
-
-    onControlChange({
+    const change = buildNumericInputControlChange(event, {
       action: dataAction,
       deviceId: dataId,
       paramKey: dataParam,
-      value: input.value,
       finalize,
-      step: Number(input.step),
     });
+    if (change) {
+      onControlChange(change);
+    }
   };
 </script>
 

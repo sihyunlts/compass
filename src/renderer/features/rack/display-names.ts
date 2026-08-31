@@ -10,7 +10,7 @@ import {
   type GeneratorChain,
   type GeneratorDeviceNode,
 } from '../../../shared/model';
-import { normalizeOptionalId } from '../../../shared/normalize-id';
+import { buildOrderedGroupIds } from './layout';
 
 type DisplayNameItem = {
   id: string;
@@ -43,25 +43,6 @@ const buildDisplayNameById = (
   return displayNameById;
 };
 
-const collectOrderedGroupIds = (
-  devices: readonly GeneratorDeviceNode[],
-): string[] => {
-  const orderedGroupIds: string[] = [];
-  const seen = new Set<string>();
-
-  for (const device of devices) {
-    const groupId = normalizeOptionalId(device.groupId);
-    if (!groupId || seen.has(groupId)) {
-      continue;
-    }
-
-    seen.add(groupId);
-    orderedGroupIds.push(groupId);
-  }
-
-  return orderedGroupIds;
-};
-
 const resolveStoredDeviceName = (
   device: Pick<GeneratorDeviceNode, 'name'>,
 ): string | null => normalizeCustomName(device.name);
@@ -90,7 +71,7 @@ export const buildGroupDisplayNameById = (
   groupStateById: GeneratorChain['groupStateById'],
   defaultNameTemplate: string = DEFAULT_GROUP_NAME_TEMPLATE,
 ): Record<string, string> => {
-  const orderedGroupIds = collectOrderedGroupIds(devices);
+  const orderedGroupIds = buildOrderedGroupIds(devices);
   return buildDisplayNameById(
     orderedGroupIds.map((groupId) => ({
       id: groupId,
