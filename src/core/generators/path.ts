@@ -1,4 +1,4 @@
-import type { Polyline, Vec2 } from '../core-types';
+import type { Bounds, Polyline, Vec2 } from '../core-types';
 import { applyAffine, IDENTITY_AFFINE } from '../geometry';
 import type {
   PathAnchor,
@@ -76,18 +76,71 @@ export const resolveAbsolutePathHandle = (
   ? { x: anchor.x + handle.x, y: anchor.y + handle.y }
   : { x: anchor.x, y: anchor.y };
 
-export const collectPathControlPoints = (
+const resolveCubicExtremaParameters = (
+  start: number,
+  control1: number,
+  control2: number,
+  end: number,
+): number[] => {
+  const quadratic = -start + 3 * control1 - 3 * control2 + end;
+  const linear = 2 * (start - 2 * control1 + control2);
+  const constant = control1 - start;
+  if (Math.abs(quadratic) <= Number.EPSILON) {
+    if (Math.abs(linear) <= Number.EPSILON) {
+      return [];
+    }
+    const parameter = -constant / linear;
+    return parameter > 0 && parameter < 1 ? [parameter] : [];
+  }
+  const discriminant = linear * linear - 4 * quadratic * constant;
+  if (discriminant < 0) {
+    return [];
+  }
+  const squareRoot = Math.sqrt(discriminant);
+  return [-linear + squareRoot, -linear - squareRoot]
+    .map((value) => value / (2 * quadratic))
+    .filter((parameter) => parameter > 0 && parameter < 1);
+};
+
+export const resolvePathBounds = (
   anchors: readonly PathAnchor[],
-  transform: Readonly<PathTransform> = IDENTITY_AFFINE,
-): Vec2[] => anchors.flatMap((anchor) => [
-  applyAffine(transform, anchor),
-  ...(anchor.handleIn
-    ? [applyAffine(transform, resolveAbsolutePathHandle(anchor, anchor.handleIn))]
-    : []),
-  ...(anchor.handleOut
-    ? [applyAffine(transform, resolveAbsolutePathHandle(anchor, anchor.handleOut))]
-    : []),
-]);
+  closed: boolean,
+): Bounds | null => {
+  if (anchors.length === 0) {
+    return null;
+  }
+  const points: Vec2[] = [];
+  const addSegmentBounds = (start: PathAnchor, end: PathAnchor): void => {
+    const p0 = { x: start.x, y: start.y };
+    const p1 = resolveAbsolutePathHandle(start, start.handleOut);
+    const p2 = resolveAbsolutePathHandle(end, end.handleIn);
+    const p3 = { x: end.x, y: end.y };
+    const parameters = new Set([
+      ...resolveCubicExtremaParameters(p0.x, p1.x, p2.x, p3.x),
+      ...resolveCubicExtremaParameters(p0.y, p1.y, p2.y, p3.y),
+    ]);
+    points.push(p0, p3, ...Array.from(parameters, (parameter) =>
+      evaluateCubicBezier(p0, p1, p2, p3, parameter)));
+  };
+
+  if (anchors.length === 1) {
+    points.push({ x: anchors[0].x, y: anchors[0].y });
+  } else {
+    for (let index = 0; index < anchors.length - 1; index += 1) {
+      addSegmentBounds(anchors[index], anchors[index + 1]);
+    }
+    if (closed) {
+      addSegmentBounds(anchors.at(-1)!, anchors[0]);
+    }
+  }
+
+  return {
+    minX: Math.min(...points.map((point) => point.x)),
+    minY: Math.min(...points.map((point) => point.y)),
+    maxX: Math.max(...points.map((point) => point.x)),
+    maxY: Math.max(...points.map((point) => point.y)),
+  };
+};
 
 const flattenCubic = (
   start: Readonly<Vec2>,

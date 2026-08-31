@@ -10,10 +10,11 @@
     sanitizePathAnchors,
     sanitizePathTransform,
   } from '../../../devices/path/schema';
+  import type { Bounds } from '../../../core/core-types';
   import {
-    collectPathControlPoints,
     evaluateCubicBezier,
     resolveAbsolutePathHandle,
+    resolvePathBounds,
     sampleAnimatedPathAtProgress,
   } from '../../../core/generators/path';
   import {
@@ -43,7 +44,6 @@
   } from './rotation-interaction';
 
   type EditorPoint = { x: number; y: number };
-  type PathBounds = { minX: number; minY: number; maxX: number; maxY: number };
   type AlignmentGuides = { x: number | null; y: number | null };
   type AxisSnap = { value: number; target: number | null };
   type RotationFeedbackPosition = {
@@ -70,7 +70,7 @@
       kind: 'path-move';
       startPoint: EditorPoint;
       startTransform: PathTransform;
-      startBounds: PathBounds;
+      startBounds: Bounds;
     }
     | {
       kind: 'path-rotate';
@@ -364,26 +364,12 @@
     y: roundCoordinate((1 - ((point.y - PATH_COORDINATE_MIN) / COORDINATE_RANGE)) * 100),
   });
 
-  const resolvePathBounds = (
-    pathAnchors: readonly PathAnchor[],
-  ): PathBounds | null => {
-    const points = collectPathControlPoints(pathAnchors);
-    if (points.length === 0) {
-      return null;
-    }
-    return {
-      minX: Math.min(...points.map((point) => point.x)),
-      minY: Math.min(...points.map((point) => point.y)),
-      maxX: Math.max(...points.map((point) => point.x)),
-      maxY: Math.max(...points.map((point) => point.y)),
-    };
-  };
-
   const resolveWorldPathBounds = (
     pathAnchors: readonly PathAnchor[],
+    pathClosed: boolean,
     pathTransform: Readonly<PathTransform>,
-  ): PathBounds | null => {
-    const bounds = resolvePathBounds(pathAnchors);
+  ): Bounds | null => {
+    const bounds = resolvePathBounds(pathAnchors, pathClosed);
     if (!bounds) {
       return null;
     }
@@ -479,7 +465,7 @@
     if (readonly || selection?.kind !== 'path') {
       return null;
     }
-    const bounds = resolvePathBounds(localAnchors);
+    const bounds = resolvePathBounds(localAnchors, localClosed);
     if (!bounds) {
       return null;
     }
@@ -908,7 +894,7 @@
 
   const movePath = (
     startTransform: Readonly<PathTransform>,
-    bounds: PathBounds,
+    bounds: Bounds,
     startPoint: EditorPoint,
     point: EditorPoint,
     lockAxis: boolean,
@@ -1373,7 +1359,7 @@
 
   const beginPathMove = (event: MouseEvent): void => {
     const startPoint = resolveUnboundedEditorPoint(event.clientX, event.clientY);
-    const startBounds = resolveWorldPathBounds(localAnchors, localTransform);
+    const startBounds = resolveWorldPathBounds(localAnchors, localClosed, localTransform);
     if (!startPoint || !startBounds) {
       return;
     }
