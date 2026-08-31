@@ -8,6 +8,7 @@
   import FieldShell from '../fields/FieldShell.svelte';
   import NumberField from '../fields/NumberField.svelte';
   import { i18n } from '../../i18n.svelte';
+  import { buildNumericInputControlChange } from '../../features/rack/control-target';
 
   const SNAP_DIVISION_OPTIONS = [4, 8, 16, 32, 64] as const;
   type TimeWindowEditorMode = 'stretch' | 'trim';
@@ -78,19 +79,16 @@
   };
 
   const emitControlChange = (event: Event, paramKey: string, finalize: boolean): void => {
-    const input = event.currentTarget;
-    if (!(input instanceof HTMLInputElement)) {
-      return;
-    }
-
-    onControlChange({
+    const change = buildNumericInputControlChange(event, {
       action: dataAction,
       deviceId,
       paramKey,
-      value: input.value,
       finalize,
       step: rangeStep,
     });
+    if (change) {
+      onControlChange(change);
+    }
   };
 </script>
 

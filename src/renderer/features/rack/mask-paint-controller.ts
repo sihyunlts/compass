@@ -1,4 +1,5 @@
 import type { GeneratorChain } from '../../../shared/model';
+import { PointerCaptureSession } from './pointer-capture-session';
 
 type ChainDevice = GeneratorChain['devices'][number];
 
@@ -17,21 +18,15 @@ interface MaskTilePaintControllerOptions {
 }
 
 interface MaskTilePaintState {
-  pointerId: number | null;
-  gridEl: HTMLElement | null;
   deviceId: string | null;
   paintMode: 'add' | 'remove' | null;
   touched: Set<number>;
-  didChange: boolean;
 }
 
 const createMaskTilePaintState = (): MaskTilePaintState => ({
-  pointerId: null,
-  gridEl: null,
   deviceId: null,
   paintMode: null,
   touched: new Set<number>(),
-  didChange: false,
 });
 
 const normalizeMaskTileIndex = (
@@ -74,7 +69,7 @@ const resolveMaskTileTarget = (
 };
 
 const resolveMaskTileFromPoint = (
-  state: MaskTilePaintState,
+  gridEl: HTMLElement,
   clientX: number,
   clientY: number,
 ): { tileIndex: number } | null => {
@@ -84,7 +79,7 @@ const resolveMaskTileFromPoint = (
   }
 
   const hit = resolveMaskTileTarget(element);
-  if (!hit || hit.grid !== state.gridEl) {
+  if (!hit || hit.grid !== gridEl) {
     return null;
   }
 
@@ -104,6 +99,13 @@ export class MaskTilePaintController {
 
   private readonly state = createMaskTilePaintState();
 
+  private readonly pointerSession = new PointerCaptureSession<HTMLElement>({
+    onChanged: () => this.commitChange(),
+    afterFinish: () => {
+      Object.assign(this.state, createMaskTilePaintState());
+    },
+  });
+
   public constructor(options: MaskTilePaintControllerOptions) {
     this.findDeviceById = options.findDeviceById;
     this.blurActiveTextEditingElement = options.blurActiveTextEditingElement;
@@ -113,7 +115,7 @@ export class MaskTilePaintController {
   }
 
   public isActive(): boolean {
-    return this.state.pointerId !== null;
+    return this.pointerSession.isActive();
   }
 
   public handlePointerDown(event: PointerEvent, target: EventTarget | null): boolean {
@@ -130,63 +132,52 @@ export class MaskTilePaintController {
     this.blurActiveTextEditingElement();
     this.closeContextMenu();
 
-    this.state.pointerId = event.pointerId;
-    this.state.gridEl = hit.grid;
     this.state.deviceId = hit.deviceId;
     this.state.touched = new Set<number>();
-    this.state.didChange = false;
     this.state.paintMode = device.params.tiles.includes(hit.tileIndex) ? 'remove' : 'add';
 
-    hit.grid.setPointerCapture(event.pointerId);
-    if (this.applyTileChange(hit.deviceId, hit.tileIndex, this.state.paintMode)) {
-      this.state.touched.add(hit.tileIndex);
-      this.state.didChange = true;
-      this.requestTransientPreview();
-    }
+    this.pointerSession.begin(hit.grid, event.pointerId);
+    this.applyTileChangeWithPreview(hit.deviceId, hit.tileIndex, this.state.paintMode);
 
     event.preventDefault();
     return true;
   }
 
   public handlePointerMove(event: PointerEvent): boolean {
-    if (this.state.pointerId !== event.pointerId || !this.state.deviceId || !this.state.paintMode) {
+    const grid = this.pointerSession.target;
+    if (
+      !this.pointerSession.matches(event.pointerId)
+      || !grid
+      || !this.state.deviceId
+      || !this.state.paintMode
+    ) {
       return false;
     }
 
-    const hit = resolveMaskTileFromPoint(this.state, event.clientX, event.clientY);
+    const hit = resolveMaskTileFromPoint(grid, event.clientX, event.clientY);
     if (!hit || this.state.touched.has(hit.tileIndex)) {
       return true;
     }
 
-    if (this.applyTileChange(this.state.deviceId, hit.tileIndex, this.state.paintMode)) {
-      this.state.touched.add(hit.tileIndex);
-      this.state.didChange = true;
-      this.requestTransientPreview();
-    }
+    this.applyTileChangeWithPreview(
+      this.state.deviceId,
+      hit.tileIndex,
+      this.state.paintMode,
+    );
     return true;
   }
 
   public handlePointerUp(event: PointerEvent): boolean {
-    if (this.state.pointerId !== event.pointerId) {
-      return false;
-    }
-
-    this.finish();
-    return true;
+    return this.pointerSession.finishForPointer(event.pointerId);
   }
 
   public handlePointerCancel(event: PointerEvent): boolean {
-    if (this.state.pointerId !== event.pointerId) {
-      return false;
-    }
-
-    this.finish();
-    return true;
+    return this.pointerSession.finishForPointer(event.pointerId);
   }
 
   public handleWindowBlur(): void {
     if (this.isActive()) {
-      this.finish();
+      this.pointerSession.finish();
     }
   }
 
@@ -218,24 +209,18 @@ export class MaskTilePaintController {
     return true;
   }
 
-  private finish(): void {
-    if (
-      this.state.gridEl
-      && this.state.pointerId !== null
-      && this.state.gridEl.hasPointerCapture(this.state.pointerId)
-    ) {
-      this.state.gridEl.releasePointerCapture(this.state.pointerId);
+  private applyTileChangeWithPreview(
+    deviceId: string,
+    tileIndex: number,
+    mode: 'add' | 'remove',
+  ): void {
+    if (!this.applyTileChange(deviceId, tileIndex, mode)) {
+      return;
     }
 
-    if (this.state.didChange) {
-      this.commitChange();
-    }
-
-    this.state.pointerId = null;
-    this.state.gridEl = null;
-    this.state.deviceId = null;
-    this.state.paintMode = null;
-    this.state.touched = new Set<number>();
-    this.state.didChange = false;
+    this.state.touched.add(tileIndex);
+    this.pointerSession.markChanged();
+    this.requestTransientPreview();
   }
+
 }

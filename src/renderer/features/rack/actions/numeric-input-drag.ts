@@ -2,6 +2,7 @@ import {
   closestRackNumericInputTarget,
   isRackNumericInput,
 } from '../control-target';
+import { releasePointerCaptureIfHeld } from '../pointer-capture-session';
 
 interface NumericInputDragState {
   pointerId: number | null;
@@ -395,9 +396,7 @@ export class NumericInputInteraction {
 
   private clearDragState(): void {
     const { pointerEl, pointerId } = this.dragState;
-    if (pointerEl && pointerId !== null && pointerEl.hasPointerCapture(pointerId)) {
-      pointerEl.releasePointerCapture(pointerId);
-    }
+    releasePointerCaptureIfHeld(pointerEl, pointerId);
 
     this.exitPointerLock(pointerEl);
     if (pointerEl) {

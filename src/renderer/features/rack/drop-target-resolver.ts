@@ -1,8 +1,10 @@
 import { normalizeOptionalId } from '../../../shared/normalize-id';
-import type {
-  ChainDragSourceKind,
-  DropPlacement,
-  RackDropZone,
+import type { GeneratorDeviceNode } from '../../../shared/model';
+import {
+  applyMoveDevicesByDropZone,
+  type ChainDragSourceKind,
+  type DropPlacement,
+  type RackDropZone,
 } from './drop-ops';
 
 type DropPosition = {
@@ -38,8 +40,14 @@ const GROUP_SELECTOR = '.device-group.is-rack[data-group-id]';
 export class RackDropTargetResolver {
   private readonly chainDevices: HTMLElement;
 
-  public constructor(chainDevices: HTMLElement) {
-    this.chainDevices = chainDevices;
+  private readonly getDevices: () => readonly GeneratorDeviceNode[];
+
+  public constructor(options: {
+    chainDevices: HTMLElement;
+    getDevices: () => readonly GeneratorDeviceNode[];
+  }) {
+    this.chainDevices = options.chainDevices;
+    this.getDevices = options.getDevices;
   }
 
   public resolveChainDropZone(
@@ -279,83 +287,12 @@ export class RackDropTargetResolver {
       return false;
     }
 
-    const sourceSet = new Set(sourceIds);
-    const orderedIds = [...this.chainDevices.querySelectorAll<HTMLElement>(DEVICE_CARD_SELECTOR)]
-      .flatMap((card) => {
-        const id = card.dataset.deviceId;
-        return id ? [id] : [];
-      });
-    const movedIds = orderedIds.filter((id) => sourceSet.has(id));
-    if (movedIds.length === 0) {
-      return true;
-    }
-
-    const remainingIds = orderedIds.filter((id) => !sourceSet.has(id));
-    const insertIndex = this.resolveInsertIndex(
-      remainingIds,
-      dropZone.targetId,
-      dropZone.placement,
-    );
-    const nextOrder = [...remainingIds];
-    nextOrder.splice(insertIndex, 0, ...movedIds);
-
-    if (!this.isSameOrder(nextOrder, orderedIds)) {
-      return false;
-    }
-
-    if (sourceKind !== 'devices') {
-      return true;
-    }
-
-    const nextGroupId = dropZone.kind === 'inside-group'
-      ? normalizeOptionalId(dropZone.groupId)
-      : null;
-    for (const sourceId of movedIds) {
-      const currentGroupId = normalizeOptionalId(
-        this.getCardElement(sourceId)
-          ?.closest<HTMLElement>(GROUP_SELECTOR)
-          ?.dataset.groupId,
-      );
-      if (currentGroupId !== nextGroupId) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  private resolveInsertIndex(
-    orderedIds: readonly string[],
-    targetId: string | null,
-    placement: DropPlacement,
-  ): number {
-    if (!targetId) {
-      return orderedIds.length;
-    }
-
-    const targetIndex = orderedIds.indexOf(targetId);
-    if (targetIndex < 0) {
-      return orderedIds.length;
-    }
-
-    return placement === 'after' ? targetIndex + 1 : targetIndex;
-  }
-
-  private isSameOrder(
-    left: readonly string[],
-    right: readonly string[],
-  ): boolean {
-    if (left.length !== right.length) {
-      return false;
-    }
-
-    for (let index = 0; index < left.length; index += 1) {
-      if (left[index] !== right[index]) {
-        return false;
-      }
-    }
-
-    return true;
+    return applyMoveDevicesByDropZone(
+      this.getDevices(),
+      sourceIds,
+      dropZone,
+      sourceKind,
+    ) === null;
   }
 
   private resolvePointerRackGroup(
@@ -414,9 +351,4 @@ export class RackDropTargetResolver {
     );
   }
 
-  private getCardElement(id: string): HTMLElement | null {
-    return this.chainDevices.querySelector<HTMLElement>(
-      `.device-card[data-device-id="${CSS.escape(id)}"]`,
-    );
-  }
 }

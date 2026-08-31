@@ -122,6 +122,7 @@ class RackSurfaceController {
 
     this.dragController = new RackDragController({
       chainDevices: elements.chainDevices,
+      getDevices: this.options.getDevices,
       browserDragBadge: elements.browserDragBadge,
       isBlocked: () => this.interactionManager?.isCenterPickerActive() ?? false,
       closeContextMenu: this.options.closeContextMenu,

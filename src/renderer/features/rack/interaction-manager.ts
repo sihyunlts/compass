@@ -1,6 +1,4 @@
 import type { GeneratorChain } from '../../../shared/model';
-import { getRendererDeviceGroup } from '../../../devices';
-import { normalizeOptionalId } from '../../../shared/normalize-id';
 import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
 import type { ChainMutationMeta } from '../editor/history-core';
 import { blurIfTextEditingElement } from './text-editing';
@@ -15,6 +13,7 @@ import {
 } from './chain-controls';
 import type { RendererControlChange } from '../../../devices/control-types';
 import type { RackOutputPreviewMode } from './types';
+import { buildGeneratorDeviceIds, buildOrderedGroupIds } from './layout';
 
 /**
  * Coordinates non-selection rack interactions in the main renderer.
@@ -276,27 +275,11 @@ export class RackInteractionManager {
   }
 
   private getMaskSourceGroupIds(): string[] {
-    const groupIds: string[] = [];
-    const seen = new Set<string>();
-
-    for (const device of this.getChainState().devices) {
-      const groupId = normalizeOptionalId(device.groupId);
-      if (!groupId || seen.has(groupId)) {
-        continue;
-      }
-
-      seen.add(groupId);
-      groupIds.push(groupId);
-    }
-
-    return groupIds;
+    return buildOrderedGroupIds(this.getChainState().devices);
   }
 
   private getMaskSourceGeneratorIds(): string[] {
-    return this.getChainState().devices
-      .filter((device) =>
-        getRendererDeviceGroup(device.kind) === 'generator')
-      .map((device) => device.id);
+    return buildGeneratorDeviceIds(this.getChainState().devices);
   }
 
   private commitChainChange(

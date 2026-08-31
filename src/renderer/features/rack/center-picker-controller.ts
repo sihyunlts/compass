@@ -1,6 +1,7 @@
 import { writeNumericDeviceParam } from '../../../devices/modulation';
 import type { GeneratorChain } from '../../../shared/model';
 import { clamp } from '../../../shared/math';
+import { PointerCaptureSession } from './pointer-capture-session';
 
 const DEFAULT_PICKER_MIN = 0;
 const DEFAULT_PICKER_MAX = 9;
@@ -24,12 +25,6 @@ interface CenterPickerControllerOptions {
   commitReset: () => void;
 }
 
-interface CenterPickerState {
-  pointerId: number | null;
-  surfaceEl: HTMLElement | null;
-  didChange: boolean;
-}
-
 const isCenterPointDevice = (device: ChainDevice | null): device is CenterPointDevice => (
   !!device
   && 'params' in device
@@ -38,12 +33,6 @@ const isCenterPointDevice = (device: ChainDevice | null): device is CenterPointD
   && 'centerX' in device.params
   && 'centerY' in device.params
 );
-
-const createCenterPickerState = (): CenterPickerState => ({
-  pointerId: null,
-  surfaceEl: null,
-  didChange: false,
-});
 
 const resolveCenterPickerSurface = (target: EventTarget | null): HTMLElement | null => {
   if (!(target instanceof HTMLElement)) {
@@ -124,7 +113,12 @@ export class CenterPickerController {
 
   private readonly commitReset: () => void;
 
-  private readonly state = createCenterPickerState();
+  private readonly pointerSession = new PointerCaptureSession<HTMLElement>({
+    onChanged: () => this.persistChange(),
+    beforeRelease: (surface) => {
+      delete surface.dataset.centerPickerInteraction;
+    },
+  });
 
   public constructor(options: CenterPickerControllerOptions) {
     this.findDeviceById = options.findDeviceById;
@@ -137,7 +131,7 @@ export class CenterPickerController {
   }
 
   public isActive(): boolean {
-    return this.state.pointerId !== null;
+    return this.pointerSession.isActive();
   }
 
   public syncSelection(deviceId: string): void {
@@ -161,52 +155,34 @@ export class CenterPickerController {
 
     this.blurActiveTextEditingElement();
     this.closeContextMenu();
-    this.state.pointerId = event.pointerId;
-    this.state.surfaceEl = surface;
-    this.state.didChange = false;
     surface.dataset.centerPickerInteraction = 'active';
-    surface.setPointerCapture(event.pointerId);
+    this.pointerSession.begin(surface, event.pointerId);
 
-    if (this.applyPosition(surface, event.clientX, event.clientY)) {
-      this.state.didChange = true;
-      this.requestTransientPreview();
-    }
+    this.applyPositionWithPreview(surface, event.clientX, event.clientY);
     return true;
   }
 
   public handlePointerMove(event: PointerEvent): boolean {
-    if (this.state.pointerId !== event.pointerId || !this.state.surfaceEl) {
+    const surface = this.pointerSession.target;
+    if (!this.pointerSession.matches(event.pointerId) || !surface) {
       return false;
     }
 
-    if (this.applyPosition(this.state.surfaceEl, event.clientX, event.clientY)) {
-      this.state.didChange = true;
-      this.requestTransientPreview();
-    }
+    this.applyPositionWithPreview(surface, event.clientX, event.clientY);
     return true;
   }
 
   public handlePointerUp(event: PointerEvent): boolean {
-    if (this.state.pointerId !== event.pointerId) {
-      return false;
-    }
-
-    this.finish();
-    return true;
+    return this.pointerSession.finishForPointer(event.pointerId);
   }
 
   public handlePointerCancel(event: PointerEvent): boolean {
-    if (this.state.pointerId !== event.pointerId) {
-      return false;
-    }
-
-    this.finish();
-    return true;
+    return this.pointerSession.finishForPointer(event.pointerId);
   }
 
   public handleWindowBlur(): void {
     if (this.isActive()) {
-      this.finish();
+      this.pointerSession.finish();
     }
   }
 
@@ -263,6 +239,19 @@ export class CenterPickerController {
     return true;
   }
 
+  private applyPositionWithPreview(
+    surface: HTMLElement,
+    clientX: number,
+    clientY: number,
+  ): void {
+    if (!this.applyPosition(surface, clientX, clientY)) {
+      return;
+    }
+
+    this.pointerSession.markChanged();
+    this.requestTransientPreview();
+  }
+
   private resetToMidpoint(surface: HTMLElement): boolean {
     const id = surface.dataset.deviceId;
     if (!id) {
@@ -301,25 +290,4 @@ export class CenterPickerController {
     return isCenterPointDevice(device) ? device : null;
   }
 
-  private finish(): void {
-    if (this.state.surfaceEl) {
-      delete this.state.surfaceEl.dataset.centerPickerInteraction;
-    }
-
-    if (
-      this.state.surfaceEl
-      && this.state.pointerId !== null
-      && this.state.surfaceEl.hasPointerCapture(this.state.pointerId)
-    ) {
-      this.state.surfaceEl.releasePointerCapture(this.state.pointerId);
-    }
-
-    if (this.state.didChange) {
-      this.persistChange();
-    }
-
-    this.state.pointerId = null;
-    this.state.surfaceEl = null;
-    this.state.didChange = false;
-  }
 }
