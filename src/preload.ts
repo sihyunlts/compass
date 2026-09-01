@@ -32,6 +32,7 @@ import {
   type RackFileMenuAction,
 } from './shared/contracts/ipc/api';
 import type { LiveTempoUpdate } from './shared/bridge/types';
+import { resolveShortcutPlatform } from './shared/keyboard-shortcuts';
 
 interface ListenerSet<T> {
   emit: (payload: T) => void;
@@ -119,6 +120,7 @@ ipcRenderer.on(IPC_CHANNELS.appFocusUpdate, (_event, isFocused: boolean) => {
 });
 
 const api: CompassApi = {
+  platform: resolveShortcutPlatform(process.platform),
   sendGeneratedPreview: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.sendGeneratedPreview, request),
   requestAppVersion: () =>

@@ -1,6 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import type { ShortcutPresentation } from '../../../shared/keyboard-shortcuts';
   import { hint } from '../overlays/hint';
   import { buttonPress } from './button-press.svelte';
 
@@ -14,6 +15,7 @@
     text,
     label,
     title,
+    shortcut,
     disabled = false,
     menuDisabled = false,
     menuLabel,
@@ -32,6 +34,7 @@
     text: string;
     label?: string;
     title?: string;
+    shortcut?: ShortcutPresentation;
     disabled?: boolean;
     menuDisabled?: boolean;
     menuLabel: string;
@@ -46,6 +49,9 @@
 
   const rootClass = $derived(`split-button split-button-${variant} ${className}`.trim());
   const mainAriaLabel = $derived(label ?? text);
+  const mainHint = $derived(title && shortcut
+    ? { text: title, shortcut: shortcut.display }
+    : title);
 
   const handleMenuKeyDown = (event: KeyboardEvent): void => {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
@@ -68,8 +74,9 @@
       class="split-button-segment split-button-main"
       {type}
       aria-label={mainAriaLabel}
+      aria-keyshortcuts={disabled ? undefined : shortcut?.ariaKeyShortcuts}
       {disabled}
-      use:hint={title}
+      use:hint={mainHint}
       onclick={onClick}
     >
       <span class="split-button-label">{text}</span>
@@ -80,7 +87,7 @@
       {id}
       class="split-button-segment split-button-main split-button-static"
       aria-label={mainAriaLabel}
-      use:hint={title}
+      use:hint={mainHint}
     >
       <span class="split-button-label">{text}</span>
     </span>

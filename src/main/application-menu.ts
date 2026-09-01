@@ -13,6 +13,13 @@ import {
   type AppLocale,
   type MessageKey,
 } from '../shared/i18n';
+import {
+  resolveElectronAccelerator,
+  resolveShortcutPlatform,
+  type AppShortcutId,
+} from '../shared/keyboard-shortcuts';
+
+const shortcutPlatform = resolveShortcutPlatform(process.platform);
 
 const sendRackFileMenuAction = (action: RackFileMenuAction): void => {
   const mainWindow = getMainWindow();
@@ -35,14 +42,24 @@ const translatedRole = (
   label: translate(locale, key, values),
 });
 
+const translatedShortcutRole = (
+  locale: AppLocale,
+  role: MenuItemConstructorOptions['role'],
+  key: MessageKey,
+  shortcutId: AppShortcutId,
+): MenuItemConstructorOptions => ({
+  ...translatedRole(locale, role, key),
+  accelerator: resolveElectronAccelerator(shortcutId, shortcutPlatform),
+});
+
 const rackActionItem = (
   locale: AppLocale,
   key: MessageKey,
-  accelerator: string,
+  shortcutId: AppShortcutId,
   action: RackFileMenuAction,
 ): MenuItemConstructorOptions => ({
   label: translate(locale, key),
-  accelerator,
+  accelerator: resolveElectronAccelerator(shortcutId, shortcutPlatform),
   click: () => sendRackFileMenuAction(action),
 });
 
@@ -75,13 +92,13 @@ export const installApplicationMenu = (
     {
       label: translate(locale, 'menu.file'),
       submenu: [
-        rackActionItem(locale, 'menu.newRack', 'CommandOrControl+N', 'new'),
+        rackActionItem(locale, 'menu.newRack', 'newRack', 'new'),
         separator(),
-        rackActionItem(locale, 'menu.saveRack', 'CommandOrControl+S', 'save'),
+        rackActionItem(locale, 'menu.saveRack', 'saveRack', 'save'),
         rackActionItem(
           locale,
           'menu.saveRackAs',
-          'CommandOrControl+Shift+S',
+          'saveRackAs',
           'save-as',
         ),
         separator(),
@@ -91,13 +108,13 @@ export const installApplicationMenu = (
     {
       label: translate(locale, 'menu.edit'),
       submenu: [
-        translatedRole(locale, 'undo', 'menu.undo'),
-        translatedRole(locale, 'redo', 'menu.redo'),
+        translatedShortcutRole(locale, 'undo', 'menu.undo', 'undo'),
+        translatedShortcutRole(locale, 'redo', 'menu.redo', 'redo'),
         separator(),
-        translatedRole(locale, 'cut', 'menu.cut'),
-        translatedRole(locale, 'copy', 'menu.copy'),
-        translatedRole(locale, 'paste', 'menu.paste'),
-        translatedRole(locale, 'selectAll', 'menu.selectAll'),
+        translatedShortcutRole(locale, 'cut', 'menu.cut', 'cut'),
+        translatedShortcutRole(locale, 'copy', 'menu.copy', 'copy'),
+        translatedShortcutRole(locale, 'paste', 'menu.paste', 'paste'),
+        translatedShortcutRole(locale, 'selectAll', 'menu.selectAll', 'selectAll'),
       ],
     },
     {

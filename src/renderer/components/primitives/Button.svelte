@@ -1,6 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import type { ShortcutPresentation } from '../../../shared/keyboard-shortcuts';
   import { hint } from '../overlays/hint';
   import { buttonPress } from './button-press.svelte';
 
@@ -18,6 +19,7 @@
     class: className = '',
     type = 'button',
     title,
+    shortcut,
     onClick,
     ...rest
   } = $props<{
@@ -31,6 +33,7 @@
     class?: string;
     type?: ButtonType;
     title?: string;
+    shortcut?: ShortcutPresentation;
     onClick?: (event: MouseEvent) => void;
   } & Record<string, unknown>>();
 
@@ -39,6 +42,9 @@
   const ariaLabel = $derived(label ?? text ?? (isIconButton ? icon : undefined));
   const visibleText = $derived(text ?? label ?? '');
   const hintText = $derived(title ?? (isIconButton ? ariaLabel : undefined));
+  const hintValue = $derived(hintText && shortcut
+    ? { text: hintText, shortcut: shortcut.display }
+    : hintText);
 </script>
 
 <button
@@ -49,8 +55,9 @@
   {type}
   aria-label={ariaLabel}
   aria-pressed={pressed}
+  aria-keyshortcuts={disabled ? undefined : shortcut?.ariaKeyShortcuts}
   {disabled}
-  use:hint={hintText}
+  use:hint={hintValue}
   use:buttonPress
   onclick={onClick}
 >

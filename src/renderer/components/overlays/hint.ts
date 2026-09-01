@@ -33,6 +33,7 @@ export type HintInput = HintValue | {
   gapPx?: number;
   dismissOnPointerDown?: boolean;
   className?: string;
+  shortcut?: string;
   renderContent?: HintContentRenderer;
 };
 
@@ -88,6 +89,7 @@ const normalizeHint = (value: HintInput): {
   gapPx: number;
   dismissOnPointerDown: boolean;
   className: string;
+  shortcut: string;
   renderContent: HintContentRenderer | null;
 } => {
   const options = typeof value === 'object' && value !== null ? value : null;
@@ -100,6 +102,9 @@ const normalizeHint = (value: HintInput): {
     dismissOnPointerDown: options?.dismissOnPointerDown ?? true,
     className: typeof options?.className === 'string'
       ? options.className.trim()
+      : '',
+    shortcut: typeof options?.shortcut === 'string'
+      ? options.shortcut.trim()
       : '',
     renderContent: typeof options?.renderContent === 'function'
       ? options.renderContent
@@ -127,6 +132,7 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
     gapPx: hintGapPx,
     dismissOnPointerDown,
     className: hintClassName,
+    shortcut: hintShortcut,
     renderContent: renderHintContent,
   } = normalizeHint(value);
   let hintEl: HTMLDivElement | null = null;
@@ -217,7 +223,7 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
     }
 
     clearHintContent();
-    hintEl.className = ['app-hint', hintClassName]
+    hintEl.className = ['app-hint', hintShortcut ? 'has-shortcut' : '', hintClassName]
       .filter(Boolean)
       .join(' ');
     if (renderHintContent) {
@@ -227,7 +233,19 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
       return;
     }
 
-    hintEl.textContent = hintText;
+    if (!hintShortcut) {
+      hintEl.textContent = hintText;
+      return;
+    }
+
+    const label = document.createElement('span');
+    label.className = 'app-hint-label';
+    label.textContent = hintText;
+    const shortcut = document.createElement('kbd');
+    shortcut.className = 'app-hint-shortcut';
+    shortcut.textContent = hintShortcut;
+    shortcut.setAttribute('aria-hidden', 'true');
+    hintEl.replaceChildren(label, shortcut);
   };
 
   const closeHint = (): void => {
@@ -450,6 +468,7 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
       hintGapPx = normalized.gapPx;
       dismissOnPointerDown = normalized.dismissOnPointerDown;
       hintClassName = normalized.className;
+      hintShortcut = normalized.shortcut;
       renderHintContent = normalized.renderContent;
       if (!hintText) {
         closeHint();

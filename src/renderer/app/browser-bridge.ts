@@ -7,6 +7,7 @@ import {
   isDeviceBrowserSystemDirectoryPath,
 } from '../../devices/browser-categories';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
+import { resolveShortcutPlatform } from '../../shared/keyboard-shortcuts';
 import { normalizeAuthoredMetadata } from '../../shared/model';
 import {
   preparePresetEntryMove,
@@ -424,6 +425,7 @@ const applyBrowserPresetInfoChange = (
 const createNoopSubscription = (): (() => void) => () => {};
 
 const createBrowserCompassBridge = (): CompassApi => ({
+  platform: resolveShortcutPlatform(navigator.userAgent),
   sendGeneratedPreview: async () => {
     throw new Error('Desktop app required to send to Ableton.');
   },

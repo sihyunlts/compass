@@ -1,8 +1,14 @@
 import type { EditorSession } from '../features/editor/session.svelte';
 import { isTextEditingElement } from '../features/rack/text-editing';
+import {
+  matchesAppShortcut,
+  type AppShortcutId,
+  type ShortcutPlatform,
+} from '../../shared/keyboard-shortcuts';
 
 interface KeyboardShortcutOptions {
   editorSession: EditorSession;
+  platform: ShortcutPlatform;
   closeContextMenu: () => void;
   interactiveElementSelector?: string;
   onNewRack?: () => void | Promise<void>;
@@ -11,8 +17,14 @@ interface KeyboardShortcutOptions {
   onBeforeUnload?: () => void;
 }
 
+type ShortcutCommand = readonly [AppShortcutId, () => boolean];
+type ShortcutAction = readonly [AppShortcutId, () => void | Promise<void> | undefined];
+
 const RACK_DEVICES_ELEMENT_ID = 'chain-devices';
-const LOCAL_RACK_KEYBOARD_SCOPE_SELECTOR = '[data-rack-keyboard-scope="local"]';
+const LOCAL_KEYBOARD_SCOPE_SELECTOR = [
+  '[data-app-keyboard-scope="local"]',
+  '[data-rack-keyboard-scope="local"]',
+].join(', ');
 
 const shouldPreserveRackSelection = (element: Element | null): boolean =>
   element instanceof HTMLElement
@@ -26,7 +38,7 @@ const isLocalKeyboardTarget = (
     return false;
   }
 
-  if (element.closest(LOCAL_RACK_KEYBOARD_SCOPE_SELECTOR)) {
+  if (element.closest(LOCAL_KEYBOARD_SCOPE_SELECTOR)) {
     return true;
   }
 
@@ -55,6 +67,55 @@ const closeContextMenuIfHandled = (
 export const mountKeyboardShortcuts = (
   options: KeyboardShortcutOptions,
 ): (() => void) => {
+  const selectionCommands: readonly ShortcutCommand[] = [
+    ['groupSelection', options.editorSession.commands.groupSelection],
+    ['ungroupSelection', options.editorSession.commands.ungroupSelectedGroups],
+    ['undo', options.editorSession.commands.undo],
+    ['redo', options.editorSession.commands.redo],
+    ['copy', options.editorSession.commands.copySelection],
+    ['cut', options.editorSession.commands.cutSelection],
+    ['paste', options.editorSession.commands.pasteClipboard],
+    ['duplicate', options.editorSession.commands.duplicateSelection],
+    ['selectAll', options.editorSession.commands.selectAllRackDevices],
+  ];
+  const rackCommands: readonly ShortcutCommand[] = [
+    ['collapseSelection', options.editorSession.commands.collapseSelection],
+    ['expandSelection', options.editorSession.commands.expandSelection],
+    ['deleteSelection', options.editorSession.commands.deleteSelection],
+  ];
+  const fileActions: readonly ShortcutAction[] = [
+    ['newRack', () => options.onNewRack?.()],
+    ['saveRackAs', () => options.onSaveRackAs?.()],
+    ['saveRack', () => options.onSaveRack?.()],
+  ];
+
+  const runCommandShortcut = (
+    event: KeyboardEvent,
+    commands: readonly ShortcutCommand[],
+  ): boolean => {
+    const command = commands.find(([id]) =>
+      matchesAppShortcut(event, id, options.platform));
+    if (!command) {
+      return false;
+    }
+
+    closeContextMenuIfHandled(command[1](), options.closeContextMenu, event);
+    return true;
+  };
+
+  const runActionShortcut = (event: KeyboardEvent): boolean => {
+    const action = fileActions.find(([id]) =>
+      matchesAppShortcut(event, id, options.platform));
+    if (!action) {
+      return false;
+    }
+
+    event.preventDefault();
+    options.closeContextMenu();
+    void action[1]();
+    return true;
+  };
+
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape') {
       options.closeContextMenu();
@@ -66,109 +127,15 @@ export const mountKeyboardShortcuts = (
       return;
     }
 
-    const isGroupShortcut =
-      (event.metaKey || event.ctrlKey)
-      && event.key.toLowerCase() === 'g';
-    if (isGroupShortcut) {
-      const handled = event.shiftKey
-        ? options.editorSession.commands.ungroupSelectedGroups()
-        : options.editorSession.commands.groupSelection();
-      closeContextMenuIfHandled(handled, options.closeContextMenu, event);
+    if (matchesAppShortcut(event, 'renameSelection', options.platform)) {
+      event.preventDefault();
+      if (options.editorSession.commands.beginRenameSelection()) {
+        options.closeContextMenu();
+      }
       return;
     }
 
-    const isModifierShortcut = (event.metaKey || event.ctrlKey) && !event.altKey;
-    if (isModifierShortcut) {
-      const key = event.key.toLowerCase();
-
-      if (key === 'r' && !event.shiftKey) {
-        event.preventDefault();
-        if (options.editorSession.commands.beginRenameSelection()) {
-          options.closeContextMenu();
-        }
-        return;
-      }
-
-      if (key === 'n' && !event.shiftKey) {
-        event.preventDefault();
-        options.closeContextMenu();
-        void options.onNewRack?.();
-        return;
-      }
-
-      if (key === 's') {
-        event.preventDefault();
-        options.closeContextMenu();
-        void (event.shiftKey
-          ? options.onSaveRackAs?.()
-          : options.onSaveRack?.());
-        return;
-      }
-
-      if (key === 'z' && !event.shiftKey) {
-        closeContextMenuIfHandled(
-          options.editorSession.commands.undo(),
-          options.closeContextMenu,
-          event,
-        );
-        return;
-      }
-
-      const isRedoShortcut =
-        (key === 'z' && event.shiftKey)
-        || (key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey);
-      if (isRedoShortcut) {
-        closeContextMenuIfHandled(
-          options.editorSession.commands.redo(),
-          options.closeContextMenu,
-          event,
-        );
-        return;
-      }
-
-      if (key === 'c') {
-        closeContextMenuIfHandled(
-          options.editorSession.commands.copySelection(),
-          options.closeContextMenu,
-          event,
-        );
-        return;
-      }
-
-      if (key === 'x') {
-        closeContextMenuIfHandled(
-          options.editorSession.commands.cutSelection(),
-          options.closeContextMenu,
-          event,
-        );
-        return;
-      }
-
-      if (key === 'v') {
-        closeContextMenuIfHandled(
-          options.editorSession.commands.pasteClipboard(),
-          options.closeContextMenu,
-          event,
-        );
-        return;
-      }
-
-      if (key === 'd') {
-        closeContextMenuIfHandled(
-          options.editorSession.commands.duplicateSelection(),
-          options.closeContextMenu,
-          event,
-        );
-        return;
-      }
-
-      if (key === 'a') {
-        closeContextMenuIfHandled(
-          options.editorSession.commands.selectAllRackDevices(),
-          options.closeContextMenu,
-          event,
-        );
-      }
+    if (runActionShortcut(event) || runCommandShortcut(event, selectionCommands)) {
       return;
     }
 
@@ -176,7 +143,7 @@ export const mountKeyboardShortcuts = (
       return;
     }
 
-    if (event.key === '0' && !event.altKey && !event.shiftKey) {
+    if (matchesAppShortcut(event, 'toggleEnabled', options.platform)) {
       if (!event.repeat) {
         closeContextMenuIfHandled(
           options.editorSession.commands.toggleSelectedDevicesEnabled(),
@@ -187,15 +154,7 @@ export const mountKeyboardShortcuts = (
       return;
     }
 
-    if (event.key !== 'Delete' && event.key !== 'Backspace') {
-      return;
-    }
-
-    closeContextMenuIfHandled(
-      options.editorSession.commands.deleteSelection(),
-      options.closeContextMenu,
-      event,
-    );
+    runCommandShortcut(event, rackCommands);
   };
 
   const handleFocusIn = (event: FocusEvent): void => {

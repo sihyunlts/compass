@@ -2,17 +2,24 @@
   import FloatingDropdown from '../primitives/FloatingDropdown.svelte';
   import SplitButton from '../primitives/SplitButton.svelte';
   import { i18n } from '../../i18n.svelte';
+  import {
+    resolveShortcutPresentation,
+    type AppShortcutId,
+    type ShortcutPlatform,
+  } from '../../../shared/keyboard-shortcuts';
 
   type RackActionItem = {
     id: string;
     label: string;
     run: () => void;
+    shortcutId?: AppShortcutId;
     disabled?: boolean;
     separatorBefore?: boolean;
   };
 
   let {
     title,
+    platform,
     dirty = false,
     disabled = false,
     onNewRack,
@@ -23,6 +30,7 @@
     onEditRackInfo,
   } = $props<{
     title: string;
+    platform: ShortcutPlatform;
     dirty?: boolean;
     disabled?: boolean;
     onNewRack: () => void;
@@ -49,9 +57,20 @@
       id: 'rack-new-button',
       label: i18n.t('rack.new'),
       run: onNewRack,
+      shortcutId: 'newRack',
     },
-    { id: 'rack-save-button', label: i18n.t('rack.save'), run: onSaveRack },
-    { id: 'rack-save-as-button', label: i18n.t('rack.saveAs'), run: onSaveRackAs },
+    {
+      id: 'rack-save-button',
+      label: i18n.t('rack.save'),
+      run: onSaveRack,
+      shortcutId: 'saveRack',
+    },
+    {
+      id: 'rack-save-as-button',
+      label: i18n.t('rack.saveAs'),
+      run: onSaveRackAs,
+      shortcutId: 'saveRackAs',
+    },
     {
       id: 'rack-revert-button',
       label: i18n.t('rack.revertSaved'),
@@ -111,18 +130,27 @@
       aria-label={i18n.t('rack.actions')}
     >
       {#each rackActions as action (action.id)}
+        {@const shortcut = action.shortcutId
+          ? resolveShortcutPresentation(action.shortcutId, platform)
+          : null}
         {#if action.separatorBefore}
           <hr class="floating-menu-separator" />
         {/if}
         <button
           id={action.id}
-          class="floating-menu-item"
+          class="floating-menu-item floating-menu-action"
           type="button"
           role="menuitem"
+          aria-keyshortcuts={disabled || action.disabled
+            ? undefined
+            : shortcut?.ariaKeyShortcuts}
           disabled={disabled || action.disabled}
           onclick={() => runAction(action)}
         >
-          {action.label}
+          <span>{action.label}</span>
+          {#if shortcut}
+            <kbd class="floating-menu-shortcut" aria-hidden="true">{shortcut.display}</kbd>
+          {/if}
         </button>
       {/each}
     </div>
