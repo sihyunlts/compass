@@ -9,6 +9,7 @@
   import NumberField from '../fields/NumberField.svelte';
   import { i18n } from '../../i18n.svelte';
   import { buildNumericInputControlChange } from '../../features/rack/control-target';
+  import TimelineVisualizer from './TimelineVisualizer.svelte';
 
   const SNAP_DIVISION_OPTIONS = [4, 8, 16, 32, 64] as const;
   type TimeWindowEditorMode = 'stretch' | 'trim';
@@ -35,7 +36,7 @@
     onControlChange: (change: RendererControlChange) => void;
   }>();
 
-  let snapDivisions = $state<number>(16);
+  let snapDivisions = $state<(typeof SNAP_DIVISION_OPTIONS)[number]>(16);
   const resolvedMin = $derived(parameter?.input.min ?? 0);
   const resolvedMax = $derived(parameter?.input.max ?? 1);
 
@@ -57,28 +58,56 @@
       ? (visibleEnd - visibleStart).toFixed(3)
       : i18n.t('control.invalid'),
   );
-  const normalizedPlayhead = $derived(
-    clamp(Number.isFinite(currentProgress01) ? currentProgress01 : 0, 0, 1),
-  );
-  const displayedPlayhead = $derived(
-    mode === 'trim' && hasValidWindow
-      ? visibleStart + (visibleEnd - visibleStart) * normalizedPlayhead
-      : normalizedPlayhead,
-  );
-  const showsPlayhead = $derived(currentProgress01 !== undefined && currentProgress01 !== null);
+  const displayedPlayhead = $derived.by(() => {
+    if (currentProgress01 === undefined || currentProgress01 === null) {
+      return null;
+    }
+
+    const progress = clamp(Number.isFinite(currentProgress01) ? currentProgress01 : 0, 0, 1);
+    return mode === 'trim' && hasValidWindow
+      ? visibleStart + (visibleEnd - visibleStart) * progress
+      : progress;
+  });
   const rangeStep = $derived(1 / snapDivisions);
-  const ticks = $derived.by(() =>
-    Array.from({ length: snapDivisions + 1 }, (_, index) => ({
-      index,
-      ratio: index / snapDivisions,
-      isMajor: index === 0 || index === snapDivisions || index % Math.max(1, snapDivisions / 4) === 0,
-    })).filter((tick) => tick.index > 0 && tick.index < snapDivisions));
+  const ticks = $derived.by(() => Array.from(
+    { length: snapDivisions - 1 },
+    (_, offset) => {
+      const index = offset + 1;
+      const ratio = index / snapDivisions;
+      return {
+        index,
+        ratio,
+        isMajor: index % (snapDivisions / 4) === 0,
+        isInsideSelectedSpan: hasValidWindow
+          && ratio >= visibleStart - 1e-9
+          && ratio <= visibleEnd + 1e-9,
+        isOnSelectedBoundary: hasValidWindow
+          && (
+            Math.abs(ratio - visibleStart) <= 1e-9
+            || Math.abs(ratio - visibleEnd) <= 1e-9
+          ),
+      };
+    },
+  ));
 
-  const setSnapDivisions = (nextDivisions: number): void => {
-    snapDivisions = nextDivisions;
-  };
+  const emitControlChange = (
+    event: Event,
+    paramKey: 'start' | 'end',
+    finalize: boolean,
+  ): void => {
+    const input = event.currentTarget;
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
 
-  const emitControlChange = (event: Event, paramKey: string, finalize: boolean): void => {
+    const value = Number(input.value);
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    input.value = String(paramKey === 'start'
+      ? clamp(value, resolvedMin, Math.max(resolvedMin, clampedEnd - rangeStep))
+      : clamp(value, Math.min(resolvedMax, clampedStart + rangeStep), resolvedMax));
     const change = buildNumericInputControlChange(event, {
       action: dataAction,
       deviceId,
@@ -102,37 +131,30 @@
       <button
         class:selected={snapDivisions === divisions}
         type="button"
-        onclick={() => setSnapDivisions(divisions)}
+        onclick={() => snapDivisions = divisions}
       >
         {divisions}
       </button>
     {/each}
   </div>
 
-  <div class="time-window-ruler" aria-hidden="true">
-    <span>0</span>
-    <span>0.5</span>
-    <span>1</span>
-  </div>
-
   <div
     class="time-window-surface"
     class:is-invalid={!hasValidWindow}
-    style={`--window-start:${visibleStart * 100}%;--window-end:${visibleEnd * 100}%;--playhead:${displayedPlayhead * 100}%;`}
+    style={`--window-start:${visibleStart * 100}%;--window-end:${visibleEnd * 100}%;`}
   >
-    <div class="time-window-track" aria-hidden="true">
+    <TimelineVisualizer playheadProgress01={displayedPlayhead}>
       <div class="time-window-selected-span"></div>
-      {#if showsPlayhead}
-        <div class="time-window-playhead"></div>
-      {/if}
       {#each ticks as tick (tick.index)}
         <span
           class="time-window-tick"
           class:is-major={tick.isMajor}
+          class:is-inside-selected-span={tick.isInsideSelectedSpan}
+          class:is-on-selected-boundary={tick.isOnSelectedBoundary}
           style={`left:${tick.ratio * 100}%;`}
         ></span>
       {/each}
-    </div>
+    </TimelineVisualizer>
 
     <div class="time-window-handle-layer">
       <input
@@ -195,7 +217,6 @@
     gap: var(--gap-8);
   }
 
-  .time-window-ruler,
   .time-window-inputs {
     display: flex;
     align-items: flex-start;
@@ -223,12 +244,6 @@
     }
   }
 
-  .time-window-ruler {
-    justify-content: space-between;
-    color: var(--color-text-secondary);
-    font-size: var(--text-12);
-  }
-
   .time-window-surface {
     position: relative;
 
@@ -239,36 +254,20 @@
     }
   }
 
-  .time-window-track {
-    position: relative;
-    height: 1.75rem;
-    border-radius: var(--radius-4);
-    background: var(--color-surface-interactive);
-    overflow: hidden;
-  }
-
   .time-window-selected-span,
-  .time-window-playhead,
   .time-window-tick {
     position: absolute;
   }
 
   .time-window-selected-span {
+    box-sizing: border-box;
     top: 0;
     bottom: 0;
     left: var(--window-start, 0%);
     width: calc(var(--window-end, 0%) - var(--window-start, 0%));
-    background: var(--time-window-accent);
-    opacity: 0.85;
-  }
-
-  .time-window-playhead {
-    top: 0;
-    bottom: 0;
-    left: var(--playhead, 0%);
-    width: 2px;
-    background: var(--color-surface-inverse);
-    transform: translateX(-1px);
+    border: 1px solid var(--time-window-accent);
+    border-radius: var(--radius-4);
+    background: color-mix(in srgb, var(--time-window-accent) 32%, transparent);
   }
 
   .time-window-tick {
@@ -281,6 +280,15 @@
 
     &.is-major {
       background: var(--color-overlay-highlight-primary);
+    }
+
+    &.is-inside-selected-span {
+      top: 1px;
+      bottom: 1px;
+    }
+
+    &.is-on-selected-boundary {
+      display: none;
     }
   }
 
@@ -299,6 +307,7 @@
     width: calc(100% + 0.9rem);
     max-width: none;
     margin-left: -0.45rem;
+    pointer-events: none;
     --range-fill: 0%;
     --range-fill-color: transparent;
     --range-track-color: transparent;
@@ -317,6 +326,12 @@
       background: var(--color-surface-inverse);
       margin-top: 0;
       opacity: 1;
+      pointer-events: auto;
+      cursor: grab;
+    }
+
+    &:active::-webkit-slider-thumb {
+      cursor: grabbing;
     }
   }
 
