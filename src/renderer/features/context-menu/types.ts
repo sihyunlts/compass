@@ -69,3 +69,25 @@ export const isPresetDeleteContextTarget = (
   target: ContextMenuTarget,
 ): target is PresetDeleteContextTarget =>
   target.kind === 'preset-entry' || target.kind === 'preset-entries';
+
+export const canRenamePresetContextTarget = (
+  target: PresetBrowserContextTarget,
+): target is PresetEntryContextTarget =>
+  target.kind === 'preset-entry'
+  && target.relativePath.length > 0
+  && target.source === 'user'
+  && !target.isSystemFolder;
+
+export const canDeletePresetContextTarget = (
+  target: PresetBrowserContextTarget,
+): boolean => target.kind === 'preset-entry'
+  ? target.relativePath.length > 0
+    && target.source === 'user'
+    && !target.isSystemFolder
+  : target.entries.length > 0
+    && target.entries.every(
+      (entry) =>
+        entry.relativePath.length > 0
+        && entry.source === 'user'
+        && !entry.isSystemFolder,
+    );

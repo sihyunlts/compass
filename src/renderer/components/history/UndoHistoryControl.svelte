@@ -4,6 +4,7 @@
   import type { EditorHistoryListEntry } from '../../features/editor/editor-history';
   import type { ChainHistoryKind } from '../../features/editor/history-core';
   import { resolveHistoryActionLabel } from '../../features/editor/history-i18n';
+  import type { ShortcutPresentation } from '../../../shared/keyboard-shortcuts';
   import SplitButton from '../primitives/SplitButton.svelte';
   import UndoHistoryDropdown from './UndoHistoryDropdown.svelte';
   import { i18n } from '../../i18n.svelte';
@@ -12,12 +13,14 @@
     canUndo,
     undoActionKind,
     historyEntries,
+    shortcut,
     onUndo,
     onCheckout,
   } = $props<{
     canUndo: boolean;
     undoActionKind: ChainHistoryKind | null;
     historyEntries: EditorHistoryListEntry[];
+    shortcut: ShortcutPresentation;
     onUndo: () => void;
     onCheckout: (id: string) => void;
   }>();
@@ -56,6 +59,7 @@
     label={canUndo
       ? i18n.t('history.undoAction', { action: localizedUndoActionLabel })
       : i18n.t('history.undoUnavailable')}
+    {shortcut}
     menuId="undo-history-trigger"
     menuDisabled={!canCheckoutHistory}
     menuLabel={i18n.t('history.showUndoHistory')}

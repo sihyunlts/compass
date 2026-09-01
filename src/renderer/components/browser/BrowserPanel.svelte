@@ -40,6 +40,14 @@
     PresetBrowserContextTarget,
     PresetEntryContextTarget,
   } from '../../features/context-menu/types';
+  import {
+    canDeletePresetContextTarget,
+    canRenamePresetContextTarget,
+  } from '../../features/context-menu/types';
+  import {
+    matchesAppShortcut,
+    type ShortcutPlatform,
+  } from '../../../shared/keyboard-shortcuts';
   import type { BrowserInsertSource } from '../../features/rack/types';
   import type {
     ThemePresetId,
@@ -334,6 +342,7 @@
 
   let {
     activePage = 'devices',
+    platform,
     deviceTree = [] as BrowserTreeDeviceFolderNode[],
     presetTree = [] as BrowserTreePresetFolderNode[],
     presetOccupiedPaths = [] as PresetEntryPath[],
@@ -382,8 +391,11 @@
     onPendingPresetFolderDraftCancel = () => {},
     onPresetEntriesMove = () => {},
     onPresetEntrySelectionHandled = () => {},
+    onPresetRenameRequest = () => {},
+    onPresetDeleteRequest = () => {},
   } = $props<{
     activePage?: BrowserPage;
+    platform: ShortcutPlatform;
     deviceTree: BrowserTreeDeviceFolderNode[];
     presetTree: BrowserTreePresetFolderNode[];
     presetOccupiedPaths?: PresetEntryPath[];
@@ -446,6 +458,8 @@
       destination: BrowserPresetMoveDestination,
     ) => void | Promise<void>;
     onPresetEntrySelectionHandled?: (token: number) => void;
+    onPresetRenameRequest?: (target: PresetEntryContextTarget) => void;
+    onPresetDeleteRequest?: (target: PresetBrowserContextTarget) => void;
   }>();
 
   let expandedFolderIds = $state<string[]>([]);
@@ -1141,6 +1155,52 @@
       return;
     }
 
+    const clickedPresetTarget = resolvePresetContextMenuTarget(row.node);
+    const selectedPresetTarget = clickedPresetTarget
+      ? browserSelection.includes(row.node.id)
+        ? resolveSelectedPresetContextMenuTarget(clickedPresetTarget)
+        : clickedPresetTarget
+      : null;
+
+    if (matchesAppShortcut(event, 'renameSelection', platform)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (
+        selectedPresetTarget
+        && canRenamePresetContextTarget(selectedPresetTarget)
+      ) {
+        onPresetRenameRequest(selectedPresetTarget);
+      }
+      return;
+    }
+
+    if (matchesAppShortcut(event, 'deletePresetEntries', platform)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (
+        selectedPresetTarget
+        && canDeletePresetContextTarget(selectedPresetTarget)
+      ) {
+        onPresetDeleteRequest(selectedPresetTarget);
+      }
+      return;
+    }
+
+    if (matchesAppShortcut(event, 'deleteSelection', platform)) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
+    if (
+      matchesAppShortcut(event, 'collapseSelection', platform)
+      || matchesAppShortcut(event, 'expandSelection', platform)
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
+
     if (event.key === ' ' || event.key === 'Spacebar') {
       event.preventDefault();
       if (event.repeat) {
@@ -1370,7 +1430,11 @@
   onMount(() => presetMoveDrag.mount());
 </script>
 
-<aside class="browser-panel" class:has-titlebar-spacer={reserveTitlebarSpace}>
+<aside
+  class="browser-panel"
+  class:has-titlebar-spacer={reserveTitlebarSpace}
+  data-app-keyboard-scope="local"
+>
   <div
     class="browser-page-top-boundary"
     class:is-window-drag-region={reserveTitlebarSpace}

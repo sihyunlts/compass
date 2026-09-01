@@ -7,6 +7,7 @@
 
   import { clamp } from '../shared/math';
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
+  import { resolveShortcutPresentation } from '../shared/keyboard-shortcuts';
   import { DEVICE_BROWSER_TREE } from './features/editor/device-browser-categories';
   import {
     loadHardwareOutputId,
@@ -74,8 +75,10 @@
   const bridgeClient = resolveCompassBridge();
   const isWebFallback = !window.compass;
   const resultDeliveryMode = isWebFallback ? 'midi-download' : 'ableton';
-  const hasWindowsTitlebarControls = navigator.userAgent.includes('Windows');
+  const hasWindowsTitlebarControls = bridgeClient.platform === 'windows';
   const reserveBrowserTitlebarSpace = !isWebFallback && !hasWindowsTitlebarControls;
+  const undoShortcut = resolveShortcutPresentation('undo', bridgeClient.platform);
+  const redoShortcut = resolveShortcutPresentation('redo', bridgeClient.platform);
   let rackViewApi: RackViewApi | null = $state(null);
   let contextMenuComponent: ReturnType<typeof ContextMenu> | null = $state(null);
   let mainWindowAlwaysOnTop = $state(loadMainWindowAlwaysOnTop());
@@ -465,6 +468,7 @@
     });
     const disposeKeyboardShortcuts = mountKeyboardShortcuts({
       editorSession,
+      platform: bridgeClient.platform,
       closeContextMenu,
       interactiveElementSelector: INTERACTIVE_ELEMENT_SELECTOR,
       onNewRack: () => presetController.handleNewRack(),
@@ -570,6 +574,7 @@
   class:has-windows-titlebar-controls={hasWindowsTitlebarControls}
 >
     <BrowserPanel
+      platform={bridgeClient.platform}
       reserveTitlebarSpace={reserveBrowserTitlebarSpace}
       canToggleWindowLayer={!isWebFallback}
       {mainWindowAlwaysOnTop}
@@ -639,6 +644,8 @@
         presetController.movePresetEntries(entries, destination)}
       onPresetEntrySelectionHandled={(token) =>
         presetController.clearPresetEntrySelectionTarget(token)}
+      onPresetRenameRequest={handleContextMenuRename}
+      onPresetDeleteRequest={handleContextMenuDelete}
     />
 
     {#if uiState.sidebarPage !== 'settings'}
@@ -663,6 +670,7 @@
 
           <WorkspaceRackTitle
             title={presetState.currentRackDisplayName}
+            platform={bridgeClient.platform}
             dirty={presetState.isRackDirty}
             disabled={presetState.isRackPresetLoadPending}
             onNewRack={() => presetController.handleNewRack()}
@@ -689,6 +697,7 @@
             canUndo={historyControls.canUndo}
             undoActionKind={historyControls.undoActionKind}
             {historyEntries}
+            shortcut={undoShortcut}
             onUndo={handleUndoClick}
             onCheckout={editorSession.commands.checkoutHistory}
           />
@@ -702,6 +711,7 @@
             label={historyControls.canRedo
               ? i18n.t('history.redoAction', { action: localizedRedoActionLabel })
               : i18n.t('history.redoUnavailable')}
+            shortcut={redoShortcut}
             onClick={handleRedoClick}
           />
           <div class="header-length-select">
@@ -787,6 +797,7 @@
   </section>
   <ContextMenu
     bind:this={contextMenuComponent}
+    platform={bridgeClient.platform}
     onCopy={editorSession.commands.copyFromContextTarget}
     onCut={editorSession.commands.cutFromContextTarget}
     onPaste={editorSession.commands.pasteFromContextTarget}

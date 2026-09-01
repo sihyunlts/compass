@@ -33,6 +33,7 @@ import type {
   SendGeneratedPreviewResponse,
 } from './generator';
 import type { UpdateCheckResponse } from './releases';
+import type { ShortcutPlatform } from '../../keyboard-shortcuts';
 
 export interface MainWindowDocumentState {
   edited: boolean;
@@ -83,6 +84,7 @@ export const parsePreviewWindowControlRequest = (
 };
 
 export interface CompassApi {
+  platform: ShortcutPlatform;
   sendGeneratedPreview: (
     request: SendGeneratedPreviewRequest,
   ) => Promise<SendGeneratedPreviewResponse>;

@@ -341,6 +341,8 @@ export class EditorSession {
     pasteClipboard: (): boolean => this.pasteClipboard(),
     duplicateSelection: (): boolean => this.duplicateSelection(),
     toggleSelectedDevicesEnabled: (): boolean => this.toggleSelectedDevicesEnabled(),
+    collapseSelection: (): boolean => this.setSelectedDevicesCollapsed(true),
+    expandSelection: (): boolean => this.setSelectedDevicesCollapsed(false),
     selectAllRackDevices: (): boolean => {
       const rackBinding = this.rackBinding;
       if (!rackBinding) {
@@ -653,6 +655,26 @@ export class EditorSession {
     }
 
     this.applyChainMutation(nextChain, EDITOR_HISTORY_META.deviceToggleEnabled);
+    return true;
+  }
+
+  private setSelectedDevicesCollapsed(collapsed: boolean): boolean {
+    const selection = this.resolveCurrentSelection();
+    if (!selection) {
+      return false;
+    }
+
+    const selectedDeviceIds = selection.kind === 'group'
+      ? selection.memberDeviceIds
+      : selection.deviceIds;
+    if (collapsed) {
+      mergeCollapsedDeviceIds(this.state, selectedDeviceIds);
+    } else {
+      replaceCollapsedDeviceIds(
+        this.state,
+        this.state.collapsedDeviceIds.filter((id) => !selectedDeviceIds.includes(id)),
+      );
+    }
     return true;
   }
 

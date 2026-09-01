@@ -272,6 +272,19 @@ html.reduce-animation {
   }
 }
 
+.floating-menu-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-16);
+}
+
+.floating-menu-item:disabled .floating-menu-shortcut,
+.floating-menu-item[aria-disabled='true'] .floating-menu-shortcut,
+.floating-menu-item.is-disabled .floating-menu-shortcut {
+  color: inherit;
+}
+
 .floating-menu-separator {
   margin: var(--gap-4) var(--gap-6);
   border: 0;
@@ -303,6 +316,25 @@ html.reduce-animation {
       cubic-bezier(0, 0.5, 0.5, 1)
       both;
   }
+}
+
+.app-hint.has-shortcut {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-6);
+}
+
+.app-hint-label {
+  min-width: 0;
+}
+
+.app-hint-shortcut,
+.floating-menu-shortcut {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+  font-family: inherit;
+  font-size: var(--text-12);
+  line-height: inherit;
 }
 
 .app-hint.preset-browser-preview-hint {

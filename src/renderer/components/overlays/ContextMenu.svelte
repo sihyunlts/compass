@@ -1,29 +1,24 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
   import {
+    canDeletePresetContextTarget,
+    canRenamePresetContextTarget,
     isPresetBrowserContextTarget,
     isRackSelectionContextTarget,
     type ModulationParameterContextTarget,
     type ContextMenuTarget,
     type PresetEntryContextTarget,
   } from '../../features/context-menu/types';
-  import {
-    attachFloatingLayerDismissHandlers,
-    isEventTargetWithinFloatingLayer,
-    resolveViewportFloatingLayerPosition,
-    waitForFloatingLayerRender,
-  } from './floating-layer';
-  import { FloatingLayerPresence } from './floating-layer-presence.svelte';
-  import {
-    activateFloatingLayer,
-    createFloatingLayerId,
-    deactivateFloatingLayer,
-    resolveFloatingLayerParentId,
-  } from './floating-layer-stack';
   import { i18n } from '../../i18n.svelte';
   import type { MessageKey } from '../../../shared/i18n';
+  import {
+    resolveShortcutPresentation,
+    type AppShortcutId,
+    type ShortcutPlatform,
+  } from '../../../shared/keyboard-shortcuts';
+  import FloatingDropdown from '../primitives/FloatingDropdown.svelte';
 
   let {
+    platform,
     onCopy,
     onCut,
     onPaste,
@@ -38,6 +33,7 @@
     onDisconnectModulation,
     clipboardAvailable = false,
   } = $props<{
+    platform: ShortcutPlatform;
     onCopy: (target: ContextMenuTarget) => void;
     onCut: (target: ContextMenuTarget) => void;
     onPaste: (target: ContextMenuTarget) => void;
@@ -57,35 +53,16 @@
   }>();
 
   let isOpen = $state(false);
-  let isPositioned = $state(false);
-  let x = $state(0);
-  let y = $state(0);
+  let anchorPoint = $state<{ x: number; y: number } | null>(null);
   let target = $state<ContextMenuTarget | null>(null);
-  let menuEl = $state<HTMLElement | null>(null);
-  let floatingLayerStackOrder = $state(1);
-  let openToken = 0;
-  const floatingLayerId = createFloatingLayerId('context-menu');
-  const presence = new FloatingLayerPresence();
 
   const isPresetBrowserTarget = $derived.by(() =>
     isPresetBrowserContextTarget(target));
-  const isDeletablePresetTarget = $derived.by(() =>
-    (
-      target?.kind === 'preset-entry'
-      && target.relativePath.length > 0
-      && target.source === 'user'
-      && !target.isSystemFolder
-    )
-    || (
-      target?.kind === 'preset-entries'
-      && target.entries.length > 0
-      && target.entries.every(
-        (entry) =>
-          entry.relativePath.length > 0
-          && entry.source === 'user'
-          && !entry.isSystemFolder,
-      )
-    ));
+  const isDeletablePresetTarget = $derived(
+    isPresetBrowserContextTarget(target)
+      ? canDeletePresetContextTarget(target)
+      : false,
+  );
   const canCreatePresetFolder = $derived.by(() =>
     target?.kind === 'preset-entry'
     && target.entryKind === 'directory'
@@ -100,13 +77,25 @@
     id: string;
     kind: ClipboardActionKind;
     labelKey: MessageKey;
+    shortcutId: AppShortcutId;
     requiresClipboard?: boolean;
   };
   const CLIPBOARD_ACTIONS: readonly ClipboardActionMeta[] = [
-    { id: 'context-cut', kind: 'cut', labelKey: 'context.cut' },
-    { id: 'context-copy', kind: 'copy', labelKey: 'context.copy' },
-    { id: 'context-paste', kind: 'paste', labelKey: 'context.paste', requiresClipboard: true },
-    { id: 'context-duplicate', kind: 'duplicate', labelKey: 'context.duplicate' },
+    { id: 'context-cut', kind: 'cut', labelKey: 'context.cut', shortcutId: 'cut' },
+    { id: 'context-copy', kind: 'copy', labelKey: 'context.copy', shortcutId: 'copy' },
+    {
+      id: 'context-paste',
+      kind: 'paste',
+      labelKey: 'context.paste',
+      shortcutId: 'paste',
+      requiresClipboard: true,
+    },
+    {
+      id: 'context-duplicate',
+      kind: 'duplicate',
+      labelKey: 'context.duplicate',
+      shortcutId: 'duplicate',
+    },
   ];
   const visibleClipboardActions = $derived.by(() =>
     isRackSelectionContextTarget(target)
@@ -114,9 +103,7 @@
       : []);
   const canRenameTarget = $derived.by(() => {
     if (target?.kind === 'preset-entry') {
-      return target.source === 'user'
-        && !target.isSystemFolder
-        && (target.entryKind === 'file' || target.relativePath.length > 0);
+      return canRenamePresetContextTarget(target);
     }
     if (!isRackSelectionContextTarget(target)) {
       return false;
@@ -131,7 +118,7 @@
     )
     || target?.kind === 'group'
     || (target?.kind === 'devices' && target.deviceIds.length === 1));
-  export async function open(clientX: number, clientY: number, nextTarget: ContextMenuTarget) {
+  export function open(clientX: number, clientY: number, nextTarget: ContextMenuTarget) {
     if (
       (nextTarget.kind === 'devices' && nextTarget.deviceIds.length === 0)
       || (nextTarget.kind === 'group' && nextTarget.memberDeviceIds.length === 0)
@@ -141,62 +128,13 @@
     }
 
     target = structuredClone(nextTarget);
-    const sourceElement = document.elementFromPoint(clientX, clientY);
-    deactivateFloatingLayer(floatingLayerId);
-    activateFloatingLayer({
-      id: floatingLayerId,
-      parentId: resolveFloatingLayerParentId(sourceElement, floatingLayerId),
-      containsEventTarget: (eventTarget) => isEventTargetWithinFloatingLayer(eventTarget, menuEl),
-      onDismissRequest: close,
-      onStackOrderChange: (stackOrder) => {
-        floatingLayerStackOrder = stackOrder;
-      },
-    });
-    presence.show();
-    isPositioned = false;
+    anchorPoint = { x: clientX, y: clientY };
     isOpen = true;
-    const token = ++openToken;
-    await tick();
-    await waitForFloatingLayerRender();
-
-    if (!menuEl || token !== openToken || !isOpen) {
-      return;
-    }
-
-    const nextPosition = resolveViewportFloatingLayerPosition(clientX, clientY, {
-      width: menuEl.offsetWidth,
-      height: menuEl.offsetHeight,
-    });
-
-    x = nextPosition.x;
-    y = nextPosition.y;
-    isPositioned = true;
   }
 
   export function close() {
-    openToken += 1;
-    const focusedElement = document.activeElement;
-    if (focusedElement instanceof HTMLElement && menuEl?.contains(focusedElement)) {
-      focusedElement.blur();
-    }
     isOpen = false;
-    if (!presence.rendered || presence.exiting) {
-      return;
-    }
-
-    const finishClose = (): void => {
-      deactivateFloatingLayer(floatingLayerId);
-      isPositioned = false;
-      target = null;
-    };
-
-    if (!menuEl || !isPositioned) {
-      presence.hideImmediately();
-      finishClose();
-      return;
-    }
-
-    presence.hide([{ element: menuEl }], finishClose);
+    anchorPoint = null;
   }
 
   function handleDeleteClick() {
@@ -290,48 +228,40 @@
     close();
   }
 
-  onMount(() => {
-    const detachDismissHandlers = attachFloatingLayerDismissHandlers({
-      layerId: floatingLayerId,
-      isActive: () => isOpen,
-      containsEventTarget: (eventTarget) => isEventTargetWithinFloatingLayer(eventTarget, menuEl),
-      onPointerDownOutside: close,
-      onResize: close,
-      onDismissRequest: close,
-    });
-
-    return () => {
-      deactivateFloatingLayer(floatingLayerId);
-      presence.destroy();
-      detachDismissHandlers();
-    };
-  });
 </script>
 
-{#snippet menuItem(id: string, label: string, handler: () => void)}
+{#snippet menuItem(
+  id: string,
+  label: string,
+  handler: () => void,
+  shortcutId?: AppShortcutId,
+)}
+{@const shortcut = shortcutId
+  ? resolveShortcutPresentation(shortcutId, platform)
+  : null}
 <button
   {id}
-  class="floating-menu-item"
+  class="floating-menu-item floating-menu-action"
   type="button"
   role="menuitem"
+  aria-keyshortcuts={shortcut?.ariaKeyShortcuts}
   onclick={handler}
 >
-  {label}
+  <span>{label}</span>
+  {#if shortcut}
+    <kbd class="floating-menu-shortcut" aria-hidden="true">{shortcut.display}</kbd>
+  {/if}
 </button>
 {/snippet}
 
-<div
-  bind:this={menuEl}
-  id="context-menu"
-  class="context-menu floating-menu-surface"
-  class:is-open={presence.rendered && isPositioned}
-  role="menu"
-  aria-hidden={!isOpen || !isPositioned}
-  hidden={!presence.rendered}
-  style:transform={presence.rendered ? `translate3d(${x}px, ${y}px, 0)` : undefined}
-  style:--floating-layer-stack-order={floatingLayerStackOrder}
+<FloatingDropdown
+  open={isOpen}
+  {anchorPoint}
+  class="context-menu"
+  onClose={() => close()}
 >
   {#if target}
+    <div id="context-menu" class="floating-menu-list" role="menu">
     {#if isPresetBrowserTarget}
       {#if canShowInfo}
         {@render menuItem('context-info', i18n.t('context.info'), handleInfoClick)}
@@ -340,13 +270,23 @@
         {@render menuItem('context-new-folder', i18n.t('context.newFolder'), handleCreatePresetFolderClick)}
       {/if}
       {#if canRenameTarget}
-        {@render menuItem('context-rename', i18n.t('context.rename'), handleRenameClick)}
+        {@render menuItem(
+          'context-rename',
+          i18n.t('context.rename'),
+          handleRenameClick,
+          'renameSelection',
+        )}
       {/if}
       {#if isDeletablePresetTarget}
         {#if canCreatePresetFolder || canRenameTarget}
           <hr class="floating-menu-separator" />
         {/if}
-        {@render menuItem('context-delete', i18n.t('context.delete'), handleDeleteClick)}
+        {@render menuItem(
+          'context-delete',
+          i18n.t('context.delete'),
+          handleDeleteClick,
+          'deletePresetEntries',
+        )}
         {#if canShowInFolder}
           <hr class="floating-menu-separator" />
         {/if}
@@ -381,34 +321,52 @@
         {@render menuItem('context-info', i18n.t('context.info'), handleInfoClick)}
       {/if}
       {#each visibleClipboardActions as action (action.id)}
-        {@render menuItem(action.id, i18n.t(action.labelKey), () => handleClipboardAction(action.kind))}
+        {@render menuItem(
+          action.id,
+          i18n.t(action.labelKey),
+          () => handleClipboardAction(action.kind),
+          action.shortcutId,
+        )}
       {/each}
       {#if canRenameTarget}
-        {@render menuItem('context-rename', i18n.t('context.rename'), handleRenameClick)}
+        {@render menuItem(
+          'context-rename',
+          i18n.t('context.rename'),
+          handleRenameClick,
+          'renameSelection',
+        )}
       {/if}
       <hr class="floating-menu-separator" />
       {#if target.kind === 'devices'}
-        {@render menuItem('context-delete', i18n.t('context.delete'), handleDeleteClick)}
+        {@render menuItem(
+          'context-delete',
+          i18n.t('context.delete'),
+          handleDeleteClick,
+          'deleteSelection',
+        )}
         {#if target.canGroup}
-          {@render menuItem('context-group', i18n.t('context.group'), handleGroupClick)}
+          {@render menuItem(
+            'context-group',
+            i18n.t('context.group'),
+            handleGroupClick,
+            'groupSelection',
+          )}
         {/if}
       {:else}
-        {@render menuItem('context-delete', i18n.t('context.delete'), handleDeleteClick)}
-        {@render menuItem('context-ungroup', i18n.t('context.ungroup'), handleUngroupClick)}
+        {@render menuItem(
+          'context-delete',
+          i18n.t('context.delete'),
+          handleDeleteClick,
+          'deleteSelection',
+        )}
+        {@render menuItem(
+          'context-ungroup',
+          i18n.t('context.ungroup'),
+          handleUngroupClick,
+          'ungroupSelection',
+        )}
       {/if}
     {/if}
+    </div>
   {/if}
-</div>
-
-<style lang="scss">
-  .context-menu {
-    transform: translate3d(-9999px, -9999px, 0);
-    visibility: hidden;
-    pointer-events: none;
-
-    &.is-open {
-      visibility: visible;
-      pointer-events: auto;
-    }
-  }
-</style>
+</FloatingDropdown>
