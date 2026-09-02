@@ -462,6 +462,18 @@ export const hint = (node: HTMLElement, value: HintInput): HintAction => {
   return {
     update(nextValue: HintInput): void {
       const normalized = normalizeHint(nextValue);
+      const hasHintConfigurationChanged = normalized.text !== hintText
+        || normalized.placement !== hintPlacement
+        || normalized.delayMs !== hintDelayMs
+        || normalized.gapPx !== hintGapPx
+        || normalized.dismissOnPointerDown !== dismissOnPointerDown
+        || normalized.className !== hintClassName
+        || normalized.shortcut !== hintShortcut
+        || normalized.renderContent !== renderHintContent;
+      if (!hasHintConfigurationChanged) {
+        return;
+      }
+
       hintText = normalized.text;
       hintPlacement = normalized.placement;
       hintDelayMs = normalized.delayMs;
