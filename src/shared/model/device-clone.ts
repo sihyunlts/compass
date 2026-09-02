@@ -113,6 +113,17 @@ const cloneDeviceNodePayload = (
     };
   }
 
+  if (device.kind === 'repeat') {
+    return {
+      id: device.id,
+      kind: 'repeat',
+      enabled: device.enabled,
+      groupId: device.groupId ?? null,
+      name: device.name ?? null,
+      params: { ...device.params },
+    };
+  }
+
   if (device.kind === 'stretch') {
     return {
       id: device.id,

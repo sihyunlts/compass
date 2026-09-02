@@ -152,13 +152,25 @@ export const createPendingFrameApplicationOperator = <TKind extends RackStageDev
     stage: RackStageOfKind<TKind>,
     context: RackStageExecutionContext,
   ) => MutableGenerationState,
+  outputPolicy: 'defer' | 'publish-timeline-state' = 'defer',
 ): RackOperator => createRackOperator<TKind, 'preserve-pending'>(
   'preserve-pending',
-  (state, stage, context) => execute(
-    preparePendingFrameApplicationInput(state, context),
-    stage,
-    context,
-  ),
+  (state, stage, context) => {
+    const nextState = execute(
+      preparePendingFrameApplicationInput(state, context),
+      stage,
+      context,
+    );
+
+    return outputPolicy === 'publish-timeline-state'
+      ? materializePendingFrameApplications(
+          nextState,
+          context.outputAdapter,
+          context.mutedGroupIds,
+          context.mutedGeneratorIds,
+        )
+      : nextState;
+  },
 );
 
 export const createPendingGeometryApplicationOperator = <TKind extends RackStageDeviceKind>(

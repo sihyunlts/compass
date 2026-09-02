@@ -136,6 +136,16 @@ export interface ReverseEffectNode extends GroupedDeviceNode {
   enabled: boolean;
 }
 
+export interface RepeatEffectNode extends GroupedDeviceNode {
+  id: string;
+  kind: 'repeat';
+  enabled: boolean;
+  params: {
+    count: number;
+    intervalPercent: number;
+  };
+}
+
 export interface TimeWarpCurve {
   divisions: number;
   nodes: CurveNode[];
@@ -267,6 +277,7 @@ export type GeneratorEffectNode =
   | MaskEffectNode
   | SymmetryEffectNode
   | ReverseEffectNode
+  | RepeatEffectNode
   | TimeWarpEffectNode
   | TrimEffectNode
   | StretchEffectNode
