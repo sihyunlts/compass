@@ -37,7 +37,7 @@ export const DEVICE_BROWSER_CATEGORY_DEFINITIONS = [
     directoryName: 'Time',
     icon: 'schedule',
     accentColorVar: '--color-category-time',
-    deviceKinds: ['trim', 'stretch', 'timewarp', 'reverse'],
+    deviceKinds: ['trim', 'stretch', 'repeat', 'timewarp', 'reverse'],
   },
   {
     categoryId: 'utility',
@@ -120,6 +120,7 @@ const DEVICE_BROWSER_ICON_BY_KIND: Record<RendererDeviceKind, string> = {
   translate: 'open_with',
   trim: 'content_cut',
   stretch: 'fit_width',
+  repeat: 'repeat',
   timewarp: 'timeline',
   reverse: 'swap_horiz',
   mask: 'grid_view',

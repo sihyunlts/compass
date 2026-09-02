@@ -26,6 +26,7 @@ export type {
   PathTransform,
   RainGeneratorNode,
   RainParams,
+  RepeatEffectNode,
   ReverseEffectNode,
   RotateEffectNode,
   ScaleEffectNode,

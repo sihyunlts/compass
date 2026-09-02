@@ -7,6 +7,7 @@ import { mirrorDeviceControls } from './mirror/controls';
 import { modulatorDeviceControls } from './modulator/controls';
 import { pathDeviceControls } from './path/controls';
 import { rainDeviceControls } from './rain/controls';
+import { repeatDeviceControls } from './repeat/controls';
 import {
   createRendererDeviceNode,
   getRendererDeviceGroup,
@@ -83,6 +84,10 @@ const rendererDeviceViewByKind: RendererDeviceViewByKind = {
   rain: {
     editor: './rain/ui.svelte',
     controls: rainDeviceControls,
+  },
+  repeat: {
+    editor: './repeat/ui.svelte',
+    controls: repeatDeviceControls,
   },
   reverse: {
     editor: './reverse/ui.svelte',

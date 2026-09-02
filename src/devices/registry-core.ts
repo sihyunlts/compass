@@ -11,6 +11,7 @@ import {
 } from './numeric-parameters';
 import { pathDeviceSchema } from './path/schema';
 import { rainDeviceSchema } from './rain/schema';
+import { repeatDeviceSchema } from './repeat/schema';
 import { reverseDeviceSchema } from './reverse/schema';
 import { rotateDeviceSchema } from './rotate/schema';
 import { scannerDeviceSchema } from './scanner/schema';
@@ -48,6 +49,7 @@ export const RENDERER_DEVICE_SCHEMAS = [
   maskDeviceSchema,
   trimDeviceSchema,
   stretchDeviceSchema,
+  repeatDeviceSchema,
   timeWarpDeviceSchema,
   reverseDeviceSchema,
   colorDeviceSchema,

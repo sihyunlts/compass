@@ -24,6 +24,7 @@ import {
   type RackStageExecutionContext,
 } from './runtime';
 import { reverseOperator, stretchOperator, timeWarpOperator, trimOperator } from './temporal';
+import { repeatOperator } from './repeat';
 
 const RACK_OPERATORS: Record<RackStageDeviceKind, RackOperator> = {
   ripple: generatorOperator,
@@ -38,6 +39,7 @@ const RACK_OPERATORS: Record<RackStageDeviceKind, RackOperator> = {
   symmetry: symmetryOperator,
   color: colorOperator,
   mask: maskOperator,
+  repeat: repeatOperator,
   reverse: reverseOperator,
   trim: trimOperator,
   stretch: stretchOperator,

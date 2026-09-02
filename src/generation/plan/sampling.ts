@@ -10,11 +10,12 @@ const resolveTemporalOversamplingFactor = (
   let combinedRate = 1;
 
   for (const stage of compiledPlan.stages) {
-    if (stage.device.kind !== 'timewarp') {
-      continue;
+    if (stage.device.kind === 'timewarp') {
+      combinedRate *= resolveTimeWarpCurveMaxRate(stage.device.params.curve);
+    } else if (stage.device.kind === 'repeat') {
+      const intervalRatio = stage.device.params.intervalPercent / 100;
+      combinedRate *= 1 + (stage.device.params.count - 1) * intervalRatio;
     }
-
-    combinedRate *= resolveTimeWarpCurveMaxRate(stage.device.params.curve);
     if (combinedRate >= MAX_TEMPORAL_OVERSAMPLING_FACTOR) {
       return MAX_TEMPORAL_OVERSAMPLING_FACTOR;
     }
