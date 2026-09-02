@@ -113,6 +113,18 @@ const migrateDeviceFromVersion1 = (value: unknown): unknown => {
     };
   }
 
+  if (kind === 'rotate') {
+    return {
+      ...value,
+      kind,
+      params: {
+        ...value.params,
+        centerX: 4.5,
+        centerY: 4.5,
+      },
+    };
+  }
+
   if (kind === 'path' && Object.hasOwn(value.params, 'points')) {
     const {
       points,

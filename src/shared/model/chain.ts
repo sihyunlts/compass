@@ -204,6 +204,8 @@ export interface RotateEffectNode extends GroupedDeviceNode {
   kind: 'rotate';
   enabled: boolean;
   params: {
+    centerX: number;
+    centerY: number;
     angleDeg: number;
   };
 }
