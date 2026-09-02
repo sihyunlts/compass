@@ -1,0 +1,183 @@
+{
+  "schemaVersion": 2,
+  "presetType": "rack",
+  "savedAtIso": "2026-08-26T20:09:00.855Z",
+  "chain": {
+    "metadata": {
+      "author": "sihyunlights"
+    },
+    "devices": [
+      {
+        "id": "generator-24",
+        "kind": "path",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "anchors": [
+            {
+              "id": "generator-24-path-anchor-1",
+              "x": 1,
+              "y": 1
+            },
+            {
+              "id": "generator-24-path-anchor-2",
+              "x": 1,
+              "y": 8
+            },
+            {
+              "id": "generator-24-path-anchor-3",
+              "x": 8,
+              "y": 1
+            },
+            {
+              "id": "generator-24-path-anchor-4",
+              "x": 8,
+              "y": 8
+            }
+          ],
+          "closed": false,
+          "fill": false,
+          "transform": {
+            "a": 1,
+            "b": 0,
+            "c": 0,
+            "d": 1,
+            "tx": 0,
+            "ty": 0
+          },
+          "animation": {
+            "enabled": false,
+            "direction": "forward",
+            "startAnchorId": "generator-24-path-anchor-1"
+          }
+        }
+      },
+      {
+        "id": "effect-26",
+        "kind": "rotate",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "angleDeg": 160
+        }
+      },
+      {
+        "id": "effect-33",
+        "kind": "modulator",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "targets": [
+            {
+              "id": "mod-target-1",
+              "slotIndex": 0,
+              "deviceId": "effect-26",
+              "paramKey": "angleDeg",
+              "amount": 90
+            }
+          ],
+          "curve": {
+            "domain": "loop01",
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "curve-node-start",
+                "t": 0,
+                "v": -1
+              },
+              {
+                "id": "curve-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "effect-34",
+        "kind": "scale",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "scaleX": 0,
+          "scaleY": 0
+        }
+      },
+      {
+        "id": "effect-27",
+        "kind": "modulator",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "targets": [
+            {
+              "id": "mod-target-2",
+              "slotIndex": 0,
+              "deviceId": "effect-34",
+              "paramKey": "scaleX",
+              "amount": 2
+            },
+            {
+              "id": "mod-target-689k5q-mrc2kasf",
+              "slotIndex": 1,
+              "deviceId": "effect-34",
+              "paramKey": "scaleY",
+              "amount": 2
+            }
+          ],
+          "curve": {
+            "domain": "loop01",
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "curve-node-start",
+                "t": 0,
+                "v": 0
+              },
+              {
+                "id": "curve-node-58jpje-mq97wajz",
+                "t": 0.5,
+                "v": 1
+              },
+              {
+                "id": "curve-node-end",
+                "t": 1,
+                "v": 0
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "effect-30",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            32,
+            33,
+            52,
+            53,
+            5,
+            6,
+            7
+          ],
+          "noteLengthPercent": 75,
+          "gapPercent": 0
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

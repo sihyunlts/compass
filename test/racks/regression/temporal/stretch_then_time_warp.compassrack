@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 2,
+  "presetType": "rack",
+  "savedAtIso": "2026-09-02T01:43:54.703Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-1",
+        "kind": "ripple",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-5",
+        "kind": "stretch",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "start": 0,
+          "end": 0.5
+        }
+      },
+      {
+        "id": "effect-4",
+        "kind": "timewarp",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "curve": {
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "timewarp-node-start",
+                "t": 0,
+                "v": 0
+              },
+              {
+                "id": "curve-node-cfp4py-mtjfe4sx",
+                "t": 0.5,
+                "v": 1
+              },
+              {
+                "id": "timewarp-node-end",
+                "t": 1,
+                "v": 0
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

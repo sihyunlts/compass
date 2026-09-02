@@ -3,8 +3,9 @@ import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 
+import { buildGeneratedFieldResult } from '../domain/field-result';
 import type { GeneratorPreview } from '../shared/contracts/preview/generator-preview';
-import type { ClipNote } from '../shared/model';
+import type { ClipNote, GeneratorChain, PathGeneratorNode } from '../shared/model';
 import {
   loadRackPreviewFromFixture,
   RACK_PREVIEW_LOOP_LENGTH_BEATS,
@@ -23,6 +24,77 @@ const PLAYBACK_LENGTH_INVARIANT_RACKS = [
   'test_modulator_all.compassrack',
 ] as const;
 const PLAYBACK_LENGTHS_BEATS = [0.25, 1, 8] as const;
+
+const createStaticPath = (
+  id: string,
+  groupId: string,
+  y: number,
+): PathGeneratorNode => ({
+  id,
+  kind: 'path',
+  enabled: true,
+  groupId,
+  name: null,
+  params: {
+    anchors: [
+      { id: `${id}-start`, x: 1, y },
+      { id: `${id}-end`, x: 8, y },
+    ],
+    closed: false,
+    fill: false,
+    transform: { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 },
+    animation: {
+      enabled: false,
+      direction: 'forward',
+      startAnchorId: `${id}-start`,
+    },
+  },
+});
+
+const createGroupedTemporalIsolationChain = (
+  includeReverse: boolean,
+): GeneratorChain => ({
+  devices: [
+    createStaticPath('long-color-path', 'long-color-group', 1),
+    {
+      id: 'long-color',
+      kind: 'color',
+      enabled: true,
+      groupId: 'long-color-group',
+      name: null,
+      params: {
+        velocities: [3, 53, 55, 3, 53, 55, 3, 53, 55, 3, 53, 55, 3, 53, 55, 3],
+        noteLengthPercent: 100,
+        gapPercent: 300,
+      },
+    },
+    createStaticPath('reversed-path', 'reversed-group', 8),
+    ...(includeReverse ? [{
+      id: 'group-reverse',
+      kind: 'reverse' as const,
+      enabled: true,
+      groupId: 'reversed-group',
+      name: null,
+    }] : []),
+  ],
+  groupStateById: {
+    'long-color-group': { enabled: true, name: null },
+    'reversed-group': { enabled: true, name: null },
+  },
+});
+
+const countActiveFramesByQuarter = (
+  preview: GeneratorPreview,
+): [number, number, number, number] => {
+  const frameCount = preview.ledFramesBySampleIndex.length;
+  assert.equal(frameCount % 4, 0, 'quarter-window fixture must have a frame count divisible by four');
+  const quarterFrameCount = frameCount / 4;
+
+  return [0, 1, 2, 3].map((quarterIndex) => preview.ledFramesBySampleIndex
+    .slice(quarterIndex * quarterFrameCount, (quarterIndex + 1) * quarterFrameCount)
+    .filter((frame) => frame.length > 0)
+    .length) as [number, number, number, number];
+};
 
 interface RackSignature {
   noteCount: number;
@@ -268,4 +340,30 @@ test('disabled group output does not leak into generated notes', async () => {
     false,
     'muted group velocity should not be emitted',
   );
+});
+
+test('reverse preserves and mirrors empty space authored by stretch', async () => {
+  const preview = await loadRackPreviewFromFixture('temporal/stretch_then_reverse.compassrack');
+  assert.deepEqual(countActiveFramesByQuarter(preview), [0, 0, 64, 64]);
+});
+
+test('time warp reads the complete stretched timeline including empty space', async () => {
+  const preview = await loadRackPreviewFromFixture('temporal/stretch_then_time_warp.compassrack');
+  assert.deepEqual(countActiveFramesByQuarter(preview), [128, 0, 0, 128]);
+});
+
+test('time warp reads visible color content after modulated geometry', async () => {
+  const preview = await loadRackPreviewFromFixture('temporal/modulated_translate_color_then_time_warp.compassrack');
+
+  assert.equal(preview.ledFramesBySampleIndex.every((frame) => frame.length > 0), true);
+});
+
+test('group temporal effects preserve other origins with longer color playback', () => {
+  const generateLongColorNotes = (includeReverse: boolean) => buildGeneratedFieldResult({
+    chain: createGroupedTemporalIsolationChain(includeReverse),
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: 'mk3',
+  }).notes.filter((note) => note.originId === 'long-color-path');
+
+  assert.deepEqual(generateLongColorNotes(true), generateLongColorNotes(false));
 });
