@@ -181,18 +181,36 @@ const writeBaseline = async (
   await writeFile(baselinePath, `${JSON.stringify(signature, null, 2)}\n`, 'utf8');
 };
 
+const collectRelativeFiles = async (
+  directory: string,
+  extension: string,
+): Promise<string[]> => {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const fileNames: string[] = [];
+
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      const nestedFileNames = await collectRelativeFiles(path.join(directory, entry.name), extension);
+      fileNames.push(...nestedFileNames.map((fileName) => path.join(entry.name, fileName)));
+      continue;
+    }
+
+    if (entry.isFile() && entry.name.endsWith(extension)) {
+      fileNames.push(entry.name);
+    }
+  }
+
+  return fileNames.sort((left, right) => left.localeCompare(right));
+};
+
 test('rack regression fixtures match their compact generation baselines', async () => {
-  const rackFileNames = (await readdir(RACK_FIXTURE_DIR))
-    .filter((name) => name.endsWith('.compassrack'))
-    .sort((left, right) => left.localeCompare(right));
+  const rackFileNames = await collectRelativeFiles(RACK_FIXTURE_DIR, '.compassrack');
   const expectedBaselineNames = rackFileNames.map((rackFileName) => rackFileName.replace(/\.compassrack$/, '.json'));
 
   assert.equal(rackFileNames.length > 0, true, 'expected at least one rack fixture');
 
   if (!UPDATE_BASELINES) {
-    const baselineNames = (await readdir(BASELINE_DIR))
-      .filter((name) => name.endsWith('.json'))
-      .sort((left, right) => left.localeCompare(right));
+    const baselineNames = await collectRelativeFiles(BASELINE_DIR, '.json');
     assert.deepEqual(baselineNames, expectedBaselineNames, 'rack baselines must match rack fixtures');
   }
 

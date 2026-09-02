@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "presetType": "rack",
+  "savedAtIso": "2026-09-01T14:55:10.412Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-36",
+        "kind": "ripple",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-73",
+        "kind": "repeat",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "count": 2,
+          "intervalPercent": 100
+        }
+      },
+      {
+        "id": "effect-71",
+        "kind": "stretch",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "start": 0,
+          "end": 0.5
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}
