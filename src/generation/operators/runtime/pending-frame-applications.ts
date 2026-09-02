@@ -17,51 +17,39 @@ import {
   buildSourceStrokesByOriginAndFrame,
   stripOriginFrames,
 } from './timeline-strokes';
-import { buildTimelineStateByOriginId } from './timeline-state';
+import {
+  applyTimelineStateOverrides,
+  buildTimelineStateByOriginId,
+  type OriginTimelineStateOverride,
+} from './timeline-state';
 import type { GeometryStroke, GeometryTimeline } from '../../types';
-import { materializeTemporalCheckpointTimeline } from './pending-temporal';
 import type { PendingFrameApplicationOperatorInput } from './types';
 import { resolveFrameWindow } from './frame-window';
-import {
-  applyFinalCleanupModeUpdate,
-  transitionGenerationState,
-  type FinalCleanupModeUpdate,
-} from './state-transition';
+import { transitionGenerationState } from './state-transition';
 
-type PendingFrameApplicationDraft =
-  | Omit<PendingGeometryRewriteApplication, 'precedingTemporalCheckpoint'>
-  | Omit<PendingStrokeRewriteApplication, 'precedingTemporalCheckpoint'>;
+type PendingFrameApplicationDraft = PendingGeometryRewriteApplication | PendingStrokeRewriteApplication;
 
 type PendingFrameApplicationAppendInput = Pick<
   PendingFrameApplicationOperatorInput,
-  'baseState' | 'precedingTemporalCheckpoint'
+  'baseState'
 >;
-
-const attachTemporalCheckpoint = (
-  input: PendingFrameApplicationAppendInput,
-  application: PendingFrameApplicationDraft,
-): PendingFrameApplication => ({
-  ...application,
-  precedingTemporalCheckpoint: input.precedingTemporalCheckpoint,
-});
 
 const appendPendingFrameApplication = (
   input: PendingFrameApplicationAppendInput,
   application: PendingFrameApplicationDraft,
-  finalCleanupModeUpdate: FinalCleanupModeUpdate,
+  timelineStateOverrides?: ReadonlyMap<string, OriginTimelineStateOverride>,
 ): MutableGenerationState => {
   const state = input.baseState;
   const pendingFrameApplications = clonePendingFrameApplications(state.pendingFrameApplications);
   if (application.targetOriginIds.size > 0) {
-    pendingFrameApplications.push(attachTemporalCheckpoint(input, application));
+    pendingFrameApplications.push(application);
   }
 
   return transitionGenerationState(state, {
     pendingFrameApplications,
-    timelineStateByOriginId: applyFinalCleanupModeUpdate(
-      state.timelineStateByOriginId,
-      finalCleanupModeUpdate,
-    ),
+    timelineStateByOriginId: timelineStateOverrides
+      ? applyTimelineStateOverrides(state.timelineStateByOriginId, timelineStateOverrides)
+      : state.timelineStateByOriginId,
   });
 };
 
@@ -69,7 +57,7 @@ export const appendPendingStrokeRewriteApplication = (
   input: PendingFrameApplicationOperatorInput,
   targetOriginIds: ReadonlySet<string>,
   writes: ReadonlyArray<PendingStrokeRewriteFrameWrite>,
-  finalCleanupModeUpdate: FinalCleanupModeUpdate,
+  timelineStateOverrides?: ReadonlyMap<string, OriginTimelineStateOverride>,
 ): MutableGenerationState => {
   return appendPendingFrameApplication(
     input,
@@ -80,7 +68,7 @@ export const appendPendingStrokeRewriteApplication = (
       endBeat: input.sourceState.timeline.timeDomainEndBeat,
       writes,
     },
-    finalCleanupModeUpdate,
+    timelineStateOverrides,
   );
 };
 
@@ -89,7 +77,7 @@ export const appendPendingGeometryRewriteApplication = (
   targetOriginIds: ReadonlySet<string>,
   requiredFrameWindow: PendingGeometryRewriteApplication['requiredFrameWindow'],
   rewriteFrameStrokes: PendingGeometryRewriteApplication['rewriteFrameStrokes'],
-  finalCleanupModeUpdate: FinalCleanupModeUpdate,
+  timelineStateOverrides?: ReadonlyMap<string, OriginTimelineStateOverride>,
 ): MutableGenerationState => {
   return appendPendingFrameApplication(
     input,
@@ -99,7 +87,7 @@ export const appendPendingGeometryRewriteApplication = (
       requiredFrameWindow,
       rewriteFrameStrokes,
     },
-    finalCleanupModeUpdate,
+    timelineStateOverrides,
   );
 };
 
@@ -239,30 +227,16 @@ const materializePendingGeometryRewriteApplication = (
   );
 };
 
-const resolveFrameRewriteSourceTimeline = (
-  timeline: GeometryTimeline,
-  application: Pick<PendingFrameApplication, 'precedingTemporalCheckpoint'>,
-): GeometryTimeline => (
-  application.precedingTemporalCheckpoint
-    ? materializeTemporalCheckpointTimeline(
-        timeline,
-        application.precedingTemporalCheckpoint,
-      )
-    : timeline
-);
-
 const materializePendingFrameApplication = (
   timeline: GeometryTimeline,
   application: PendingFrameApplication,
 ): GeometryTimeline => {
   switch (application.kind) {
     case 'geometry-rewrite': {
-      const sourceTimeline = resolveFrameRewriteSourceTimeline(timeline, application);
-      return materializePendingGeometryRewriteApplication(sourceTimeline, application);
+      return materializePendingGeometryRewriteApplication(timeline, application);
     }
     case 'stroke-rewrite': {
-      const sourceTimeline = resolveFrameRewriteSourceTimeline(timeline, application);
-      return materializePendingStrokeRewriteApplication(sourceTimeline, application);
+      return materializePendingStrokeRewriteApplication(timeline, application);
     }
   }
 };

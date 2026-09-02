@@ -2,7 +2,6 @@ import {
   buildColorConfig,
 } from '../../devices/color/color-program';
 import type { ColorEffectNode } from '../../shared/model';
-import type { BeatRange } from '../analysis/types';
 import { compileColorAgeKernel } from '../color/age-kernel';
 import { materializeColorTimeline } from '../color/materialization';
 import {
@@ -12,7 +11,6 @@ import {
   buildTargetOriginIds,
   createPendingFrameApplicationOperator,
   replaceTimelineAndRefreshRackState,
-  resolveFrameWindow,
   type PendingFrameApplicationOperatorInput,
   type RackStageExecutionContext,
 } from './runtime';
@@ -22,7 +20,6 @@ const applyColorEffect = (
   effect: ColorEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
-  requiredFrameWindow: BeatRange | 'all',
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
   context: RackStageExecutionContext,
@@ -45,11 +42,6 @@ const applyColorEffect = (
   const materialization = materializeColorTimeline({
     sourceTimeline: sourceState.timeline,
     targetOriginIds,
-    sourceFrameWindow: resolveFrameWindow(
-      requiredFrameWindow,
-      sourceState.timeline.sampleStepBeats,
-      sourceState.timeline.frames.length,
-    ),
     kernel,
     writeOrder,
   });
@@ -59,8 +51,10 @@ const applyColorEffect = (
     materialization.timeline,
     sourceState.timelineStateByOriginId,
     context,
-    targetOriginIds,
-    materialization.playbackWindowByOriginId,
+    new Map(Array.from(
+      materialization.playbackExtentByOriginId,
+      ([originId, playbackExtent]) => [originId, { playbackExtent }] as const,
+    )),
   );
 };
 
@@ -73,7 +67,6 @@ export const colorOperator = createPendingFrameApplicationOperator<'color'>(
       device,
       stage.groupId,
       stage.stageIndex,
-      'all',
       context.mutedGroupIds,
       context.mutedGeneratorIds,
       context,

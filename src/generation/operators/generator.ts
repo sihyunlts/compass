@@ -60,10 +60,9 @@ const applyGeneratorDevice = (
     seedGeneratedOriginTimelineState(
       state.timelineStateByOriginId,
       stage.deviceId,
-      preservesFullPlaybackWindow ? 'preserve' : 'cleanup',
+      preservesFullPlaybackWindow ? 'fixed' : 'natural',
     ),
     context,
-    preservesFullPlaybackWindow ? [] : [stage.deviceId],
   );
 };
 

@@ -109,7 +109,6 @@ const applyPendingSymmetryEffect = (
         : effect;
       return resolveStrokeRewrite(effectAtFrame)(stroke);
     }),
-    { mode: 'cleanup', originIds: targetOriginIds },
   );
 };
 

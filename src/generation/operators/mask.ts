@@ -130,7 +130,7 @@ const applyMaskEffect = (
   outputAdapter: CanonicalOutputAdapter,
   referenceContext: MaskSourceReferenceContext,
 ): MutableGenerationState => {
-  const { baseState, sourceState } = input;
+  const { sourceState } = input;
   const sourceTimeline = resolveMaskSourceTimeline(
     sourceState.timeline,
     effect,
@@ -173,7 +173,6 @@ const applyMaskEffect = (
     input,
     targetOriginIds,
     writes,
-    { mode: 'cleanup', originIds: baseState.timelineStateByOriginId.keys() },
   );
 };
 

@@ -8,16 +8,17 @@ import {
 } from './runtime';
 import { buildSourceStrokesByOriginAndFrame } from './runtime/timeline-strokes';
 import { toFrameWindow } from '../timeline';
-import {
-  resolveTemporalPlacementWindow,
-  resolveTemporalSourceWindow,
-} from '../timeline/temporal-window';
+import { DEFAULT_TIMELINE_WINDOW } from '../timeline/temporal-window';
 import type {
   MutableGenerationState,
   OriginTimelineState,
   PendingStrokeRewriteFrameWrite,
 } from '../timeline/state';
 import type { GeometryTimeline } from '../types';
+import {
+  buildFixedTimelineStateOverrides,
+  resolveCanonicalSourceWindow,
+} from './runtime/timeline-state';
 
 const buildRepeatedFrameWrites = (
   timeline: GeometryTimeline,
@@ -41,10 +42,10 @@ const buildRepeatedFrameWrites = (
 
   for (const originId of targetOriginIds) {
     const timelineState = timelineStateByOriginId.get(originId);
-    const sourceWindow = resolveTemporalSourceWindow(timelineStateByOriginId, originId);
-    if (!timelineState || !sourceWindow) {
+    if (!timelineState) {
       continue;
     }
+    const sourceWindow = resolveCanonicalSourceWindow(timelineState);
 
     const sourceFrameWindow = toFrameWindow(
       sourceWindow,
@@ -52,7 +53,7 @@ const buildRepeatedFrameWrites = (
       timeline.frames.length,
     );
     const placementFrameWindow = toFrameWindow(
-      resolveTemporalPlacementWindow(timelineState),
+      DEFAULT_TIMELINE_WINDOW,
       timeline.sampleStepBeats,
       timeline.frames.length,
     );
@@ -138,7 +139,7 @@ const applyRepeatEffect = (
       intervalPercent,
       writeOrder,
     ),
-    { mode: 'preserve', originIds: targetOriginIds },
+    buildFixedTimelineStateOverrides(targetOriginIds),
   );
 };
 

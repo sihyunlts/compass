@@ -1,5 +1,3 @@
-import { cloneSceneTemporalState } from '../../core/scene-operators/temporal';
-import type { SceneTemporalState } from '../../core/core-types';
 import type { BeatRange } from '../analysis/types';
 import type {
   GenerationOriginTimelineState,
@@ -10,11 +8,6 @@ import { createEmptyTimeline, DEFAULT_SAMPLE_STEP_BEATS } from './index';
 
 export type OriginTimelineState = GenerationOriginTimelineState;
 
-export interface PendingTemporalMaterializationCheckpoint {
-  temporalByOriginId: ReadonlyMap<string, SceneTemporalState>;
-  writeOrderByOriginId: ReadonlyMap<string, number>;
-}
-
 export interface PendingStrokeRewriteFrameWrite {
   destinationFrameIndex: number;
   strokes: ReadonlyArray<Omit<GeometryStroke, 'writeId'>>;
@@ -22,7 +15,6 @@ export interface PendingStrokeRewriteFrameWrite {
 
 export interface PendingStrokeRewriteApplication {
   kind: 'stroke-rewrite';
-  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
   targetOriginIds: ReadonlySet<string>;
   sourceFrameCount: number;
   endBeat: number;
@@ -37,7 +29,6 @@ interface MaterializedGeometryRewriteInput {
 
 export interface PendingGeometryRewriteApplication {
   kind: 'geometry-rewrite';
-  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
   targetOriginIds: ReadonlySet<string>;
   requiredFrameWindow: BeatRange | 'all';
   rewriteFrameStrokes: (
@@ -52,7 +43,6 @@ export type PendingFrameApplication =
 export interface DeferredGenerationState {
   timeline: GeometryTimeline;
   timelineStateByOriginId: Map<string, OriginTimelineState>;
-  pendingTemporalWriteOrderByOriginId: Map<string, number>;
   pendingFrameApplications: PendingFrameApplication[];
 }
 
@@ -69,7 +59,6 @@ export const createEmptyGenerationState = (
 ): MutableGenerationState => ({
   timeline: createEmptyTimeline(sampleStepBeats),
   timelineStateByOriginId: new Map<string, OriginTimelineState>(),
-  pendingTemporalWriteOrderByOriginId: new Map<string, number>(),
   pendingFrameApplications: [],
 });
 
@@ -83,19 +72,14 @@ export const cloneTimelineStateByOriginId = (
         start: timelineState.observedWindow.start,
         end: timelineState.observedWindow.end,
       },
-      playbackWindow: {
-        start: timelineState.playbackWindow.start,
-        end: timelineState.playbackWindow.end,
+      playbackExtent: {
+        start: timelineState.playbackExtent.start,
+        end: timelineState.playbackExtent.end,
       },
-      temporal: cloneSceneTemporalState(timelineState.temporal),
-      finalCleanupMode: timelineState.finalCleanupMode,
+      timelineDomain: timelineState.timelineDomain,
     },
   ]),
 );
-
-export const clonePendingTemporalWriteOrderByOriginId = (
-  pendingTemporalWriteOrderByOriginId: ReadonlyMap<string, number>,
-): Map<string, number> => new Map(pendingTemporalWriteOrderByOriginId);
 
 const clonePendingStroke = (
   stroke: Omit<GeometryStroke, 'writeId'>,
@@ -115,22 +99,9 @@ const clonePendingStroke = (
 export const clonePendingFrameApplications = (
   pendingFrameApplications: ReadonlyArray<PendingFrameApplication>,
 ): PendingFrameApplication[] => pendingFrameApplications.map((application) => {
-  const precedingTemporalCheckpoint = application.precedingTemporalCheckpoint
-    ? {
-        temporalByOriginId: new Map(
-          Array.from(application.precedingTemporalCheckpoint.temporalByOriginId.entries(), ([originId, temporal]) => [
-            originId,
-            cloneSceneTemporalState(temporal),
-          ]),
-        ),
-        writeOrderByOriginId: new Map(application.precedingTemporalCheckpoint.writeOrderByOriginId),
-      }
-    : null;
-
   if (application.kind === 'geometry-rewrite') {
     return {
       kind: 'geometry-rewrite',
-      precedingTemporalCheckpoint,
       targetOriginIds: new Set(application.targetOriginIds),
       requiredFrameWindow: application.requiredFrameWindow === 'all'
         ? 'all'
@@ -144,7 +115,6 @@ export const clonePendingFrameApplications = (
 
   return {
     kind: 'stroke-rewrite',
-    precedingTemporalCheckpoint,
     targetOriginIds: new Set(application.targetOriginIds),
     sourceFrameCount: application.sourceFrameCount,
     endBeat: application.endBeat,

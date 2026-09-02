@@ -3,14 +3,11 @@ import {
   type MaterializedGenerationState,
   type MutableGenerationState,
   type OriginTimelineState,
-  type PendingTemporalMaterializationCheckpoint,
 } from '../../timeline/state';
-import type {
-  GeometryTimeline,
-} from '../../types';
-import type { TimelineWindow } from '../../timeline/temporal-window';
+import type { GeometryTimeline } from '../../types';
 import {
   buildTimelineStateByOriginId,
+  type OriginTimelineStateOverride,
 } from './timeline-state';
 import type {
   PendingFrameApplicationOperatorInput,
@@ -23,25 +20,11 @@ import type {
 import { createRackOperator } from './types';
 import type { RackStageDeviceKind } from '../../plan/types';
 import { materializePendingFrameApplications } from './pending-frame-applications';
-import {
-  extractPendingTemporalCheckpoint,
-  materializePendingTemporalState,
-} from './pending-temporal';
-import {
-  applyFinalCleanupModeUpdate,
-  transitionGenerationState,
-} from './state-transition';
+import { transitionGenerationState } from './state-transition';
 import { applyFinalTimelineNormalization } from './final-normalization';
-
-interface PendingFrameApplicationInputPlan {
-  baseState: DeferredGenerationState;
-  sourceState: MaterializedGenerationState;
-  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
-}
 
 export interface PendingGeometryApplicationOperatorInput {
   baseState: DeferredGenerationState;
-  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
 }
 
 const materializePendingRackOperatorInput = (
@@ -55,12 +38,7 @@ const materializePendingRackOperatorInput = (
     context.mutedGeneratorIds,
   );
 
-  return materializePendingTemporalState(
-    frameMaterializedState,
-    context.outputAdapter,
-    context.mutedGroupIds,
-    context.mutedGeneratorIds,
-  ) as MaterializedGenerationState;
+  return frameMaterializedState as MaterializedGenerationState;
 };
 
 export const prepareRackOperatorInput = <TPolicy extends RackOperatorInputPolicy>(
@@ -76,74 +54,39 @@ export const prepareRackOperatorInput = <TPolicy extends RackOperatorInputPolicy
   }
 };
 
-const buildPendingFrameApplicationInputPlan = (
-  state: MutableGenerationState,
-  context: RackStageExecutionContext,
-): PendingFrameApplicationInputPlan => {
-  const pendingTemporalExtraction = extractPendingTemporalCheckpoint(state);
-  const baseState = pendingTemporalExtraction?.state ?? state;
-  const needsSourceMaterialization = pendingTemporalExtraction !== null
-    || state.pendingFrameApplications.length > 0;
-
-  return {
-    baseState,
-    sourceState: needsSourceMaterialization
-      ? materializePendingRackOperatorInput(state, context)
-      : state as MaterializedGenerationState,
-    precedingTemporalCheckpoint: pendingTemporalExtraction?.checkpoint ?? null,
-  };
-};
-
 const preparePendingFrameApplicationInput = (
   state: MutableGenerationState,
   context: RackStageExecutionContext,
-): PendingFrameApplicationOperatorInput => buildPendingFrameApplicationInputPlan(
-  state,
-  context,
-);
-
-const preparePendingGeometryApplicationInput = (
-  state: MutableGenerationState,
-): PendingGeometryApplicationOperatorInput => {
-  const pendingTemporalExtraction = extractPendingTemporalCheckpoint(state);
-
-  return {
-    baseState: pendingTemporalExtraction?.state ?? state,
-    precedingTemporalCheckpoint: pendingTemporalExtraction?.checkpoint ?? null,
-  };
-};
+): PendingFrameApplicationOperatorInput => ({
+  baseState: state,
+  sourceState: state.pendingFrameApplications.length > 0
+    ? materializePendingRackOperatorInput(state, context)
+    : state as MaterializedGenerationState,
+});
 
 export const replaceTimelineAndRefreshRackState = (
   state: MutableGenerationState,
   timeline: GeometryTimeline,
   timelineStateSeedByOriginId: ReadonlyMap<string, OriginTimelineState>,
   context: RackStageExecutionContext,
-  unprotectedOriginIds: Iterable<string> = [],
-  playbackWindowOverrides: ReadonlyMap<string, TimelineWindow> = new Map(),
+  timelineStateOverrides: ReadonlyMap<string, OriginTimelineStateOverride> = new Map(),
 ): MutableGenerationState => transitionGenerationState(state, {
   timeline,
-  timelineStateByOriginId: applyFinalCleanupModeUpdate(
-    buildTimelineStateByOriginId(
-      timeline,
-      timelineStateSeedByOriginId,
-      context.outputAdapter,
-      context.mutedGroupIds,
-      context.mutedGeneratorIds,
-      undefined,
-      playbackWindowOverrides,
-    ),
-    { mode: 'cleanup', originIds: unprotectedOriginIds },
+  timelineStateByOriginId: buildTimelineStateByOriginId(
+    timeline,
+    timelineStateSeedByOriginId,
+    context.outputAdapter,
+    context.mutedGroupIds,
+    context.mutedGeneratorIds,
+    timelineStateOverrides,
   ),
 });
 
-export const materializeAndNormalizeRackState = (
+export const materializeAndNormalizeRackTimeline = (
   state: MutableGenerationState,
   context: RackStageExecutionContext,
-): MutableGenerationState => applyFinalTimelineNormalization(
+): GeometryTimeline => applyFinalTimelineNormalization(
   materializePendingRackOperatorInput(state, context),
-  context.outputAdapter,
-  context.mutedGroupIds,
-  context.mutedGeneratorIds,
 );
 
 export const createPendingFrameApplicationOperator = <TKind extends RackStageDeviceKind>(
@@ -182,7 +125,7 @@ export const createPendingGeometryApplicationOperator = <TKind extends RackStage
 ): RackOperator => createRackOperator<TKind, 'preserve-pending'>(
   'preserve-pending',
   (state, stage, context) => execute(
-    preparePendingGeometryApplicationInput(state),
+    { baseState: state },
     stage,
     context,
   ),

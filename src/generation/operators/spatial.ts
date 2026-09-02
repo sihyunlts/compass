@@ -94,7 +94,6 @@ const applyPendingSpatialTransform = (
         );
       });
     },
-    { mode: 'cleanup', originIds: targetOriginIds },
   );
 };
 

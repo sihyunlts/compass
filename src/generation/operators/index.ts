@@ -12,7 +12,7 @@ import { symmetryOperator } from './symmetry';
 import {
   createModulationContext,
   createRackStageExecutionContext,
-  materializeAndNormalizeRackState,
+  materializeAndNormalizeRackTimeline,
   prepareRackOperatorInput,
   resolveMaskReferenceMutedGeneratorIds,
   resolveMaskReferenceMutedGroupIds,
@@ -123,8 +123,7 @@ const resolveMaskSourceReference = (
       );
     }
 
-    const normalizedState = materializeAndNormalizeRackState(currentState, stageExecutionContext);
-    const timeline = normalizedState.timeline;
+    const timeline = materializeAndNormalizeRackTimeline(currentState, stageExecutionContext);
     context.timelineBySourceKey.set(sourceKey, timeline);
     return { status: 'resolved', timeline };
   } finally {
@@ -140,7 +139,7 @@ export const executeCompiledRackPlan = (
   generatorOutputBounds: SpatialRequirement,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
-): MutableGenerationState => {
+): GeometryTimeline => {
   const sampleStepBeats = resolveCompiledRackSampleStepBeats(compiledPlan);
   const modulationContext = createModulationContext(modulationChain, loopLengthBeats);
   const referenceContext: MaskSourceReferenceContext = {
@@ -169,5 +168,5 @@ export const executeCompiledRackPlan = (
     );
   }
 
-  return materializeAndNormalizeRackState(currentState, stageExecutionContext);
+  return materializeAndNormalizeRackTimeline(currentState, stageExecutionContext);
 };
