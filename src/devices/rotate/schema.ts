@@ -6,6 +6,8 @@ import {
   resolveImportedParams,
 } from '../import-hydration';
 import {
+  boundedNumericParameter,
+  DISCRETE_DRAG_PIXELS_PER_STEP,
   defineNumericParameterRules,
   finiteNumericParameter,
   hydrateImportedNumericParameters,
@@ -13,12 +15,30 @@ import {
 import type { RendererDeviceSchema } from '../types';
 
 const DEFAULT_ROTATE_PARAMS: RotateEffectNode['params'] = {
+  centerX: 4.5,
+  centerY: 4.5,
   angleDeg: 0,
 };
 
 export const ROTATE_NUMERIC_PARAMETERS = defineNumericParameterRules<
   RotateEffectNode['params']
 >()({
+  centerX: boundedNumericParameter({
+    defaultValue: DEFAULT_ROTATE_PARAMS.centerX,
+    min: 0,
+    max: 9,
+    step: 0.5,
+    dragPixelsPerStep: DISCRETE_DRAG_PIXELS_PER_STEP,
+    modulationMessageKey: 'control.centerX',
+  }),
+  centerY: boundedNumericParameter({
+    defaultValue: DEFAULT_ROTATE_PARAMS.centerY,
+    min: 0,
+    max: 9,
+    step: 0.5,
+    dragPixelsPerStep: DISCRETE_DRAG_PIXELS_PER_STEP,
+    modulationMessageKey: 'control.centerY',
+  }),
   angleDeg: finiteNumericParameter({
     defaultValue: DEFAULT_ROTATE_PARAMS.angleDeg,
     step: 1,

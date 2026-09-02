@@ -31,7 +31,10 @@ const resolveEffectTransform = (
   }
 
   if (effect.kind === 'rotate') {
-    return toRotateTransformAt(effect.params.angleDeg, COMPOSITION_CENTER);
+    return toRotateTransformAt(effect.params.angleDeg, {
+      x: effect.params.centerX,
+      y: effect.params.centerY,
+    });
   }
 
   if (effect.kind === 'translate') {

@@ -8,6 +8,7 @@
 
   type DeviceBodyLayoutProps = {
     size?: DeviceBodySize;
+    controlWidth?: string;
   } & ({
     kind: 'surface';
     surface: Snippet;
@@ -22,9 +23,17 @@
 
   const props: DeviceBodyLayoutProps = $props();
   const size = $derived(props.size ?? 'compact');
+  const controlWidthStyle = $derived(
+    props.controlWidth ? `--device-control-width:${props.controlWidth};` : '',
+  );
 </script>
 
-<div class="device-controls device-body-layout" data-layout={props.kind} data-size={size}>
+<div
+  class="device-controls device-body-layout"
+  data-layout={props.kind}
+  data-size={size}
+  style={controlWidthStyle}
+>
   {#if props.kind === 'surface'}
     <div class="device-surface-region">
       {@render props.surface()}
