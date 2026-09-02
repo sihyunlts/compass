@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 2,
+  "presetType": "rack",
+  "savedAtIso": "2026-09-02T08:22:31.586Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-8",
+        "kind": "path",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "anchors": [
+            {
+              "id": "generator-8-path-anchor-1",
+              "x": 0,
+              "y": 9
+            },
+            {
+              "id": "generator-8-path-anchor-2",
+              "x": 9,
+              "y": 9
+            }
+          ],
+          "closed": false,
+          "fill": false,
+          "transform": {
+            "a": 1,
+            "b": 0,
+            "c": 0,
+            "d": 1,
+            "tx": 0,
+            "ty": 0
+          },
+          "animation": {
+            "enabled": false,
+            "direction": "forward",
+            "startAnchorId": "generator-8-path-anchor-1"
+          }
+        }
+      },
+      {
+        "id": "effect-29",
+        "kind": "translate",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "offsetX": 0,
+          "offsetY": 0
+        }
+      },
+      {
+        "id": "effect-30",
+        "kind": "modulator",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "targets": [
+            {
+              "id": "mod-target-9z2oky-mrelpota",
+              "slotIndex": 0,
+              "deviceId": "effect-29",
+              "paramKey": "offsetY",
+              "amount": -12
+            }
+          ],
+          "curve": {
+            "domain": "loop01",
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "curve-node-start",
+                "t": 0,
+                "v": -1
+              },
+              {
+                "id": "curve-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "effect-65",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            32,
+            33,
+            52,
+            53,
+            5,
+            6,
+            7
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      },
+      {
+        "id": "effect-66",
+        "kind": "timewarp",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "curve": {
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "timewarp-node-start",
+                "t": 0,
+                "v": 0,
+                "nextCurveBend": 0.047887
+              },
+              {
+                "id": "timewarp-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

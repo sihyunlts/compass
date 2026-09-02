@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 2,
+  "presetType": "rack",
+  "savedAtIso": "2026-09-02T03:24:51.751Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-37",
+        "kind": "ripple",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-73",
+        "kind": "stretch",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "start": 0,
+          "end": 1
+        }
+      },
+      {
+        "id": "effect-74",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            32,
+            33,
+            52,
+            53,
+            5,
+            6,
+            7,
+            3,
+            32,
+            33,
+            52,
+            53,
+            5,
+            6,
+            7
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}
