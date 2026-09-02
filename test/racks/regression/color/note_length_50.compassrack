@@ -1,11 +1,11 @@
 {
   "schemaVersion": 2,
   "presetType": "rack",
-  "savedAtIso": "2026-06-17T06:33:42.600Z",
+  "savedAtIso": "2026-09-02T01:46:16.104Z",
   "chain": {
     "devices": [
       {
-        "id": "generator-1",
+        "id": "generator-36",
         "kind": "ripple",
         "enabled": true,
         "groupId": null,
@@ -17,7 +17,7 @@
         }
       },
       {
-        "id": "effect-1",
+        "id": "effect-75",
         "kind": "color",
         "enabled": true,
         "groupId": null,
@@ -25,10 +25,15 @@
         "params": {
           "velocities": [
             3,
+            32,
             33,
-            34
+            52,
+            53,
+            5,
+            6,
+            7
           ],
-          "noteLengthPercent": 20,
+          "noteLengthPercent": 50,
           "gapPercent": 0
         }
       }
