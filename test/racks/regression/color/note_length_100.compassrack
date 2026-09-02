@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 2,
+  "presetType": "rack",
+  "savedAtIso": "2026-09-02T01:46:16.104Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-36",
+        "kind": "ripple",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "curvature": 2
+        }
+      },
+      {
+        "id": "effect-75",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "velocities": [
+            3,
+            32,
+            33,
+            52,
+            53,
+            5,
+            6,
+            7
+          ],
+          "noteLengthPercent": 100,
+          "gapPercent": 0
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}
