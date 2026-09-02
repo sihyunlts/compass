@@ -1,4 +1,3 @@
-import type { SceneTemporalState } from '../../../core/core-types';
 import type { CompiledModulationProgram } from '../../../core/modulation/compiled-program';
 import type {
   GeneratorDeviceNode,
@@ -16,7 +15,6 @@ import type {
   DeferredGenerationState,
   MaterializedGenerationState,
   MutableGenerationState,
-  PendingTemporalMaterializationCheckpoint,
 } from '../../timeline/state';
 import type { CanonicalOutputAdapter, GeometryTimeline } from '../../types';
 
@@ -69,7 +67,6 @@ export type RackOperatorInput<TPolicy extends RackOperatorInputPolicy> =
 export interface PendingFrameApplicationOperatorInput {
   baseState: DeferredGenerationState;
   sourceState: MaterializedGenerationState;
-  precedingTemporalCheckpoint: PendingTemporalMaterializationCheckpoint | null;
 }
 
 export interface RackOperatorContract<TPolicy extends RackOperatorInputPolicy> {
@@ -113,7 +110,6 @@ export const createRackOperator = <
 });
 
 export interface OriginFrameRemap {
-  nextTemporal: SceneTemporalState;
   sourceFrameIndexByOutputFrame: ReadonlyArray<number | null>;
   writeOrder: number;
 }

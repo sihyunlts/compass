@@ -17,7 +17,7 @@ export const buildCanonicalFieldResult = (
 ): CanonicalFieldResult => {
   const compiledPlan = buildCompiledRackPlan(chain);
   const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(compiledPlan.baseChain);
-  const executionState = executeCompiledRackPlan(
+  const generatedTimeline = executeCompiledRackPlan(
     compiledPlan,
     chain,
     loopLengthBeats,
@@ -26,7 +26,7 @@ export const buildCanonicalFieldResult = (
     mutedGroupIds,
     mutedGeneratorIds,
   );
-  const timeline = finalizeTimeline(executionState.timeline);
+  const timeline = finalizeTimeline(generatedTimeline);
 
   return {
     loopLengthBeats,
@@ -35,6 +35,5 @@ export const buildCanonicalFieldResult = (
     sampleStepBeats: timeline.sampleStepBeats,
     mutedGroupIds,
     mutedGeneratorIds,
-    timelineStateByOriginId: executionState.timelineStateByOriginId,
   };
 };

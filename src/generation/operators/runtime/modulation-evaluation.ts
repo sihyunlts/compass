@@ -1,5 +1,6 @@
 import type { PendingGeometryApplicationOperatorInput } from './materialization';
 import type { ModulationEvaluationWindow } from './modulation';
+import { hasTimelineSpan } from './timeline-state';
 
 export const buildModulationEvaluationWindowByOriginId = (
   input: PendingGeometryApplicationOperatorInput,
@@ -8,9 +9,9 @@ export const buildModulationEvaluationWindowByOriginId = (
 ): ReadonlyMap<string, ModulationEvaluationWindow> => new Map(
   Array.from(targetOriginIds, (originId) => {
     const timelineState = input.baseState.timelineStateByOriginId.get(originId);
-    const window = input.precedingTemporalCheckpoint?.temporalByOriginId.has(originId)
-      ? timelineState?.temporal.visibilityWindow
-      : timelineState?.playbackWindow;
+    const window = timelineState && hasTimelineSpan(timelineState.playbackExtent)
+      ? timelineState.playbackExtent
+      : timelineState?.observedWindow;
     return [
       originId,
       window && Number.isFinite(window.start) && Number.isFinite(window.end) && window.end > window.start

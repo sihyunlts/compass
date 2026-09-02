@@ -5,8 +5,6 @@ import {
   beginTimelineStage,
   completeTimelineStage,
   deleteOrigins,
-  setFrameStrokes,
-  type FrameWindow,
 } from '../timeline';
 import type {
   GeometryStroke,
@@ -17,14 +15,13 @@ import type { CompiledColorAgeKernel } from './types';
 interface ColorTimelineMaterializationInput {
   sourceTimeline: GeometryTimeline;
   targetOriginIds: ReadonlySet<string>;
-  sourceFrameWindow: FrameWindow;
   kernel: CompiledColorAgeKernel;
   writeOrder: number;
 }
 
 interface ColorTimelineMaterializationResult {
   timeline: GeometryTimeline;
-  playbackWindowByOriginId: ReadonlyMap<string, {
+  playbackExtentByOriginId: ReadonlyMap<string, {
     start: number;
     end: number;
   }>;
@@ -261,32 +258,36 @@ const buildEventWrites = (
   return writes;
 };
 
-const mergePlaybackWindow = (
-  windows: Map<string, { start: number; end: number }>,
+const mergePlaybackExtent = (
+  extents: Map<string, { start: number; end: number }>,
   originId: string,
   start: number,
   end: number,
 ): void => {
-  const current = windows.get(originId);
+  const current = extents.get(originId);
   if (current) {
     current.start = Math.min(current.start, start);
     current.end = Math.max(current.end, end);
-  } else {
-    windows.set(originId, { start, end });
+    return;
   }
+
+  extents.set(originId, { start, end });
 };
 
 export const materializeColorTimeline = (
   input: ColorTimelineMaterializationInput,
 ): ColorTimelineMaterializationResult => {
   const writes: ColorAgeWrite[] = [];
-  const playbackWindowByOriginId = new Map<string, { start: number; end: number }>();
+  const playbackExtentByOriginId = new Map<string, { start: number; end: number }>();
   const usesNearestColorBoundary = input.kernel.noteLengthRatio < 1;
   let outputEndFrameExclusive = input.sourceTimeline.frames.length;
   const eventsByOriginId = extractGeometryEventTracks({
     timeline: input.sourceTimeline,
     targetOriginIds: input.targetOriginIds,
-    frameWindow: input.sourceFrameWindow,
+    frameWindow: {
+      startFrame: 0,
+      endFrameExclusive: input.sourceTimeline.frames.length,
+    },
   });
 
   for (const originId of input.targetOriginIds) {
@@ -298,8 +299,8 @@ export const materializeColorTimeline = (
         outputEndFrameExclusive,
         write.playbackEndFrameExclusive,
       );
-      mergePlaybackWindow(
-        playbackWindowByOriginId,
+      mergePlaybackExtent(
+        playbackExtentByOriginId,
         originId,
         write.startFrame * input.sourceTimeline.sampleStepBeats,
         write.playbackEndFrameExclusive * input.sourceTimeline.sampleStepBeats,
@@ -312,22 +313,7 @@ export const materializeColorTimeline = (
     outputEndFrameExclusive * input.sourceTimeline.sampleStepBeats,
   );
   const timelineStage = beginTimelineStage(input.sourceTimeline, outputEndBeat);
-  if (
-    input.sourceFrameWindow.startFrame === 0
-    && input.sourceFrameWindow.endFrameExclusive >= input.sourceTimeline.frames.length
-  ) {
-    deleteOrigins(timelineStage, input.targetOriginIds);
-  }
-  for (
-    let frameIndex = input.sourceFrameWindow.startFrame;
-    frameIndex < input.sourceFrameWindow.endFrameExclusive;
-    frameIndex += 1
-  ) {
-    const retainedStrokes = timelineStage.frames[frameIndex].strokes.filter(
-      (stroke) => !input.targetOriginIds.has(stroke.polyline.originId),
-    );
-    setFrameStrokes(timelineStage, frameIndex, retainedStrokes);
-  }
+  deleteOrigins(timelineStage, input.targetOriginIds);
 
   for (const write of writes) {
     for (const stroke of write.event.strokes) {
@@ -348,6 +334,6 @@ export const materializeColorTimeline = (
 
   return {
     timeline: completeTimelineStage(timelineStage),
-    playbackWindowByOriginId,
+    playbackExtentByOriginId,
   };
 };

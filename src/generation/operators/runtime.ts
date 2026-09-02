@@ -1,11 +1,10 @@
 export {
-  isFrameWithinWindow,
   resolveFrameWindow,
 } from './runtime/frame-window';
 export {
   createPendingFrameApplicationOperator,
   createPendingGeometryApplicationOperator,
-  materializeAndNormalizeRackState,
+  materializeAndNormalizeRackTimeline,
   prepareRackOperatorInput,
   replaceTimelineAndRefreshRackState,
   type PendingGeometryApplicationOperatorInput,
@@ -24,10 +23,6 @@ export {
   appendPendingStrokeRewriteApplication,
   buildPendingStrokeRewriteFrameWrites,
 } from './runtime/pending-frame-applications';
-export {
-  buildTemporalStateUpdatesForTargetOrigins,
-  createTemporalStateUpdateOperator,
-} from './runtime/pending-temporal';
 export {
   createRackStageExecutionContext,
   resolveMaskReferenceMutedGeneratorIds,

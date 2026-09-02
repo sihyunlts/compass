@@ -19,33 +19,11 @@ export interface AffineTransform {
   ty: number;
 }
 
-export interface TemporalAffineRemap {
-  kind: 'affine';
-  alpha: number;
-  beta: number;
-}
-
 export interface TemporalSampledRemap {
   kind: 'sampled';
   domainStart: number;
   domainEnd: number;
   samples: Array<number | null>;
-}
-
-export type TemporalRemap = TemporalAffineRemap | TemporalSampledRemap;
-
-export interface TemporalVisibilityWindow {
-  start: number;
-  end: number;
-}
-
-export interface SceneTemporalState {
-  /** Pending temporal transform relative to the current baked source timeline. */
-  remap: TemporalRemap;
-  /** Placement window that should be preserved when the pending transform is baked. */
-  visibilityWindow: TemporalVisibilityWindow;
-  /** True while authored placement is still pending and has not been baked into geometry. */
-  hasAuthoredTimeline: boolean;
 }
 
 export interface Polyline {

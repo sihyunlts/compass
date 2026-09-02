@@ -1,4 +1,4 @@
-import type { AffineTransform, Polyline, SceneTemporalState } from '../core/core-types';
+import type { AffineTransform, Polyline } from '../core/core-types';
 import type { SpatialRequirement } from './analysis/types';
 
 export interface GeometryMask {
@@ -31,17 +31,15 @@ export interface GenerationTimelineWindow {
   end: number;
 }
 
-export type GenerationFinalCleanupMode = 'cleanup' | 'preserve' | 'align-end';
+export type GenerationTimelineDomain = 'natural' | 'fixed';
 
 export interface GenerationOriginTimelineState {
   /** Observed note-output occupancy from the most recent baked timeline. */
   observedWindow: GenerationTimelineWindow;
-  /** Time range preserved by front/back cleanup and temporal source-window lookup. */
-  playbackWindow: GenerationTimelineWindow;
-  /** Pending temporal intent relative to the current baked source timeline. */
-  temporal: SceneTemporalState;
-  /** Final front/back cleanup policy for this origin. */
-  finalCleanupMode: GenerationFinalCleanupMode;
+  /** Explicit authored clock including gaps/tail; empty means use observed occupancy. */
+  playbackExtent: GenerationTimelineWindow;
+  /** Natural output is normalized once; fixed output preserves authored empty frames. */
+  timelineDomain: GenerationTimelineDomain;
 }
 
 export type LedFrameVelocityEntry = readonly [pitch: number, velocity: number];
@@ -53,7 +51,6 @@ export interface CanonicalFieldResult {
   sampleStepBeats: number;
   mutedGroupIds: ReadonlySet<string>;
   mutedGeneratorIds: ReadonlySet<string>;
-  timelineStateByOriginId: ReadonlyMap<string, GenerationOriginTimelineState>;
 }
 
 export interface GenerationExecutionContext {
