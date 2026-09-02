@@ -1,53 +1,60 @@
-# Compass
+<div align="center">
+  <p><a href="README.ko.md">한국어</a></p>
+  <img width="3840" height="1440" alt="Compass" src="https://github.com/user-attachments/assets/ba80995b-65fc-4e0d-94b1-c9448fe9bb1f" />
+  <h1>Compass</h1>
+  <p>Compass is a Launchpad lightshow tool that lets you quickly experiment with unique light effects using a rack based workflow.</p>
+  <p>
+    <a href="https://github.com/sihyunlts/compass/releases/latest">
+      <img src="https://img.shields.io/github/v/release/sihyunlts/compass?label=Download" alt="Download Latest Release" />
+    </a>
+    <a href="LICENSE">
+      <img src="https://img.shields.io/badge/License-0BSD-black" alt="0BSD License" />
+    </a>
+  </p>
+</div>
 
-Compass is a Launchpad lightshow tool for experimenting with the lights you have imagined, built to be used together with Ableton Live.
+## Please Read This First
 
-> [!WARNING]
-> I will explain this in more detail below, but Compass is not polished software or a stable project. On top of that, I am not thinking about backward compatibility at all right now, so racks you make today may stop working in the next version.
+**The code for Compass was written with the help of AI.** I only know how to read a bit of markup and stylesheets like HTML/CSS, and I have zero actual programming experience.
 
-## A few things to know
+As you may know, AI doesn't perfectly understand context yet. When I asked it to solve a problem, it tended to find workarounds instead of fixing the root cause in the design itself. Of course, I tried my best to document things and create fixtures to prevent it from straying too far from basic design principles, but since I'm not used to building systematic structures either, my guidelines are pretty flawed. As a result, the app itself often doesn't work as intended. **Therefore, if you use this app, please be prepared for situations where a rack you just built might completely break in the very next version.**
 
-**Pretty much everything here was written by AI.** I can read markup and stylesheets like HTML and CSS to some extent, but outside of that I basically cannot read code at all.
+I made this open source because people around me asked to try it out, but the original goal of this project was simply to satisfy my own curiosity about whether this idea was even possible. Even now, I am only improving it for my own personal use. In short, I might arbitrarily remove or change features, or I could suddenly stop maintaining the project altogether.
 
-As you would expect, AI-written code is really hard to maintain. No matter how many times I told it to find and fix the root cause, AI cannot have all of the context. So whenever something broke, it often tried to slap another patch on top instead. I tried to push back against that, but honestly, even now there are still plenty of cases where racks do not process in the right order, or changing the order changes the output when it really should not. So yeah, things are still a bit of a mess.
+Unless you absolutely *must* use Compass's features within Ableton Live, I highly recommend trying out the Crystal Composition feature included in [Anth's Amethyst](https://amethyst.anthonyhfm.dev/). It is based on Compass's core ideas but utilizes a proper node-based interface, and unlike this project, it is being developed by an actual programmer, so I believe it will be far more reliable.
 
-The reason I started making this software was to test whether an idea I had always been thinking about could actually work. **It was personal software for myself from the beginning, and that has not really changed.** Because of that, I may change features however I want, or suddenly stop maintaining it.
+Lastly, Compass uses the [0BSD License](LICENSE), so feel free to add new devices or features, redistribute it, or freely implement Compass's functionalities into your own programs.
 
-That said, you are totally welcome to take this and plug it into your own project, or use it as a starting point for something else. (0BSD license.)
+## Why is this necessary?
 
-## Why does this even exist?
+Traditionally, creating a Launchpad lightshow meant drawing patterns frame by frame and then adding colors to them. It's a very intuitive and easy to understand method, but it was incredibly difficult to make fine adjustments to a pattern. Finding the perfect effect meant repeating the drawing process countless times. Furthermore, things like rotating an effect by just 20° or adjusting its scale were practically impossible, which severely limited how accurately you could bring your ideas to life.
 
-Most lightshow software works by having you draw patterns frame by frame, then paint colors onto them. It is simple, clean, and gets the job done, but stacking multiple effects on top of each other is a pain. For example, if you want to rotate an effect while preserving the output properly, you can only rotate it in 90-degree steps.
+Compass, on the other hand, calculates everything based on lines/paths first and converts them into notes at the very end. This allows you to apply sequential effects like rotation, movement (translation), and symmetry. For example, if you draw a shape using the Path device and control its rotation and scale with a Modulator, you can easily create effects like the one below.
 
-Compass does things differently. While racks are being processed, it does not bake the result into Launchpad notes right away. Instead, it keeps a geometry timeline of strokes through most of the rack, applies effects to that, and only projects it onto the Launchpad note map at the end. The result is then sampled into notes for the playback range. That means effects like rotation, translation, and symmetry can be stacked and modulated without falling apart, at least in theory (in practice it is still pretty buggy in certain situations). It also makes room for device types that did not exist before. For example, you can draw a shape with the path device, modulate rotate and scale, throw time warp on top, and get something like the effect shown below.
+https://github.com/user-attachments/assets/1d18c875-45b7-4ec0-a8bf-5234ce4bdcd8
 
-https://github.com/user-attachments/assets/eca40f46-12f4-406c-8c69-3ab6e7293a05
+> [!NOTE]
+> However, Compass cannot entirely replace the traditional workflow. Using a completely different method means you can create previously impossible effects, but it also means it can be highly inefficient or difficult to achieve specific shapes for certain types of effects.
 
-## How to use it
+## Getting Started
 
-Compass is not a standalone app. It generates MIDI notes and sends them into Ableton Live through a Max for Live bridge.
+> [!NOTE]
+> Compass generates MIDI notes and sends them to Ableton Live via a Max for Live bridge. Essentially, it acts like a plugin for Live.
+> Therefore, to use the send feature, you need Ableton Live 10 Suite (Max 8) or higher, which supports Max for Live. If you are using a version below Suite, or if you want to use it in other apps, you can download the effect as a MIDI file from the Compass web version.
 
-The minimum supported version is Ableton Live 10 with Max 8.
+1. Run the appropriate installer for your operating system to install Compass, then launch the app.
+2. Open Ableton Live and add `CompassBridge-vX.X.X.amxd` to a MIDI track (highly recommended to use the bridge version that matches your Compass app version).
+3. When you change the BPM in Ableton Live, it will automatically sync with the Compass app.
+4. Drag and drop devices from the browser on the left to build your rack, and check out the effect in the preview on the right.
+5. In Ableton Live, select the MIDI clip you want to replace, or if you don't have a clip yet, click on the desired location on the track, then press the `Send` button in Compass.
 
-1. Open Ableton Live and add `CompassBridge-vX.X.X.amxd` to any MIDI track in your set.
-2. Open the Compass desktop app.
-3. Build a rack in Compass and preview the result.
-4. Select a MIDI clip in Ableton Live if you want Compass to replace that clip's notes. If no MIDI clip is open, select a MIDI track and Compass will try to create an arrangement clip at the current playhead position.
-5. Press `Send` in Compass.
-
-Because the macOS build is not signed, you will likely need to remove the quarantine flag manually after installing it:
-
+> [!IMPORTANT]
+> The macOS app does not have a developer signature. After installation, you must run the following command in the Terminal for the app to launch properly.
 ```sh
 xattr -dr com.apple.quarantine /Applications/Compass.app
 ```
 
-## Can it replace plugins like Eyedrop?
-
-**No.** Like I said, Compass generates visuals from a completely different foundation, and that cuts both ways. Honestly, drawing effects frame by frame in Ableton Live still gets you cleaner, sharper results most of the time.
-
-What I would actually suggest is sticking with something like Ableton Live for the bulk of your work, then pulling in Compass for the moments you really want to punch up. That combination can get you somewhere pretty cool.
-
-## Development
+## Development Environment
 
 Requirements:
 
@@ -60,14 +67,14 @@ Install:
 npm ci
 ```
 
-Run the Electron app:
+Run Electron app:
 
 ```sh
 npm start
 ```
 
-Build the renderer-only web version:
+Run in web browser:
 
 ```sh
-npm run web:build
+npm run web:dev
 ```
