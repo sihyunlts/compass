@@ -82,16 +82,25 @@ const handleSquirrelStartupEvent = (): boolean => {
     });
   };
 
-  if (squirrelEvent === '--squirrel-install' || squirrelEvent === '--squirrel-updated') {
-    runUpdate(['--createShortcut', exeName]);
+  switch (squirrelEvent) {
+    case '--squirrel-install':
+    case '--squirrel-updated':
+      runUpdate(['--createShortcut', exeName]);
+      app.quit();
+      return true;
+    case '--squirrel-uninstall':
+      runUpdate(['--removeShortcut', exeName]);
+      app.quit();
+      return true;
+    case '--squirrel-obsolete':
+      app.quit();
+      return true;
+    case '--squirrel-firstrun':
+      // Squirrel launches the app with this flag after installation is complete.
+      return false;
+    default:
+      return false;
   }
-
-  if (squirrelEvent === '--squirrel-uninstall') {
-    runUpdate(['--removeShortcut', exeName]);
-  }
-
-  app.quit();
-  return true;
 };
 
 const sendToAllWindows = <T>(channel: string, payload: T): void => {
