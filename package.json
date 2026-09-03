@@ -2,7 +2,7 @@
   "name": "compass",
   "productName": "Compass",
   "version": "1.0.3",
-  "description": "Next Generation Lightshow Tool",
+  "description": "Launchpad lightshow playground.",
   "main": ".vite/build/main.js",
   "private": true,
   "packageManager": "npm@11.5.1",

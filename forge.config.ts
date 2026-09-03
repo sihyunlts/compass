@@ -63,6 +63,9 @@ const config: ForgeConfig = {
     new MakerSquirrel({
       setupExe: `${ARTIFACT_NAME}-Setup.exe`,
       setupIcon: 'assets/compass.ico',
+      authors: 'sihyunlights',
+      owners: 'sihyunlights',
+      iconUrl: 'https://raw.githubusercontent.com/sihyunlts/compass/master/assets/compass.ico',
     }),
     new MakerZIP({}, ['darwin']),
     new MakerDMG({
