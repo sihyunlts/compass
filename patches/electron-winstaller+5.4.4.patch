@@ -1,0 +1,37 @@
+diff --git a/node_modules/electron-winstaller/lib/index.js b/node_modules/electron-winstaller/lib/index.js
+index b0a5077..3e1d048 100644
+--- a/node_modules/electron-winstaller/lib/index.js
++++ b/node_modules/electron-winstaller/lib/index.js
+@@ -123,7 +123,7 @@ function checkIfCommandExists(command) {
+  */
+ function createWindowsInstaller(options) {
+     return __awaiter(this, void 0, void 0, function () {
+-        var useMono, monoExe, wineExe, hasWine, hasMono, appDirectory, outputDirectory, loadingGif, vendorPath, vendorUpdate, appUpdate, cmd_1, args_1, defaultLoadingGif, certificateFile, certificatePassword, remoteReleases, signWithParams, remoteToken, windowsSign, metadata, appResources, asarFile, appMetadata, templatePath, templateData, _i, _a, f, nuspecContent, nugetOutput, targetNuspecPath, cmd, args, _b, nupkgPath, _c, _d, setupPath, unfixedSetupPath, msiPath, unfixedMsiPath;
++        var useMono, monoExe, wineExe, hasWine, hasMono, appDirectory, outputDirectory, loadingGif, vendorPath, vendorUpdate, appUpdate, cmd_1, args_1, certificateFile, certificatePassword, remoteReleases, signWithParams, remoteToken, windowsSign, metadata, appResources, asarFile, appMetadata, templatePath, templateData, _i, _a, f, nuspecContent, nugetOutput, targetNuspecPath, cmd, args, _b, nupkgPath, _c, _d, setupPath, unfixedSetupPath, msiPath, unfixedMsiPath;
+         return __generator(this, function (_e) {
+             switch (_e.label) {
+                 case 0:
+@@ -174,8 +174,7 @@ function createWindowsInstaller(options) {
+                     _e.sent();
+                     _e.label = 8;
+                 case 8:
+-                    defaultLoadingGif = path.join(__dirname, '..', 'resources', 'install-spinner.gif');
+-                    loadingGif = loadingGif ? path.resolve(loadingGif) : defaultLoadingGif;
++                    loadingGif = loadingGif ? path.resolve(loadingGif) : undefined;
+                     certificateFile = options.certificateFile, certificatePassword = options.certificatePassword, remoteReleases = options.remoteReleases, signWithParams = options.signWithParams, remoteToken = options.remoteToken, windowsSign = options.windowsSign;
+                     metadata = {
+                         description: '',
+@@ -288,9 +287,11 @@ function createWindowsInstaller(options) {
+                     cmd = path.join(vendorPath, 'Squirrel.exe');
+                     args = [
+                         '--releasify', nupkgPath,
+-                        '--releaseDir', outputDirectory,
+-                        '--loadingGif', loadingGif
++                        '--releaseDir', outputDirectory
+                     ];
++                    if (loadingGif) {
++                        args.push('--loadingGif', loadingGif);
++                    }
+                     if (useMono) {
+                         args.unshift(path.join(vendorPath, 'Squirrel-Mono.exe'));
+                         cmd = monoExe;
