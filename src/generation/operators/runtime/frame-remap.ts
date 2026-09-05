@@ -63,6 +63,16 @@ const lowerBoundFrame = (
   return low;
 };
 
+export const createFrameIndexWindowMapper = (
+  indices: ReadonlyArray<number | null>,
+): OriginFrameRemap['mapSourceWindow'] => {
+  const runs = splitMonotoneFrameRuns(indices, indices.length);
+  return (window) => runs.map((run) => ({
+    startFrame: lowerBoundFrame(run, indices, run.ascending ? window.startFrame : window.endFrameExclusive),
+    endFrameExclusive: lowerBoundFrame(run, indices, run.ascending ? window.endFrameExclusive : window.startFrame),
+  }));
+};
+
 export const remapTimeline = (
   timeline: GeometryTimeline,
   remaps: ReadonlyMap<string, OriginFrameRemap>,
@@ -93,21 +103,10 @@ export const remapTimeline = (
         });
       }
     }
-    const runs = splitMonotoneFrameRuns(remap.sourceFrameIndexByOutputFrame, nextTimeline.frameCount);
     for (const placement of placements) {
       const stroke = preserveWriteMetadata ? placement.stroke : remappedStrokes.get(placement.stroke)!;
-      for (const run of runs) {
-        const start = lowerBoundFrame(
-          run,
-          remap.sourceFrameIndexByOutputFrame,
-          run.ascending ? placement.startFrame : placement.endFrameExclusive,
-        );
-        const end = lowerBoundFrame(
-          run,
-          remap.sourceFrameIndexByOutputFrame,
-          run.ascending ? placement.endFrameExclusive : placement.startFrame,
-        );
-        addExistingStrokeToFrameRange(nextTimeline, start, end, stroke);
+      for (const window of remap.mapSourceWindow(placement)) {
+        addExistingStrokeToFrameRange(nextTimeline, window.startFrame, window.endFrameExclusive, stroke);
       }
     }
   }

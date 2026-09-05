@@ -5,16 +5,14 @@ import {
   canSegmentCurveBendAffectShape,
   evaluateCurveSegments,
   roundCurveNumber,
+  resolveNormalizedCurveMaxRate,
 } from '../curve-segments';
 import {
   DEFAULT_CURVE_DIVISIONS,
   sanitizeCurveDivisions,
 } from '../curve-divisions';
-import type { TemporalSampledRemap } from '../core-types';
 
 const CURVE_ZERO_EPSILON = 1e-6;
-const DEFAULT_SAMPLE_MULTIPLIER = 8;
-const MIN_SAMPLE_COUNT = 33;
 const IDENTITY_TIME_WARP_EPSILON = 1e-6;
 const DEFAULT_TIME_WARP_CURVE: Readonly<TimeWarpCurve> = Object.freeze({
   divisions: DEFAULT_CURVE_DIVISIONS,
@@ -136,66 +134,27 @@ export const sanitizeTimeWarpCurve = (raw: unknown): TimeWarpCurve => {
   };
 };
 
-const resolveSampleCount = (curve: TimeWarpCurve): number =>
-  Math.max(MIN_SAMPLE_COUNT, sanitizeCurveDivisions(curve.divisions) * DEFAULT_SAMPLE_MULTIPLIER + 1);
-
-export const createSampledRemapFromTimeWarpCurve = (
-  curve: TimeWarpCurve,
-): TemporalSampledRemap => {
-  const sanitized = sanitizeTimeWarpCurve(curve);
-  const segments = buildCurveSegments(sanitized.nodes);
-  const sampleCount = resolveSampleCount(sanitized);
-  const samples = Array.from({ length: sampleCount }, (_, index) => {
-    if (sampleCount <= 1) {
-      return 0;
-    }
-
-    const t = index / (sampleCount - 1);
-    return clamp(evaluateCurveSegments(segments, t), 0, 1);
-  });
-
+export const compileTimeWarpCurve = (curve: TimeWarpCurve) => {
+  const segments = buildCurveSegments(sanitizeTimeWarpCurve(curve).nodes);
   return {
-    kind: 'sampled',
-    domainStart: 0,
-    domainEnd: 1,
-    samples,
+    segments,
+    evaluate: (progress: number): number => evaluateCurveSegments(segments, progress),
   };
 };
 
-export const resolveTimeWarpCurveMaxRate = (
-  curve: TimeWarpCurve,
-): number => {
-  const remap = createSampledRemapFromTimeWarpCurve(curve);
-  const sampleSpan = remap.samples.length - 1;
-  const domainSpan = remap.domainEnd - remap.domainStart;
-  if (sampleSpan <= 0 || !Number.isFinite(domainSpan) || domainSpan <= 0) {
-    return 1;
+export const resolveTimeWarpCurveMaxRate = (curve: TimeWarpCurve): number => {
+  let maxRate = 1;
+  for (const segment of compileTimeWarpCurve(curve).segments) {
+    const span = segment.end.t - segment.start.t;
+    if (span <= 0) continue;
+    maxRate = Math.max(maxRate, Math.abs(segment.end.v - segment.start.v) / span
+      * resolveNormalizedCurveMaxRate(segment.bend));
   }
-
-  const sampleStep = domainSpan / sampleSpan;
-  let maxRate = 0;
-  for (let index = 1; index < remap.samples.length; index += 1) {
-    const previous = remap.samples[index - 1];
-    const current = remap.samples[index];
-    if (previous === null || current === null) {
-      continue;
-    }
-
-    maxRate = Math.max(maxRate, Math.abs(current - previous) / sampleStep);
-  }
-
-  return Number.isFinite(maxRate) ? Math.max(maxRate, 1) : 1;
+  return maxRate;
 };
 
-export const isIdentityTimeWarpCurve = (
-  curve: TimeWarpCurve,
-): boolean => {
-  const remap = createSampledRemapFromTimeWarpCurve(curve);
-  const lastIndex = remap.samples.length - 1;
-  if (lastIndex <= 0) {
-    return true;
-  }
-
-  return remap.samples.every((sample, index) =>
-    Math.abs(sample - (index / lastIndex)) <= IDENTITY_TIME_WARP_EPSILON);
-};
+export const isIdentityTimeWarpCurve = (curve: TimeWarpCurve): boolean =>
+  compileTimeWarpCurve(curve).segments.every(({ start, end, bend }) =>
+    Math.abs(start.t - start.v) <= IDENTITY_TIME_WARP_EPSILON
+    && Math.abs(end.t - end.v) <= IDENTITY_TIME_WARP_EPSILON
+    && Math.abs(bend) <= CURVE_ZERO_EPSILON);

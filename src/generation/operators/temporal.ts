@@ -1,5 +1,5 @@
-import { evaluateTemporalRemap } from '../../core/scene-operators/temporal';
-import { createSampledRemapFromTimeWarpCurve, isIdentityTimeWarpCurve } from '../../core/timewarp/curve';
+import { invertNormalizedCurveAt } from '../../core/curve-segments';
+import { compileTimeWarpCurve, isIdentityTimeWarpCurve } from '../../core/timewarp/curve';
 import type {
   GeneratorEffectNode,
   StretchEffectNode,
@@ -18,7 +18,7 @@ import {
   type ModulationContext,
   type RackStageExecutionContext,
 } from './runtime';
-import { remapTimeline } from './runtime/frame-remap';
+import { createFrameIndexWindowMapper, remapTimeline } from './runtime/frame-remap';
 import {
   buildFixedTimelineStateOverrides,
   resolveCanonicalSourceWindow,
@@ -122,11 +122,11 @@ const applyFixedDomainTemporalTransform = (
     }
 
     originRemaps.set(originId, {
-      sourceFrameIndexByOutputFrame: buildFixedDomainFrameIndexes(
+      mapSourceWindow: createFrameIndexWindowMapper(buildFixedDomainFrameIndexes(
         state.timeline,
         resolveCanonicalSourceWindow(timelineState),
         resolveSourceSelection,
-      ),
+      )),
       writeOrder,
     });
   }
@@ -268,17 +268,69 @@ const applyTimeWarp = (
     return state;
   }
 
-  const remap = createSampledRemapFromTimeWarpCurve(effect.params.curve);
-  return applyFixedDomainTemporalTransform(
+  const curve = compileTimeWarpCurve(effect.params.curve);
+  const timeline = state.timeline;
+  const targetOriginIds = buildTargetOriginIds(timeline, targetGroupId);
+  const outputFrameCount = toFrameCount(1, timeline.sampleStepBeats);
+  const outputSpan = Math.max(outputFrameCount - 1, 1);
+  const remaps = new Map<string, OriginFrameRemap>();
+  for (const originId of targetOriginIds) {
+    const sourceWindow = toFrameWindow(
+      resolveCanonicalSourceWindow(state.timelineStateByOriginId.get(originId)!),
+      timeline.sampleStepBeats,
+      timeline.frameCount,
+    );
+    const sourceCount = sourceWindow.endFrameExclusive - sourceWindow.startFrame;
+    remaps.set(originId, {
+      writeOrder,
+      mapSourceWindow: (window) => {
+        if (sourceCount <= 0) return [];
+        if (sourceCount === 1) {
+          return window.startFrame <= sourceWindow.startFrame && window.endFrameExclusive > sourceWindow.startFrame
+            ? [{ startFrame: 0, endFrameExclusive: outputFrameCount }] : [];
+        }
+        // Invert the curve at the source sample's cell boundaries. No sampled
+        // curve table or per-output-frame source selection is constructed.
+        const low = (window.startFrame - sourceWindow.startFrame - 0.5) / (sourceCount - 1);
+        const high = (window.endFrameExclusive - sourceWindow.startFrame - 0.5) / (sourceCount - 1);
+        const windows = [];
+        for (const segment of curve.segments) {
+          const { start, end, bend } = segment;
+          const firstFrame = Math.ceil(start.t * outputSpan);
+          const lastFrame = end.t === 1 ? outputFrameCount : Math.ceil(end.t * outputSpan);
+          const valueSpan = end.v - start.v;
+          if (valueSpan === 0) {
+            if (low <= start.v && start.v < high) {
+              windows.push({ startFrame: firstFrame, endFrameExclusive: lastFrame });
+            }
+            continue;
+          }
+          const minValue = Math.min(start.v, end.v);
+          const maxValue = Math.max(start.v, end.v);
+          if (low > maxValue || high <= minValue) continue;
+          const inverseFrame = (value: number): number => (start.t + (end.t - start.t)
+            * invertNormalizedCurveAt((value - start.v) / valueSpan, bend)) * outputSpan;
+          const lower = valueSpan > 0
+            ? (low <= minValue ? firstFrame : Math.ceil(inverseFrame(low)))
+            : (high > maxValue ? firstFrame : Math.floor(inverseFrame(high)) + 1);
+          const upper = valueSpan > 0
+            ? (high > maxValue ? lastFrame : Math.ceil(inverseFrame(high)))
+            : (low <= minValue ? lastFrame : Math.floor(inverseFrame(low)) + 1);
+          const startFrame = Math.max(firstFrame, lower);
+          const endFrameExclusive = Math.min(lastFrame, upper);
+          if (endFrameExclusive > startFrame) windows.push({ startFrame, endFrameExclusive });
+        }
+        return windows;
+      },
+    });
+  }
+  return replaceTimelineAndRefreshRackState(
     state,
-    targetGroupId,
-    writeOrder,
-    (outputProgress) => {
-      const progress = evaluateTemporalRemap(remap, outputProgress);
-      return progress === null ? null : { start: 0, end: 1, progress };
-    },
+    remapTimeline(timeline, remaps, resolveTemporalStageEndBeat(timeline, targetOriginIds), false),
+    state.timelineStateByOriginId,
     context,
-  );
+    buildFixedTimelineStateOverrides(remaps.keys()),
+  ) as MaterializedGenerationState;
 };
 
 export const reverseOperator = createRackOperator<'reverse', 'materialize-all'>(

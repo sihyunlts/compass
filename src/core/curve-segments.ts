@@ -43,6 +43,16 @@ export const evaluateNormalizedCurveAt = (
   return 1 - ((1 - progress) ** power);
 };
 
+export const invertNormalizedCurveAt = (value: number, bend: number): number => {
+  const progress = clamp(value, 0, 1);
+  if (Math.abs(bend) <= CURVE_ZERO_EPSILON) return progress;
+  const inversePower = 1 / toCurvePower(bend);
+  return bend < 0 ? progress ** inversePower : 1 - (1 - progress) ** inversePower;
+};
+
+export const resolveNormalizedCurveMaxRate = (bend: number): number =>
+  Math.abs(bend) <= CURVE_ZERO_EPSILON ? 1 : toCurvePower(bend);
+
 export const canSegmentCurveBendAffectShape = (
   startNode: CurveNode,
   endNode: CurveNode,
