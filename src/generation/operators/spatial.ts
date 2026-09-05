@@ -1,13 +1,12 @@
 import {
   buildTargetOriginIds,
-  createPendingGeometryApplicationOperator,
+  createRackOperator,
   appendPendingGeometryRewriteApplication,
   buildModulationEvaluationWindowByOriginId,
   isDeviceModulated,
   resolveModulatedDeviceAtFrame,
   transformStroke,
   type ModulationEvaluationWindow,
-  type PendingGeometryApplicationOperatorInput,
   type SpatialTransformStageKind,
 } from './runtime';
 import {
@@ -19,13 +18,14 @@ import {
 } from '../../core/geometry';
 import type { GeneratorEffectNode } from '../../shared/model';
 import {
-  type MutableGenerationState,
+  type GenerationState,
 } from '../timeline/state';
-import type { BeatRange } from '../analysis/types';
+
+type SpatialTransformEffectNode = Extract<GeneratorEffectNode, { kind: SpatialTransformStageKind }>;
 
 const resolveEffectTransform = (
-  effect: GeneratorEffectNode,
-): ReturnType<typeof toTranslationTransform> | null => {
+  effect: SpatialTransformEffectNode,
+): ReturnType<typeof toTranslationTransform> => {
   if (effect.kind === 'mirror') {
     return toMirrorTransformAt(effect.params.angleDeg, COMPOSITION_CENTER);
   }
@@ -41,23 +41,19 @@ const resolveEffectTransform = (
     return toTranslationTransform(effect.params.offsetX, effect.params.offsetY);
   }
 
-  if (effect.kind === 'scale') {
-    return toScaleTransformAt(
-      effect.params.scaleX,
-      effect.params.scaleY,
-      {
-        x: effect.params.centerX,
-        y: effect.params.centerY,
-      },
-    );
-  }
-
-  return null;
+  return toScaleTransformAt(
+    effect.params.scaleX,
+    effect.params.scaleY,
+    {
+      x: effect.params.centerX,
+      y: effect.params.centerY,
+    },
+  );
 };
 
 const applyPendingSpatialTransform = (
-  input: PendingGeometryApplicationOperatorInput,
-  effect: GeneratorEffectNode,
+  state: GenerationState,
+  effect: SpatialTransformEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
   isModulated: boolean,
@@ -65,22 +61,19 @@ const applyPendingSpatialTransform = (
     frameIndex: number,
     sampleStepBeats: number,
     evaluationWindow: ModulationEvaluationWindow,
-  ) => GeneratorEffectNode,
-  requiredFrameWindow: BeatRange | 'all',
+  ) => SpatialTransformEffectNode,
   fallbackEvaluationWindow: ModulationEvaluationWindow,
-): MutableGenerationState => {
-  const { baseState } = input;
-  const targetOriginIds = buildTargetOriginIds(baseState.timeline, targetGroupId);
+): GenerationState => {
+  const targetOriginIds = buildTargetOriginIds(state.timeline, targetGroupId);
   const evaluationWindowByTargetOriginId = buildModulationEvaluationWindowByOriginId(
-    input,
+    state,
     targetOriginIds,
     fallbackEvaluationWindow,
   );
 
   return appendPendingGeometryRewriteApplication(
-    input,
+    state,
     targetOriginIds,
-    requiredFrameWindow,
     ({ timeline, frameIndex, strokes }) => {
       return strokes.map((stroke) => {
         const deviceAtFrame = isModulated
@@ -100,13 +93,14 @@ const applyPendingSpatialTransform = (
   );
 };
 
-export const spatialTransformOperator = createPendingGeometryApplicationOperator<SpatialTransformStageKind>(
-  (input, stage, context) => {
+export const spatialTransformOperator = createRackOperator<SpatialTransformStageKind, 'preserve-pending'>(
+  'preserve-pending',
+  (state, stage, context) => {
     const device = stage.device;
     const isModulated = isDeviceModulated(context.modulationContext, stage.deviceId);
 
     return applyPendingSpatialTransform(
-      input,
+      state,
       device,
       stage.groupId,
       stage.stageIndex,
@@ -117,8 +111,7 @@ export const spatialTransformOperator = createPendingGeometryApplicationOperator
         frameIndex,
         sampleStepBeats,
         evaluationWindow,
-      ) as GeneratorEffectNode,
-      'all',
+      ),
       {
         start: 0,
         end: context.modulationContext.loopLengthBeats,

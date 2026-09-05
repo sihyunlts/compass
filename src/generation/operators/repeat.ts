@@ -2,15 +2,16 @@ import type { RepeatEffectNode } from '../../shared/model';
 import {
   appendPendingStrokeRewriteApplication,
   buildTargetOriginIds,
-  cloneStrokeWithWriteOrder,
-  createPendingFrameApplicationOperator,
-  type PendingFrameApplicationOperatorInput,
+  transformStroke,
+  createRackOperator,
+  materializeRackState,
 } from './runtime';
 import { buildSourceStrokesByOriginAndFrame } from './runtime/timeline-strokes';
 import { toFrameWindow } from '../timeline';
 import { DEFAULT_TIMELINE_WINDOW } from '../timeline/temporal-window';
 import type {
-  MutableGenerationState,
+  GenerationState,
+  MaterializedGenerationState,
   OriginTimelineState,
   PendingStrokeRewriteFrameWrite,
 } from '../timeline/state';
@@ -97,7 +98,7 @@ const buildRepeatedFrameWrites = (
         }
 
         destinationStrokes.push(
-          ...sourceStrokes.map((stroke) => cloneStrokeWithWriteOrder(stroke, writeOrder)),
+          ...sourceStrokes.map((stroke) => transformStroke(stroke, null, writeOrder)),
         );
       }
 
@@ -116,12 +117,11 @@ const buildRepeatedFrameWrites = (
 };
 
 const applyRepeatEffect = (
-  input: PendingFrameApplicationOperatorInput,
+  sourceState: MaterializedGenerationState,
   effect: RepeatEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
-): MutableGenerationState => {
-  const sourceState = input.sourceState;
+): GenerationState => {
   const { count: repeatCount, intervalPercent } = effect.params;
   const targetOriginIds = buildTargetOriginIds(sourceState.timeline, targetGroupId);
   if (repeatCount === 1 || targetOriginIds.size === 0) {
@@ -129,7 +129,8 @@ const applyRepeatEffect = (
   }
 
   return appendPendingStrokeRewriteApplication(
-    input,
+    sourceState,
+    sourceState.timeline,
     targetOriginIds,
     buildRepeatedFrameWrites(
       sourceState.timeline,
@@ -143,12 +144,15 @@ const applyRepeatEffect = (
   );
 };
 
-export const repeatOperator = createPendingFrameApplicationOperator<'repeat'>(
-  (input, stage) => applyRepeatEffect(
-    input,
-    stage.device,
-    stage.groupId,
-    stage.stageIndex,
+export const repeatOperator = createRackOperator<'repeat', 'materialize-all'>(
+  'materialize-all',
+  (state, stage, context) => materializeRackState(
+    applyRepeatEffect(
+      state,
+      stage.device,
+      stage.groupId,
+      stage.stageIndex,
+    ),
+    context,
   ),
-  'publish-timeline-state',
 );

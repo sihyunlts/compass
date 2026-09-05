@@ -4,10 +4,6 @@ import {
   composeAffine,
   resolveFixedPointAffinePullback,
 } from '../../../core/geometry';
-import {
-  deleteOrigins,
-  setFrameStrokes,
-} from '../../timeline';
 import type {
   GeometryMask,
   GeometryStroke,
@@ -78,13 +74,6 @@ export const buildTargetOriginIds = (
   return originIds;
 };
 
-export const cloneMask = (
-  mask: GeometryMask,
-): GeometryMask => ({
-  contains: mask.contains,
-  inverseTransform: { ...mask.inverseTransform },
-});
-
 const resolveIntraWriteOrder = (
   writeOrder: number,
 ): number => {
@@ -103,15 +92,11 @@ const resolveStageWriteOrder = (
 
 const transformMask = (
   mask: GeometryMask,
-  transform: AffineTransform | null,
+  transform: AffineTransform,
 ): GeometryMask => {
-  if (!transform) {
-    return cloneMask(mask);
-  }
-
   const pullback = resolveFixedPointAffinePullback(transform);
   if (!pullback) {
-    return cloneMask(mask);
+    return mask;
   }
 
   return {
@@ -119,19 +104,6 @@ const transformMask = (
     inverseTransform: composeAffine(mask.inverseTransform, pullback),
   };
 };
-
-export const cloneStrokeWithWriteOrder = (
-  stroke: GeometryStroke,
-  writeOrder: number,
-): Omit<GeometryStroke, 'writeId'> => ({
-  polyline: {
-    ...stroke.polyline,
-    points: stroke.polyline.points.map((point) => ({ ...point })),
-  },
-  originGroupId: stroke.originGroupId,
-  writeOrder: resolveStageWriteOrder(writeOrder, stroke),
-  masks: stroke.masks.map(cloneMask),
-});
 
 export const transformStroke = (
   stroke: GeometryStroke,
@@ -148,7 +120,9 @@ export const transformStroke = (
     polyline,
     originGroupId: stroke.originGroupId,
     writeOrder: resolveStageWriteOrder(writeOrder, stroke),
-    masks: stroke.masks.map((mask) => transformMask(mask, transform)),
+    masks: transform
+      ? stroke.masks.map((mask) => transformMask(mask, transform))
+      : stroke.masks,
   };
 };
 
@@ -181,56 +155,6 @@ export const buildSourceStrokesByOriginAndFrame = (
   }
 
   return strokesByOriginId;
-};
-
-const splitFrameStrokesByOriginIds = (
-  strokes: ReadonlyArray<GeometryStroke>,
-  targetOriginIds: ReadonlySet<string>,
-): {
-  targeted: GeometryStroke[];
-  untargeted: GeometryStroke[];
-} => {
-  const targeted: GeometryStroke[] = [];
-  const untargeted: GeometryStroke[] = [];
-
-  for (const stroke of strokes) {
-    if (targetOriginIds.has(stroke.polyline.originId)) {
-      targeted.push(stroke);
-    } else {
-      untargeted.push(stroke);
-    }
-  }
-
-  return { targeted, untargeted };
-};
-
-const takeOriginStrokesFromFrame = (
-  timeline: GeometryTimeline,
-  frameIndex: number,
-  targetOriginIds: ReadonlySet<string>,
-): GeometryStroke[] => {
-  const { targeted, untargeted } = splitFrameStrokesByOriginIds(
-    timeline.frames[frameIndex]?.strokes ?? [],
-    targetOriginIds,
-  );
-
-  if (targeted.length > 0) {
-    setFrameStrokes(timeline, frameIndex, untargeted);
-  }
-
-  return targeted;
-};
-
-export const stripOriginFrames = (
-  timeline: GeometryTimeline,
-  sourceFrameCount: number,
-  targetOriginIds: ReadonlySet<string>,
-): void => {
-  deleteOrigins(timeline, targetOriginIds);
-
-  for (let frameIndex = 0; frameIndex < sourceFrameCount; frameIndex += 1) {
-    takeOriginStrokesFromFrame(timeline, frameIndex, targetOriginIds);
-  }
 };
 
 export const toSourceFrameIndex = (

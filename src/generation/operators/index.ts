@@ -2,7 +2,7 @@ import type { GeneratorChain } from '../../shared/model';
 import type { SpatialRequirement } from '../analysis/types';
 import type { CompiledRackPlan, CompiledRackStage, RackStageDeviceKind } from '../plan/types';
 import { resolveCompiledRackSampleStepBeats } from '../plan/sampling';
-import { createEmptyGenerationState, type MutableGenerationState } from '../timeline/state';
+import { createEmptyGenerationState, type GenerationState } from '../timeline/state';
 import type { CanonicalOutputAdapter, GeometryTimeline } from '../types';
 import { colorOperator } from './color';
 import { generatorOperator } from './generator';
@@ -51,10 +51,10 @@ const getRackOperator = (
 ): RackOperator => RACK_OPERATORS[deviceKind];
 
 const applyCompiledRackStage = (
-  state: MutableGenerationState,
+  state: GenerationState,
   stage: CompiledRackStage,
   context: RackStageExecutionContext,
-): MutableGenerationState => {
+): GenerationState => {
   const operator = getRackOperator(stage.deviceKind);
   switch (operator.inputPolicy) {
     case 'preserve-pending':

@@ -134,7 +134,6 @@ const applyFixedDomainTemporalTransform = (
   const timeline = remapTimeline(
     state.timeline,
     originRemaps,
-    'all',
     resolveTemporalStageEndBeat(state.timeline, targetOriginIds),
     false,
   );

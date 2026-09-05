@@ -4,7 +4,7 @@ import {
   addStrokeToFrameRange,
   beginTimelineStage,
   completeTimelineStage,
-  deleteOrigins,
+  unregisterTimelineOrigins,
 } from '../timeline';
 import type {
   GeometryStroke,
@@ -313,7 +313,7 @@ export const materializeColorTimeline = (
     outputEndFrameExclusive * input.sourceTimeline.sampleStepBeats,
   );
   const timelineStage = beginTimelineStage(input.sourceTimeline, outputEndBeat);
-  deleteOrigins(timelineStage, input.targetOriginIds);
+  unregisterTimelineOrigins(timelineStage, input.targetOriginIds);
 
   for (const write of writes) {
     for (const stroke of write.event.strokes) {

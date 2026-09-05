@@ -5,26 +5,25 @@ import type { ColorEffectNode } from '../../shared/model';
 import { compileColorAgeKernel } from '../color/age-kernel';
 import { materializeColorTimeline } from '../color/materialization';
 import {
-  type MutableGenerationState,
+  type MaterializedGenerationState,
+  type GenerationState,
 } from '../timeline/state';
 import {
   buildTargetOriginIds,
-  createPendingFrameApplicationOperator,
+  createRackOperator,
   replaceTimelineAndRefreshRackState,
-  type PendingFrameApplicationOperatorInput,
   type RackStageExecutionContext,
 } from './runtime';
 
 const applyColorEffect = (
-  input: PendingFrameApplicationOperatorInput,
+  sourceState: MaterializedGenerationState,
   effect: ColorEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
   context: RackStageExecutionContext,
-): MutableGenerationState => {
-  const sourceState = input.sourceState;
+): GenerationState => {
   const targetOriginIds = buildTargetOriginIds(
     sourceState.timeline,
     targetGroupId,
@@ -58,12 +57,13 @@ const applyColorEffect = (
   );
 };
 
-export const colorOperator = createPendingFrameApplicationOperator<'color'>(
-  (input, stage, context) => {
+export const colorOperator = createRackOperator<'color', 'materialize-all'>(
+  'materialize-all',
+  (state, stage, context) => {
     const device = stage.device;
 
     return applyColorEffect(
-      input,
+      state,
       device,
       stage.groupId,
       stage.stageIndex,
