@@ -4,6 +4,7 @@
   import { clamp } from '../../shared/math';
   import {
     PREVIEW_SCRUB_MAX,
+    resolvePreviewScrubValue,
     type PreviewWindowState,
   } from '../../shared/contracts/preview/window-state';
   import { resolveCompassBridge } from '../app/browser-bridge';
@@ -47,18 +48,7 @@
       : null,
   );
   const scrubValue = $derived.by(() => {
-    if (!previewState || previewState.sourceTimelineEndBeat <= 0) {
-      return 0;
-    }
-
-    return Math.round(clamp(
-      (
-        previewState.displayProgress01
-        ?? previewState.currentBeat / previewState.sourceTimelineEndBeat
-      ) * PREVIEW_SCRUB_MAX,
-      0,
-      PREVIEW_SCRUB_MAX,
-    ));
+    return previewState ? resolvePreviewScrubValue(previewState) : 0;
   });
 
   const handlePlayClick = (): void => {

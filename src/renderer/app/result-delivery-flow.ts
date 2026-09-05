@@ -42,6 +42,10 @@ class ResultDeliveryFlowController {
   public constructor(private readonly options: ResultDeliveryFlowOptions) {}
 
   public async deliver(clipName: string): Promise<void> {
+    if (this.options.editorSession.state.deliveryButtonState === 'working') {
+      return;
+    }
+
     const {
       bridgeClient,
       editorSession,

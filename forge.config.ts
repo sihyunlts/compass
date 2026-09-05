@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { rename, rm } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
@@ -14,6 +15,22 @@ import { version } from './package.json';
 
 const RELEASE_VERSION = `v${version}`;
 const ARTIFACT_NAME = `Compass-${RELEASE_VERSION}`;
+const NATIVE_MODULE_BUILD_PATH = '/native/macos/build/Release';
+
+const isNativeModulePackagePath = (filePath: string): boolean =>
+  NATIVE_MODULE_BUILD_PATH.startsWith(filePath)
+  || (
+    filePath.startsWith(`${NATIVE_MODULE_BUILD_PATH}/`)
+    && filePath.endsWith('.node')
+  );
+
+const buildNativeModules = (args: string[] = []): void => {
+  execFileSync(
+    process.execPath,
+    ['scripts/build-native-modules.mjs', ...args],
+    { stdio: 'inherit' },
+  );
+};
 
 const PRESET_DOCUMENT_TYPES = [
   {
@@ -38,7 +55,12 @@ const PRESET_DOCUMENT_TYPES = [
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
+    ignore: (filePath) =>
+      !filePath.startsWith('/.vite')
+      && !isNativeModulePackagePath(filePath),
+    asar: {
+      unpack: '*.node',
+    },
     extendInfo: {
       CFBundleDocumentTypes: PRESET_DOCUMENT_TYPES.map((type) => ({
         CFBundleTypeExtensions: [type.extension],
@@ -75,6 +97,27 @@ const config: ForgeConfig = {
     new MakerDeb({}),
   ],
   hooks: {
+    preStart: async () => {
+      if (process.platform === 'darwin') {
+        buildNativeModules();
+      }
+    },
+    packageAfterCopy: async (
+      _forgeConfig,
+      buildPath,
+      _electronVersion,
+      platform,
+      arch,
+    ) => {
+      if (platform === 'darwin') {
+        buildNativeModules([
+          '--arch',
+          arch,
+          '--output-root',
+          buildPath,
+        ]);
+      }
+    },
     postMake: async (_forgeConfig, makeResults) => Promise.all(makeResults.map(async (result) => {
       result.artifacts = await Promise.all(result.artifacts.map(async (artifact) => {
         const extension = path.extname(artifact);

@@ -503,6 +503,16 @@
     );
     const disposePreviewWindowControlRequest = bridgeClient.subscribePreviewWindowControlRequest(
       (request) => {
+        if (request.action === 'set-duration') {
+          handlePreviewLengthChange(request.label);
+          return;
+        }
+
+        if (request.action === 'deliver') {
+          void resultDeliveryFlow.deliver(presetState.currentRackDisplayName);
+          return;
+        }
+
         if (request.action === 'toggle-playback') {
           playbackSession.togglePlayback();
           return;

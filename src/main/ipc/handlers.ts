@@ -22,6 +22,10 @@ import { PresetService } from '../services/preset-service';
 import { UpdateCheckService } from '../services/update-check-service';
 import { isAppLocale } from '../../shared/i18n';
 import { setApplicationMenuLocale } from '../application-menu';
+import {
+  setMainWindowNativeTouchBarLocale,
+  updateMainWindowNativeTouchBarState,
+} from '../native-touchbar';
 
 let latestPreviewWindowState: PreviewWindowState | null = null;
 
@@ -77,6 +81,7 @@ export const registerIpcHandlers = (
     (_event, locale: unknown) => {
       if (isAppLocale(locale)) {
         setApplicationMenuLocale(locale);
+        setMainWindowNativeTouchBarLocale(locale);
       }
     },
   );
@@ -181,6 +186,7 @@ export const registerIpcHandlers = (
     IPC_CHANNELS.pushPreviewWindowState,
     (_event, state: PreviewWindowState) => {
       latestPreviewWindowState = state;
+      updateMainWindowNativeTouchBarState(state);
       const previewWindow = getPreviewWindow();
       if (!previewWindow) {
         return;

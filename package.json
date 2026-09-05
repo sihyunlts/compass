@@ -10,6 +10,7 @@
     "node": "24.13.1"
   },
   "scripts": {
+    "native:build": "node scripts/build-native-modules.mjs",
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",

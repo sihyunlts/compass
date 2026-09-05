@@ -45,6 +45,8 @@ export type RackFileMenuAction = 'new' | 'save' | 'save-as';
 export type PreviewWindowControlRequest =
   | { action: 'toggle-playback' }
   | { action: 'toggle-loop' }
+  | { action: 'deliver' }
+  | { action: 'set-duration'; label: string }
   | { action: 'seek'; scrubValue: number }
   | { action: 'refresh-hardware-outputs' }
   | { action: 'select-hardware-output'; outputId: string | null };
@@ -60,9 +62,21 @@ export const parsePreviewWindowControlRequest = (
   if (
     action === 'toggle-playback'
     || action === 'toggle-loop'
+    || action === 'deliver'
     || action === 'refresh-hardware-outputs'
   ) {
     return { action };
+  }
+
+  const durationLabel = (value as { label?: unknown }).label;
+  if (
+    action === 'set-duration'
+    && typeof durationLabel === 'string'
+  ) {
+    return {
+      action,
+      label: durationLabel,
+    };
   }
 
   const scrubValue = (value as { scrubValue?: unknown }).scrubValue;

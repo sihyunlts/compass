@@ -4,6 +4,8 @@ import type { GeneratorPreview } from '../../shared/contracts/preview/generator-
 import type { HardwareMidiOutputState } from '../../shared/contracts/preview/hardware-output';
 import {
   PREVIEW_SCRUB_MAX,
+  resolvePreviewScrubValue,
+  type PreviewTimelineFrameStrip,
   type PreviewWindowState,
 } from '../../shared/contracts/preview/window-state';
 import { clamp } from '../../shared/math';
@@ -27,6 +29,7 @@ import {
 } from '../features/preview/generation-reason';
 import type { HeaderIndicatorController } from './header-indicator.svelte';
 import { i18n } from '../i18n.svelte';
+import { buildTouchBarTimelineFrameStrip } from './touchbar-timeline';
 
 interface PlaybackSessionState {
   currentBeat: number;
@@ -128,6 +131,8 @@ export class PlaybackSessionController {
   private previewVisualPhase: PreviewVisualPhase = 'disabled';
 
   private hardwareFrameSink: ((frame: ReadonlyMap<number, number>) => void) | null = null;
+
+  private pendingTimelineFrameStrip: PreviewTimelineFrameStrip | null = null;
 
   public constructor(private readonly options: PlaybackSessionOptions) {
     const maxFps = options.previewWindowStateMaxFps ?? DEFAULT_PREVIEW_WINDOW_STATE_MAX_FPS;
@@ -238,10 +243,14 @@ export class PlaybackSessionController {
       nextPreviewWindowState.displayProgress01 = previewVisualProgress01;
     }
 
-    const progress = nextPreviewWindowState.displayProgress01
-      ?? nextPreviewWindowState.currentBeat / nextPreviewWindowState.sourceTimelineEndBeat;
-    const nextPreviewScrubValue = Math.round(
-      clamp(progress, 0, 1) * (this.options.scrubMax ?? PREVIEW_SCRUB_MAX),
+    if (this.pendingTimelineFrameStrip) {
+      nextPreviewWindowState.timelineFrameStrip = this.pendingTimelineFrameStrip;
+      this.pendingTimelineFrameStrip = null;
+    }
+
+    const nextPreviewScrubValue = resolvePreviewScrubValue(
+      nextPreviewWindowState,
+      this.options.scrubMax ?? PREVIEW_SCRUB_MAX,
     );
     if (uiState.previewScrubValue !== nextPreviewScrubValue) {
       uiState.previewScrubValue = nextPreviewScrubValue;
@@ -345,6 +354,14 @@ export class PlaybackSessionController {
       launchpadModel: input.launchpadModel,
       preview: input.preview,
     };
+
+    if (this.options.bridgeClient.platform === 'mac') {
+      this.pendingTimelineFrameStrip = buildTouchBarTimelineFrameStrip(
+        input.preview,
+        input.launchpadModel,
+        this.options.resolveLedRgb,
+      );
+    }
 
     if (this.playbackScheduler) {
       this.playbackScheduler.setCurrentBeat(nextBeat);
