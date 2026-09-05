@@ -1,3 +1,4 @@
+import { iterateTimelineSpans } from './timeline';
 import { MIN_NOTE_DURATION, THICKNESS } from '../core/pipeline/constants';
 import { collectPitchSampledNotes, type SampledActivePitch } from '../core/pipeline/note-sampling';
 import {
@@ -12,8 +13,7 @@ import type { LaunchpadButton } from '../shared/model';
 import { createSpatialBounds } from './analysis/bounds';
 import {
   collectStrokeOccupiedCoordinateCandidates,
-  createOccupiedCoordinate,
-  shouldReplaceOccupiedCoordinate,
+  writeOccupiedCoordinateWinner,
   type OccupiedCoordinate,
   type OccupiedCoordinateCandidateBounds,
 } from './timeline/analysis';
@@ -227,17 +227,35 @@ const isStrokeActiveAtCoordinate = (
     <= THICKNESS * THICKNESS;
 };
 
-const doesStrokeHitNoteOutput = (
-  stroke: GeometryStroke,
-  noteOutputCoordinateGroups: ReadonlyArray<CoordinateGroup>,
-): boolean => {
-  for (const coordinateGroup of noteOutputCoordinateGroups) {
-    if (isStrokeActiveAtCoordinate(stroke, coordinateGroup.x, coordinateGroup.y)) {
-      return true;
-    }
-  }
+const createStrokeNoteOutputPredicate = (
+  coordinateGroupByKey: ReadonlyMap<string, CoordinateGroup>,
+  fractionalCoordinateGroups: ReadonlyArray<CoordinateGroup>,
+  outputBounds: OccupiedCoordinateCandidateBounds | null,
+): ((stroke: GeometryStroke) => boolean) => {
+  const integerNoteOutputKeys = new Set(
+    Array.from(coordinateGroupByKey)
+      .filter(([, group]) => hasNoteOutput(group))
+      .map(([key]) => key),
+  );
+  const fractionalNoteOutputGroups = fractionalCoordinateGroups.filter(hasNoteOutput);
+  const noteOutputCoordinateGroups = buildNoteOutputCoordinateGroups(
+    coordinateGroupByKey,
+    fractionalCoordinateGroups,
+  );
 
-  return false;
+  return (stroke) => {
+    // Centerline rasterization already identifies the integer LED candidates.
+    // Test that footprint once instead of rasterizing and masking it per LED.
+    if (stroke.polyline.rasterMode === 'centerline') {
+      const coordinates = collectStrokeOccupiedCoordinateCandidates(stroke, outputBounds);
+      if (coordinates.some(({ x, y }) => integerNoteOutputKeys.has(`${x},${y}`))) {
+        return true;
+      }
+      return fractionalNoteOutputGroups.some(({ x, y }) => isStrokeActiveAtCoordinate(stroke, x, y));
+    }
+
+    return noteOutputCoordinateGroups.some(({ x, y }) => isStrokeActiveAtCoordinate(stroke, x, y));
+  };
 };
 
 const buildProjectionGeometryKey = (
@@ -315,7 +333,7 @@ const createStrokeOutputProjectionResolver = (): ResolveStrokeOutputProjection =
 
 const resolveStrokeHitsNoteOutput = (
   stroke: GeometryStroke,
-  noteOutputCoordinateGroups: ReadonlyArray<CoordinateGroup>,
+  doesStrokeHitNoteOutput: (stroke: GeometryStroke) => boolean,
   resolveStrokeOutputProjection: ResolveStrokeOutputProjection,
 ): boolean => {
   const projection = resolveStrokeOutputProjection(stroke);
@@ -323,7 +341,7 @@ const resolveStrokeHitsNoteOutput = (
     return projection.noteOutputHit;
   }
 
-  const result = doesStrokeHitNoteOutput(stroke, noteOutputCoordinateGroups);
+  const result = doesStrokeHitNoteOutput(stroke);
   projection.noteOutputHit = result;
   return result;
 };
@@ -388,60 +406,44 @@ const resolveFractionalCoordinateHits = (
 
 const buildVisibleWindowByOriginId = (
   timeline: GeometryTimeline,
-  noteOutputCoordinateGroups: ReadonlyArray<CoordinateGroup>,
+  doesStrokeHitNoteOutput: (stroke: GeometryStroke) => boolean,
   resolveStrokeOutputProjection: ResolveStrokeOutputProjection,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): ReadonlyMap<string, GenerationTimelineWindow> => {
   const windowByOriginId = new Map<string, GenerationTimelineWindow>();
 
-  const updateWindow = (
-    originId: string,
-    frameStartBeat: number,
-    frameEndBeat: number,
-  ): void => {
-    const existing = windowByOriginId.get(originId);
-    if (existing) {
-      if (frameStartBeat < existing.start) {
-        existing.start = frameStartBeat;
-      }
-      if (frameEndBeat > existing.end) {
-        existing.end = frameEndBeat;
-      }
-      return;
-    }
-
-    windowByOriginId.set(originId, {
-      start: frameStartBeat,
-      end: frameEndBeat,
-    });
-  };
-
-  for (let frameIndex = 0; frameIndex < timeline.frames.length; frameIndex += 1) {
-    const frameStrokes = timeline.frames[frameIndex]?.strokes ?? [];
-    if (frameStrokes.length === 0) {
+  const placements = [...timeline.placements]
+    .sort((left, right) => left.startFrame - right.startFrame);
+  for (const { stroke, startFrame, endFrameExclusive } of placements) {
+    const originId = stroke.polyline.originId;
+    if (
+      windowByOriginId.has(originId)
+      || !isVisibleStroke(stroke, mutedGroupIds, mutedGeneratorIds)
+      || !resolveStrokeHitsNoteOutput(stroke, doesStrokeHitNoteOutput, resolveStrokeOutputProjection)
+    ) {
       continue;
     }
-
-    const frameStartBeat = frameIndex * timeline.sampleStepBeats;
-    const frameEndBeat = frameStartBeat + timeline.sampleStepBeats;
-    const updatedOriginIds = new Set<string>();
-    for (const stroke of frameStrokes) {
-      if (
-        updatedOriginIds.has(stroke.polyline.originId)
-        || !isVisibleStroke(stroke, mutedGroupIds, mutedGeneratorIds)
-        || !resolveStrokeHitsNoteOutput(
-          stroke,
-          noteOutputCoordinateGroups,
-          resolveStrokeOutputProjection,
-        )
-      ) {
-        continue;
-      }
-
-      updateWindow(stroke.polyline.originId, frameStartBeat, frameEndBeat);
-      updatedOriginIds.add(stroke.polyline.originId);
+    windowByOriginId.set(originId, {
+      start: startFrame * timeline.sampleStepBeats,
+      end: (endFrameExclusive - 1) * timeline.sampleStepBeats + timeline.sampleStepBeats,
+    });
+  }
+  const remainingOriginIds = new Set(windowByOriginId.keys());
+  placements.sort((left, right) => right.endFrameExclusive - left.endFrameExclusive);
+  for (const { stroke, endFrameExclusive } of placements) {
+    if (remainingOriginIds.size === 0) break;
+    const originId = stroke.polyline.originId;
+    if (
+      !remainingOriginIds.has(originId)
+      || !isVisibleStroke(stroke, mutedGroupIds, mutedGeneratorIds)
+      || !resolveStrokeHitsNoteOutput(stroke, doesStrokeHitNoteOutput, resolveStrokeOutputProjection)
+    ) {
+      continue;
     }
+    windowByOriginId.get(originId)!.end = (endFrameExclusive - 1) * timeline.sampleStepBeats
+      + timeline.sampleStepBeats;
+    remainingOriginIds.delete(originId);
   }
 
   return windowByOriginId;
@@ -457,7 +459,7 @@ const resolveActiveByPitchFromFrameStrokes = (
   mutedGeneratorIds: ReadonlySet<string>,
 ): Map<number, SampledActivePitch> => {
   const activeByPitch = new Map<number, SampledActivePitch>();
-  const integerWinnerByCoordinateKey = new Map<string, OccupiedCoordinate>();
+  const integerWinnerByCoordinateGroup = new Map<CoordinateGroup, OccupiedCoordinate>();
   const fractionalWinnerByCoordinateGroup = new Map<CoordinateGroup, OccupiedCoordinate>();
 
   for (const stroke of strokes) {
@@ -472,21 +474,14 @@ const resolveActiveByPitchFromFrameStrokes = (
       resolveStrokeOutputProjection,
     )) {
       const { coordinateGroup } = hit;
-      const coordinateKey = toRoundedCoordinateKey(coordinateGroup.x, coordinateGroup.y);
-      if (coordinateKey === null) {
-        continue;
-      }
-
-      const current = integerWinnerByCoordinateKey.get(coordinateKey);
-      const candidate = createOccupiedCoordinate(
+      writeOccupiedCoordinateWinner(
+        integerWinnerByCoordinateGroup,
+        coordinateGroup,
         stroke,
         coordinateGroup.x,
         coordinateGroup.y,
         hit.distanceSquared,
       );
-      if (!current || shouldReplaceOccupiedCoordinate(candidate, current)) {
-        integerWinnerByCoordinateKey.set(coordinateKey, candidate);
-      }
     }
 
     for (const hit of resolveFractionalCoordinateHits(
@@ -495,33 +490,27 @@ const resolveActiveByPitchFromFrameStrokes = (
       resolveStrokeOutputProjection,
     )) {
       const { coordinateGroup } = hit;
-      const current = fractionalWinnerByCoordinateGroup.get(coordinateGroup);
-      const candidate = createOccupiedCoordinate(
+      writeOccupiedCoordinateWinner(
+        fractionalWinnerByCoordinateGroup,
+        coordinateGroup,
         stroke,
         coordinateGroup.x,
         coordinateGroup.y,
         hit.distanceSquared,
       );
-      if (!current || shouldReplaceOccupiedCoordinate(candidate, current)) {
-        fractionalWinnerByCoordinateGroup.set(coordinateGroup, candidate);
-      }
     }
   }
 
-  for (const [coordinateKey, winner] of integerWinnerByCoordinateKey.entries()) {
-    const coordinateGroup = coordinateGroupByKey.get(coordinateKey);
-    if (!coordinateGroup) {
-      continue;
-    }
+  for (const [coordinateGroup, winner] of integerWinnerByCoordinateGroup) {
     for (const button of coordinateGroup.buttons) {
       if (button.output.kind !== 'note') {
         continue;
       }
 
       activeByPitch.set(button.output.number, {
-        velocity: winner.velocity,
+        velocity: winner.stroke.polyline.velocity,
         channel: button.output.channel,
-        originId: winner.originId,
+        originId: winner.stroke.polyline.originId,
       });
     }
   }
@@ -538,9 +527,9 @@ const resolveActiveByPitchFromFrameStrokes = (
       }
 
       activeByPitch.set(button.output.number, {
-        velocity: winner.velocity,
+        velocity: winner.stroke.polyline.velocity,
         channel: button.output.channel,
-        originId: winner.originId,
+        originId: winner.stroke.polyline.originId,
       });
     }
   }
@@ -554,9 +543,10 @@ export const createLaunchpadProjectionContext = (
   const coordinateGroupByKey = buildCoordinateGroupByKey(runtimeMap.buttonIndex);
   const outputBounds = resolveCoordinateGroupBounds(coordinateGroupByKey);
   const fractionalCoordinateGroups = buildFractionalCoordinateGroups(runtimeMap.buttonIndex);
-  const noteOutputCoordinateGroups = buildNoteOutputCoordinateGroups(
+  const doesStrokeHitNoteOutput = createStrokeNoteOutputPredicate(
     coordinateGroupByKey,
     fractionalCoordinateGroups,
+    outputBounds,
   );
   const coordinateKeyByTileId = buildViewportCoordinateKeyByTileId(runtimeMap.buttonIndex);
   const resolveStrokeOutputProjection = createStrokeOutputProjectionResolver();
@@ -572,7 +562,7 @@ export const createLaunchpadProjectionContext = (
     buildVisibleWindowByOriginId: (timeline, mutedGroupIds, mutedGeneratorIds) =>
       buildVisibleWindowByOriginId(
         timeline,
-        noteOutputCoordinateGroups,
+        doesStrokeHitNoteOutput,
         resolveStrokeOutputProjection,
         mutedGroupIds,
         mutedGeneratorIds,
@@ -585,21 +575,24 @@ export const createLaunchpadProjectionContext = (
       timeline,
       mutedGroupIds,
       mutedGeneratorIds,
-    ) => timeline.frames.map((frame) => {
-      if (frame.strokes.length === 0) {
-        return EMPTY_ACTIVE_BY_PITCH;
+    ) => {
+      const frames = new Array<ReadonlyMap<number, SampledActivePitch>>(timeline.frameCount);
+      for (const span of iterateTimelineSpans(timeline)) {
+        const activeByPitch = span.strokes.length === 0
+          ? EMPTY_ACTIVE_BY_PITCH
+          : resolveActiveByPitchFromFrameStrokes(
+              span.strokes,
+              coordinateGroupByKey,
+              outputBounds,
+              fractionalCoordinateGroups,
+              resolveStrokeOutputProjection,
+              mutedGroupIds,
+              mutedGeneratorIds,
+            );
+        frames.fill(activeByPitch, span.startFrame, span.endFrameExclusive);
       }
-
-      return resolveActiveByPitchFromFrameStrokes(
-        frame.strokes,
-        coordinateGroupByKey,
-        outputBounds,
-        fractionalCoordinateGroups,
-        resolveStrokeOutputProjection,
-        mutedGroupIds,
-        mutedGeneratorIds,
-      );
-    }),
+      return frames;
+    },
   };
 };
 

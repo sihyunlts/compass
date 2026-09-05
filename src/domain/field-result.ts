@@ -81,7 +81,7 @@ const buildGeneratedFieldResultWithRuntimeMap = ({
     generated.timeline,
   );
   const scaledNotes = scaleNotesToLoopLength(notes, loopLengthBeats);
-  const sampleStepBeats = loopLengthBeats / Math.max(generated.timeline.frames.length, 1);
+  const sampleStepBeats = loopLengthBeats / Math.max(generated.timeline.frameCount, 1);
   const ledFramesBySampleIndex = toLedFramesFromActivePitches(activeByPitchFrames);
   return {
     notes: scaledNotes,

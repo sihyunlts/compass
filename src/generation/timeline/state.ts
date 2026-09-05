@@ -20,8 +20,8 @@ export interface PendingStrokeRewriteApplication {
   readonly writes: ReadonlyArray<PendingStrokeRewriteFrameWrite>;
 }
 
-interface MaterializedGeometryRewriteInput {
-  readonly timeline: GeometryTimeline;
+interface FrameGeometryRewriteInput {
+  readonly sampleStepBeats: number;
   readonly frameIndex: number;
   readonly strokes: ReadonlyArray<GeometryStroke>;
 }
@@ -30,7 +30,7 @@ export interface PendingGeometryRewriteApplication {
   readonly kind: 'geometry-rewrite';
   readonly targetOriginIds: ReadonlySet<string>;
   readonly rewriteFrameStrokes: (
-    input: MaterializedGeometryRewriteInput,
+    input: FrameGeometryRewriteInput,
   ) => ReadonlyArray<Omit<GeometryStroke, 'writeId'>>;
 }
 

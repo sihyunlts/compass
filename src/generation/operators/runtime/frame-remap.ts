@@ -1,49 +1,66 @@
 import {
-  addExistingStrokeToFrame,
+  addExistingStrokeToFrameRange,
   beginTimelineStage,
-  completeTimelineStage,
+  groupPlacementsByOrigin,
   removeOriginStrokes,
+  type FrameWindow,
 } from '../../timeline';
 import type { GeometryStroke, GeometryTimeline } from '../../types';
-import {
-  buildSourceStrokesByOriginAndFrame,
-  transformStroke,
-} from './timeline-strokes';
+import { transformStroke } from './timeline-strokes';
 import type { OriginFrameRemap } from './types';
 
-const buildRemappedStrokeBySource = (
-  sourceStrokesByOriginAndFrame: ReadonlyMap<string, ReadonlyMap<number, GeometryStroke[]>>,
-  remaps: ReadonlyMap<string, OriginFrameRemap>,
-  firstWriteId: number,
-): WeakMap<GeometryStroke, GeometryStroke> => {
-  const remappedStrokeBySource = new WeakMap<GeometryStroke, GeometryStroke>();
-  let nextWriteId = firstWriteId;
+interface MonotoneFrameRun extends FrameWindow {
+  ascending: boolean;
+}
 
-  for (const [originId, remap] of remaps.entries()) {
-    const sourceStrokesByFrame = sourceStrokesByOriginAndFrame.get(originId);
-    if (!sourceStrokesByFrame) {
-      continue;
-    }
-
-    const uniqueSourceStrokes = new Set<GeometryStroke>();
-    for (const frameStrokes of sourceStrokesByFrame.values()) {
-      for (const stroke of frameStrokes) {
-        uniqueSourceStrokes.add(stroke);
+// A time map can reverse or contain gaps. Within each monotone run an input
+// interval maps to one output interval, found without expanding its strokes.
+const splitMonotoneFrameRuns = (
+  indices: ReadonlyArray<number | null>,
+  frameCount: number,
+): MonotoneFrameRun[] => {
+  const runs: MonotoneFrameRun[] = [];
+  let startFrame = 0;
+  let direction = 0;
+  const endFrame = Math.min(indices.length, frameCount);
+  for (let frame = 0; frame <= endFrame; frame += 1) {
+    const current = frame < endFrame ? indices[frame] : null;
+    if (current === null) {
+      if (frame > startFrame) {
+        runs.push({ startFrame, endFrameExclusive: frame, ascending: direction >= 0 });
+      }
+      startFrame = frame + 1;
+      direction = 0;
+    } else if (frame > startFrame) {
+      const step = Math.sign(current - indices[frame - 1]!);
+      if (step !== 0 && direction !== 0 && step !== direction) {
+        runs.push({ startFrame, endFrameExclusive: frame, ascending: direction > 0 });
+        startFrame = frame;
+        direction = 0;
+      } else if (step !== 0) {
+        direction = step;
       }
     }
-    const sourceStrokes = Array.from(uniqueSourceStrokes)
-      .sort((left, right) => left.writeId - right.writeId);
-
-    for (const sourceStroke of sourceStrokes) {
-      remappedStrokeBySource.set(sourceStroke, {
-        ...transformStroke(sourceStroke, null, remap.writeOrder),
-        writeId: nextWriteId,
-      });
-      nextWriteId += 1;
-    }
   }
+  return runs;
+};
 
-  return remappedStrokeBySource;
+const lowerBoundFrame = (
+  run: MonotoneFrameRun,
+  indices: ReadonlyArray<number | null>,
+  boundary: number,
+): number => {
+  let low = run.startFrame;
+  let high = run.endFrameExclusive;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    const beforeBoundary = run.ascending
+      ? indices[middle]! < boundary
+      : indices[middle]! >= boundary;
+    if (beforeBoundary) low = middle + 1;
+    else high = middle;
+  }
+  return low;
 };
 
 export const remapTimeline = (
@@ -57,58 +74,42 @@ export const remapTimeline = (
   removeOriginStrokes(
     nextTimeline,
     targetOriginIds,
-    Math.min(timeline.frames.length, nextTimeline.frames.length),
+    Math.min(timeline.frameCount, nextTimeline.frameCount),
   );
+  const placementsByOrigin = groupPlacementsByOrigin(timeline, targetOriginIds);
+  let nextWriteId = nextTimeline.nextWriteId;
 
-  const sourceStrokesByOriginAndFrame = buildSourceStrokesByOriginAndFrame(
-    timeline,
-    targetOriginIds,
-  );
-  const remappedStrokeBySource = preserveWriteMetadata
-    ? null
-    : buildRemappedStrokeBySource(
-        sourceStrokesByOriginAndFrame,
-        remaps,
-        nextTimeline.nextWriteId,
-      );
-  for (const [originId, remap] of remaps.entries()) {
-    const sourceStrokesByFrame = sourceStrokesByOriginAndFrame.get(originId);
-    if (!sourceStrokesByFrame) {
-      continue;
-    }
-
-    for (
-      let frameIndex = 0;
-      frameIndex < Math.min(remap.sourceFrameIndexByOutputFrame.length, nextTimeline.frames.length);
-      frameIndex += 1
-    ) {
-      const sourceFrameIndex = remap.sourceFrameIndexByOutputFrame[frameIndex];
-      if (sourceFrameIndex === null) {
-        continue;
-      }
-
-      const sourceStrokes = sourceStrokesByFrame.get(sourceFrameIndex);
-      if (!sourceStrokes || sourceStrokes.length === 0) {
-        continue;
-      }
-
+  for (const [originId, remap] of remaps) {
+    const placements = placementsByOrigin.get(originId);
+    if (!placements) continue;
+    const remappedStrokes = new Map<GeometryStroke, GeometryStroke>();
+    if (!preserveWriteMetadata) {
+      const sourceStrokes = Array.from(new Set(placements.map(({ stroke }) => stroke)))
+        .sort((left, right) => left.writeId - right.writeId);
       for (const stroke of sourceStrokes) {
-        if (preserveWriteMetadata) {
-          addExistingStrokeToFrame(nextTimeline, frameIndex, stroke);
-          continue;
-        }
-
-        // Source write ids define stable order within each origin. Assigning one
-        // remap-stage id per immutable source stroke preserves that order while
-        // sharing the temporal placement across output frames.
-        const remappedStroke = remappedStrokeBySource?.get(stroke);
-        if (!remappedStroke) {
-          throw new Error('Temporal remap stroke cache is incomplete.');
-        }
-        addExistingStrokeToFrame(nextTimeline, frameIndex, remappedStroke);
+        remappedStrokes.set(stroke, {
+          ...transformStroke(stroke, null, remap.writeOrder),
+          writeId: nextWriteId++,
+        });
+      }
+    }
+    const runs = splitMonotoneFrameRuns(remap.sourceFrameIndexByOutputFrame, nextTimeline.frameCount);
+    for (const placement of placements) {
+      const stroke = preserveWriteMetadata ? placement.stroke : remappedStrokes.get(placement.stroke)!;
+      for (const run of runs) {
+        const start = lowerBoundFrame(
+          run,
+          remap.sourceFrameIndexByOutputFrame,
+          run.ascending ? placement.startFrame : placement.endFrameExclusive,
+        );
+        const end = lowerBoundFrame(
+          run,
+          remap.sourceFrameIndexByOutputFrame,
+          run.ascending ? placement.endFrameExclusive : placement.startFrame,
+        );
+        addExistingStrokeToFrameRange(nextTimeline, start, end, stroke);
       }
     }
   }
-
-  return completeTimelineStage(nextTimeline);
+  return nextTimeline;
 };

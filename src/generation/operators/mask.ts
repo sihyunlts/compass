@@ -9,6 +9,7 @@ import {
 import {
   createEmptyTimeline,
   createIdentityMask,
+  iterateTimelineFrames,
 } from '../timeline';
 import type { CanonicalOutputAdapter, GeometryMask, GeometryTimeline } from '../types';
 import {
@@ -100,15 +101,16 @@ const createMaskFrameResolver = (
     targetGroupId,
     consumingDeviceId,
   );
+  const sourceFrames = Array.from(iterateTimelineFrames(sourceTimeline));
   return (frameIndex) => {
     const resolvedFrameIndex = isTimeReversed
-      ? Math.max(sourceTimeline.frames.length - 1 - frameIndex, 0)
+      ? Math.max(sourceTimeline.frameCount - 1 - frameIndex, 0)
       : frameIndex;
-    if (resolvedFrameIndex < 0 || resolvedFrameIndex >= sourceTimeline.frames.length) {
+    if (resolvedFrameIndex < 0 || resolvedFrameIndex >= sourceTimeline.frameCount) {
       return createIdentityMask(() => false);
     }
 
-    const sourceStrokes = sourceTimeline.frames[resolvedFrameIndex].strokes.filter((stroke) => (
+    const sourceStrokes = sourceFrames[resolvedFrameIndex].strokes.filter((stroke) => (
       effect.params.sourceKind === 'group'
         ? stroke.originGroupId === sourceId
         : stroke.polyline.originId === sourceId
@@ -139,7 +141,7 @@ const applyMaskEffect = (
   );
   const targetFrameWindow = {
     startFrame: 0,
-    endFrameExclusive: sourceTimeline.frames.length,
+    endFrameExclusive: sourceTimeline.frameCount,
   };
   const targetOriginIds = buildTargetOriginIds(inputTimeline, targetGroupId);
   const resolveMaskAtFrame = createMaskFrameResolver(

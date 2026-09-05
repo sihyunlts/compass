@@ -3,7 +3,6 @@ import { extractGeometryEventTracks } from '../geometry/event-track';
 import {
   addStrokeToFrameRange,
   beginTimelineStage,
-  completeTimelineStage,
   unregisterTimelineOrigins,
 } from '../timeline';
 import type {
@@ -280,13 +279,13 @@ export const materializeColorTimeline = (
   const writes: ColorAgeWrite[] = [];
   const playbackExtentByOriginId = new Map<string, { start: number; end: number }>();
   const usesNearestColorBoundary = input.kernel.noteLengthRatio < 1;
-  let outputEndFrameExclusive = input.sourceTimeline.frames.length;
+  let outputEndFrameExclusive = input.sourceTimeline.frameCount;
   const eventsByOriginId = extractGeometryEventTracks({
     timeline: input.sourceTimeline,
     targetOriginIds: input.targetOriginIds,
     frameWindow: {
       startFrame: 0,
-      endFrameExclusive: input.sourceTimeline.frames.length,
+      endFrameExclusive: input.sourceTimeline.frameCount,
     },
   });
 
@@ -333,7 +332,7 @@ export const materializeColorTimeline = (
   }
 
   return {
-    timeline: completeTimelineStage(timelineStage),
+    timeline: timelineStage,
     playbackExtentByOriginId,
   };
 };

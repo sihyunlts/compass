@@ -95,12 +95,12 @@ const applyPendingSymmetryEffect = (
   return appendPendingGeometryRewriteApplication(
     state,
     targetOriginIds,
-    ({ timeline, frameIndex, strokes }) => strokes.flatMap((stroke) => {
+    ({ sampleStepBeats, frameIndex, strokes }) => strokes.flatMap((stroke) => {
       const evaluationWindow = evaluationWindowByTargetOriginId.get(
         stroke.polyline.originId,
       ) ?? fallbackEvaluationWindow;
       const effectAtFrame = isModulated
-        ? resolveDeviceAtFrame(frameIndex, timeline.sampleStepBeats, evaluationWindow)
+        ? resolveDeviceAtFrame(frameIndex, sampleStepBeats, evaluationWindow)
         : effect;
       return resolveStrokeRewrite(effectAtFrame)(stroke);
     }),

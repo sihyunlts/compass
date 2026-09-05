@@ -1,5 +1,5 @@
 import type { Vec2 } from '../../core/core-types';
-import type { FrameWindow } from '../timeline';
+import { iterateTimelineFrames, type FrameWindow } from '../timeline';
 import type { GeometryStroke, GeometryTimeline } from '../types';
 
 export interface GeometryStateEvent {
@@ -54,7 +54,8 @@ interface SpatialHash {
   maxCellY: number;
   cellWidth: number;
   usesPackedKeys: boolean;
-  probeOffsetsByCell: Map<SpatialCellKey, number[]>;
+  firstProbeIndexByCell: Map<SpatialCellKey, number>;
+  nextProbeIndex: Int32Array;
 }
 
 const spatialHashBySnapshot = new WeakMap<
@@ -217,7 +218,8 @@ const buildSpatialHash = (
     maxCellY,
     cellWidth,
     usesPackedKeys,
-    probeOffsetsByCell: new Map(),
+    firstProbeIndexByCell: new Map(),
+    nextProbeIndex: new Int32Array(probes.length / 2),
   };
   for (let probeOffset = 0; probeOffset < probes.length; probeOffset += 2) {
     const cellX = Math.floor(probes[probeOffset] / cellSize);
@@ -227,12 +229,10 @@ const buildSpatialHash = (
       continue;
     }
 
-    const cell = hash.probeOffsetsByCell.get(key);
-    if (cell) {
-      cell.push(probeOffset);
-    } else {
-      hash.probeOffsetsByCell.set(key, [probeOffset]);
-    }
+    // Link cell members in one array instead of allocating an array per cell.
+    const probeIndex = probeOffset / 2;
+    hash.nextProbeIndex[probeIndex] = hash.firstProbeIndexByCell.get(key) ?? -1;
+    hash.firstProbeIndexByCell.set(key, probeIndex);
   }
   return hash;
 };
@@ -282,12 +282,12 @@ const hasProbeOutsideDistance = (
           continue;
         }
 
-        const cell = candidates.probeOffsetsByCell.get(key);
-        if (!cell) {
-          continue;
-        }
-
-        for (const candidateOffset of cell) {
+        for (
+          let candidateIndex = candidates.firstProbeIndexByCell.get(key) ?? -1;
+          candidateIndex >= 0;
+          candidateIndex = candidates.nextProbeIndex[candidateIndex]
+        ) {
+          const candidateOffset = candidateIndex * 2;
           const dx = candidates.probes[candidateOffset] - probeX;
           const dy = candidates.probes[candidateOffset + 1] - probeY;
           if ((dx * dx) + (dy * dy) < thresholdSquared) {
@@ -365,7 +365,7 @@ const closeActiveRun = (
 export const extractGeometryEventTracks = (
   input: ExtractGeometryEventTracksInput,
 ): Map<string, GeometryStateEvent[]> => {
-  const frameWindow = clampFrameWindow(input.frameWindow, input.timeline.frames.length);
+  const frameWindow = clampFrameWindow(input.frameWindow, input.timeline.frameCount);
   if (frameWindow.endFrameExclusive <= frameWindow.startFrame) {
     return new Map();
   }
@@ -388,13 +388,11 @@ export const extractGeometryEventTracks = (
     });
   }
 
-  for (
-    let frameIndex = frameWindow.startFrame;
-    frameIndex < frameWindow.endFrameExclusive;
-    frameIndex += 1
-  ) {
+  for (const { frameIndex, strokes: frameStrokes } of iterateTimelineFrames(
+    input.timeline, frameWindow, input.targetOriginIds,
+  )) {
     const strokesByOriginId = new Map<string, GeometryStroke[]>();
-    for (const stroke of input.timeline.frames[frameIndex].strokes) {
+    for (const stroke of frameStrokes) {
       const originId = stroke.polyline.originId;
       if (!input.targetOriginIds.has(originId)) {
         continue;

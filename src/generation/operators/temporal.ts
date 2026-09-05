@@ -49,7 +49,7 @@ const buildFixedDomainFrameIndexes = (
   const sourceFrameWindow = toFrameWindow(
     sourceWindow,
     timeline.sampleStepBeats,
-    timeline.frames.length,
+    timeline.frameCount,
   );
   const sourceFrameCount = sourceFrameWindow.endFrameExclusive - sourceFrameWindow.startFrame;
   const outputFrameCount = toFrameCount(1, timeline.sampleStepBeats);
