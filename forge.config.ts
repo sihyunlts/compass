@@ -92,6 +92,22 @@ const config: ForgeConfig = {
     new MakerZIP({}, ['darwin']),
     new MakerDMG({
       name: ARTIFACT_NAME,
+      icon: 'assets/compass.icns',
+      background: 'assets/dmg-background.png',
+      contents: (opts) => [
+        {
+          x: 260,
+          y: 349,
+          type: 'file',
+          path: opts.appPath,
+        },
+        {
+          x: 398,
+          y: 349,
+          type: 'link',
+          path: '/Applications',
+        },
+      ],
     }, ['darwin']),
     new MakerRpm({}),
     new MakerDeb({}),
