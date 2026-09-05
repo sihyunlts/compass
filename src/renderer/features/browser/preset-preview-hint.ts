@@ -10,7 +10,7 @@ import {
   type LaunchpadModel,
 } from '../../../shared/model';
 import type { RackPresetFile } from '../../../shared/presets';
-import { resolveLedSurfaceRgb } from '../../app/led-surface-color';
+import { resolveLedSurfaceRgb } from '../../../shared/led-surface-color';
 import type { HintInput } from '../../components/overlays/hint';
 import { getDeviceMessageKey } from '../../device-i18n';
 import { i18n } from '../../i18n.svelte';

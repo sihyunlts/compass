@@ -3,7 +3,7 @@
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
-  import { resolveLedSurfaceRgb } from '../../renderer/app/led-surface-color';
+  import { resolveLedSurfaceRgb } from '../../shared/led-surface-color';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import {
     COLOR_NUMERIC_PARAMETERS,

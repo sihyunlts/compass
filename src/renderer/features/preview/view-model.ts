@@ -5,7 +5,7 @@ import {
 import type { LaunchpadButton, LaunchpadModel } from '../../../shared/model';
 import type { PreviewWindowState } from '../../../shared/contracts/preview/window-state';
 import { buildLaunchpadPreviewGridCells } from '../../../shared/launchpad-preview-grid';
-import { resolveLedSurfaceRgb } from '../../app/led-surface-color';
+import { resolveLedSurfaceRgb } from '../../../shared/led-surface-color';
 
 export interface PreviewSurfaceCellModel {
   key: string;

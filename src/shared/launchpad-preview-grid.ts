@@ -84,3 +84,15 @@ export const buildLaunchpadPreviewGridCells = (
   }
   return cells;
 };
+
+export const buildLaunchpadPreviewCellIndexByPitch = (
+  buttons: ReadonlyArray<LaunchpadButton>,
+): ReadonlyMap<number, number> => {
+  const indexByPitch = new Map<number, number>();
+  buildLaunchpadPreviewGridCells(buttons).forEach((cell, cellIndex) => {
+    for (const pitch of cell.pitches) {
+      indexByPitch.set(pitch, cellIndex);
+    }
+  });
+  return indexByPitch;
+};

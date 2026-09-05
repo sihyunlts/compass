@@ -14,7 +14,7 @@ import {
   sampleRackPreviewFrames,
   type SampledRackFrame,
 } from '../src/generation/rack-preview-debug';
-import { resolveLedSurfaceRgb } from '../src/renderer/app/led-surface-color';
+import { resolveLedSurfaceRgb } from '../src/shared/led-surface-color';
 import type { GeneratorPreview } from '../src/shared/contracts/preview/generator-preview';
 import {
   buildLaunchpadPreviewGridCells,

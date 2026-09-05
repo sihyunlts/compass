@@ -3,6 +3,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { IPC_CHANNELS } from '../shared/contracts/ipc/channels';
+import {
+  disposeMainWindowNativeTouchBar,
+  installMainWindowNativeTouchBar,
+} from './native-touchbar';
 
 let mainWindowRef: BrowserWindow | null = null;
 let previewWindowRef: BrowserWindow | null = null;
@@ -98,8 +102,10 @@ export const createMainWindow = (): BrowserWindow => {
   const mainWindow = new BrowserWindow(buildMainWindowOptions());
   mainWindow.setMenuBarVisibility(false);
   mainWindowRef = mainWindow;
+
   mainWindow.once('ready-to-show', () => {
     if (!mainWindow.isDestroyed()) {
+      installMainWindowNativeTouchBar(mainWindow);
       mainWindow.show();
     }
   });
@@ -126,6 +132,7 @@ export const createMainWindow = (): BrowserWindow => {
   mainWindow.on('closed', () => {
     mainWindowCloseConfirmed = false;
     mainWindowDocumentEdited = false;
+    disposeMainWindowNativeTouchBar();
     mainWindowRef = null;
     if (previewWindowRef && !previewWindowRef.isDestroyed()) {
       previewWindowRef.close();
