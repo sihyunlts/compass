@@ -1,5 +1,4 @@
-import { evaluateTemporalRemap } from '../../../core/scene-operators/temporal';
-import { createSampledRemapFromTimeWarpCurve } from '../../../core/timewarp/curve';
+import { compileTimeWarpCurve } from '../../../core/timewarp/curve';
 import { createRendererDeviceNode } from '../../../devices';
 import {
   cloneDeviceNode,
@@ -210,12 +209,12 @@ const renderTimeWarpPresetPreview = (
     undefined,
     author,
   );
-  const remap = createSampledRemapFromTimeWarpCurve(curve);
+  const remap = compileTimeWarpCurve(curve);
   const movingSlotByFrame = Array.from(
     { length: TIME_WARP_PRESET_PREVIEW_FRAME_COUNT },
     (_, frameIndex) => {
       const progress = frameIndex / (TIME_WARP_PRESET_PREVIEW_FRAME_COUNT - 1);
-      const warpedProgress = evaluateTemporalRemap(remap, progress) ?? 0;
+      const warpedProgress = remap.evaluate(progress);
       return Math.round(
         Math.min(Math.max(warpedProgress, 0), 1) * (PRESET_PREVIEW_SWATCH_COUNT - 1),
       );

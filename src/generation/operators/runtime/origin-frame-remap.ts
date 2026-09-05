@@ -1,3 +1,4 @@
+import { createFrameIndexWindowMapper } from './frame-remap';
 import { toFrameCount } from '../../timeline';
 import type { TimelineWindow } from '../../timeline/temporal-window';
 import type { GeometryTimeline } from '../../types';
@@ -17,12 +18,12 @@ export const buildSourceWindowOriginFrameRemap = (
 
   const outputFrameCount = toFrameCount(outputEndBeat, timeline.sampleStepBeats);
   return {
-    sourceFrameIndexByOutputFrame: Array.from({ length: outputFrameCount }, (_, frameIndex) => {
+    mapSourceWindow: createFrameIndexWindowMapper(Array.from({ length: outputFrameCount }, (_, frameIndex) => {
       const outputBeat = frameIndex * timeline.sampleStepBeats;
       const progress = outputBeat / outputEndBeat;
       const sourceBeat = sourceWindow.start + (sourceSpan * progress);
       return toSourceFrameIndex(sourceBeat, timeline);
-    }),
+    })),
     writeOrder,
   };
 };

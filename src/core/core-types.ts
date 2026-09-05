@@ -19,13 +19,6 @@ export interface AffineTransform {
   ty: number;
 }
 
-export interface TemporalSampledRemap {
-  kind: 'sampled';
-  domainStart: number;
-  domainEnd: number;
-  samples: Array<number | null>;
-}
-
 export interface Polyline {
   readonly points: ReadonlyArray<Readonly<Vec2>>;
   readonly closed: boolean;

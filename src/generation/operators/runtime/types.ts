@@ -1,3 +1,4 @@
+import type { FrameWindow } from '../../timeline';
 import type { CompiledModulationProgram } from '../../../core/modulation/compiled-program';
 import type {
   GeneratorDeviceNode,
@@ -104,6 +105,6 @@ export const createRackOperator = <
 });
 
 export interface OriginFrameRemap {
-  sourceFrameIndexByOutputFrame: ReadonlyArray<number | null>;
+  mapSourceWindow(window: FrameWindow): ReadonlyArray<FrameWindow>;
   writeOrder: number;
 }
