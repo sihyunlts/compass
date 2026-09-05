@@ -1,13 +1,8 @@
 export {
-  resolveFrameWindow,
-} from './runtime/frame-window';
-export {
-  createPendingFrameApplicationOperator,
-  createPendingGeometryApplicationOperator,
+  materializeRackState,
   materializeAndNormalizeRackTimeline,
   prepareRackOperatorInput,
   replaceTimelineAndRefreshRackState,
-  type PendingGeometryApplicationOperatorInput,
 } from './runtime/materialization';
 export {
   createModulationContext,
@@ -34,8 +29,6 @@ export {
 } from './runtime/timeline-state';
 export {
   buildTargetOriginIds,
-  cloneMask,
-  cloneStrokeWithWriteOrder,
   transformStroke,
 } from './runtime/timeline-strokes';
 export {
@@ -45,7 +38,6 @@ export {
   type MaskSourceReferenceRequest,
   type MaskSourceReferenceResult,
   type ModulationContext,
-  type PendingFrameApplicationOperatorInput,
   type RackOperator,
   type RackStageExecutionContext,
   type RackStageOfKind,

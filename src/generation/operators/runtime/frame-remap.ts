@@ -1,14 +1,12 @@
-import type { BeatRange } from '../../analysis/types';
 import {
   addExistingStrokeToFrame,
   beginTimelineStage,
   completeTimelineStage,
+  removeOriginStrokes,
 } from '../../timeline';
 import type { GeometryStroke, GeometryTimeline } from '../../types';
-import { isFrameWithinWindow, resolveFrameWindow } from './frame-window';
 import {
   buildSourceStrokesByOriginAndFrame,
-  stripOriginFrames,
   transformStroke,
 } from './timeline-strokes';
 import type { OriginFrameRemap } from './types';
@@ -51,22 +49,15 @@ const buildRemappedStrokeBySource = (
 export const remapTimeline = (
   timeline: GeometryTimeline,
   remaps: ReadonlyMap<string, OriginFrameRemap>,
-  requiredFrameWindow: BeatRange | 'all',
   outputEndBeat: number,
   preserveWriteMetadata: boolean,
 ): GeometryTimeline => {
   const targetOriginIds = new Set(remaps.keys());
   const nextTimeline = beginTimelineStage(timeline, outputEndBeat);
-  const frameWindow = resolveFrameWindow(
-    requiredFrameWindow,
-    timeline.sampleStepBeats,
-    nextTimeline.frames.length,
-  );
-
-  stripOriginFrames(
+  removeOriginStrokes(
     nextTimeline,
-    Math.min(timeline.frames.length, nextTimeline.frames.length),
     targetOriginIds,
+    Math.min(timeline.frames.length, nextTimeline.frames.length),
   );
 
   const sourceStrokesByOriginAndFrame = buildSourceStrokesByOriginAndFrame(
@@ -91,10 +82,6 @@ export const remapTimeline = (
       frameIndex < Math.min(remap.sourceFrameIndexByOutputFrame.length, nextTimeline.frames.length);
       frameIndex += 1
     ) {
-      if (!isFrameWithinWindow(frameIndex, frameWindow)) {
-        continue;
-      }
-
       const sourceFrameIndex = remap.sourceFrameIndexByOutputFrame[frameIndex];
       if (sourceFrameIndex === null) {
         continue;

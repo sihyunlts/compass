@@ -1,15 +1,15 @@
-import type { MutableGenerationState } from '../../timeline/state';
+import type { GenerationState } from '../../timeline/state';
 
 interface GenerationStateTransitionOverrides {
-  timeline?: MutableGenerationState['timeline'];
-  timelineStateByOriginId?: MutableGenerationState['timelineStateByOriginId'];
-  pendingFrameApplications?: MutableGenerationState['pendingFrameApplications'];
+  timeline?: GenerationState['timeline'];
+  timelineStateByOriginId?: GenerationState['timelineStateByOriginId'];
+  pendingFrameApplications?: GenerationState['pendingFrameApplications'];
 }
 
 export const transitionGenerationState = (
-  state: MutableGenerationState,
+  state: GenerationState,
   overrides: GenerationStateTransitionOverrides = {},
-): MutableGenerationState => ({
+): GenerationState => ({
   timeline: overrides.timeline ?? state.timeline,
   timelineStateByOriginId: overrides.timelineStateByOriginId
     ?? state.timelineStateByOriginId,

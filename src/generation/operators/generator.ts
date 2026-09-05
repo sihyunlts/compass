@@ -9,7 +9,7 @@ import {
 } from './runtime';
 import { rasterizeGeneratorFrame } from '../raster';
 import {
-  type MutableGenerationState,
+  type GenerationState,
 } from '../timeline/state';
 import {
   beginTimelineStage,
@@ -20,10 +20,10 @@ import {
 import { FIXED_TIMELINE_END_BEAT } from '../timeline/temporal-window';
 
 const applyGeneratorDevice = (
-  state: MutableGenerationState,
+  state: GenerationState,
   stage: RackStageOfKind<GeneratorStageKind>,
   context: RackStageExecutionContext,
-): MutableGenerationState => {
+): GenerationState => {
   const device = stage.device;
   const nextTimeline = beginTimelineStage(state.timeline);
   // Generators author one canonical pattern. The field result scales that

@@ -12,9 +12,8 @@ import type {
   RackStageDeviceNode,
 } from '../../plan/types';
 import type {
-  DeferredGenerationState,
   MaterializedGenerationState,
-  MutableGenerationState,
+  GenerationState,
 } from '../../timeline/state';
 import type { CanonicalOutputAdapter, GeometryTimeline } from '../../types';
 
@@ -62,12 +61,7 @@ export type RackOperatorInputPolicy = 'preserve-pending' | 'materialize-all';
 export type RackOperatorInput<TPolicy extends RackOperatorInputPolicy> =
   TPolicy extends 'materialize-all'
     ? MaterializedGenerationState
-    : MutableGenerationState;
-
-export interface PendingFrameApplicationOperatorInput {
-  baseState: DeferredGenerationState;
-  sourceState: MaterializedGenerationState;
-}
+    : GenerationState;
 
 export interface RackOperatorContract<TPolicy extends RackOperatorInputPolicy> {
   inputPolicy: TPolicy;
@@ -75,7 +69,7 @@ export interface RackOperatorContract<TPolicy extends RackOperatorInputPolicy> {
     state: RackOperatorInput<TPolicy>,
     stage: CompiledRackStage,
     context: RackStageExecutionContext,
-  ): MutableGenerationState;
+  ): GenerationState;
 }
 
 export type RackOperator =
@@ -99,7 +93,7 @@ export const createRackOperator = <
     state: RackOperatorInput<TPolicy>,
     stage: RackStageOfKind<TKind>,
     context: RackStageExecutionContext,
-  ) => MutableGenerationState,
+  ) => GenerationState,
 ): RackOperatorContract<TPolicy> => ({
   inputPolicy,
   execute: (state, stage, context) => execute(

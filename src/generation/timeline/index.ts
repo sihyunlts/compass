@@ -39,11 +39,6 @@ interface TimelineStageBuffer extends GeometryTimeline {
   readonly sourceFrames: ReadonlyArray<GeometryFrame>;
 }
 
-const cloneMask = (mask: GeometryMask): GeometryMask => ({
-  contains: mask.contains,
-  inverseTransform: { ...mask.inverseTransform },
-});
-
 const isTimelineStageBuffer = (
   timeline: GeometryTimeline | TimelineStageBuffer,
 ): timeline is TimelineStageBuffer => 'sourceFrames' in timeline;
@@ -123,17 +118,6 @@ const getWritableFrame = (
   return frame;
 };
 
-export const setFrameStrokes = (
-  timeline: GeometryTimeline | TimelineStageBuffer,
-  frameIndex: number,
-  strokes: ReadonlyArray<GeometryStroke>,
-): void => {
-  const safeFrameIndex = clampFrameIndex(frameIndex, timeline.frames.length);
-  timeline.frames[safeFrameIndex] = {
-    strokes: [...strokes],
-  };
-};
-
 const clampFrameIndex = (
   frameIndex: number,
   frameCount: number,
@@ -190,7 +174,7 @@ export const addStrokeToFrame = (
   const nextStroke: GeometryStroke = {
     ...stroke,
     writeId: timeline.nextWriteId,
-    masks: stroke.masks?.map(cloneMask) ?? [],
+    masks: stroke.masks ?? [],
   };
   writableFrame.strokes.push(nextStroke);
   registerStrokeOrigin(timeline, nextStroke);
@@ -217,7 +201,7 @@ export const addStrokeToFrameRange = (
   const sharedStroke: GeometryStroke = {
     ...stroke,
     writeId: timeline.nextWriteId,
-    masks: stroke.masks?.map(cloneMask) ?? [],
+    masks: stroke.masks ?? [],
   };
   timeline.nextWriteId += 1;
   registerStrokeOrigin(timeline, sharedStroke);
@@ -240,12 +224,28 @@ export const addExistingStrokeToFrame = (
   timeline.nextWriteId = Math.max(timeline.nextWriteId, stroke.writeId + 1);
 };
 
-export const deleteOrigins = (
+export const unregisterTimelineOrigins = (
   timeline: GeometryTimeline | TimelineStageBuffer,
   originIds: Iterable<string>,
 ): void => {
   for (const originId of originIds) {
     timeline.originGroupIdByOriginId.delete(originId);
+  }
+};
+
+export const removeOriginStrokes = (
+  timeline: GeometryTimeline | TimelineStageBuffer,
+  targetOriginIds: ReadonlySet<string>,
+  frameCount: number,
+): void => {
+  unregisterTimelineOrigins(timeline, targetOriginIds);
+
+  for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+    const strokes = timeline.frames[frameIndex].strokes;
+    const remainingStrokes = strokes.filter((stroke) => !targetOriginIds.has(stroke.polyline.originId));
+    if (remainingStrokes.length !== strokes.length) {
+      timeline.frames[frameIndex] = { strokes: remainingStrokes };
+    }
   }
 };
 

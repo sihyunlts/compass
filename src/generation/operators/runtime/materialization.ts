@@ -1,7 +1,6 @@
 import {
-  type DeferredGenerationState,
   type MaterializedGenerationState,
-  type MutableGenerationState,
+  type GenerationState,
   type OriginTimelineState,
 } from '../../timeline/state';
 import type { GeometryTimeline } from '../../types';
@@ -10,25 +9,16 @@ import {
   type OriginTimelineStateOverride,
 } from './timeline-state';
 import type {
-  PendingFrameApplicationOperatorInput,
-  RackOperator,
   RackOperatorInput,
   RackOperatorInputPolicy,
   RackStageExecutionContext,
-  RackStageOfKind,
 } from './types';
-import { createRackOperator } from './types';
-import type { RackStageDeviceKind } from '../../plan/types';
 import { materializePendingFrameApplications } from './pending-frame-applications';
 import { transitionGenerationState } from './state-transition';
 import { applyFinalTimelineNormalization } from './final-normalization';
 
-export interface PendingGeometryApplicationOperatorInput {
-  baseState: DeferredGenerationState;
-}
-
-const materializePendingRackOperatorInput = (
-  state: MutableGenerationState,
+export const materializeRackState = (
+  state: GenerationState,
   context: RackStageExecutionContext,
 ): MaterializedGenerationState => {
   const frameMaterializedState = materializePendingFrameApplications(
@@ -43,34 +33,24 @@ const materializePendingRackOperatorInput = (
 
 export const prepareRackOperatorInput = <TPolicy extends RackOperatorInputPolicy>(
   policy: TPolicy,
-  state: MutableGenerationState,
+  state: GenerationState,
   context: RackStageExecutionContext,
 ): RackOperatorInput<TPolicy> => {
   switch (policy) {
     case 'preserve-pending':
       return state as RackOperatorInput<TPolicy>;
     case 'materialize-all':
-      return materializePendingRackOperatorInput(state, context) as RackOperatorInput<TPolicy>;
+      return materializeRackState(state, context) as RackOperatorInput<TPolicy>;
   }
 };
 
-const preparePendingFrameApplicationInput = (
-  state: MutableGenerationState,
-  context: RackStageExecutionContext,
-): PendingFrameApplicationOperatorInput => ({
-  baseState: state,
-  sourceState: state.pendingFrameApplications.length > 0
-    ? materializePendingRackOperatorInput(state, context)
-    : state as MaterializedGenerationState,
-});
-
 export const replaceTimelineAndRefreshRackState = (
-  state: MutableGenerationState,
+  state: GenerationState,
   timeline: GeometryTimeline,
   timelineStateSeedByOriginId: ReadonlyMap<string, OriginTimelineState>,
   context: RackStageExecutionContext,
   timelineStateOverrides: ReadonlyMap<string, OriginTimelineStateOverride> = new Map(),
-): MutableGenerationState => transitionGenerationState(state, {
+): GenerationState => transitionGenerationState(state, {
   timeline,
   timelineStateByOriginId: buildTimelineStateByOriginId(
     timeline,
@@ -83,50 +63,8 @@ export const replaceTimelineAndRefreshRackState = (
 });
 
 export const materializeAndNormalizeRackTimeline = (
-  state: MutableGenerationState,
+  state: GenerationState,
   context: RackStageExecutionContext,
 ): GeometryTimeline => applyFinalTimelineNormalization(
-  materializePendingRackOperatorInput(state, context),
-);
-
-export const createPendingFrameApplicationOperator = <TKind extends RackStageDeviceKind>(
-  execute: (
-    input: PendingFrameApplicationOperatorInput,
-    stage: RackStageOfKind<TKind>,
-    context: RackStageExecutionContext,
-  ) => MutableGenerationState,
-  outputPolicy: 'defer' | 'publish-timeline-state' = 'defer',
-): RackOperator => createRackOperator<TKind, 'preserve-pending'>(
-  'preserve-pending',
-  (state, stage, context) => {
-    const nextState = execute(
-      preparePendingFrameApplicationInput(state, context),
-      stage,
-      context,
-    );
-
-    return outputPolicy === 'publish-timeline-state'
-      ? materializePendingFrameApplications(
-          nextState,
-          context.outputAdapter,
-          context.mutedGroupIds,
-          context.mutedGeneratorIds,
-        )
-      : nextState;
-  },
-);
-
-export const createPendingGeometryApplicationOperator = <TKind extends RackStageDeviceKind>(
-  execute: (
-    input: PendingGeometryApplicationOperatorInput,
-    stage: RackStageOfKind<TKind>,
-    context: RackStageExecutionContext,
-  ) => MutableGenerationState,
-): RackOperator => createRackOperator<TKind, 'preserve-pending'>(
-  'preserve-pending',
-  (state, stage, context) => execute(
-    { baseState: state },
-    stage,
-    context,
-  ),
+  materializeRackState(state, context),
 );

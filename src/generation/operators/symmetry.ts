@@ -1,22 +1,20 @@
 import {
   buildTargetOriginIds,
-  createPendingGeometryApplicationOperator,
+  createRackOperator,
   appendPendingGeometryRewriteApplication,
   buildModulationEvaluationWindowByOriginId,
   isDeviceModulated,
   resolveModulatedDeviceAtFrame,
   transformStroke,
   type ModulationEvaluationWindow,
-  type PendingGeometryApplicationOperatorInput,
 } from './runtime';
 import {
   buildSymmetryTransformPlan,
   isPointInSymmetrySector,
 } from '../../core/symmetry';
 import type { SymmetryEffectNode } from '../../shared/model';
-import type { MutableGenerationState } from '../timeline/state';
+import type { GenerationState } from '../timeline/state';
 import { createIdentityMask } from '../timeline';
-import type { BeatRange } from '../analysis/types';
 import type { GeometryStroke } from '../types';
 
 const buildSymmetryStrokeRewrite = (
@@ -59,7 +57,7 @@ const buildSymmetryStrokeRewrite = (
 };
 
 const applyPendingSymmetryEffect = (
-  input: PendingGeometryApplicationOperatorInput,
+  state: GenerationState,
   effect: SymmetryEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
@@ -69,13 +67,11 @@ const applyPendingSymmetryEffect = (
     sampleStepBeats: number,
     evaluationWindow: ModulationEvaluationWindow,
   ) => SymmetryEffectNode,
-  requiredFrameWindow: BeatRange | 'all',
   fallbackEvaluationWindow: ModulationEvaluationWindow,
-): MutableGenerationState => {
-  const { baseState } = input;
-  const targetOriginIds = buildTargetOriginIds(baseState.timeline, targetGroupId);
+): GenerationState => {
+  const targetOriginIds = buildTargetOriginIds(state.timeline, targetGroupId);
   const evaluationWindowByTargetOriginId = buildModulationEvaluationWindowByOriginId(
-    input,
+    state,
     targetOriginIds,
     fallbackEvaluationWindow,
   );
@@ -97,9 +93,8 @@ const applyPendingSymmetryEffect = (
   };
 
   return appendPendingGeometryRewriteApplication(
-    input,
+    state,
     targetOriginIds,
-    requiredFrameWindow,
     ({ timeline, frameIndex, strokes }) => strokes.flatMap((stroke) => {
       const evaluationWindow = evaluationWindowByTargetOriginId.get(
         stroke.polyline.originId,
@@ -112,12 +107,13 @@ const applyPendingSymmetryEffect = (
   );
 };
 
-export const symmetryOperator = createPendingGeometryApplicationOperator<'symmetry'>(
-  (input, stage, context) => {
+export const symmetryOperator = createRackOperator<'symmetry', 'preserve-pending'>(
+  'preserve-pending',
+  (state, stage, context) => {
     const isModulated = isDeviceModulated(context.modulationContext, stage.deviceId);
 
     return applyPendingSymmetryEffect(
-      input,
+      state,
       stage.device,
       stage.groupId,
       stage.stageIndex,
@@ -129,7 +125,6 @@ export const symmetryOperator = createPendingGeometryApplicationOperator<'symmet
         sampleStepBeats,
         evaluationWindow,
       ),
-      'all',
       {
         start: 0,
         end: context.modulationContext.loopLengthBeats,

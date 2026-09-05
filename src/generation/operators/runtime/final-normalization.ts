@@ -1,4 +1,4 @@
-import type { MutableGenerationState, OriginTimelineState } from '../../timeline/state';
+import type { GenerationState, OriginTimelineState } from '../../timeline/state';
 import {
   DEFAULT_TIMELINE_WINDOW,
   FIXED_TIMELINE_END_BEAT,
@@ -19,7 +19,7 @@ const resolveFinalSourceWindow = (
   : timelineState.observedWindow;
 
 const buildFinalOriginRemaps = (
-  state: MutableGenerationState,
+  state: GenerationState,
 ): Map<string, OriginFrameRemap> => {
   const remaps = new Map<string, OriginFrameRemap>();
 
@@ -39,11 +39,10 @@ const buildFinalOriginRemaps = (
 };
 
 export const applyFinalTimelineNormalization = (
-  state: MutableGenerationState,
+  state: GenerationState,
 ): GeometryTimeline => remapTimeline(
   state.timeline,
   buildFinalOriginRemaps(state),
-  'all',
   FIXED_TIMELINE_END_BEAT,
   true,
 );
