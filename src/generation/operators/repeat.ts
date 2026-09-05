@@ -51,12 +51,12 @@ const buildRepeatedFrameWrites = (
     const sourceFrameWindow = toFrameWindow(
       sourceWindow,
       timeline.sampleStepBeats,
-      timeline.frames.length,
+      timeline.frameCount,
     );
     const placementFrameWindow = toFrameWindow(
       DEFAULT_TIMELINE_WINDOW,
       timeline.sampleStepBeats,
-      timeline.frames.length,
+      timeline.frameCount,
     );
     const sourceFrameCount = sourceFrameWindow.endFrameExclusive
       - sourceFrameWindow.startFrame;

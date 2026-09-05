@@ -14,14 +14,18 @@ export interface GeometryStroke {
   readonly masks: ReadonlyArray<GeometryMask>;
 }
 
-export interface GeometryFrame {
-  strokes: GeometryStroke[];
+export interface GeometryPlacement {
+  readonly stroke: GeometryStroke;
+  readonly startFrame: number;
+  readonly endFrameExclusive: number;
 }
 
 export interface GeometryTimeline {
   sampleStepBeats: number;
   timeDomainEndBeat: number;
-  frames: GeometryFrame[];
+  frameCount: number;
+  /** Placement order preserves the drawing order within every sampled frame. */
+  placements: GeometryPlacement[];
   originGroupIdByOriginId: Map<string, string | null>;
   nextWriteId: number;
 }

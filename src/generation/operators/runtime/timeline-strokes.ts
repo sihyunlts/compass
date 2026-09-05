@@ -1,3 +1,4 @@
+import { iterateTimelineFrames } from '../../timeline';
 import type { AffineTransform } from '../../../core/core-types';
 import {
   applyTransformToPolyline,
@@ -51,24 +52,22 @@ export const buildTargetOriginIds = (
     return originIds;
   }
 
-  for (const frame of timeline.frames) {
-    for (const stroke of frame.strokes) {
-      if (!isTargetedStroke(stroke, targetGroupId)) {
-        continue;
-      }
-
-      if (
-        excludeMutedSources
-        && (
-          mutedGeneratorIds.has(stroke.polyline.originId)
-          || (stroke.originGroupId !== null && mutedGroupIds.has(stroke.originGroupId))
-        )
-      ) {
-        continue;
-      }
-
-      originIds.add(stroke.polyline.originId);
+  for (const { stroke } of timeline.placements) {
+    if (!isTargetedStroke(stroke, targetGroupId)) {
+      continue;
     }
+
+    if (
+      excludeMutedSources
+      && (
+        mutedGeneratorIds.has(stroke.polyline.originId)
+        || (stroke.originGroupId !== null && mutedGroupIds.has(stroke.originGroupId))
+      )
+    ) {
+      continue;
+    }
+
+    originIds.add(stroke.polyline.originId);
   }
 
   return originIds;
@@ -132,8 +131,8 @@ export const buildSourceStrokesByOriginAndFrame = (
 ): Map<string, Map<number, GeometryStroke[]>> => {
   const strokesByOriginId = new Map<string, Map<number, GeometryStroke[]>>();
 
-  for (let frameIndex = 0; frameIndex < timeline.frames.length; frameIndex += 1) {
-    for (const stroke of timeline.frames[frameIndex].strokes) {
+  for (const { frameIndex, strokes } of iterateTimelineFrames(timeline, undefined, targetOriginIds)) {
+    for (const stroke of strokes) {
       if (!targetOriginIds.has(stroke.polyline.originId)) {
         continue;
       }
@@ -161,7 +160,7 @@ export const toSourceFrameIndex = (
   beat: number,
   timeline: GeometryTimeline,
 ): number => {
-  const frameCount = Math.max(timeline.frames.length, 1);
+  const frameCount = Math.max(timeline.frameCount, 1);
   return Math.min(
     Math.max(Math.floor(beat / timeline.sampleStepBeats), 0),
     frameCount - 1,

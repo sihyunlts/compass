@@ -14,16 +14,10 @@ import type {
 } from '../types';
 
 export interface OccupiedCoordinate {
-  originId: string;
-  originGroupId: string | null;
+  stroke: GeometryStroke;
   x: number;
   y: number;
-  velocity: number;
-  writeOrder: number;
-  writeId: number;
   distanceSquared: number;
-  colorAgeBandIndex?: number;
-  colorAgeBandCount?: number;
 }
 
 interface StrokeOccupiedCoordinateCandidate {
@@ -135,67 +129,81 @@ const toCandidateBounds = (
     : null;
 };
 
-export const shouldReplaceOccupiedCoordinate = (
-  candidate: OccupiedCoordinate,
+const shouldReplaceOccupiedCoordinate = (
+  candidate: GeometryStroke,
+  candidateDistanceSquared: number,
   current: OccupiedCoordinate,
 ): boolean => {
-  if (isRelatedColorAgeBand(candidate, current)) {
-    if (Math.abs(candidate.writeOrder - current.writeOrder) > 1e-9) {
-      return candidate.writeOrder > current.writeOrder;
+  if (isRelatedColorAgeBand(candidate, current.stroke)) {
+    if (Math.abs(candidate.writeOrder - current.stroke.writeOrder) > 1e-9) {
+      return candidate.writeOrder > current.stroke.writeOrder;
     }
 
-    const distanceDelta = resolveColorAgeBandBoundaryDistance(candidate)
-      - resolveColorAgeBandBoundaryDistance(current);
+    const distanceDelta = resolveColorAgeBandBoundaryDistance(candidate, candidateDistanceSquared)
+      - resolveColorAgeBandBoundaryDistance(current.stroke, current.distanceSquared);
     if (Math.abs(distanceDelta) > 1e-9) {
       return distanceDelta < 0;
     }
   }
 
-  return candidate.writeOrder > current.writeOrder
-    || (candidate.writeOrder === current.writeOrder && candidate.writeId > current.writeId);
+  return candidate.writeOrder > current.stroke.writeOrder
+    || (candidate.writeOrder === current.stroke.writeOrder && candidate.writeId > current.stroke.writeId);
 };
 
 const isRelatedColorAgeBand = (
-  first: OccupiedCoordinate,
-  second: OccupiedCoordinate,
+  first: GeometryStroke,
+  second: GeometryStroke,
 ): boolean => (
-  first.originId === second.originId
+  first.polyline.originId === second.polyline.originId
   && first.originGroupId === second.originGroupId
-  && typeof first.colorAgeBandIndex === 'number'
-  && typeof second.colorAgeBandIndex === 'number'
-  && typeof first.colorAgeBandCount === 'number'
-  && typeof second.colorAgeBandCount === 'number'
-  && first.colorAgeBandCount === second.colorAgeBandCount
+  && typeof first.polyline.colorAgeBandIndex === 'number'
+  && typeof second.polyline.colorAgeBandIndex === 'number'
+  && typeof first.polyline.colorAgeBandCount === 'number'
+  && typeof second.polyline.colorAgeBandCount === 'number'
+  && first.polyline.colorAgeBandCount === second.polyline.colorAgeBandCount
 );
 
 const resolveColorAgeBandBoundaryDistance = (
-  coordinate: OccupiedCoordinate,
+  stroke: GeometryStroke,
+  distanceSquared: number,
 ): number => {
   // The final band has only a preceding neighbor, so keep near-boundary raster
   // overlap with that neighbor instead of letting the final band swallow it.
-  const trailingBandBias = coordinate.colorAgeBandIndex === coordinate.colorAgeBandCount - 1
+  const trailingBandBias = stroke.polyline.colorAgeBandIndex === stroke.polyline.colorAgeBandCount - 1
     ? TRAILING_COLOR_AGE_BAND_DISTANCE_BIAS_SQUARED
     : 0;
-  return coordinate.distanceSquared + trailingBandBias;
+  return distanceSquared + trailingBandBias;
 };
 
-export const createOccupiedCoordinate = (
+const createOccupiedCoordinate = (
   stroke: GeometryStroke,
   x: number,
   y: number,
   distanceSquared: number,
 ): OccupiedCoordinate => ({
-  originId: stroke.polyline.originId,
-  originGroupId: stroke.originGroupId,
+  stroke,
   x,
   y,
-  velocity: stroke.polyline.velocity,
-  writeOrder: stroke.writeOrder,
-  writeId: stroke.writeId,
   distanceSquared,
-  colorAgeBandIndex: stroke.polyline.colorAgeBandIndex,
-  colorAgeBandCount: stroke.polyline.colorAgeBandCount,
 });
+
+export const writeOccupiedCoordinateWinner = <TKey>(
+  winners: Map<TKey, OccupiedCoordinate>,
+  key: TKey,
+  stroke: GeometryStroke,
+  x: number,
+  y: number,
+  distanceSquared: number,
+): void => {
+  const current = winners.get(key);
+  if (!current) {
+    winners.set(key, createOccupiedCoordinate(stroke, x, y, distanceSquared));
+  } else if (shouldReplaceOccupiedCoordinate(stroke, distanceSquared, current)) {
+    // This record belongs to one coordinate in the current projection only.
+    current.stroke = stroke;
+    current.distanceSquared = distanceSquared;
+  }
+};
 
 const collectCenterlineCandidateCoordinates = (
   stroke: GeometryStroke,
@@ -387,22 +395,24 @@ export const collectOccupiedCoordinates = (
         continue;
       }
 
-      const candidate = createOccupiedCoordinate(
+      if (!winnerOnly) {
+        byCoordinate.set(`${stroke.writeId}:${coordinateKey}`, createOccupiedCoordinate(
+          stroke,
+          Math.round(x),
+          Math.round(y),
+          distanceSquared,
+        ));
+        continue;
+      }
+
+      writeOccupiedCoordinateWinner(
+        byCoordinate,
+        coordinateKey,
         stroke,
         Math.round(x),
         Math.round(y),
         distanceSquared,
       );
-
-      if (!winnerOnly) {
-        byCoordinate.set(`${stroke.writeId}:${coordinateKey}`, candidate);
-        continue;
-      }
-
-      const existing = byCoordinate.get(coordinateKey);
-      if (!existing || shouldReplaceOccupiedCoordinate(candidate, existing)) {
-        byCoordinate.set(coordinateKey, candidate);
-      }
     }
   }
 

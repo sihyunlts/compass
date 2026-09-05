@@ -74,12 +74,12 @@ const applyPendingSpatialTransform = (
   return appendPendingGeometryRewriteApplication(
     state,
     targetOriginIds,
-    ({ timeline, frameIndex, strokes }) => {
+    ({ sampleStepBeats, frameIndex, strokes }) => {
       return strokes.map((stroke) => {
         const deviceAtFrame = isModulated
           ? resolveDeviceAtFrame(
               frameIndex,
-              timeline.sampleStepBeats,
+              sampleStepBeats,
               evaluationWindowByTargetOriginId.get(stroke.polyline.originId)!,
             )
           : effect;

@@ -6,15 +6,13 @@ import {
 } from '../../timeline/state';
 import {
   addStrokeToFrame,
+  addExistingStrokeToFrameRange,
+  iterateTimelineFrames,
   beginTimelineStage,
-  completeTimelineStage,
   removeOriginStrokes,
   type FrameWindow,
 } from '../../timeline';
 import type { CanonicalOutputAdapter } from '../../types';
-import {
-  buildSourceStrokesByOriginAndFrame,
-} from './timeline-strokes';
 import {
   applyTimelineStateOverrides,
   buildTimelineStateByOriginId,
@@ -50,7 +48,7 @@ export const appendPendingStrokeRewriteApplication = (
     {
       kind: 'stroke-rewrite',
       targetOriginIds: new Set(targetOriginIds),
-      sourceFrameCount: sourceTimeline.frames.length,
+      sourceFrameCount: sourceTimeline.frameCount,
       endBeat: sourceTimeline.timeDomainEndBeat,
       writes,
     },
@@ -84,21 +82,17 @@ export const buildPendingStrokeRewriteFrameWrites = (
     strokes: ReadonlyArray<GeometryStroke>,
   ) => ReadonlyArray<Omit<GeometryStroke, 'writeId'>>,
 ): PendingStrokeRewriteFrameWrite[] => {
-  const sourceStrokesByOriginAndFrame = buildSourceStrokesByOriginAndFrame(
-    timeline,
-    targetOriginIds,
-  );
   const writes: PendingStrokeRewriteFrameWrite[] = [];
   const originIds = Array.from(targetOriginIds);
-
-  for (
-    let frameIndex = frameWindow.startFrame;
-    frameIndex < frameWindow.endFrameExclusive;
-    frameIndex += 1
-  ) {
-    const sourceStrokes = originIds.flatMap((originId) => (
-      sourceStrokesByOriginAndFrame.get(originId)?.get(frameIndex) ?? []
-    ));
+  for (const { frameIndex, strokes: frameStrokes } of iterateTimelineFrames(timeline, frameWindow, targetOriginIds)) {
+    const byOrigin = new Map<string, GeometryStroke[]>();
+    for (const stroke of frameStrokes) {
+      const originId = stroke.polyline.originId;
+      const strokes = byOrigin.get(originId);
+      if (strokes) strokes.push(stroke);
+      else byOrigin.set(originId, [stroke]);
+    }
+    const sourceStrokes = originIds.flatMap((originId) => byOrigin.get(originId) ?? []);
     if (sourceStrokes.length === 0) {
       continue;
     }
@@ -117,108 +111,101 @@ export const buildPendingStrokeRewriteFrameWrites = (
   return writes;
 };
 
-type PendingFrameRewriteStage = ReturnType<typeof beginTimelineStage>;
-
-interface PendingFrameRewritePlan {
-  targetOriginIds: ReadonlySet<string>;
-  sourceFrameCount: number;
-  endBeat: number;
-}
-
-const isFrameIndexWithinTimeline = (
-  timeline: GeometryTimeline,
-  frameIndex: number,
-): boolean => frameIndex >= 0 && frameIndex < timeline.frames.length;
-
-const materializeTargetOriginFrameRewrite = (
-  timeline: GeometryTimeline,
-  plan: PendingFrameRewritePlan,
-  applyWrites: (timeline: PendingFrameRewriteStage) => void,
-): GeometryTimeline => {
-  const nextTimeline = beginTimelineStage(
-    timeline,
-    Math.max(timeline.timeDomainEndBeat, plan.endBeat),
-  );
-  removeOriginStrokes(
-    nextTimeline,
-    plan.targetOriginIds,
-    Math.min(plan.sourceFrameCount, nextTimeline.frames.length),
-  );
-
-  applyWrites(nextTimeline);
-
-  return completeTimelineStage(nextTimeline);
-};
-
 const materializePendingStrokeRewriteApplication = (
   timeline: GeometryTimeline,
   application: Extract<PendingFrameApplication, { kind: 'stroke-rewrite' }>,
-): GeometryTimeline => materializeTargetOriginFrameRewrite(timeline, application, (nextTimeline) => {
+): GeometryTimeline => {
+  const nextTimeline = beginTimelineStage(timeline, Math.max(timeline.timeDomainEndBeat, application.endBeat));
+  removeOriginStrokes(
+    nextTimeline,
+    application.targetOriginIds,
+    Math.min(application.sourceFrameCount, nextTimeline.frameCount),
+  );
   for (const write of application.writes) {
-    if (!isFrameIndexWithinTimeline(nextTimeline, write.destinationFrameIndex)) {
+    if (write.destinationFrameIndex < 0 || write.destinationFrameIndex >= nextTimeline.frameCount) {
       continue;
     }
-
     for (const stroke of write.strokes) {
       addStrokeToFrame(nextTimeline, write.destinationFrameIndex, stroke);
     }
   }
-});
-
-const materializePendingGeometryRewriteApplication = (
-  timeline: GeometryTimeline,
-  application: Extract<PendingFrameApplication, { kind: 'geometry-rewrite' }>,
-): GeometryTimeline => {
-  const sourceStrokesByOriginAndFrame = buildSourceStrokesByOriginAndFrame(
-    timeline,
-    application.targetOriginIds,
-  );
-  const originIds = Array.from(application.targetOriginIds);
-  return materializeTargetOriginFrameRewrite(
-    timeline,
-    {
-      targetOriginIds: application.targetOriginIds,
-      sourceFrameCount: timeline.frames.length,
-      endBeat: timeline.timeDomainEndBeat,
-    },
-    (nextTimeline) => {
-      for (
-        let frameIndex = 0;
-        frameIndex < timeline.frames.length;
-        frameIndex += 1
-      ) {
-        const sourceStrokes = originIds.flatMap((originId) => (
-          sourceStrokesByOriginAndFrame.get(originId)?.get(frameIndex) ?? []
-        ));
-        if (sourceStrokes.length === 0) {
-          continue;
-        }
-
-        const rewrittenStrokes = application.rewriteFrameStrokes({
-          timeline,
-          frameIndex,
-          strokes: sourceStrokes,
-        });
-        for (const stroke of rewrittenStrokes) {
-          addStrokeToFrame(nextTimeline, frameIndex, stroke);
-        }
-      }
-    },
-  );
+  return nextTimeline;
 };
 
-const materializePendingFrameApplication = (
+interface FrameRewriteStroke {
+  stroke: GeometryStroke;
+  applicationIndex: number;
+}
+
+const materializeGeometryRewriteBatch = (
   timeline: GeometryTimeline,
-  application: PendingFrameApplication,
+  applications: ReadonlyArray<PendingGeometryRewriteApplication>,
 ): GeometryTimeline => {
-  switch (application.kind) {
-    case 'geometry-rewrite': {
-      return materializePendingGeometryRewriteApplication(timeline, application);
+  const targetOriginIds = new Set(
+    applications.flatMap((application) => Array.from(application.targetOriginIds)),
+  );
+  const nextTimeline = beginTimelineStage(timeline);
+  removeOriginStrokes(nextTimeline, targetOriginIds, timeline.frameCount);
+  const writesByApplication = applications.map(
+    () => [] as Array<{ frameIndex: number; stroke: GeometryStroke }>,
+  );
+  const writeCounts = applications.map(() => 0);
+
+  for (const { frameIndex, strokes } of iterateTimelineFrames(timeline, undefined, targetOriginIds)) {
+    const currentByOrigin = new Map<string, FrameRewriteStroke[]>();
+    const append = (entry: FrameRewriteStroke): void => {
+      const originId = entry.stroke.polyline.originId;
+      const entries = currentByOrigin.get(originId);
+      if (entries) entries.push(entry);
+      else currentByOrigin.set(originId, [entry]);
+    };
+    // Every input origin is targeted by this batch, so every surviving input
+    // receives an application index before it is written to the output.
+    for (const stroke of strokes) append({ stroke, applicationIndex: -1 });
+
+    for (let applicationIndex = 0; applicationIndex < applications.length; applicationIndex += 1) {
+      const application = applications[applicationIndex];
+      const sourceStrokes: GeometryStroke[] = [];
+      for (const originId of application.targetOriginIds) {
+        for (const entry of currentByOrigin.get(originId) ?? []) sourceStrokes.push(entry.stroke);
+        currentByOrigin.delete(originId);
+      }
+      if (sourceStrokes.length === 0) continue;
+      const rewritten = application.rewriteFrameStrokes({
+        sampleStepBeats: timeline.sampleStepBeats,
+        frameIndex,
+        strokes: sourceStrokes,
+      });
+      for (const stroke of rewritten) {
+        append({
+          stroke: { ...stroke, writeId: writeCounts[applicationIndex]++ },
+          applicationIndex,
+        });
+      }
     }
-    case 'stroke-rewrite': {
-      return materializePendingStrokeRewriteApplication(timeline, application);
+    for (const entries of currentByOrigin.values()) {
+      for (const entry of entries) {
+        writesByApplication[entry.applicationIndex].push({ frameIndex, stroke: entry.stroke });
+      }
     }
   }
+
+  // Reserve ids in stage order, including writes overwritten by later stages.
+  // Frame-local execution must not change the original overlap precedence.
+  let firstWriteId = timeline.nextWriteId;
+  for (let applicationIndex = 0; applicationIndex < applications.length; applicationIndex += 1) {
+    const writes = writesByApplication[applicationIndex]
+      .sort((left, right) => left.stroke.writeId - right.stroke.writeId);
+    for (const { frameIndex, stroke } of writes) {
+      addExistingStrokeToFrameRange(nextTimeline, frameIndex, frameIndex + 1, {
+        ...stroke,
+        writeId: firstWriteId + stroke.writeId,
+      });
+    }
+    firstWriteId += writeCounts[applicationIndex];
+  }
+  nextTimeline.nextWriteId = firstWriteId;
+  return nextTimeline;
 };
 
 export const materializePendingFrameApplications = (
@@ -232,8 +219,22 @@ export const materializePendingFrameApplications = (
   }
 
   let timeline = state.timeline;
-  for (const application of state.pendingFrameApplications) {
-    timeline = materializePendingFrameApplication(timeline, application);
+  let applicationIndex = 0;
+  while (applicationIndex < state.pendingFrameApplications.length) {
+    const application = state.pendingFrameApplications[applicationIndex];
+    if (application.kind === 'stroke-rewrite') {
+      timeline = materializePendingStrokeRewriteApplication(timeline, application);
+      applicationIndex += 1;
+      continue;
+    }
+    const batch: PendingGeometryRewriteApplication[] = [];
+    while (applicationIndex < state.pendingFrameApplications.length) {
+      const next = state.pendingFrameApplications[applicationIndex];
+      if (next.kind !== 'geometry-rewrite') break;
+      batch.push(next);
+      applicationIndex += 1;
+    }
+    timeline = materializeGeometryRewriteBatch(timeline, batch);
   }
 
   return transitionGenerationState(state, {

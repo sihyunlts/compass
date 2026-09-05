@@ -2,7 +2,7 @@ import { IDENTITY_AFFINE } from '../../core/geometry';
 import { NOTE_SAMPLES_PER_BEAT } from '../../core/pipeline/constants';
 import type { BeatRange } from '../analysis/types';
 import type {
-  GeometryFrame,
+  GeometryPlacement,
   GeometryMask,
   GeometryStroke,
   GeometryTimeline,
@@ -21,112 +21,46 @@ export const toFrameCount = (
   return Math.max(Math.ceil(endBeat / sampleStepBeats), 1);
 };
 
-const createEmptyFrames = (count: number): GeometryTimeline['frames'] =>
-  Array.from({ length: Math.max(count, 1) }, () => ({ strokes: [] as GeometryStroke[] }));
-
 export const createEmptyTimeline = (
   sampleStepBeats = DEFAULT_SAMPLE_STEP_BEATS,
   endBeat = 1,
 ): GeometryTimeline => ({
   sampleStepBeats,
   timeDomainEndBeat: Math.max(endBeat, 1),
-  frames: createEmptyFrames(toFrameCount(Math.max(endBeat, 1), sampleStepBeats)),
+  frameCount: toFrameCount(Math.max(endBeat, 1), sampleStepBeats),
+  placements: [],
   originGroupIdByOriginId: new Map(),
   nextWriteId: 1,
 });
 
-interface TimelineStageBuffer extends GeometryTimeline {
-  readonly sourceFrames: ReadonlyArray<GeometryFrame>;
-}
-
-const isTimelineStageBuffer = (
-  timeline: GeometryTimeline | TimelineStageBuffer,
-): timeline is TimelineStageBuffer => 'sourceFrames' in timeline;
-
-const createFramesFromBase = (
-  sourceFrames: ReadonlyArray<GeometryFrame>,
-  frameCount: number,
-): GeometryTimeline['frames'] => Array.from(
-  { length: frameCount },
-  (_, index) => sourceFrames[index] ?? { strokes: [] as GeometryStroke[] },
-);
-
-const registerStrokeOrigin = (
-  timeline: GeometryTimeline | TimelineStageBuffer,
-  stroke: Pick<GeometryStroke, 'polyline' | 'originGroupId'>,
-): void => {
-  timeline.originGroupIdByOriginId.set(stroke.polyline.originId, stroke.originGroupId);
-};
-
 export const beginTimelineStage = (
   sourceTimeline: GeometryTimeline,
   endBeat = sourceTimeline.timeDomainEndBeat,
-): TimelineStageBuffer => {
-  const safeEndBeat = Number.isFinite(endBeat) && endBeat > 0
-    ? endBeat
-    : 1;
+): GeometryTimeline => {
+  const safeEndBeat = Number.isFinite(endBeat) && endBeat > 0 ? endBeat : 1;
   const frameCount = toFrameCount(safeEndBeat, sourceTimeline.sampleStepBeats);
-
   return {
     sampleStepBeats: sourceTimeline.sampleStepBeats,
     timeDomainEndBeat: safeEndBeat,
-    frames: createFramesFromBase(sourceTimeline.frames, frameCount),
+    frameCount,
+    placements: sourceTimeline.placements
+      .filter((placement) => placement.startFrame < frameCount)
+      .map((placement) => placement.endFrameExclusive <= frameCount ? placement : {
+        ...placement,
+        endFrameExclusive: frameCount,
+      }),
     originGroupIdByOriginId: new Map(sourceTimeline.originGroupIdByOriginId),
     nextWriteId: sourceTimeline.nextWriteId,
-    sourceFrames: sourceTimeline.frames,
   };
 };
 
 export const ensureTimelineFrameCount = (
-  timeline: GeometryTimeline | TimelineStageBuffer,
+  timeline: GeometryTimeline,
   minEndBeat: number,
 ): void => {
-  const safeEndBeat = Number.isFinite(minEndBeat) && minEndBeat > 0
-    ? minEndBeat
-    : 1;
-  const requiredFrameCount = toFrameCount(safeEndBeat, timeline.sampleStepBeats);
-
-  while (timeline.frames.length < requiredFrameCount) {
-    if (isTimelineStageBuffer(timeline)) {
-      timeline.frames.push(timeline.sourceFrames[timeline.frames.length] ?? { strokes: [] });
-      continue;
-    }
-
-    timeline.frames.push({ strokes: [] });
-  }
-
-  if (safeEndBeat > timeline.timeDomainEndBeat) {
-    timeline.timeDomainEndBeat = safeEndBeat;
-  }
-};
-
-const getWritableFrame = (
-  timeline: GeometryTimeline | TimelineStageBuffer,
-  frameIndex: number,
-): GeometryFrame => {
-  const safeFrameIndex = clampFrameIndex(frameIndex, timeline.frames.length);
-  const frame = timeline.frames[safeFrameIndex];
-
-  if (isTimelineStageBuffer(timeline) && frame === timeline.sourceFrames[safeFrameIndex]) {
-    const writableFrame: GeometryFrame = {
-      strokes: [...frame.strokes],
-    };
-    timeline.frames[safeFrameIndex] = writableFrame;
-    return writableFrame;
-  }
-
-  return frame;
-};
-
-const clampFrameIndex = (
-  frameIndex: number,
-  frameCount: number,
-): number => {
-  if (frameCount <= 0) {
-    return 0;
-  }
-
-  return Math.min(Math.max(frameIndex, 0), frameCount - 1);
+  const safeEndBeat = Number.isFinite(minEndBeat) && minEndBeat > 0 ? minEndBeat : 1;
+  timeline.frameCount = Math.max(timeline.frameCount, toFrameCount(safeEndBeat, timeline.sampleStepBeats));
+  timeline.timeDomainEndBeat = Math.max(timeline.timeDomainEndBeat, safeEndBeat);
 };
 
 export interface FrameWindow {
@@ -163,124 +97,151 @@ export const toFrameWindow = (
   };
 };
 
-export const addStrokeToFrame = (
-  timeline: GeometryTimeline | TimelineStageBuffer,
-  frameIndex: number,
-  stroke: Omit<GeometryStroke, 'writeId' | 'masks'> & {
-    masks?: ReadonlyArray<GeometryMask>;
-  },
+export const addExistingStrokeToFrameRange = (
+  timeline: GeometryTimeline,
+  startFrame: number,
+  endFrameExclusive: number,
+  stroke: GeometryStroke,
 ): void => {
-  const writableFrame = getWritableFrame(timeline, frameIndex);
-  const nextStroke: GeometryStroke = {
-    ...stroke,
-    writeId: timeline.nextWriteId,
-    masks: stroke.masks ?? [],
-  };
-  writableFrame.strokes.push(nextStroke);
-  registerStrokeOrigin(timeline, nextStroke);
-  timeline.nextWriteId += 1;
+  const start = Math.min(Math.max(Math.trunc(startFrame), 0), timeline.frameCount);
+  const end = Math.min(Math.max(Math.trunc(endFrameExclusive), start), timeline.frameCount);
+  if (end <= start) return;
+  timeline.placements.push({ stroke, startFrame: start, endFrameExclusive: end });
+  timeline.originGroupIdByOriginId.set(stroke.polyline.originId, stroke.originGroupId);
+  timeline.nextWriteId = Math.max(timeline.nextWriteId, stroke.writeId + 1);
 };
 
 export const addStrokeToFrameRange = (
-  timeline: GeometryTimeline | TimelineStageBuffer,
+  timeline: GeometryTimeline,
   startFrame: number,
   endFrameExclusive: number,
   stroke: Omit<GeometryStroke, 'writeId' | 'masks'> & {
     masks?: ReadonlyArray<GeometryMask>;
   },
 ): void => {
-  const safeStartFrame = Math.min(Math.max(Math.trunc(startFrame), 0), timeline.frames.length);
-  const safeEndFrameExclusive = Math.min(
-    Math.max(Math.trunc(endFrameExclusive), safeStartFrame),
-    timeline.frames.length,
-  );
-  if (safeEndFrameExclusive <= safeStartFrame) {
-    return;
-  }
-
-  const sharedStroke: GeometryStroke = {
+  addExistingStrokeToFrameRange(timeline, startFrame, endFrameExclusive, {
     ...stroke,
     writeId: timeline.nextWriteId,
     masks: stroke.masks ?? [],
-  };
-  timeline.nextWriteId += 1;
-  registerStrokeOrigin(timeline, sharedStroke);
-
-  for (let frameIndex = safeStartFrame; frameIndex < safeEndFrameExclusive; frameIndex += 1) {
-    getWritableFrame(timeline, frameIndex).strokes.push(sharedStroke);
-  }
+  });
 };
 
-export const addExistingStrokeToFrame = (
-  timeline: GeometryTimeline | TimelineStageBuffer,
+export const addStrokeToFrame = (
+  timeline: GeometryTimeline,
   frameIndex: number,
-  stroke: GeometryStroke,
+  stroke: Omit<GeometryStroke, 'writeId' | 'masks'> & {
+    masks?: ReadonlyArray<GeometryMask>;
+  },
 ): void => {
-  const writableFrame = getWritableFrame(timeline, frameIndex);
-  // Temporal placement preserves every stroke field. Geometry strokes and
-  // masks are immutable snapshots, so the frame only needs another reference.
-  writableFrame.strokes.push(stroke);
-  registerStrokeOrigin(timeline, stroke);
-  timeline.nextWriteId = Math.max(timeline.nextWriteId, stroke.writeId + 1);
+  const frame = Math.min(Math.max(frameIndex, 0), timeline.frameCount - 1);
+  addStrokeToFrameRange(timeline, frame, frame + 1, stroke);
 };
 
 export const unregisterTimelineOrigins = (
-  timeline: GeometryTimeline | TimelineStageBuffer,
+  timeline: GeometryTimeline,
   originIds: Iterable<string>,
 ): void => {
-  for (const originId of originIds) {
-    timeline.originGroupIdByOriginId.delete(originId);
-  }
+  for (const originId of originIds) timeline.originGroupIdByOriginId.delete(originId);
 };
 
 export const removeOriginStrokes = (
-  timeline: GeometryTimeline | TimelineStageBuffer,
+  timeline: GeometryTimeline,
   targetOriginIds: ReadonlySet<string>,
   frameCount: number,
 ): void => {
   unregisterTimelineOrigins(timeline, targetOriginIds);
-
-  for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
-    const strokes = timeline.frames[frameIndex].strokes;
-    const remainingStrokes = strokes.filter((stroke) => !targetOriginIds.has(stroke.polyline.originId));
-    if (remainingStrokes.length !== strokes.length) {
-      timeline.frames[frameIndex] = { strokes: remainingStrokes };
+  timeline.placements = timeline.placements.flatMap((placement) => {
+    if (!targetOriginIds.has(placement.stroke.polyline.originId) || placement.startFrame >= frameCount) {
+      return [placement];
     }
-  }
+    return placement.endFrameExclusive > frameCount
+      ? [{ ...placement, startFrame: frameCount }]
+      : [];
+  });
 };
 
-export const completeTimelineStage = (
-  timeline: GeometryTimeline | TimelineStageBuffer,
-): GeometryTimeline => ({
-  sampleStepBeats: timeline.sampleStepBeats,
-  timeDomainEndBeat: timeline.timeDomainEndBeat,
-  frames: timeline.frames.slice(),
-  originGroupIdByOriginId: new Map(timeline.originGroupIdByOriginId),
-  nextWriteId: timeline.nextWriteId,
-});
-
-export const finalizeTimeline = (
-  timeline: GeometryTimeline,
-): GeometryTimeline => {
+export const finalizeTimeline = (timeline: GeometryTimeline): GeometryTimeline => {
   const endBeat = Math.max(timeline.timeDomainEndBeat, 1);
-  const frameCount = toFrameCount(endBeat, timeline.sampleStepBeats);
+  return toFrameCount(endBeat, timeline.sampleStepBeats) === timeline.frameCount
+    ? timeline
+    : beginTimelineStage(timeline, endBeat);
+};
 
-  if (frameCount === timeline.frames.length) {
-    return timeline;
-  }
-
-  return {
-    sampleStepBeats: timeline.sampleStepBeats,
-    timeDomainEndBeat: endBeat,
-    frames: timeline.frames.length > frameCount
-      ? timeline.frames.slice(0, frameCount)
-      : [
-          ...timeline.frames,
-          ...createEmptyFrames(frameCount - timeline.frames.length),
-    ],
-    originGroupIdByOriginId: new Map(timeline.originGroupIdByOriginId),
-    nextWriteId: timeline.nextWriteId,
+/** Emits maximal spans with the same ordered set of active placements. */
+export function* iterateTimelineSpans(
+  timeline: GeometryTimeline,
+  frameWindow: FrameWindow = { startFrame: 0, endFrameExclusive: timeline.frameCount },
+  targetOriginIds?: ReadonlySet<string>,
+): Generator<FrameWindow & { strokes: ReadonlyArray<GeometryStroke> }> {
+  const placements = targetOriginIds
+    ? timeline.placements.filter(({ stroke }) => targetOriginIds.has(stroke.polyline.originId))
+    : timeline.placements;
+  const starts = new Map<number, number[]>();
+  const ends = new Map<number, number[]>();
+  const addBoundary = (boundaries: Map<number, number[]>, frame: number, index: number): void => {
+    const indices = boundaries.get(frame);
+    if (indices) indices.push(index);
+    else boundaries.set(frame, [index]);
   };
+  placements.forEach((placement, index) => {
+    const start = Math.max(placement.startFrame, frameWindow.startFrame);
+    const end = Math.min(placement.endFrameExclusive, frameWindow.endFrameExclusive);
+    if (end > start) {
+      addBoundary(starts, start, index);
+      addBoundary(ends, end, index);
+    }
+  });
+  // Bits enumerate active placements in insertion order without sorting each frame.
+  const active = new Uint32Array(Math.ceil(placements.length / 32));
+  const boundaries = Array.from(new Set([
+    frameWindow.startFrame, frameWindow.endFrameExclusive, ...starts.keys(), ...ends.keys(),
+  ])).sort((left, right) => left - right);
+  for (let boundaryIndex = 0; boundaryIndex < boundaries.length - 1; boundaryIndex += 1) {
+    const frameIndex = boundaries[boundaryIndex];
+    for (const index of ends.get(frameIndex) ?? []) active[index >>> 5] &= ~(1 << (index & 31));
+    for (const index of starts.get(frameIndex) ?? []) active[index >>> 5] |= 1 << (index & 31);
+    const strokes: GeometryStroke[] = [];
+    for (let wordIndex = 0; wordIndex < active.length; wordIndex += 1) {
+      let word = active[wordIndex];
+      while (word !== 0) {
+        const bit = 31 - Math.clz32(word & -word);
+        strokes.push(placements[wordIndex * 32 + bit].stroke);
+        word = (word & (word - 1)) >>> 0;
+      }
+    }
+    yield {
+      startFrame: frameIndex,
+      endFrameExclusive: boundaries[boundaryIndex + 1],
+      strokes,
+    };
+  }
+}
+
+export function* iterateTimelineFrames(
+  timeline: GeometryTimeline,
+  frameWindow?: FrameWindow,
+  targetOriginIds?: ReadonlySet<string>,
+): Generator<{ frameIndex: number; strokes: ReadonlyArray<GeometryStroke> }> {
+  for (const span of iterateTimelineSpans(timeline, frameWindow, targetOriginIds)) {
+    for (let frameIndex = span.startFrame; frameIndex < span.endFrameExclusive; frameIndex += 1) {
+      yield { frameIndex, strokes: span.strokes };
+    }
+  }
+}
+
+export const groupPlacementsByOrigin = (
+  timeline: GeometryTimeline,
+  targetOriginIds: ReadonlySet<string>,
+): Map<string, GeometryPlacement[]> => {
+  const byOrigin = new Map<string, GeometryPlacement[]>();
+  for (const placement of timeline.placements) {
+    const originId = placement.stroke.polyline.originId;
+    if (!targetOriginIds.has(originId)) continue;
+    const placements = byOrigin.get(originId);
+    if (placements) placements.push(placement);
+    else byOrigin.set(originId, [placement]);
+  }
+  return byOrigin;
 };
 
 export const createIdentityMask = (

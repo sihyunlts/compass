@@ -13,7 +13,6 @@ import {
 } from '../timeline/state';
 import {
   beginTimelineStage,
-  completeTimelineStage,
   ensureTimelineFrameCount,
   toFrameCount,
 } from '../timeline';
@@ -52,11 +51,10 @@ const applyGeneratorDevice = (
     );
   }
 
-  const completedTimeline = completeTimelineStage(nextTimeline);
   const preservesFullPlaybackWindow = device.kind === 'rain';
   return replaceTimelineAndRefreshRackState(
     state,
-    completedTimeline,
+    nextTimeline,
     seedGeneratedOriginTimelineState(
       state.timelineStateByOriginId,
       stage.deviceId,
