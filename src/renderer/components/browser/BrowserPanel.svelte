@@ -1720,7 +1720,7 @@
     border-right: 1px solid var(--color-border-tertiary);
 
     &.has-titlebar-spacer {
-      --floating-layer-viewport-top: 48px;
+      --floating-layer-viewport-top: 38px;
       --browser-page-top-inset: calc(
         var(--gap-10) + var(--gap-32) - var(--gap-4)
       );
