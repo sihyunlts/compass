@@ -351,6 +351,7 @@ export const distanceToRasterizedPolylineSquared = (
 export const applyTransformToPolyline = (polyline: Polyline, transform: AffineTransform): Polyline => ({
   ...polyline,
   points: polyline.points.map((pt) => applyAffine(transform, pt)),
+  motionReferencePoints: polyline.motionReferencePoints?.map((pt) => applyAffine(transform, pt)),
   ...(polyline.rasterTieBreakDirection
     ? {
         rasterTieBreakDirection: {
