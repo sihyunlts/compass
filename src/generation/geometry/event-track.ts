@@ -14,6 +14,7 @@ export interface GeometryStateEvent {
 
 interface GeometryMotionSnapshot {
   probes: Float64Array;
+  motionProbes: Float64Array;
   topologyKey: string;
   isEmpty: boolean;
 }
@@ -66,8 +67,8 @@ const spatialHashBySnapshot = new WeakMap<
 const samplePolylineByArcLength = (
   stroke: GeometryStroke,
   probeStepLed: number,
+  points = stroke.polyline.points,
 ): Float64Array => {
-  const points = stroke.polyline.points;
   if (points.length === 0) {
     return new Float64Array();
   }
@@ -99,7 +100,7 @@ const samplePolylineByArcLength = (
   }
 
   const safeStep = Math.max(probeStepLed, GEOMETRY_DISTANCE_EPSILON);
-  const sampleCount = Math.max(Math.ceil(totalLength / safeStep), 1);
+  const sampleCount = Math.max(Math.ceil((totalLength - GEOMETRY_DISTANCE_EPSILON) / safeStep), 1);
   const probeCount = stroke.polyline.closed ? sampleCount : sampleCount + 1;
   const probes = new Float64Array(probeCount * 2);
   let segmentIndex = 0;
@@ -108,7 +109,7 @@ const samplePolylineByArcLength = (
       break;
     }
 
-    const distance = Math.min(sampleIndex * safeStep, totalLength);
+    const distance = totalLength * sampleIndex / sampleCount;
     while (
       segmentIndex < segments.length - 1
       && distance > segments[segmentIndex].startDistance + segments[segmentIndex].length
@@ -145,21 +146,29 @@ const buildGeometryMotionSnapshot = (
   // Visibility clipping changes what is drawn, not how far the source moved.
   // Measure source centerlines so Mask and Symmetry keep the same one-LED clock.
   const probeChunks = strokes.map((stroke) => samplePolylineByArcLength(stroke, probeStepLed));
-  let probes = probeChunks[0] ?? new Float64Array();
-  if (probeChunks.length > 1) {
-    const probeValueCount = probeChunks.reduce((count, chunk) => count + chunk.length, 0);
-    probes = new Float64Array(probeValueCount);
-    let probeOffset = 0;
-    for (const chunk of probeChunks) {
-      probes.set(chunk, probeOffset);
-      probeOffset += chunk.length;
-    }
-  }
+  const motionProbeChunks = strokes.map((stroke, index) => stroke.polyline.motionReferencePoints
+    ? samplePolylineByArcLength(stroke, probeStepLed, stroke.polyline.motionReferencePoints)
+    : probeChunks[index]);
+  const probes = concatenateProbes(probeChunks);
   return {
     probes,
+    motionProbes: motionProbeChunks.every((chunk, index) => chunk === probeChunks[index])
+      ? probes
+      : concatenateProbes(motionProbeChunks),
     topologyKey: buildTopologyKey(strokes),
     isEmpty: probes.length === 0,
   };
+};
+
+const concatenateProbes = (chunks: ReadonlyArray<Float64Array>): Float64Array => {
+  if (chunks.length <= 1) return chunks[0] ?? new Float64Array();
+  const probes = new Float64Array(chunks.reduce((count, chunk) => count + chunk.length, 0));
+  let offset = 0;
+  for (const chunk of chunks) {
+    probes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return probes;
 };
 
 const resolveSpatialCellKey = (
@@ -257,13 +266,15 @@ const resolveSpatialHash = (
   return hash;
 };
 
-const hasProbeOutsideDistance = (
+const hasProbesOutsideDistance = (
   probes: Float64Array,
   candidates: SpatialHash,
   distanceLed: number,
+  requiredProbeCount: number,
 ): boolean => {
   const threshold = Math.max(distanceLed - GEOMETRY_DISTANCE_EPSILON, 0);
   const thresholdSquared = threshold * threshold;
+  let outsideProbeCount = 0;
 
   for (let probeOffset = 0; probeOffset < probes.length; probeOffset += 2) {
     const probeX = probes[probeOffset];
@@ -299,7 +310,8 @@ const hasProbeOutsideDistance = (
     }
 
     if (!hasNearbyCandidate) {
-      return true;
+      outsideProbeCount += 1;
+      if (outsideProbeCount >= requiredProbeCount) return true;
     }
   }
 
@@ -326,8 +338,30 @@ const hasGeometryChangedByAtLeast = (
     : DEFAULT_MOTION_UNIT_DISTANCE_LED;
   const referenceHash = resolveSpatialHash(reference, safeDistance);
   const candidateHash = resolveSpatialHash(candidate, safeDistance);
-  return hasProbeOutsideDistance(reference.probes, candidateHash, safeDistance)
-    || hasProbeOutsideDistance(candidate.probes, referenceHash, safeDistance);
+  return hasProbesOutsideDistance(reference.probes, candidateHash, safeDistance, 1)
+    || hasProbesOutsideDistance(candidate.probes, referenceHash, safeDistance, 1);
+};
+
+const hasRepresentativeMotionUnit = (
+  reference: GeometryMotionSnapshot,
+  candidate: GeometryMotionSnapshot,
+  distanceLed: number,
+): boolean => {
+  // Pose retention detects ANY change; the Color unit measures the median
+  // centerline displacement. A fast endpoint must not set every point's age.
+  // Query the full centerline so reference-support endpoints do not introduce
+  // artificial motion when the shape moves along its own tangent.
+  return hasProbesOutsideDistance(
+    reference.motionProbes,
+    resolveSpatialHash(candidate, distanceLed),
+    distanceLed,
+    Math.ceil(reference.motionProbes.length / 4),
+  ) || hasProbesOutsideDistance(
+    candidate.motionProbes,
+    resolveSpatialHash(reference, distanceLed),
+    distanceLed,
+    Math.ceil(candidate.motionProbes.length / 4),
+  );
 };
 
 const clampFrameWindow = (
@@ -444,7 +478,7 @@ export const extractGeometryEventTracks = (
       }
 
       activeRun.movingFrameCountSinceUnit += 1;
-      const reachedMotionUnit = hasGeometryChangedByAtLeast(
+      const reachedMotionUnit = hasRepresentativeMotionUnit(
         activeRun.motionUnitAnchor,
         candidate,
         motionUnitDistanceLed,

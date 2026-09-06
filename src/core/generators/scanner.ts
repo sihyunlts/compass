@@ -1,6 +1,6 @@
 import type { Bounds, Polyline, Vec2 } from '../core-types';
 import type { ScannerParams } from '../../shared/model';
-import { toAxisBasis } from '../geometry';
+import { COMPOSITION_BOUNDS, toAxisBasis } from '../geometry';
 
 const SCAN_TRAVEL_PADDING = 0.5;
 const SCAN_POSITION_TIE_BREAK = 1e-6;
@@ -76,8 +76,21 @@ export const buildScannerPolyline = (
     points.push({ x, y });
   }
 
+  const referenceCenter = projectOnAxis({
+    x: (COMPOSITION_BOUNDS.minX + COMPOSITION_BOUNDS.maxX) / 2,
+    y: (COMPOSITION_BOUNDS.minY + COMPOSITION_BOUNDS.maxY) / 2,
+  }, perp);
+  const referenceHalfSpan = (
+    Math.abs(perp.x) * (COMPOSITION_BOUNDS.maxX - COMPOSITION_BOUNDS.minX)
+    + Math.abs(perp.y) * (COMPOSITION_BOUNDS.maxY - COMPOSITION_BOUNDS.minY)
+  ) / 2;
+
   return {
     points,
+    // Rendering extends the line beyond the composition for later transforms.
+    // Those extra endpoints must not accelerate the Color motion clock.
+    motionReferencePoints: [referenceCenter - referenceHalfSpan, referenceCenter + referenceHalfSpan]
+      .map((s) => ({ x: axis.x * scanPos + perp.x * s, y: axis.y * scanPos + perp.y * s })),
     closed: false,
     originId,
     velocity,
