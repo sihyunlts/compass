@@ -25,7 +25,7 @@ import {
   type GenerationTimelineWindow,
 } from './types';
 import {
-  coordinateKeySetContainsPoint,
+  coordinatePredicateContainsPoint,
   toRoundedCoordinateKey,
 } from './coordinates';
 
@@ -164,7 +164,7 @@ const buildViewportCoordinateKeyByTileId = (
 const createMaskFromCoordinateKeys = (
   coordinateKeys: ReadonlySet<string>,
 ): CanonicalSpatialMask => ({
-  contains: (x, y) => coordinateKeySetContainsPoint(coordinateKeys, x, y),
+  contains: (x, y) => coordinatePredicateContainsPoint((candidateX, candidateY) => coordinateKeys.has(`${candidateX},${candidateY}`), x, y),
 });
 
 const hasNoteOutput = (
@@ -218,7 +218,7 @@ const isStrokeActiveAtCoordinate = (
       || (Number.isInteger(x) && Number.isInteger(y))
     )
   ) {
-    return collectStrokeOccupiedCoordinateCandidates(stroke).some(
+    return collectStrokeOccupiedCoordinateCandidates(stroke, { minX: x, maxX: x, minY: y, maxY: y }).some(
       (coordinate) => coordinate.x === x && coordinate.y === y,
     );
   }
@@ -263,6 +263,7 @@ const buildProjectionGeometryKey = (
   resolveMaskFunctionId: (contains: GeometryStroke['masks'][number]['contains']) => number,
 ): string => [
   stroke.polyline.closed ? 'closed' : 'open',
+  stroke.polyline.extent ?? 'bounded',
   stroke.polyline.rasterMode ?? 'stroke',
   stroke.polyline.rasterTieBreakDirection?.x ?? 'no-tie-x',
   stroke.polyline.rasterTieBreakDirection?.y ?? 'no-tie-y',

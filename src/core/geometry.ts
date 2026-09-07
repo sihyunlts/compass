@@ -269,7 +269,7 @@ export const toScaleTransformAt = (
   };
 };
 
-const distanceToSegmentSquared = (point: Vec2, a: Vec2, b: Vec2): number => {
+export const distanceToSegmentSquared = (point: Vec2, a: Vec2, b: Vec2, extent?: 'line'): number => {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   if (dx === 0 && dy === 0) {
@@ -279,7 +279,7 @@ const distanceToSegmentSquared = (point: Vec2, a: Vec2, b: Vec2): number => {
   }
 
   const t = ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy);
-  const clamped = Math.max(0, Math.min(1, t));
+  const clamped = extent === 'line' ? t : Math.max(0, Math.min(1, t));
   const projX = a.x + clamped * dx;
   const projY = a.y + clamped * dy;
   const vx = point.x - projX;
@@ -300,7 +300,7 @@ export const distanceToPolylineSquared = (point: Vec2, polyline: Polyline): numb
 
   let minDist = Number.POSITIVE_INFINITY;
   for (let i = 0; i < pts.length - 1; i += 1) {
-    const dist = distanceToSegmentSquared(point, pts[i], pts[i + 1]);
+    const dist = distanceToSegmentSquared(point, pts[i], pts[i + 1], polyline.extent);
     if (dist < minDist) {
       minDist = dist;
     }
@@ -351,7 +351,6 @@ export const distanceToRasterizedPolylineSquared = (
 export const applyTransformToPolyline = (polyline: Polyline, transform: AffineTransform): Polyline => ({
   ...polyline,
   points: polyline.points.map((pt) => applyAffine(transform, pt)),
-  motionReferencePoints: polyline.motionReferencePoints?.map((pt) => applyAffine(transform, pt)),
   ...(polyline.rasterTieBreakDirection
     ? {
         rasterTieBreakDirection: {

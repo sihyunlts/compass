@@ -64,7 +64,6 @@ const buildScannerGeneratorPolyline = (
     device.id,
     device.params,
     beat01,
-    POLYLINE_STEP,
     GENERATED_VELOCITY,
     bounds,
   );

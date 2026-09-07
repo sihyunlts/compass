@@ -5,7 +5,7 @@ import {
   distanceToRasterizedPolylineSquared,
 } from '../../core/geometry';
 import {
-  coordinateKeySetContainsPoint,
+  coordinatePredicateContainsPoint,
   toRoundedCoordinateKey,
 } from '../coordinates';
 import type {
@@ -32,13 +32,6 @@ export interface OccupiedCoordinateCandidateBounds {
   minY: number;
   maxY: number;
 }
-
-const UNBOUNDED_COORDINATE_CANDIDATES: OccupiedCoordinateCandidateBounds = {
-  minX: Number.NEGATIVE_INFINITY,
-  maxX: Number.POSITIVE_INFINITY,
-  minY: Number.NEGATIVE_INFINITY,
-  maxY: Number.POSITIVE_INFINITY,
-};
 
 type OccupiedCoordinateCandidateCache = Map<string, StrokeOccupiedCoordinateCandidate[]>;
 
@@ -107,7 +100,8 @@ const toCandidateBounds = (
     return null;
   }
 
-  const candidateBounds = outputBounds ?? UNBOUNDED_COORDINATE_CANDIDATES;
+  if (!outputBounds) return null;
+  const candidateBounds = outputBounds;
   const startX = Math.max(
     Math.floor(minX - THICKNESS),
     Math.ceil(candidateBounds.minX),
@@ -210,7 +204,7 @@ const collectCenterlineCandidateCoordinates = (
   outputBounds: OccupiedCoordinateCandidateBounds | null,
 ): Array<{ x: number; y: number }> => {
   const points = stroke.polyline.points;
-  if (points.length === 0) {
+  if (points.length === 0 || !outputBounds) {
     return [];
   }
 
@@ -253,29 +247,36 @@ const collectCenterlineCandidateCoordinates = (
   ): void => {
     const dx = end.x - start.x;
     const dy = end.y - start.y;
+    if (dx === 0 && dy === 0) {
+      addCoordinate(start.x, start.y, stroke.polyline.rasterTieBreakDirection);
+      return;
+    }
+    const isLine = stroke.polyline.extent === 'line';
     if (Math.abs(dx) >= Math.abs(dy)) {
-      const startX = Math.ceil(Math.min(start.x, end.x));
-      const endX = Math.floor(Math.max(start.x, end.x));
+      const startX = Math.ceil(Math.max(isLine ? -Infinity : Math.min(start.x, end.x), outputBounds.minX));
+      const endX = Math.floor(Math.min(isLine ? Infinity : Math.max(start.x, end.x), outputBounds.maxX));
       for (let x = startX; x <= endX; x += 1) {
         const t = dx === 0 ? 0 : (x - start.x) / dx;
-        if (t < 0 || t > 1) {
+        if (!isLine && (t < 0 || t > 1)) {
           continue;
         }
         addCoordinate(x, start.y + t * dy);
       }
     } else {
-      const startY = Math.ceil(Math.min(start.y, end.y));
-      const endY = Math.floor(Math.max(start.y, end.y));
+      const startY = Math.ceil(Math.max(isLine ? -Infinity : Math.min(start.y, end.y), outputBounds.minY));
+      const endY = Math.floor(Math.min(isLine ? Infinity : Math.max(start.y, end.y), outputBounds.maxY));
       for (let y = startY; y <= endY; y += 1) {
         const t = dy === 0 ? 0 : (y - start.y) / dy;
-        if (t < 0 || t > 1) {
+        if (!isLine && (t < 0 || t > 1)) {
           continue;
         }
         addCoordinate(start.x + t * dx, y);
       }
     }
-    addCoordinate(start.x, start.y);
-    addCoordinate(end.x, end.y);
+    if (!isLine) {
+      addCoordinate(start.x, start.y);
+      addCoordinate(end.x, end.y);
+    }
   };
 
   for (let index = 0; index < points.length - 1; index += 1) {
@@ -309,6 +310,7 @@ const resolveStrokeOccupiedCoordinateCandidates = (
   const cacheKey = [
     toCandidateCacheKey(outputBounds),
     stroke.polyline.closed ? 'closed' : 'open',
+    stroke.polyline.extent ?? 'bounded',
     stroke.polyline.rasterMode ?? 'stroke',
     stroke.polyline.rasterTieBreakDirection?.x ?? 'no-tie-x',
     stroke.polyline.rasterTieBreakDirection?.y ?? 'no-tie-y',
@@ -371,61 +373,22 @@ const resolveStrokeOccupiedCoordinateCandidates = (
 
 export const collectStrokeOccupiedCoordinateCandidates = (
   stroke: GeometryStroke,
-  outputBounds: OccupiedCoordinateCandidateBounds | null = null,
+  outputBounds: OccupiedCoordinateCandidateBounds | null,
 ): StrokeOccupiedCoordinateCandidate[] => resolveStrokeOccupiedCoordinateCandidates(
   stroke,
   outputBounds,
 ).filter(({ x, y }) => isPointInsideMasks(stroke.masks, x, y));
 
-export const collectOccupiedCoordinates = (
+export const createGeometryCoordinateMask = (
   strokes: ReadonlyArray<GeometryStroke>,
-  winnerOnly: boolean,
-  outputBounds: OccupiedCoordinateCandidateBounds | null = null,
-): Map<string, OccupiedCoordinate> => {
-  const byCoordinate = new Map<string, OccupiedCoordinate>();
-
-  for (const stroke of strokes) {
-    for (const {
-      x,
-      y,
-      distanceSquared,
-    } of collectStrokeOccupiedCoordinateCandidates(stroke, outputBounds)) {
-      const coordinateKey = toRoundedCoordinateKey(x, y);
-      if (!coordinateKey) {
-        continue;
-      }
-
-      if (!winnerOnly) {
-        byCoordinate.set(`${stroke.writeId}:${coordinateKey}`, createOccupiedCoordinate(
-          stroke,
-          Math.round(x),
-          Math.round(y),
-          distanceSquared,
-        ));
-        continue;
-      }
-
-      writeOccupiedCoordinateWinner(
-        byCoordinate,
-        coordinateKey,
-        stroke,
-        Math.round(x),
-        Math.round(y),
-        distanceSquared,
-      );
-    }
-  }
-
-  return byCoordinate;
-};
-
-export const createCoordinateMask = (
-  coordinates: ReadonlyMap<string, OccupiedCoordinate>,
-): ((x: number, y: number) => boolean) => {
-  const roundedKeys = new Set<string>();
-  for (const coordinate of coordinates.values()) {
-    roundedKeys.add(`${coordinate.x},${coordinate.y}`);
-  }
-
-  return (x, y) => coordinateKeySetContainsPoint(roundedKeys, x, y);
-};
+): ((x: number, y: number) => boolean) => (x, y) => coordinatePredicateContainsPoint(
+  (candidateX, candidateY) => strokes.some((stroke) => isPointInsideMasks(stroke.masks, candidateX, candidateY)
+    && (stroke.polyline.rasterMode === 'centerline'
+      ? collectCenterlineCandidateCoordinates(stroke, {
+          minX: candidateX, maxX: candidateX, minY: candidateY, maxY: candidateY,
+        }).length > 0
+      : distanceToRasterizedPolylineSquared({ x: candidateX, y: candidateY }, stroke.polyline)
+        <= THICKNESS * THICKNESS)),
+  x,
+  y,
+);

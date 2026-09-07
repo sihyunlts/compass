@@ -11,7 +11,6 @@ export const buildScannerPolyline = (
   originId: string,
   params: ScannerParams,
   t01: number,
-  step: number,
   velocity: number,
   bounds: Bounds,
 ): Polyline | null => {
@@ -37,20 +36,14 @@ export const buildScannerPolyline = (
 
   let minAxis = Number.POSITIVE_INFINITY;
   let maxAxis = Number.NEGATIVE_INFINITY;
-  let minPerp = Number.POSITIVE_INFINITY;
-  let maxPerp = Number.NEGATIVE_INFINITY;
 
   for (const corner of corners) {
     const projAxis = projectOnAxis(corner, axis);
-    const projPerp = projectOnAxis(corner, perp);
     if (projAxis < minAxis) minAxis = projAxis;
     if (projAxis > maxAxis) maxAxis = projAxis;
-    if (projPerp < minPerp) minPerp = projPerp;
-    if (projPerp > maxPerp) maxPerp = projPerp;
   }
 
-  if (!Number.isFinite(minAxis) || !Number.isFinite(maxAxis)
-    || !Number.isFinite(minPerp) || !Number.isFinite(maxPerp)) {
+  if (!Number.isFinite(minAxis) || !Number.isFinite(maxAxis)) {
     return null;
   }
 
@@ -66,16 +59,6 @@ export const buildScannerPolyline = (
     return null;
   }
 
-  const points: Vec2[] = [];
-  const span = maxPerp - minPerp;
-  const count = Math.max(2, Math.ceil(span / Math.max(step, 0.01)));
-  for (let i = 0; i < count; i += 1) {
-    const s = minPerp + (i / (count - 1)) * span;
-    const x = axis.x * scanPos + perp.x * s;
-    const y = axis.y * scanPos + perp.y * s;
-    points.push({ x, y });
-  }
-
   const referenceCenter = projectOnAxis({
     x: (COMPOSITION_BOUNDS.minX + COMPOSITION_BOUNDS.maxX) / 2,
     y: (COMPOSITION_BOUNDS.minY + COMPOSITION_BOUNDS.maxY) / 2,
@@ -86,10 +69,8 @@ export const buildScannerPolyline = (
   ) / 2;
 
   return {
-    points,
-    // Rendering extends the line beyond the composition for later transforms.
-    // Those extra endpoints must not accelerate the Color motion clock.
-    motionReferencePoints: [referenceCenter - referenceHalfSpan, referenceCenter + referenceHalfSpan]
+    extent: 'line',
+    points: [referenceCenter - referenceHalfSpan, referenceCenter + referenceHalfSpan]
       .map((s) => ({ x: axis.x * scanPos + perp.x * s, y: axis.y * scanPos + perp.y * s })),
     closed: false,
     originId,

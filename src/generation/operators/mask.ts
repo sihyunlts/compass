@@ -3,8 +3,7 @@ import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
 import type { GeneratorChain, MaskEffectNode } from '../../shared/model';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import {
-  collectOccupiedCoordinates,
-  createCoordinateMask,
+  createGeometryCoordinateMask,
 } from '../timeline/analysis';
 import {
   createEmptyTimeline,
@@ -115,11 +114,7 @@ const createMaskFrameResolver = (
         ? stroke.originGroupId === sourceId
         : stroke.polyline.originId === sourceId
     ));
-    const coordinates = collectOccupiedCoordinates(
-      sourceStrokes,
-      effect.params.sourceDomain === 'activation',
-    );
-    return createIdentityMask(createCoordinateMask(coordinates));
+    return createIdentityMask(createGeometryCoordinateMask(sourceStrokes));
   };
 };
 
