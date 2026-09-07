@@ -5,7 +5,7 @@ import {
   buildModulationEvaluationWindowByOriginId,
   isDeviceModulated,
   resolveModulatedDeviceAtFrame,
-  transformStroke,
+  createStrokeTransformer,
   type ModulationEvaluationWindow,
   type SpatialTransformStageKind,
 } from './runtime';
@@ -75,6 +75,7 @@ const applyPendingSpatialTransform = (
     state,
     targetOriginIds,
     ({ sampleStepBeats, frameIndex, strokes }) => {
+      const transformStroke = createStrokeTransformer();
       return strokes.map((stroke) => {
         const deviceAtFrame = isModulated
           ? resolveDeviceAtFrame(
