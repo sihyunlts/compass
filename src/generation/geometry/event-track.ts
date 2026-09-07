@@ -14,7 +14,6 @@ export interface GeometryStateEvent {
 
 interface GeometryMotionSnapshot {
   probes: Float64Array;
-  motionProbes: Float64Array;
   topologyKey: string;
   isEmpty: boolean;
 }
@@ -135,6 +134,7 @@ const buildTopologyKey = (
   strokes: ReadonlyArray<GeometryStroke>,
 ): string => Array.from(new Set(strokes.map((stroke) => [
   stroke.polyline.closed ? 'closed' : 'open',
+  stroke.polyline.extent ?? 'bounded',
   stroke.polyline.rasterMode ?? 'stroke',
   stroke.masks.length,
 ].join(':')))).sort().join('|');
@@ -146,15 +146,9 @@ const buildGeometryMotionSnapshot = (
   // Visibility clipping changes what is drawn, not how far the source moved.
   // Measure source centerlines so Mask and Symmetry keep the same one-LED clock.
   const probeChunks = strokes.map((stroke) => samplePolylineByArcLength(stroke, probeStepLed));
-  const motionProbeChunks = strokes.map((stroke, index) => stroke.polyline.motionReferencePoints
-    ? samplePolylineByArcLength(stroke, probeStepLed, stroke.polyline.motionReferencePoints)
-    : probeChunks[index]);
   const probes = concatenateProbes(probeChunks);
   return {
     probes,
-    motionProbes: motionProbeChunks.every((chunk, index) => chunk === probeChunks[index])
-      ? probes
-      : concatenateProbes(motionProbeChunks),
     topologyKey: buildTopologyKey(strokes),
     isEmpty: probes.length === 0,
   };
@@ -352,15 +346,15 @@ const hasRepresentativeMotionUnit = (
   // Query the full centerline so reference-support endpoints do not introduce
   // artificial motion when the shape moves along its own tangent.
   return hasProbesOutsideDistance(
-    reference.motionProbes,
+    reference.probes,
     resolveSpatialHash(candidate, distanceLed),
     distanceLed,
-    Math.ceil(reference.motionProbes.length / 4),
+    Math.ceil(reference.probes.length / 4),
   ) || hasProbesOutsideDistance(
-    candidate.motionProbes,
+    candidate.probes,
     resolveSpatialHash(reference, distanceLed),
     distanceLed,
-    Math.ceil(candidate.motionProbes.length / 4),
+    Math.ceil(candidate.probes.length / 4),
   );
 };
 

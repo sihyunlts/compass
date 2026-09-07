@@ -21,8 +21,8 @@ const resolveNearestCoordinateValues = (
     : [rounded];
 };
 
-export const coordinateKeySetContainsPoint = (
-  coordinateKeys: ReadonlySet<string>,
+export const coordinatePredicateContainsPoint = (
+  containsCoordinate: (x: number, y: number) => boolean,
   x: number,
   y: number,
 ): boolean => {
@@ -33,6 +33,6 @@ export const coordinateKeySetContainsPoint = (
   const candidateXs = resolveNearestCoordinateValues(x);
   const candidateYs = resolveNearestCoordinateValues(y);
   return candidateXs.some((candidateX) => candidateYs.some(
-    (candidateY) => coordinateKeys.has(`${candidateX},${candidateY}`),
+    (candidateY) => containsCoordinate(candidateX, candidateY),
   ));
 };

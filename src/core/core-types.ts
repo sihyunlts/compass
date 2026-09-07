@@ -21,8 +21,8 @@ export interface AffineTransform {
 
 export interface Polyline {
   readonly points: ReadonlyArray<Readonly<Vec2>>;
-  /** Authored centerline support for motion measurement, excluding render extensions. */
-  readonly motionReferencePoints?: ReadonlyArray<Readonly<Vec2>>;
+  /** A line extends through its two support points; other paths end at their vertices. */
+  readonly extent?: 'line';
   readonly closed: boolean;
   readonly originId: string;
   readonly velocity: number;
