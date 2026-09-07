@@ -30,6 +30,7 @@ export {
 export {
   buildTargetOriginIds,
   transformStroke,
+  createStrokeTransformer,
 } from './runtime/timeline-strokes';
 export {
   createRackOperator,

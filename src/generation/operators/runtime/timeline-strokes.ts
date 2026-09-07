@@ -108,6 +108,7 @@ export const transformStroke = (
   stroke: GeometryStroke,
   transform: AffineTransform | null,
   writeOrder: number,
+  resolveMask: typeof transformMask = transformMask,
 ): Omit<GeometryStroke, 'writeId'> => {
   const polyline = transform
     ? applyTransformToPolyline(stroke.polyline, transform)
@@ -120,9 +121,29 @@ export const transformStroke = (
     originGroupId: stroke.originGroupId,
     writeOrder: resolveStageWriteOrder(writeOrder, stroke),
     masks: transform
-      ? stroke.masks.map((mask) => transformMask(mask, transform))
+      ? stroke.masks.map((mask) => resolveMask(mask, transform))
       : stroke.masks,
   };
+};
+
+/** Reuse identical mask transforms within one geometry rewrite. */
+export const createStrokeTransformer = (): typeof transformStroke => {
+  const masksBySource = new Map<GeometryMask, Map<string, GeometryMask>>();
+  const resolveMask: typeof transformMask = (mask, transform) => {
+    const key = [transform.a, transform.b, transform.c, transform.d, transform.tx, transform.ty].join(',');
+    let transformed = masksBySource.get(mask);
+    if (!transformed) {
+      transformed = new Map();
+      masksBySource.set(mask, transformed);
+    }
+    let result = transformed.get(key);
+    if (!result) {
+      result = transformMask(mask, transform);
+      transformed.set(key, result);
+    }
+    return result;
+  };
+  return (stroke, transform, writeOrder) => transformStroke(stroke, transform, writeOrder, resolveMask);
 };
 
 export const buildSourceStrokesByOriginAndFrame = (

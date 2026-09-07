@@ -5,7 +5,7 @@ import {
   buildModulationEvaluationWindowByOriginId,
   isDeviceModulated,
   resolveModulatedDeviceAtFrame,
-  transformStroke,
+  createStrokeTransformer,
   type ModulationEvaluationWindow,
 } from './runtime';
 import {
@@ -21,6 +21,7 @@ const buildSymmetryStrokeRewrite = (
   effect: SymmetryEffectNode,
   writeOrder: number,
 ): (stroke: GeometryStroke) => ReadonlyArray<Omit<GeometryStroke, 'writeId'>> => {
+  const transformStroke = createStrokeTransformer();
   const center = {
     x: effect.params.centerX,
     y: effect.params.centerY,
