@@ -13,7 +13,11 @@ import type {
 import { canCreateGroupFromSelection } from '../editor/chain-ops';
 import type { ChainMutationMeta } from '../editor/history-core';
 import { blurIfTextEditingElement } from './text-editing';
-import { createRackSelection } from './selection.svelte';
+import {
+  buildRackNavigationItems,
+  createRackSelection,
+  type RackSelectionItem,
+} from './selection.svelte';
 import type { RackDropZone } from './drop-ops';
 import { createExternalFileDropController } from './external-file-drop-controller';
 import { createRackRenameController } from './rename-controller.svelte';
@@ -88,7 +92,6 @@ class DeviceRackController {
       getDevices: () => this.options.getDevices(),
       getChainState: () => this.options.getChainState(),
       getOrderedDeviceIds: () => this.options.getOrderedDeviceIds(),
-      getOrderedGroupIds: () => this.options.getOrderedGroupIds(),
       getInteractiveElementSelector: () => this.options.getInteractiveElementSelector(),
       resolveMiniMapLayoutSignature: () => this.options.resolveMiniMapLayoutSignature(),
       closeContextMenu: () => this.options.closeContextMenu(),
@@ -172,10 +175,10 @@ class DeviceRackController {
     this.options.closeContextMenu();
     const additiveSelection = hasAdditiveSelectionModifier(event);
     if (event.shiftKey) {
-      this.rackSelection.applyRangeSelection(
+      this.rackSelection.selectDeviceRange(
         deviceId,
         additiveSelection,
-        this.options.getOrderedDeviceIds(),
+        this.options.getDevices(),
       );
       void this.focusRackDeviceHeader(deviceId);
       return;
@@ -270,11 +273,18 @@ class DeviceRackController {
     this.blurActiveTextEditingElement();
     this.options.closeContextMenu();
 
-    if (hasAdditiveSelectionModifier(event)) {
+    if (event.shiftKey) {
+      this.rackSelection.selectRange(
+        { kind: 'group', id: groupId },
+        this.options.getDevices(),
+      );
+    } else if (hasAdditiveSelectionModifier(event)) {
       this.rackSelection.toggleSelectedGroupId(groupId, this.options.getOrderedGroupIds());
     } else {
-      this.rackSelection.clear();
-      this.rackSelection.setSelectedGroupIds([groupId], this.options.getOrderedGroupIds());
+      this.rackSelection.selectSingleItem(
+        { kind: 'group', id: groupId },
+        this.options.getDevices(),
+      );
     }
 
     const sourceIds = this.options.getGroupMemberIds(groupId);
@@ -287,13 +297,14 @@ class DeviceRackController {
     }
   }
 
-  public handleGroupRailClick(event: MouseEvent): void {
+  public handleGroupRailClick(event: MouseEvent, groupId: string): void {
     event.stopPropagation();
     if (this.consumeSuppressedDeviceSelectionClick()) {
       return;
     }
 
     this.options.closeContextMenu();
+    void this.focusRackGroupHeader(groupId);
   }
 
   public handleGroupRailContextMenu(event: MouseEvent, groupId: string): void {
@@ -359,6 +370,34 @@ class DeviceRackController {
     });
   }
 
+  private resolveRackGroupHeader(groupId: string): HTMLElement | null {
+    return this.options.getChainDevices()?.querySelector<HTMLElement>(
+      `.device-group[data-group-id="${CSS.escape(groupId)}"] [data-rack-group-header="true"]`,
+    ) ?? null;
+  }
+
+  private async focusRackGroupHeader(groupId: string): Promise<void> {
+    await tick();
+    const headerEl = this.resolveRackGroupHeader(groupId);
+    if (!headerEl) {
+      return;
+    }
+
+    headerEl.focus();
+    headerEl.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+    });
+  }
+
+  private async focusRackItem(item: RackSelectionItem): Promise<void> {
+    if (item.kind === 'group') {
+      await this.focusRackGroupHeader(item.id);
+      return;
+    }
+    await this.focusRackDeviceHeader(item.id);
+  }
+
   private blurActiveTextEditingElement(): void {
     blurIfTextEditingElement(document.activeElement);
   }
@@ -372,12 +411,7 @@ class DeviceRackController {
       return;
     }
 
-    this.rackSelection.clear();
-    this.rackSelection.selectDeviceIds(
-      [deviceId],
-      deviceId,
-      this.options.getOrderedDeviceIds(),
-    );
+    this.rackSelection.selectSingleDevice(deviceId, this.options.getOrderedDeviceIds());
   }
 
   private selectGroupForContextMenu(groupId: string): void {
@@ -385,31 +419,41 @@ class DeviceRackController {
       return;
     }
 
-    this.rackSelection.clear();
-    this.rackSelection.setSelectedGroupIds([groupId], this.options.getOrderedGroupIds());
+    this.rackSelection.selectSingleItem(
+      { kind: 'group', id: groupId },
+      this.options.getDevices(),
+    );
   }
 
-  private resolveKeyboardSelectionTargetId(): string | null {
-    const orderedDeviceIds = this.options.getOrderedDeviceIds();
-    if (orderedDeviceIds.length === 0) {
+  private resolveKeyboardSelectionTarget(): RackSelectionItem | null {
+    const navigationItems = buildRackNavigationItems(this.options.getDevices());
+    if (navigationItems.length === 0) {
       return null;
+    }
+
+    const selectionCursor = this.rackSelection.state.navigationCursorItem;
+    if (selectionCursor) {
+      return selectionCursor;
     }
 
     const activeElement = document.activeElement;
     if (activeElement instanceof HTMLElement) {
+      const activeGroup = activeElement.closest<HTMLElement>('.device-group[data-group-id]');
+      if (activeElement.matches('[data-rack-group-header="true"]')) {
+        const activeGroupId = activeGroup?.dataset.groupId;
+        if (activeGroupId) {
+          return { kind: 'group', id: activeGroupId };
+        }
+      }
+
       const activeCard = activeElement.closest<HTMLElement>('.device-card[data-device-id]');
       const activeDeviceId = activeCard?.dataset.deviceId;
-      if (activeDeviceId && orderedDeviceIds.includes(activeDeviceId)) {
-        return activeDeviceId;
+      if (activeDeviceId) {
+        return { kind: 'device', id: activeDeviceId };
       }
     }
 
-    const anchorId = this.rackSelection.state.lastSelectedDeviceId;
-    if (anchorId && orderedDeviceIds.includes(anchorId)) {
-      return anchorId;
-    }
-
-    return this.getOrderedSelectedDeviceIdsInRack().at(-1) ?? orderedDeviceIds[0] ?? null;
+    return navigationItems[0] ?? null;
   }
 
   private shouldHandleDeviceNavigationKey(event: KeyboardEvent): boolean {
@@ -439,13 +483,22 @@ class DeviceRackController {
   }
 
   private async handleDeviceNavigationKeyDown(event: KeyboardEvent): Promise<boolean> {
-    const orderedDeviceIds = this.options.getOrderedDeviceIds();
-    if (!this.shouldHandleDeviceNavigationKey(event) || orderedDeviceIds.length === 0) {
+    const devices = this.options.getDevices();
+    if (!this.shouldHandleDeviceNavigationKey(event) || devices.length === 0) {
       return false;
     }
 
-    const currentDeviceId = this.resolveKeyboardSelectionTargetId();
-    const currentIndex = currentDeviceId ? orderedDeviceIds.indexOf(currentDeviceId) : -1;
+    const currentItem = this.resolveKeyboardSelectionTarget();
+    const selectionAnchor = this.rackSelection.state.selectionAnchorItem;
+    const navigationItems = event.shiftKey
+      ? devices.map((device): RackSelectionItem => ({ kind: 'device', id: device.id }))
+      : buildRackNavigationItems(devices);
+    const navigationDirection = event.key === 'ArrowLeft' || event.key === 'Home' ? -1 : 1;
+    const currentIndex = this.resolveNavigationItemIndex(
+      currentItem,
+      navigationItems,
+      navigationDirection,
+    );
 
     let nextIndex: number;
     switch (event.key) {
@@ -453,34 +506,76 @@ class DeviceRackController {
         nextIndex = currentIndex <= 0 ? 0 : currentIndex - 1;
         break;
       case 'ArrowRight':
-        nextIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, orderedDeviceIds.length - 1);
+        nextIndex = currentIndex < 0 ? 0 : Math.min(currentIndex + 1, navigationItems.length - 1);
         break;
       case 'Home':
         nextIndex = 0;
         break;
       case 'End':
-        nextIndex = orderedDeviceIds.length - 1;
+        nextIndex = navigationItems.length - 1;
         break;
       default:
         return false;
     }
 
-    const nextDeviceId = orderedDeviceIds[nextIndex];
-    if (!nextDeviceId) {
+    const nextItem = navigationItems[nextIndex];
+    if (!nextItem) {
       return false;
     }
 
     event.preventDefault();
     this.options.closeContextMenu();
 
-    if (event.shiftKey && currentDeviceId) {
-      this.rackSelection.applyRangeSelection(nextDeviceId, false, orderedDeviceIds);
+    if (event.shiftKey && selectionAnchor?.kind === 'group') {
+      this.rackSelection.selectRange(
+        nextItem,
+        devices,
+        { direction: navigationDirection },
+      );
+    } else if (
+      event.shiftKey
+      && selectionAnchor?.kind === 'device'
+      && nextItem.kind === 'device'
+    ) {
+      this.rackSelection.selectDeviceRange(
+        nextItem.id,
+        false,
+        devices,
+        navigationDirection,
+      );
     } else {
-      this.rackSelection.selectSingleDevice(nextDeviceId, orderedDeviceIds);
+      this.rackSelection.selectSingleItem(nextItem, devices);
     }
 
-    await this.focusRackDeviceHeader(nextDeviceId);
+    await this.focusRackItem(nextItem);
     return true;
+  }
+
+  private resolveNavigationItemIndex(
+    currentItem: RackSelectionItem | null,
+    navigationItems: readonly RackSelectionItem[],
+    direction: -1 | 1,
+  ): number {
+    if (!currentItem) {
+      return -1;
+    }
+
+    const exactIndex = navigationItems.findIndex((item) =>
+      item.kind === currentItem.kind && item.id === currentItem.id);
+    if (exactIndex >= 0 || currentItem.kind === 'device') {
+      return exactIndex;
+    }
+
+    const memberDeviceIds = this.options.getGroupMemberIds(currentItem.id);
+    const edgeDeviceId = direction > 0
+      ? memberDeviceIds.at(-1)
+      : memberDeviceIds[0];
+    if (!edgeDeviceId) {
+      return -1;
+    }
+
+    return navigationItems.findIndex((item) =>
+      item.kind === 'device' && item.id === edgeDeviceId);
   }
 }
 

@@ -26,14 +26,11 @@ interface ClipboardContext {
     deviceIds: readonly string[],
     meta?: ChainMutationMeta,
   ) => boolean;
-  deleteGroup: (
-    rawGroupId: string,
-    meta?: ChainMutationMeta,
-  ) => boolean;
   applyInsertedSelection: (
     clipboard: RackClipboard,
     previousChain: EditorSessionState['chainState'],
     nextChain: EditorSessionState['chainState'],
+    collapsedDeviceIds: readonly string[],
   ) => void;
 }
 
@@ -81,6 +78,7 @@ export const copySelectionToClipboard = (
   const nextClipboard = buildClipboardFromSelection(
     context.state.chainState,
     selection,
+    context.state.collapsedDeviceIds,
   );
   if (!nextClipboard) {
     return null;
@@ -108,9 +106,7 @@ export const cutSelection = (
     return false;
   }
 
-  return selection.kind === 'group'
-    ? context.deleteGroup(selection.groupId, EDITOR_HISTORY_META.clipboardCut)
-    : context.deleteDevicesById(selection.deviceIds, EDITOR_HISTORY_META.clipboardCut);
+  return context.deleteDevicesById(selection.deviceIds, EDITOR_HISTORY_META.clipboardCut);
 };
 
 export const pasteClipboard = (
@@ -129,17 +125,21 @@ export const pasteClipboard = (
     context.rackBinding,
     selectionOverride,
   );
-  const nextChain = buildChainWithClipboardPaste(
+  const result = buildChainWithClipboardPaste(
     context.state.chainState,
     clipboard,
     selection,
   );
   const previousChain = context.state.chainState;
-  context.applyChainMutation(nextChain, meta);
+  context.applyChainMutation(result.chain, meta);
   context.applyInsertedSelection(
     clipboard,
     previousChain,
-    nextChain,
+    result.chain,
+    clipboard.collapsedDeviceIds.flatMap((id) => {
+      const remappedId = result.idMap.get(id);
+      return remappedId ? [remappedId] : [];
+    }),
   );
   return true;
 };

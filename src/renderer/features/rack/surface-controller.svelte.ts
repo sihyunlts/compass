@@ -22,7 +22,6 @@ interface RackSurfaceControllerOptions {
   getDevices: () => readonly GeneratorDeviceNode[];
   getChainState: () => GeneratorChain;
   getOrderedDeviceIds: () => readonly string[];
-  getOrderedGroupIds: () => readonly string[];
   getInteractiveElementSelector: () => string;
   resolveMiniMapLayoutSignature: () => string;
   closeContextMenu: () => void;
@@ -91,7 +90,6 @@ class RackSurfaceController {
       rackSelection: options.rackSelection,
       getDevices: options.getDevices,
       getOrderedDeviceIds: options.getOrderedDeviceIds,
-      getOrderedGroupIds: options.getOrderedGroupIds,
       syncAfterRender: () => this.syncAfterRender(),
       startRenamingDevice: options.startRenamingDevice,
       startRenamingGroup: options.startRenamingGroup,

@@ -12,78 +12,92 @@ import {
   type UnresolvedReferencePolicy,
 } from './device-reference-remap';
 
-export type RackClipboard =
-  | {
-      kind: 'devices';
-      devices: GeneratorDeviceNode[];
-    }
-  | {
-      kind: 'group';
-      enabled: boolean;
-      mode: GroupMode;
-      name: string | null;
-      metadata?: AuthoredMetadata;
-      devices: GeneratorDeviceNode[];
-    };
+export interface RackClipboardGroupState {
+  enabled: boolean;
+  mode: GroupMode;
+  name: string | null;
+  metadata?: AuthoredMetadata;
+}
+
+export interface RackClipboard {
+  kind: 'devices' | 'group' | 'rack-items';
+  devices: GeneratorDeviceNode[];
+  groupStateById: Record<string, RackClipboardGroupState>;
+  collapsedDeviceIds: string[];
+}
 
 type ClipboardBuildOptions =
   | { kind: 'devices' }
+  | ({ kind: 'group' } & RackClipboardGroupState)
   | {
-      kind: 'group';
-      enabled: boolean;
-      mode: GroupMode;
-      name: string | null;
-      metadata?: AuthoredMetadata;
+      kind: 'rack-items';
+      groupStateById: Readonly<Record<string, RackClipboardGroupState>>;
     };
 
-type PreparedClipboardInsert = {
+export interface PreparedClipboardInsert {
   devices: GeneratorDeviceNode[];
   idMap: ReadonlyMap<string, string>;
   forcedGroupId: string | null;
-  groupStatePatch: {
-    groupId: string;
-    enabled: boolean;
-    mode: GroupMode;
-    name: string | null;
-    metadata?: AuthoredMetadata;
-  } | null;
-};
+  preservePreparedGroupIds: boolean;
+  groupStatePatches: Array<RackClipboardGroupState & { groupId: string }>;
+}
 
-type PrepareClipboardInsertOptions = {
+interface PrepareClipboardInsertOptions {
   allocateDeviceId: (kind: GeneratorDeviceNode['kind']) => string;
   resolveNextGroupId: () => string;
+  allocateGroupId?: () => string;
   groupIdOverride?: string | null;
   unresolvedReferencePolicy?: UnresolvedReferencePolicy;
+}
+
+const cloneGroupState = (
+  state: RackClipboardGroupState,
+): RackClipboardGroupState => {
+  const metadata = cloneAuthoredMetadata(state.metadata);
+  return {
+    enabled: state.enabled,
+    mode: state.mode,
+    name: state.name,
+    ...(metadata ? { metadata } : {}),
+  };
 };
 
-const cloneClipboardDevices = (
-  devices: readonly GeneratorDeviceNode[],
-): GeneratorDeviceNode[] => devices.map((device) => cloneDeviceNode(device));
+const cloneGroupStateById = (
+  groupStateById: Readonly<Record<string, RackClipboardGroupState>>,
+): Record<string, RackClipboardGroupState> => Object.fromEntries(
+  Object.entries(groupStateById).map(([groupId, state]) => [
+    groupId,
+    cloneGroupState(state),
+  ]),
+);
 
 export const createRackClipboard = (
   devices: readonly GeneratorDeviceNode[],
   options: ClipboardBuildOptions,
+  collapsedDeviceIds: readonly string[] = [],
 ): RackClipboard | null => {
-  const cloned = cloneClipboardDevices(devices);
-  if (cloned.length === 0) {
+  if (devices.length === 0) {
     return null;
   }
 
+  const deviceIdSet = new Set(devices.map((device) => device.id));
+  let groupStateById: Record<string, RackClipboardGroupState> = {};
   if (options.kind === 'group') {
-    const metadata = cloneAuthoredMetadata(options.metadata);
-    return {
-      kind: 'group',
-      enabled: options.enabled,
-      mode: options.mode,
-      name: options.name,
-      ...(metadata ? { metadata } : {}),
-      devices: cloned,
-    };
+    for (const device of devices) {
+      const groupId = normalizeOptionalId(device.groupId);
+      if (groupId) {
+        groupStateById[groupId] = cloneGroupState(options);
+      }
+    }
+  } else if (options.kind === 'rack-items') {
+    groupStateById = cloneGroupStateById(options.groupStateById);
   }
 
   return {
-    kind: 'devices',
-    devices: cloned,
+    kind: options.kind,
+    devices: devices.map((device) => cloneDeviceNode(device)),
+    groupStateById,
+    collapsedDeviceIds: collapsedDeviceIds.filter((id) => deviceIdSet.has(id)),
   };
 };
 
@@ -92,60 +106,52 @@ export const prepareClipboardInsert = (
   options: PrepareClipboardInsertOptions,
 ): PreparedClipboardInsert => {
   const unresolvedReferencePolicy = options.unresolvedReferencePolicy ?? 'preserve';
-  const { devices: cloned, idMap } = cloneDevicesWithFreshIds(
+  const { devices, idMap } = cloneDevicesWithFreshIds(
     clipboard.devices,
     options.allocateDeviceId,
   );
 
-  if (clipboard.kind === 'group') {
-    const nextGroupId =
-      normalizeOptionalId(options.groupIdOverride) ?? options.resolveNextGroupId();
-    const groupIdMap: Record<string, string> = {};
-    for (const source of clipboard.devices) {
-      const sourceGroupId = normalizeOptionalId(source.groupId);
-      if (!sourceGroupId || groupIdMap[sourceGroupId]) {
-        continue;
-      }
-      groupIdMap[sourceGroupId] = nextGroupId;
+  if (clipboard.kind === 'devices') {
+    for (const device of devices) {
+      remapInternalDeviceReferences(device, idMap, undefined, unresolvedReferencePolicy);
     }
-
-    for (const device of cloned) {
-      remapInternalDeviceReferences(
-        device,
-        idMap,
-        groupIdMap,
-        unresolvedReferencePolicy,
-      );
-    }
-
-    const metadata = cloneAuthoredMetadata(clipboard.metadata);
     return {
-      devices: cloned,
+      devices,
       idMap,
-      forcedGroupId: nextGroupId,
-      groupStatePatch: {
-        groupId: nextGroupId,
-        enabled: clipboard.enabled,
-        mode: clipboard.mode,
-        name: clipboard.name,
-        ...(metadata ? { metadata } : {}),
-      },
+      forcedGroupId: null,
+      preservePreparedGroupIds: false,
+      groupStatePatches: [],
     };
   }
 
-  for (const device of cloned) {
+  const sourceGroupIds = Object.keys(clipboard.groupStateById);
+  const groupIdMap: Record<string, string> = {};
+  for (const sourceGroupId of sourceGroupIds) {
+    groupIdMap[sourceGroupId] = clipboard.kind === 'group'
+      ? normalizeOptionalId(options.groupIdOverride) ?? options.resolveNextGroupId()
+      : options.allocateGroupId?.() ?? options.resolveNextGroupId();
+  }
+
+  for (let index = 0; index < devices.length; index += 1) {
+    const sourceGroupId = normalizeOptionalId(clipboard.devices[index].groupId);
+    devices[index].groupId = sourceGroupId ? groupIdMap[sourceGroupId] ?? null : null;
     remapInternalDeviceReferences(
-      device,
+      devices[index],
       idMap,
-      undefined,
+      groupIdMap,
       unresolvedReferencePolicy,
     );
   }
 
+  const groupStatePatches = sourceGroupIds.map((sourceGroupId) => ({
+    groupId: groupIdMap[sourceGroupId],
+    ...cloneGroupState(clipboard.groupStateById[sourceGroupId]),
+  }));
   return {
-    devices: cloned,
+    devices,
     idMap,
-    forcedGroupId: null,
-    groupStatePatch: null,
+    forcedGroupId: clipboard.kind === 'group' ? groupStatePatches[0]?.groupId ?? null : null,
+    preservePreparedGroupIds: clipboard.kind === 'rack-items',
+    groupStatePatches,
   };
 };

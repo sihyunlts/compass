@@ -173,3 +173,14 @@ export const applyInsertDeviceByDropZone = (
   drop: RackDropZone,
 ): GeneratorDeviceNode[] =>
   applyInsertDevicesByDropZone(devices, [device], drop);
+
+export const applyInsertDevicesPreservingGroupsByDropZone = (
+  devices: readonly GeneratorDeviceNode[],
+  toInsert: readonly GeneratorDeviceNode[],
+  drop: RackDropZone,
+): GeneratorDeviceNode[] => {
+  const insertIndex = resolveInsertIndex(devices, drop.targetId, drop.placement);
+  const nextDevices = [...devices];
+  nextDevices.splice(insertIndex, 0, ...toInsert);
+  return nextDevices;
+};

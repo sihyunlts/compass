@@ -304,14 +304,17 @@
     return {
       getSelectedGroupContexts: () => rackViewApi?.getSelectedGroupContexts() ?? [],
       getOrderedSelectedDeviceIds: () => rackViewApi?.getOrderedSelectedDeviceIds() ?? [],
-      selectAllDevices: (ids) => {
-        rackViewApi?.selectAllDevices(ids);
+      selectAllRackItems: () => {
+        rackViewApi?.selectAllRackItems();
       },
-      setSelectedDeviceIds: (ids, orderedDeviceIds) => {
-        rackViewApi?.setSelectedDeviceIds(ids, orderedDeviceIds);
+      setSelectedDeviceIds: (ids) => {
+        rackViewApi?.setSelectedDeviceIds(ids);
       },
-      setSelectedGroupIds: (ids, orderedGroupIds) => {
-        rackViewApi?.setSelectedGroupIds(ids, orderedGroupIds);
+      setSelectedGroupIds: (ids) => {
+        rackViewApi?.setSelectedGroupIds(ids);
+      },
+      setSelectedRackItems: (deviceIds, groupIds, anchor) => {
+        rackViewApi?.setSelectedRackItems(deviceIds, groupIds, anchor);
       },
       applyNextSelectionAfterDelete: (deviceIds) => {
         rackViewApi?.applyNextSelectionAfterDelete(deviceIds);

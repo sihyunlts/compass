@@ -145,19 +145,19 @@ const buildChainWithPreparedPresetInsert = (
     chain.devices,
     prepared.devices,
     dropZone,
-    prepared.groupStatePatch ? prepared.forcedGroupId : undefined,
+    prepared.groupStatePatches.length > 0 ? prepared.forcedGroupId : undefined,
   );
   const nextGroupStateById = reconcileGroupStateById(
     chain.groupStateById,
     nextDevices,
   );
-  if (prepared.groupStatePatch) {
-    nextGroupStateById[prepared.groupStatePatch.groupId] = {
-      enabled: prepared.groupStatePatch.enabled,
-      mode: prepared.groupStatePatch.mode,
-      name: prepared.groupStatePatch.name,
-      ...(prepared.groupStatePatch.metadata
-        ? { metadata: prepared.groupStatePatch.metadata }
+  for (const patch of prepared.groupStatePatches) {
+    nextGroupStateById[patch.groupId] = {
+      enabled: patch.enabled,
+      mode: patch.mode,
+      name: patch.name,
+      ...(patch.metadata
+        ? { metadata: patch.metadata }
         : {}),
     };
   }
@@ -328,7 +328,7 @@ export const insertGroupPresetFile = (
       status: 'group-insert-failed',
     };
   }
-  const groupId = prepared.groupStatePatch?.groupId ?? prepared.forcedGroupId;
+  const groupId = prepared.groupStatePatches[0]?.groupId ?? prepared.forcedGroupId;
   if (!groupId) {
     return {
       ok: false,

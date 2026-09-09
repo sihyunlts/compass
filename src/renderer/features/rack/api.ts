@@ -1,20 +1,19 @@
 import type { GeneratorDeviceNode } from '../../../shared/model';
 import type { BrowserInsertSource } from './types';
-import type { GroupSelectionContext } from './selection.svelte';
+import type { GroupSelectionContext, RackSelectionItem } from './selection.svelte';
 import type { RackSelection } from './selection.svelte';
 
 export interface RackViewApi {
   syncAfterRender(): void;
   applyNextSelectionAfterDelete(deletedIds: readonly string[]): void;
   getOrderedSelectedDeviceIds(): string[];
-  selectAllDevices(deviceIds: readonly string[]): void;
-  setSelectedDeviceIds(
+  selectAllRackItems(): void;
+  setSelectedDeviceIds(deviceIds: readonly string[]): void;
+  setSelectedGroupIds(groupIds: readonly string[]): void;
+  setSelectedRackItems(
     deviceIds: readonly string[],
-    orderedDeviceIds?: readonly string[],
-  ): void;
-  setSelectedGroupIds(
     groupIds: readonly string[],
-    orderedGroupIds?: readonly string[],
+    anchor: RackSelectionItem | null,
   ): void;
   getSelectedGroupContexts(): GroupSelectionContext[];
   clearSelection(): void;
@@ -34,7 +33,6 @@ interface CreateRackViewApiOptions {
   rackSelection: RackSelection;
   getDevices: () => readonly GeneratorDeviceNode[];
   getOrderedDeviceIds: () => readonly string[];
-  getOrderedGroupIds: () => readonly string[];
   syncAfterRender: () => void;
   startRenamingDevice: (deviceId: string) => boolean;
   startRenamingGroup: (groupId: string) => boolean;
@@ -60,34 +58,34 @@ export const createRackViewApi = (
   },
   getOrderedSelectedDeviceIds: () =>
     options.rackSelection.getOrderedSelectedDeviceIds(options.getOrderedDeviceIds()),
-  selectAllDevices: (deviceIds) => {
-    options.rackSelection.clear();
-    if (deviceIds.length === 0) {
-      return;
-    }
-
-    const anchorId = deviceIds[deviceIds.length - 1] ?? null;
-    options.rackSelection.selectDeviceIds(
+  selectAllRackItems: () => {
+    options.rackSelection.selectAll(options.getDevices());
+  },
+  setSelectedDeviceIds: (deviceIds) => {
+    const anchorId = deviceIds.at(-1) ?? null;
+    options.rackSelection.setSelectedRackItems(
       deviceIds,
-      anchorId,
-      options.getOrderedDeviceIds(),
+      [],
+      anchorId ? { kind: 'device', id: anchorId } : null,
+      options.getDevices(),
     );
   },
-  setSelectedDeviceIds: (deviceIds, orderedDeviceIds = options.getOrderedDeviceIds()) => {
-    const anchorId = deviceIds[deviceIds.length - 1] ?? null;
-    options.rackSelection.selectDeviceIds(
-      deviceIds,
-      anchorId,
-      orderedDeviceIds,
+  setSelectedGroupIds: (groupIds) => {
+    const anchorId = groupIds.at(-1) ?? null;
+    options.rackSelection.setSelectedRackItems(
+      [],
+      groupIds,
+      anchorId ? { kind: 'group', id: anchorId } : null,
+      options.getDevices(),
     );
   },
-  setSelectedGroupIds: (groupIds, orderedGroupIds = options.getOrderedGroupIds()) => {
-    options.rackSelection.clear();
-    if (groupIds.length === 0) {
-      return;
-    }
-
-    options.rackSelection.setSelectedGroupIds(groupIds, orderedGroupIds);
+  setSelectedRackItems: (deviceIds, groupIds, anchor) => {
+    options.rackSelection.setSelectedRackItems(
+      deviceIds,
+      groupIds,
+      anchor,
+      options.getDevices(),
+    );
   },
   getSelectedGroupContexts: () =>
     options.rackSelection.getSelectedGroupContexts(options.getDevices()),
