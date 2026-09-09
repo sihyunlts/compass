@@ -293,8 +293,11 @@ export type GeneratorDeviceNode =
   | GeneratorEffectNode
   | CurveModulatorNode;
 
+export type GroupMode = 'normal' | 'isolate';
+
 interface GroupStateEntry {
   enabled: boolean;
+  mode: GroupMode;
   name?: string | null;
   metadata?: AuthoredMetadata;
 }

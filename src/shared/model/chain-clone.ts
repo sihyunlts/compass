@@ -9,6 +9,7 @@ export const cloneChainForIpc = (chain: GeneratorChain): GeneratorChain => {
     const metadata = cloneAuthoredMetadata(state.metadata);
     groupStateById[groupId] = {
       enabled: state.enabled,
+      mode: state.mode,
       name: state.name ?? null,
       ...(metadata ? { metadata } : {}),
     };

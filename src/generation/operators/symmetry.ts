@@ -116,7 +116,7 @@ export const symmetryOperator = createRackOperator<'symmetry', 'preserve-pending
     return applyPendingSymmetryEffect(
       state,
       stage.device,
-      stage.groupId,
+      stage.targetGroupId,
       stage.stageIndex,
       isModulated,
       (frameIndex, sampleStepBeats, evaluationWindow) => resolveModulatedDeviceAtFrame(

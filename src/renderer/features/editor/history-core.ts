@@ -13,6 +13,7 @@ export type ChainHistoryKind =
   | 'group-create'
   | 'group-ungroup'
   | 'group-toggle-enabled'
+  | 'group-toggle-isolate'
   | 'rename-device'
   | 'rename-group'
   | 'edit-device-info'

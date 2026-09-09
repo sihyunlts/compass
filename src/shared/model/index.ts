@@ -13,6 +13,7 @@ export type {
   GeneratorChain,
   GeneratorDeviceNode,
   GeneratorEffectNode,
+  GroupMode,
   GeneratorNode,
   MaskEffectNode,
   MirrorEffectNode,

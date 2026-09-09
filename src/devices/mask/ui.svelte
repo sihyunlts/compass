@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import type { GeneratorDeviceNode } from '../../shared/model';
+  import { isIsolatedGroupMode } from '../../shared/group-state';
   import { normalizeOptionalId } from '../../shared/normalize-id';
   import MaskTilePicker from '../../renderer/components/controls/MaskTilePicker.svelte';
   import SelectField from '../../renderer/components/fields/SelectField.svelte';
@@ -20,6 +21,7 @@
     device,
     devices = [] as GeneratorDeviceNode[],
     groupDisplayNameById = {},
+    groupModeById = {},
     deviceDisplayNameById = {},
     onControlChange,
   }: MaskDeviceEditorProps = $props();
@@ -42,7 +44,11 @@
     const groups: string[] = [];
     for (const item of devices) {
       const groupId = normalizeOptionalId(item.groupId);
-      if (!groupId || groups.includes(groupId)) {
+      if (
+        !groupId
+        || !isIsolatedGroupMode(groupModeById[groupId])
+        || groups.includes(groupId)
+      ) {
         continue;
       }
       groups.push(groupId);

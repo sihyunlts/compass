@@ -7,7 +7,8 @@ export interface CompiledRackStage {
   stageIndex: number;
   deviceId: string;
   deviceKind: RackStageDeviceKind;
-  groupId: string | null;
+  memberGroupId: string | null;
+  targetGroupId: string | null;
   device: RackStageDeviceNode;
 }
 

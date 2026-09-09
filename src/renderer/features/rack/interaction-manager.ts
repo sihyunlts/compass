@@ -1,4 +1,5 @@
 import type { GeneratorChain } from '../../../shared/model';
+import { isGroupIsolated } from '../../../shared/group-state';
 import { reconcileGeneratorChainModulators } from '../../../core/modulation/routing';
 import type { ChainMutationMeta } from '../editor/history-core';
 import { blurIfTextEditingElement } from './text-editing';
@@ -275,7 +276,9 @@ export class RackInteractionManager {
   }
 
   private getMaskSourceGroupIds(): string[] {
-    return buildOrderedGroupIds(this.getChainState().devices);
+    const chain = this.getChainState();
+    return buildOrderedGroupIds(chain.devices)
+      .filter((groupId) => isGroupIsolated(chain, groupId));
   }
 
   private getMaskSourceGeneratorIds(): string[] {

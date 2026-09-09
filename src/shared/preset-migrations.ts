@@ -158,6 +158,41 @@ const migrateDevicesFromVersion1 = (value: unknown): unknown =>
     ? value.map((device) => migrateDeviceFromVersion1(device))
     : value;
 
+const migrateGroupStateByIdFromVersion1 = (
+  value: unknown,
+  devices: unknown,
+): unknown => {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const migrated: Record<string, unknown> = Object.fromEntries(
+    Object.entries(value).map(([groupId, state]) => [
+      groupId,
+      isRecord(state)
+        ? { ...state, mode: 'isolate' }
+        : { enabled: true, mode: 'isolate' },
+    ]),
+  );
+
+  if (!Array.isArray(devices)) {
+    return migrated;
+  }
+
+  for (const device of devices) {
+    if (!isRecord(device) || typeof device.groupId !== 'string') {
+      continue;
+    }
+    const groupId = device.groupId.trim();
+    if (!groupId || Object.hasOwn(migrated, groupId)) {
+      continue;
+    }
+    migrated[groupId] = { enabled: true, mode: 'isolate' };
+  }
+
+  return migrated;
+};
+
 const migratePresetFromVersion1 = (
   value: Record<string, unknown>,
 ): Record<string, unknown> => {
@@ -175,6 +210,7 @@ const migratePresetFromVersion1 = (
       schemaVersion: 2,
       group: {
         ...value.group,
+        mode: 'isolate',
         devices: migrateDevicesFromVersion1(value.group.devices),
       },
     };
@@ -187,6 +223,10 @@ const migratePresetFromVersion1 = (
       chain: {
         ...value.chain,
         devices: migrateDevicesFromVersion1(value.chain.devices),
+        groupStateById: migrateGroupStateByIdFromVersion1(
+          value.chain.groupStateById,
+          value.chain.devices,
+        ),
       },
     };
   }

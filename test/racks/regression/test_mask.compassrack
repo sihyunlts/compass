@@ -84,13 +84,15 @@
       }
     ],
     "groupStateById": {
-      "group-1": {
-        "enabled": true,
-        "name": null
+    "group-1": {
+      "enabled": true,
+      "mode": "isolate",
+      "name": null
       },
-      "group-2": {
-        "enabled": true,
-        "name": null
+    "group-2": {
+      "enabled": true,
+      "mode": "isolate",
+      "name": null
       }
     }
   }

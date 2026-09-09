@@ -71,6 +71,7 @@ import {
   groupCurrentSelection as groupEditorSelection,
   groupDeviceIds as groupEditorDeviceIds,
   toggleGroupEnabled as toggleEditorGroupEnabled,
+  toggleGroupIsolated as toggleEditorGroupIsolated,
   ungroupGroup as ungroupEditorGroup,
   ungroupSelectedGroups as ungroupEditorSelections,
 } from './grouping';
@@ -329,6 +330,9 @@ export class EditorSession {
     },
     toggleGroupEnabled: (groupId: string, nextEnabled: boolean): void => {
       toggleEditorGroupEnabled(this.buildGroupingContext(), groupId, nextEnabled);
+    },
+    toggleGroupIsolated: (groupId: string, nextIsolated: boolean): void => {
+      toggleEditorGroupIsolated(this.buildGroupingContext(), groupId, nextIsolated);
     },
     handleAutoCreateLengthChange: (): void => {
       handleAutoCreateLengthChange(this.state, (delayMs) => this.requestOutputPreview(delayMs));

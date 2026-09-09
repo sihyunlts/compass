@@ -1,5 +1,8 @@
 import { doesDeviceToggleTimelineParity } from '../../devices/timeline-parity';
-import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
+import {
+  isDeviceEffectivelyEnabled,
+  resolveEffectTargetGroupId,
+} from '../../shared/group-state';
 import type { GeneratorChain, MaskEffectNode } from '../../shared/model';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import {
@@ -38,8 +41,9 @@ const resolveMaskSourceTimeReversed = (
 
   for (let index = chain.devices.length - 1; index > consumingDeviceIndex; index -= 1) {
     const device = chain.devices[index];
-    const deviceGroupId = normalizeOptionalId(device.groupId);
-    const affectsTarget = deviceGroupId === null || deviceGroupId === targetGroupId;
+    const deviceTargetGroupId = resolveEffectTargetGroupId(chain, device.groupId);
+    const affectsTarget = deviceTargetGroupId === null
+      || (targetGroupId !== null && deviceTargetGroupId === targetGroupId);
     if (
       affectsTarget
       && isDeviceEffectivelyEnabled(chain, device)
@@ -188,7 +192,7 @@ export const maskOperator = createRackOperator<'mask', 'preserve-pending'>(
       inputTimeline,
       context.compiledPlan.baseChain,
       device,
-      stage.groupId,
+      stage.targetGroupId,
       stage.stageIndex,
       stage.deviceId,
       context.outputAdapter,

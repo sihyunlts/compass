@@ -7,6 +7,7 @@ import {
   resolveNextGroupId,
 } from './chain-ops';
 import {
+  applyGroupModeChange,
   applyGroupEnabledChange,
   EDITOR_HISTORY_META,
 } from './commands';
@@ -81,6 +82,23 @@ export const toggleGroupEnabled = (
   }
 
   context.applyChainMutation(nextChain, EDITOR_HISTORY_META.groupToggleEnabled);
+};
+
+export const toggleGroupIsolated = (
+  context: GroupingContext,
+  groupId: string,
+  nextIsolated: boolean,
+): void => {
+  const nextChain = applyGroupModeChange(
+    context.state.chainState,
+    groupId,
+    nextIsolated ? 'isolate' : 'normal',
+  );
+  if (!nextChain) {
+    return;
+  }
+
+  context.applyChainMutation(nextChain, EDITOR_HISTORY_META.groupToggleIsolate);
 };
 
 export const deleteGroup = (

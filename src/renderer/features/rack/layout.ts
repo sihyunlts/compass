@@ -1,6 +1,6 @@
 import { getRendererDeviceGroup } from '../../../devices';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
-import type { GeneratorDeviceNode } from '../../../shared/model';
+import type { GeneratorDeviceNode, GroupMode } from '../../../shared/model';
 
 type RackDeviceItem = {
   kind: 'device';
@@ -13,6 +13,7 @@ type RackGroupItem = {
   key: string;
   groupId: string;
   enabled: boolean;
+  mode: GroupMode;
   devices: GeneratorDeviceNode[];
 };
 
@@ -24,6 +25,7 @@ type GroupColumn =
       key: `rail-left-${string}`;
       groupId: string;
       enabled: boolean;
+      mode: GroupMode;
     }
   | {
       kind: 'device';
@@ -82,6 +84,7 @@ export const buildGeneratorDeviceIds = (
 export const buildRackContentItems = (
   devices: readonly GeneratorDeviceNode[],
   resolveGroupEnabled: (groupId: string) => boolean,
+  resolveGroupMode: (groupId: string) => GroupMode,
 ): RackContentItem[] => {
   const items: RackContentItem[] = [];
   let activeGroupId: string | null = null;
@@ -101,6 +104,7 @@ export const buildRackContentItems = (
       key: `group-${activeGroupId}-${anchorId}`,
       groupId: activeGroupId,
       enabled: resolveGroupEnabled(activeGroupId),
+      mode: resolveGroupMode(activeGroupId),
       devices: activeGroupDevices,
     });
     activeGroupId = null;
@@ -146,6 +150,7 @@ export const buildGroupColumns = (groupItem: RackGroupItem): GroupColumn[] => {
     key: `rail-left-${groupItem.groupId}`,
     groupId: groupItem.groupId,
     enabled: groupItem.enabled,
+    mode: groupItem.mode,
   };
   const rightRail: GroupColumn = {
     kind: 'right-rail',

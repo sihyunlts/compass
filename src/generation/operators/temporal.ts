@@ -337,7 +337,7 @@ export const reverseOperator = createRackOperator<'reverse', 'materialize-all'>(
   'materialize-all',
   (state, stage, context) => applyReverse(
     state,
-    stage.groupId,
+    stage.targetGroupId,
     stage.stageIndex,
     context,
   ),
@@ -348,7 +348,7 @@ export const stretchOperator = createRackOperator<'stretch', 'materialize-all'>(
   (state, stage, context) => applyStretch(
     state,
     stage.device,
-    stage.groupId,
+    stage.targetGroupId,
     stage.stageIndex,
     context.modulationContext,
     context,
@@ -360,7 +360,7 @@ export const trimOperator = createRackOperator<'trim', 'materialize-all'>(
   (state, stage, context) => applyTrim(
     state,
     stage.device,
-    stage.groupId,
+    stage.targetGroupId,
     stage.stageIndex,
     context.modulationContext,
     context,
@@ -372,7 +372,7 @@ export const timeWarpOperator = createRackOperator<'timewarp', 'materialize-all'
   (state, stage, context) => applyTimeWarp(
     state,
     stage.device,
-    stage.groupId,
+    stage.targetGroupId,
     stage.stageIndex,
     context,
   ),

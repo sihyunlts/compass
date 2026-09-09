@@ -27,7 +27,7 @@ const PLAYBACK_LENGTHS_BEATS = [0.25, 1, 8] as const;
 
 const createStaticPath = (
   id: string,
-  groupId: string,
+  groupId: string | null,
   y: number,
 ): PathGeneratorNode => ({
   id,
@@ -78,8 +78,8 @@ const createGroupedTemporalIsolationChain = (
     }] : []),
   ],
   groupStateById: {
-    'long-color-group': { enabled: true, name: null },
-    'reversed-group': { enabled: true, name: null },
+    'long-color-group': { enabled: true, mode: 'isolate', name: null },
+    'reversed-group': { enabled: true, mode: 'isolate', name: null },
   },
 });
 
@@ -366,4 +366,73 @@ test('group temporal effects preserve other origins with longer color playback',
   }).notes.filter((note) => note.originId === 'long-color-path');
 
   assert.deepEqual(generateLongColorNotes(true), generateLongColorNotes(false));
+});
+
+test('normal groups preserve serial effect scope while isolate groups limit it', () => {
+  const createScopeChain = (
+    effectGroupId: string | null,
+    mode?: 'normal' | 'isolate',
+  ): GeneratorChain => ({
+    devices: [
+      createStaticPath('scope-path-a', null, 2),
+      createStaticPath('scope-path-b', effectGroupId, 7),
+      {
+        id: 'scope-translate',
+        kind: 'translate',
+        enabled: true,
+        groupId: effectGroupId,
+        name: null,
+        params: { offsetX: 1, offsetY: 0 },
+      },
+    ],
+    groupStateById: effectGroupId && mode
+      ? { [effectGroupId]: { enabled: true, mode, name: null } }
+      : {},
+  });
+  const generateNotes = (chain: GeneratorChain) => buildGeneratedFieldResult({
+    chain,
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: 'mk3',
+  }).notes;
+
+  const ungroupedNotes = generateNotes(createScopeChain(null));
+  assert.deepEqual(
+    generateNotes(createScopeChain('normal-group', 'normal')),
+    ungroupedNotes,
+  );
+  assert.notDeepEqual(
+    generateNotes(createScopeChain('isolate-group', 'isolate')),
+    ungroupedNotes,
+  );
+});
+
+test('normal effect-only groups process prior output while isolate groups have no target', () => {
+  const createEffectOnlyGroupChain = (mode: 'normal' | 'isolate'): GeneratorChain => ({
+    devices: [
+      createStaticPath('effect-only-path', null, 4),
+      {
+        id: 'effect-only-translate',
+        kind: 'translate',
+        enabled: true,
+        groupId: 'effect-only-group',
+        name: null,
+        params: { offsetX: 1, offsetY: 0 },
+      },
+    ],
+    groupStateById: {
+      'effect-only-group': { enabled: true, mode, name: null },
+    },
+  });
+  const generateNotes = (chain: GeneratorChain) => buildGeneratedFieldResult({
+    chain,
+    loopLengthBeats: LOOP_LENGTH_BEATS,
+    launchpadModel: 'mk3',
+  }).notes;
+  const sourceOnlyNotes = generateNotes({
+    devices: [createStaticPath('effect-only-path', null, 4)],
+    groupStateById: {},
+  });
+
+  assert.notDeepEqual(generateNotes(createEffectOnlyGroupChain('normal')), sourceOnlyNotes);
+  assert.deepEqual(generateNotes(createEffectOnlyGroupChain('isolate')), sourceOnlyNotes);
 });

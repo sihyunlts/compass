@@ -52,8 +52,12 @@ export const renameGroupById = (
   }
 
   const reconciledById = reconcileGroupStateById(chain.groupStateById, chain.devices);
+  const current = reconciledById[groupId];
+  if (!current) {
+    return null;
+  }
   const nextName = normalizeCustomName(rawName);
-  if (normalizeCustomName(reconciledById[groupId]?.name) === nextName) {
+  if (normalizeCustomName(current.name) === nextName) {
     return null;
   }
 
@@ -62,11 +66,8 @@ export const renameGroupById = (
     groupStateById: {
       ...reconciledById,
       [groupId]: {
-        enabled: reconciledById[groupId]?.enabled !== false,
+        ...current,
         name: nextName,
-        ...(reconciledById[groupId]?.metadata
-          ? { metadata: reconciledById[groupId].metadata }
-          : {}),
       },
     },
   };
