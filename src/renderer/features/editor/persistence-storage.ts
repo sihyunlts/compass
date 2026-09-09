@@ -191,6 +191,19 @@ export const saveReduceAnimation = (enabled: boolean): void => {
   });
 };
 
+/** Loads the reduced blur flag with `false` fallback for missing or invalid values. */
+export const loadReduceBlur = (): boolean =>
+  toBoolean(readPersistedRendererState().ui?.reduceBlur, false);
+
+/** Persists the reduced blur flag as a strict boolean. */
+export const saveReduceBlur = (enabled: boolean): void => {
+  writePersistedRendererState({
+    ui: {
+      reduceBlur: enabled === true,
+    },
+  });
+};
+
 export interface ThemeSettings {
   hue: number;
   saturation: number;

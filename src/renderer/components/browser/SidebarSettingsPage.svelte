@@ -20,6 +20,7 @@
     launchpadMk2Enabled,
     locale,
     reduceAnimation,
+    reduceBlur,
     themePreset,
     themeHue,
     themeSaturation,
@@ -33,6 +34,7 @@
     onLaunchpadModelToggle,
     onLocaleChange,
     onReduceAnimationToggle,
+    onReduceBlurToggle,
     onThemePresetChange,
     onThemeHueChange,
     onThemeSaturationChange,
@@ -45,6 +47,7 @@
     launchpadMk2Enabled: boolean;
     locale: AppLocale;
     reduceAnimation: boolean;
+    reduceBlur: boolean;
     themePreset: ThemeSelectionId;
     themeHue: number;
     themeSaturation: number;
@@ -58,6 +61,7 @@
     onLaunchpadModelToggle: (enabled: boolean) => void;
     onLocaleChange: (locale: AppLocale) => void;
     onReduceAnimationToggle: (enabled: boolean) => void;
+    onReduceBlurToggle: (enabled: boolean) => void;
     onThemePresetChange: (presetId: ThemePresetId) => void;
     onThemeHueChange: (hue: number) => void;
     onThemeSaturationChange: (saturation: number) => void;
@@ -239,17 +243,32 @@
       </div>
     </div>
 
-    <div class="sidebar-settings-card sidebar-settings-row">
-      <div class="sidebar-settings-info">
-        <span class="sidebar-settings-label">{i18n.t('settings.reduceAnimation')}</span>
-        <span class="sidebar-settings-description">{i18n.t('settings.reduceAnimationDescription')}</span>
+    <div class="sidebar-settings-card">
+      <div class="sidebar-settings-row">
+        <div class="sidebar-settings-info">
+          <span class="sidebar-settings-label">{i18n.t('settings.reduceAnimation')}</span>
+          <span class="sidebar-settings-description">{i18n.t('settings.reduceAnimationDescription')}</span>
+        </div>
+        <Switch
+          id="reduce-animation"
+          checked={reduceAnimation}
+          label={i18n.t('settings.reduceAnimation')}
+          onCheckedChange={onReduceAnimationToggle}
+        />
       </div>
-      <Switch
-        id="reduce-animation"
-        checked={reduceAnimation}
-        label={i18n.t('settings.reduceAnimation')}
-        onCheckedChange={onReduceAnimationToggle}
-      />
+
+      <div class="sidebar-settings-row">
+        <div class="sidebar-settings-info">
+          <span class="sidebar-settings-label">{i18n.t('settings.reduceBlur')}</span>
+          <span class="sidebar-settings-description">{i18n.t('settings.reduceBlurDescription')}</span>
+        </div>
+        <Switch
+          id="reduce-blur"
+          checked={reduceBlur}
+          label={i18n.t('settings.reduceBlur')}
+          onCheckedChange={onReduceBlurToggle}
+        />
+      </div>
     </div>
 
     <div class="sidebar-settings-card sidebar-settings-row">

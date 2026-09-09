@@ -17,6 +17,7 @@ export interface PersistedRendererState {
     locale?: AppLocale;
     mainWindowAlwaysOnTop?: boolean;
     reduceAnimation?: boolean;
+    reduceBlur?: boolean;
     themeHue?: number;
     themeSaturation?: number;
   };
@@ -83,6 +84,7 @@ const pickPersistedUi = (
     ...(ui.reduceAnimation !== undefined
       ? { reduceAnimation: ui.reduceAnimation }
       : {}),
+    ...(ui.reduceBlur !== undefined ? { reduceBlur: ui.reduceBlur } : {}),
     ...(ui.themeHue !== undefined ? { themeHue: ui.themeHue } : {}),
     ...(ui.themeSaturation !== undefined
       ? { themeSaturation: ui.themeSaturation }

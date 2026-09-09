@@ -195,6 +195,20 @@ html.reduce-animation {
   }
 }
 
+html.reduce-blur {
+  --color-surface-floating: var(--color-surface);
+
+  *,
+  *::before,
+  *::after {
+    backdrop-filter: none !important;
+  }
+
+  .app-hint {
+    filter: none !important;
+  }
+}
+
 .floating-menu-surface {
   position: fixed;
   inset: 0 auto auto 0;

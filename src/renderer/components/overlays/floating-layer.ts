@@ -1,5 +1,5 @@
 import { clamp } from '../../../shared/math';
-import { SPRING_PRECISION, shouldReduceMotion } from '../../motion';
+import { SPRING_PRECISION, shouldReduceBlur, shouldReduceMotion } from '../../motion';
 import { isTopmostFloatingLayer } from './floating-layer-stack';
 
 type FloatingLayerSize = {
@@ -90,7 +90,7 @@ export const animateFloatingLayerEnter = (
   const animations = targets.map((target) => {
     const fromKeyframe: Keyframe = { opacity: '0' };
     const toKeyframe: Keyframe = { opacity: '1' };
-    if (target.blurPx !== null) {
+    if (target.blurPx !== null && !shouldReduceBlur()) {
       fromKeyframe.filter = `blur(${target.blurPx ?? 4}px)`;
       toKeyframe.filter = 'blur(0)';
     }
@@ -184,7 +184,7 @@ export const animateFloatingLayerExit = (
       : computedStyle.transform;
     const fromKeyframe: Keyframe = { opacity: computedStyle.opacity };
     const toKeyframe: Keyframe = { opacity: '0' };
-    if (target.blurPx !== null) {
+    if (target.blurPx !== null && !shouldReduceBlur()) {
       fromKeyframe.filter = computedStyle.filter;
       toKeyframe.filter = `blur(${target.blurPx ?? 4}px)`;
     }

@@ -3,8 +3,10 @@ import type { UpdateCheckResponse } from '../../shared/contracts/ipc/releases';
 import type { EditorSession } from '../features/editor/session.svelte';
 import {
   loadReduceAnimation,
+  loadReduceBlur,
   loadThemeSettings,
   saveReduceAnimation,
+  saveReduceBlur,
 } from '../features/editor/persistence-storage';
 import {
   findThemePreset,
@@ -25,6 +27,7 @@ interface SettingsControllerState {
   updateCheckText: string;
   updateAvailable: boolean;
   reduceAnimation: boolean;
+  reduceBlur: boolean;
   themePreset: ThemeSelectionId;
   themeHue: number;
   themeSaturation: number;
@@ -48,6 +51,7 @@ class SettingsController {
     updateCheckText: '',
     updateAvailable: false,
     reduceAnimation: loadReduceAnimation(),
+    reduceBlur: loadReduceBlur(),
     themePreset: resolveThemeSelection(
       this.initialTheme.hue,
       this.initialTheme.saturation,
@@ -151,6 +155,11 @@ class SettingsController {
   public handleReduceAnimationToggle(enabled: boolean): void {
     this.state.reduceAnimation = enabled;
     saveReduceAnimation(enabled);
+  }
+
+  public handleReduceBlurToggle(enabled: boolean): void {
+    this.state.reduceBlur = enabled;
+    saveReduceBlur(enabled);
   }
 
   public handleThemeHueChange(hue: number): void {
