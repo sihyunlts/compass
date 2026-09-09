@@ -1,6 +1,6 @@
 import type { Component } from 'svelte';
 
-import type { GeneratorDeviceNode } from '../shared/model';
+import type { GeneratorDeviceNode, GroupMode } from '../shared/model';
 import type { MessageKey } from '../shared/i18n';
 import type { RendererControlChange, RendererKindControlDefinition } from './control-types';
 import type { NumericParameterRules } from './numeric-parameters';
@@ -21,6 +21,7 @@ export interface RendererDeviceEditorPropsBase {
   devices?: GeneratorDeviceNode[];
   deviceDisplayNameById?: Record<string, string>;
   groupDisplayNameById?: Record<string, string>;
+  groupModeById?: Record<string, GroupMode>;
   paletteRevision: number;
   currentBeatBeats?: number;
   currentProgress01?: number;

@@ -8,7 +8,10 @@ import {
 } from '../../shared/model';
 import { isModulationTargetDeviceKind, isModulationTargetParamKey } from '../../devices/modulation';
 import { normalizeOptionalId } from '../../shared/normalize-id';
-import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
+import {
+  isDeviceEffectivelyEnabled,
+  resolveGroupMode,
+} from '../../shared/group-state';
 import { sanitizeModulationCurve } from './curve';
 import { sanitizeModulationTargets } from './targets';
 
@@ -157,6 +160,7 @@ export const stripModulationDevicesFromChain = (
   for (const groupId of activeGroupIds) {
     groupStateById[groupId] = {
       enabled: chain.groupStateById[groupId]?.enabled !== false,
+      mode: resolveGroupMode(chain.groupStateById, groupId),
       name: chain.groupStateById[groupId]?.name ?? null,
       ...(chain.groupStateById[groupId]?.metadata
         ? { metadata: chain.groupStateById[groupId].metadata }

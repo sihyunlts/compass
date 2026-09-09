@@ -1,7 +1,16 @@
 import { doesDeviceToggleTimelineParity } from '../../devices/timeline-parity';
 import { readNumericDeviceParam, writeNumericDeviceParam } from '../../devices/modulation';
-import type { GeneratorChain, GeneratorDeviceNode, ModulationCurve } from '../../shared/model';
-import { isDeviceEffectivelyEnabled } from '../../shared/group-state';
+import {
+  isGeneratorNode,
+  type GeneratorChain,
+  type GeneratorDeviceNode,
+  type ModulationCurve,
+} from '../../shared/model';
+import {
+  isDeviceEffectivelyEnabled,
+  resolveEffectTargetGroupId,
+} from '../../shared/group-state';
+import { normalizeOptionalId } from '../../shared/normalize-id';
 import {
   buildCurveSegments,
   evaluateCurveSegments,
@@ -42,7 +51,10 @@ const resolveReversedTimelineByDeviceId = (
   chain: GeneratorChain,
 ): Map<string, boolean> => {
   const deviceIndexById = new Map<string, number>();
-  const reverseIndices: number[] = [];
+  const reverseStages: Array<{
+    index: number;
+    targetGroupId: string | null;
+  }> = [];
 
   for (let index = 0; index < chain.devices.length; index += 1) {
     const device = chain.devices[index];
@@ -50,19 +62,31 @@ const resolveReversedTimelineByDeviceId = (
       deviceIndexById.set(device.id, index);
     }
     if (doesDeviceToggleTimelineParity(device) && isDeviceEffectivelyEnabled(chain, device)) {
-      reverseIndices.push(index);
+      reverseStages.push({
+        index,
+        targetGroupId: resolveEffectTargetGroupId(chain, device.groupId),
+      });
     }
   }
 
-  if (reverseIndices.length === 0) {
+  if (reverseStages.length === 0) {
     return new Map<string, boolean>();
   }
 
   const reversedById = new Map<string, boolean>();
   for (const [deviceId, index] of deviceIndexById.entries()) {
+    const device = chain.devices[index];
+    const targetGroupId = isGeneratorNode(device)
+      ? normalizeOptionalId(device.groupId)
+      : resolveEffectTargetGroupId(chain, device.groupId);
     let reverseCount = 0;
-    for (const reverseIndex of reverseIndices) {
-      if (reverseIndex > index) {
+    for (const reverseStage of reverseStages) {
+      const affectsEntireTarget = reverseStage.targetGroupId === null
+        || (
+          targetGroupId !== null
+          && reverseStage.targetGroupId === targetGroupId
+        );
+      if (reverseStage.index > index && affectsEntireTarget) {
         reverseCount += 1;
       }
     }

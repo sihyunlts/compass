@@ -20,6 +20,7 @@ import {
   type GeneratorDeviceNode,
 } from '../../../shared/model';
 import { sanitizeGeneratorChain } from '../../../shared/model/chain-normalization';
+import { resolveGroupMode } from '../../../shared/group-state';
 import {
   buildDeviceDisplayNameById,
   buildGroupDisplayNameById,
@@ -99,6 +100,7 @@ const buildPreparedPresetInsert = (
     ? createRackClipboard(preset.group.devices, {
       kind: 'group',
       enabled: preset.group.enabled,
+      mode: preset.group.mode,
       name: preset.group.name,
       metadata: preset.group.metadata,
     })
@@ -152,6 +154,7 @@ const buildChainWithPreparedPresetInsert = (
   if (prepared.groupStatePatch) {
     nextGroupStateById[prepared.groupStatePatch.groupId] = {
       enabled: prepared.groupStatePatch.enabled,
+      mode: prepared.groupStatePatch.mode,
       name: prepared.groupStatePatch.name,
       ...(prepared.groupStatePatch.metadata
         ? { metadata: prepared.groupStatePatch.metadata }
@@ -249,6 +252,7 @@ export const buildGroupPresetFile = (
     savedAtIso: createSavedAtIso(),
     group: {
       enabled: chain.groupStateById[groupId]?.enabled !== false,
+      mode: resolveGroupMode(chain.groupStateById, groupId),
       name: chain.groupStateById[groupId]?.name ?? null,
       ...(chain.groupStateById[groupId]?.metadata
         ? { metadata: chain.groupStateById[groupId].metadata }

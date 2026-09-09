@@ -8,8 +8,10 @@
     isCurveModulatorNode,
     type GeneratorDeviceNode,
     type GeneratorChain,
+    type GroupMode,
   } from '../../../shared/model';
   import type { ContextMenuTarget } from '../../features/context-menu/types';
+  import { resolveGroupMode as resolveStoredGroupMode } from '../../../shared/group-state';
   import type { ModulationStateByParameter } from '../../../shared/contracts/preview/modulation';
   import type {
     BrowserNonRackPresetInsertSource,
@@ -69,6 +71,7 @@
     onSaveDevicePreset = () => {},
     onSaveGroupPreset = () => {},
     onToggleGroupEnabled = () => {},
+    onToggleGroupIsolated = () => {},
     onToggleCollapse = () => {},
     onRenameDevice = () => false,
     onRenameGroup = () => false,
@@ -106,6 +109,7 @@
     onSaveDevicePreset?: (deviceId: string) => void;
     onSaveGroupPreset?: (groupId: string) => void;
     onToggleGroupEnabled?: (groupId: string, nextEnabled: boolean) => void;
+    onToggleGroupIsolated?: (groupId: string, nextIsolated: boolean) => void;
     onToggleCollapse: (id: string) => void;
     onRenameDevice?: (deviceId: string, rawName: string) => boolean;
     onRenameGroup?: (groupId: string, rawName: string) => boolean;
@@ -121,6 +125,8 @@
 
   const resolveGroupEnabled = (groupId: string): boolean =>
     chainState.groupStateById[groupId]?.enabled !== false;
+  const resolveGroupMode = (groupId: string): GroupMode =>
+    resolveStoredGroupMode(chainState.groupStateById, groupId);
 
   const groupMemberIdsByGroupId = $derived.by(() => buildGroupMemberIdsByGroupId(devices));
 
@@ -141,8 +147,11 @@
       chainState.groupStateById,
       i18n.t('group.defaultTemplate'),
     ));
+  const groupModeById = $derived.by(() => Object.fromEntries(
+    orderedGroupIds.map((groupId) => [groupId, resolveGroupMode(groupId)]),
+  ));
   const rackContentItems = $derived.by(() =>
-    buildRackContentItems(devices, resolveGroupEnabled));
+    buildRackContentItems(devices, resolveGroupEnabled, resolveGroupMode));
 
   const isModulatorDeviceId = (deviceId: string): boolean => {
     const device = devices.find(
@@ -267,7 +276,7 @@
       .map((item) =>
         item.kind === 'device'
           ? `d:${item.device.id}:${resolveDeviceDisplayName(deviceDisplayNameById, item.device.id)}`
-          : `g:${item.groupId}:${resolveGroupDisplayName(groupDisplayNameById, item.groupId)}:${item.enabled ? '1' : '0'}:${item.devices.map((device) => device.id).join(',')}`)
+          : `g:${item.groupId}:${resolveGroupDisplayName(groupDisplayNameById, item.groupId)}:${item.enabled ? '1' : '0'}:${item.mode}:${item.devices.map((device) => device.id).join(',')}`)
       .join('|');
     const collapsedSignature = collapsedDeviceIds.join('|');
     return `${rackOrderSignature}::collapsed:${collapsedSignature}`;
@@ -300,6 +309,8 @@
     saveDevicePreset: (deviceId) => onSaveDevicePreset(deviceId),
     saveGroupPreset: (groupId) => onSaveGroupPreset(groupId),
     toggleGroupEnabled: (groupId, nextEnabled) => onToggleGroupEnabled(groupId, nextEnabled),
+    toggleGroupIsolated: (groupId, nextIsolated) =>
+      onToggleGroupIsolated(groupId, nextIsolated),
     toggleCollapse: (id) => onToggleCollapse(id),
     renameDevice: (deviceId, rawName) => onRenameDevice(deviceId, rawName),
     renameGroup: (groupId, rawName) => onRenameGroup(groupId, rawName),
@@ -414,6 +425,7 @@
             {devices}
             {deviceDisplayNameById}
             {groupDisplayNameById}
+            {groupModeById}
             {paletteRevision}
             {currentBeatBeats}
             {currentProgress01}
@@ -498,6 +510,7 @@
                     {devices}
                     {deviceDisplayNameById}
                     {groupDisplayNameById}
+                    {groupModeById}
                     {paletteRevision}
                     {currentBeatBeats}
                     {currentProgress01}
@@ -541,6 +554,12 @@
                     col.enabled ? 'group.disable' : 'group.enable',
                     { name: groupName },
                   )}
+                  {@const groupIsolateLabel = i18n.t(
+                    col.mode === 'isolate'
+                      ? 'group.isolateDisable'
+                      : 'group.isolateEnable',
+                    { name: groupName },
+                  )}
                   <div class="group-rail-controls">
                     <input
                       class="group-enabled-toggle round-checkbox"
@@ -565,6 +584,22 @@
                     </button>
                   </div>
                   <span class="group-label">{groupName}</span>
+                  <button
+                    class="preset-save-button group-isolate-toggle"
+                    class:is-active={col.mode === 'isolate'}
+                    type="button"
+                    aria-label={groupIsolateLabel}
+                    aria-pressed={col.mode === 'isolate'}
+                    use:hint={groupIsolateLabel}
+                    onpointerdown={(event) => controller.handleGroupIsolatePointerDown(event)}
+                    onclick={(event) => controller.handleGroupIsolateClick(
+                      event,
+                      col.groupId,
+                      col.mode !== 'isolate',
+                    )}
+                  >
+                    <span class="material-symbols-rounded" aria-hidden="true">arrow_split</span>
+                  </button>
                 {/if}
               </div>
             {/each}
@@ -778,6 +813,16 @@
     writing-mode: sideways-lr;
     font-size: var(--text-12);
     pointer-events: none;
+  }
+
+  .group-isolate-toggle {
+    margin-top: auto;
+
+    &.is-active {
+      background: var(--color-surface-inverse);
+      color: var(--color-text-inverse);
+      outline-color: var(--color-surface-inverse);
+    }
   }
 
   .group-enabled-toggle {

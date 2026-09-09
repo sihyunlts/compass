@@ -1,6 +1,8 @@
 import type { RendererDeviceKind } from '../../../devices';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
-import type { GeneratorChain, GeneratorDeviceNode } from '../../../shared/model';
+import type { GeneratorChain, GeneratorDeviceNode, GroupMode } from '../../../shared/model';
+import { sanitizeGeneratorChain } from '../../../shared/model/chain-normalization';
+import { resolveGroupMode } from '../../../shared/group-state';
 import type { RackInteractionCommit } from '../rack/types';
 import {
   createRackClipboard,
@@ -35,6 +37,7 @@ export const EDITOR_HISTORY_META = {
   groupCreate: { kind: 'group-create' },
   groupUngroup: { kind: 'group-ungroup' },
   groupToggleEnabled: { kind: 'group-toggle-enabled' },
+  groupToggleIsolate: { kind: 'group-toggle-isolate' },
   renameDevice: { kind: 'rename-device' },
   renameGroup: { kind: 'rename-group' },
   editDeviceInfo: { kind: 'edit-device-info' },
@@ -212,6 +215,7 @@ export const buildClipboardFromSelection = (
     return createRackClipboard(sourceDevices, {
       kind: 'group',
       enabled: chain.groupStateById[selection.groupId]?.enabled !== false,
+      mode: resolveGroupMode(chain.groupStateById, selection.groupId),
       name: chain.groupStateById[selection.groupId]?.name ?? null,
       metadata: chain.groupStateById[selection.groupId]?.metadata,
     });
@@ -248,6 +252,7 @@ export const buildChainWithClipboardPaste = (
   if (prepared.groupStatePatch) {
     nextChain.groupStateById[prepared.groupStatePatch.groupId] = {
       enabled: prepared.groupStatePatch.enabled,
+      mode: prepared.groupStatePatch.mode,
       name: prepared.groupStatePatch.name,
       ...(prepared.groupStatePatch.metadata
         ? { metadata: prepared.groupStatePatch.metadata }
@@ -283,20 +288,55 @@ export const applyGroupEnabledChange = (
     chain.groupStateById,
     chain.devices,
   );
+  const current = reconciledById[groupId];
+  if (!current) {
+    return null;
+  }
 
   return {
     ...chain,
     groupStateById: {
       ...reconciledById,
       [groupId]: {
+        ...current,
         enabled: nextEnabled,
-        name: reconciledById[groupId]?.name ?? null,
-        ...(reconciledById[groupId]?.metadata
-          ? { metadata: reconciledById[groupId].metadata }
-          : {}),
       },
     },
   };
+};
+
+export const applyGroupModeChange = (
+  chain: GeneratorChain,
+  rawGroupId: string,
+  nextMode: GroupMode,
+): GeneratorChain | null => {
+  const groupId = normalizeOptionalId(rawGroupId);
+  if (
+    !groupId
+    || !chain.devices.some((device) => normalizeOptionalId(device.groupId) === groupId)
+  ) {
+    return null;
+  }
+
+  const reconciledById = reconcileGroupStateById(
+    chain.groupStateById,
+    chain.devices,
+  );
+  const current = reconciledById[groupId];
+  if (!current || current.mode === nextMode) {
+    return null;
+  }
+
+  return sanitizeGeneratorChain({
+    ...chain,
+    groupStateById: {
+      ...reconciledById,
+      [groupId]: {
+        ...current,
+        mode: nextMode,
+      },
+    },
+  });
 };
 
 export const toggleDevicesEnabled = (

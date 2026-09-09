@@ -4,6 +4,7 @@ import {
   cloneDeviceNode,
   type AuthoredMetadata,
   type GeneratorDeviceNode,
+  type GroupMode,
 } from '../../../shared/model';
 import {
   cloneDevicesWithFreshIds,
@@ -19,6 +20,7 @@ export type RackClipboard =
   | {
       kind: 'group';
       enabled: boolean;
+      mode: GroupMode;
       name: string | null;
       metadata?: AuthoredMetadata;
       devices: GeneratorDeviceNode[];
@@ -29,6 +31,7 @@ type ClipboardBuildOptions =
   | {
       kind: 'group';
       enabled: boolean;
+      mode: GroupMode;
       name: string | null;
       metadata?: AuthoredMetadata;
     };
@@ -40,6 +43,7 @@ type PreparedClipboardInsert = {
   groupStatePatch: {
     groupId: string;
     enabled: boolean;
+    mode: GroupMode;
     name: string | null;
     metadata?: AuthoredMetadata;
   } | null;
@@ -70,6 +74,7 @@ export const createRackClipboard = (
     return {
       kind: 'group',
       enabled: options.enabled,
+      mode: options.mode,
       name: options.name,
       ...(metadata ? { metadata } : {}),
       devices: cloned,
@@ -121,6 +126,7 @@ export const prepareClipboardInsert = (
       groupStatePatch: {
         groupId: nextGroupId,
         enabled: clipboard.enabled,
+        mode: clipboard.mode,
         name: clipboard.name,
         ...(metadata ? { metadata } : {}),
       },

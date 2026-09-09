@@ -53,6 +53,7 @@ interface DeviceRackControllerOptions {
   saveDevicePreset: (deviceId: string) => void;
   saveGroupPreset: (groupId: string) => void;
   toggleGroupEnabled: (groupId: string, nextEnabled: boolean) => void;
+  toggleGroupIsolated: (groupId: string, nextIsolated: boolean) => void;
   toggleCollapse: (id: string) => void;
   renameDevice: (deviceId: string, rawName: string) => boolean;
   renameGroup: (groupId: string, rawName: string) => boolean;
@@ -244,6 +245,20 @@ class DeviceRackController {
   public handleGroupSaveContextMenu(event: MouseEvent): void {
     event.preventDefault();
     event.stopPropagation();
+  }
+
+  public handleGroupIsolatePointerDown(event: PointerEvent): void {
+    event.stopPropagation();
+  }
+
+  public handleGroupIsolateClick(
+    event: MouseEvent,
+    groupId: string,
+    nextIsolated: boolean,
+  ): void {
+    event.stopPropagation();
+    this.consumeSuppressedDeviceSelectionClick();
+    this.options.toggleGroupIsolated(groupId, nextIsolated);
   }
 
   public handleGroupRailPointerDown(event: PointerEvent, groupId: string): void {

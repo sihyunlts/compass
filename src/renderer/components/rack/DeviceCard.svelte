@@ -6,6 +6,7 @@
   import {
     normalizeCustomName,
     type GeneratorDeviceNode,
+    type GroupMode,
   } from '../../../shared/model';
   import type { RendererControlChange } from '../../../devices/control-types';
   import type { ModulationStateByParameter } from '../../../shared/contracts/preview/modulation';
@@ -26,6 +27,7 @@
     devices = [] as GeneratorDeviceNode[],
     deviceDisplayNameById = {},
     groupDisplayNameById = {},
+    groupModeById = {},
     paletteRevision,
     currentBeatBeats = 0,
     currentProgress01 = 0,
@@ -58,6 +60,7 @@
     devices?: GeneratorDeviceNode[];
     deviceDisplayNameById?: Record<string, string>;
     groupDisplayNameById?: Record<string, string>;
+    groupModeById?: Record<string, GroupMode>;
     paletteRevision: number;
     currentBeatBeats?: number;
     currentProgress01?: number;
@@ -330,6 +333,7 @@
       {devices}
       {deviceDisplayNameById}
       {groupDisplayNameById}
+      {groupModeById}
       {paletteRevision}
       {currentBeatBeats}
       {currentProgress01}

@@ -65,7 +65,7 @@ export const colorOperator = createRackOperator<'color', 'materialize-all'>(
     return applyColorEffect(
       state,
       device,
-      stage.groupId,
+      stage.targetGroupId,
       stage.stageIndex,
       context.mutedGroupIds,
       context.mutedGeneratorIds,

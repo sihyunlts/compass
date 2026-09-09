@@ -69,11 +69,14 @@ export const updateGroupAuthoredInfo = (
     chain.devices,
   );
   const current = groupStateById[groupId];
+  if (!current) {
+    return null;
+  }
   const nextName = normalizeCustomName(draft.name);
   const nextMetadata = normalizeAuthoredMetadata(draft);
   if (
-    normalizeCustomName(current?.name) === nextName
-    && isMetadataEqual(current?.metadata, nextMetadata)
+    normalizeCustomName(current.name) === nextName
+    && isMetadataEqual(current.metadata, nextMetadata)
   ) {
     return null;
   }
@@ -82,11 +85,10 @@ export const updateGroupAuthoredInfo = (
     ...chain,
     groupStateById: {
       ...groupStateById,
-      [groupId]: {
-        enabled: current?.enabled !== false,
+      [groupId]: replaceAuthoredMetadata({
+        ...current,
         name: nextName,
-        ...(nextMetadata ? { metadata: nextMetadata } : {}),
-      },
+      }, nextMetadata),
     },
   };
 };

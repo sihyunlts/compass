@@ -69,13 +69,15 @@
       }
     ],
     "groupStateById": {
-      "group-active": {
-        "enabled": true,
-        "name": "Active group"
+    "group-active": {
+      "enabled": true,
+      "mode": "isolate",
+      "name": "Active group"
       },
-      "group-muted": {
-        "enabled": false,
-        "name": "Muted group"
+    "group-muted": {
+      "enabled": false,
+      "mode": "isolate",
+      "name": "Muted group"
       }
     }
   }

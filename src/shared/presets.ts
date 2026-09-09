@@ -6,6 +6,7 @@ import {
   type GeneratorChain,
   type GeneratorDeviceNode,
   type GeneratorNode,
+  type GroupMode,
   type TimeWarpCurve,
   isGeneratorNode,
 } from './model';
@@ -54,6 +55,7 @@ export interface DevicePresetFile extends PresetFileBase<'device'> {
 export interface GroupPresetFile extends PresetFileBase<'group'> {
   group: {
     enabled: boolean;
+    mode: GroupMode;
     name: string | null;
     metadata?: AuthoredMetadata;
     devices: GeneratorDeviceNode[];
@@ -292,6 +294,7 @@ const parseGroupPresetPayload = (
   if (
     !isRecord(group)
     || typeof group.enabled !== 'boolean'
+    || group.mode !== 'normal' && group.mode !== 'isolate'
     || group.name !== undefined && group.name !== null && typeof group.name !== 'string'
     || !Array.isArray(group.devices)
     || group.devices.length === 0
@@ -317,6 +320,7 @@ const parseGroupPresetPayload = (
       savedAtIso: header.savedAtIso,
       group: {
         enabled: group.enabled,
+        mode: group.mode,
         name: typeof group.name === 'string' ? group.name : null,
         ...(metadata ? { metadata } : {}),
         devices: hydratedDevices,

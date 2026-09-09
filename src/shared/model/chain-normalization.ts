@@ -18,6 +18,10 @@ import type {
 import { cloneChainForIpc } from './chain-clone';
 import { normalizeCustomName, normalizeRackName } from './naming';
 import { normalizeAuthoredMetadata } from './authored-metadata';
+import {
+  collectActiveIsolatedGroupIds,
+  normalizeGroupMode,
+} from '../group-state';
 
 export const hydrateImportedGeneratorDevice = (
   value: unknown,
@@ -86,6 +90,7 @@ const hydrateImportedGroupStateById = (
     const metadata = normalizeAuthoredMetadata(state.metadata);
     next[groupId] = {
       enabled: toBoolean(state.enabled, true),
+      mode: normalizeGroupMode(state.mode),
       name: normalizeCustomName(state.name),
       ...(metadata ? { metadata } : {}),
     };
@@ -133,6 +138,7 @@ export const reconcileChainGroupStateById = (
     const metadata = normalizeAuthoredMetadata(prevEntry.metadata);
     next[groupId] = {
       enabled: toBoolean(prevEntry.enabled, true),
+      mode: normalizeGroupMode(prevEntry.mode),
       name: normalizeCustomName(prevEntry.name),
       ...(metadata ? { metadata } : {}),
     };
@@ -173,7 +179,7 @@ const reconcilePathDeviceParams = (chain: GeneratorChain): void => {
 };
 
 const reconcileMaskSourceIds = (chain: GeneratorChain): void => {
-  const groupIds = collectActiveGroupIds(chain.devices);
+  const isolatedGroupIds = collectActiveIsolatedGroupIds(chain);
   const generatorIds = collectGeneratorIds(chain.devices);
 
   for (const device of chain.devices) {
@@ -189,7 +195,7 @@ const reconcileMaskSourceIds = (chain: GeneratorChain): void => {
     let nextSourceId: string | null = null;
 
     if (device.params.sourceKind === 'group') {
-      nextSourceId = prevSourceId && groupIds.has(prevSourceId) ? prevSourceId : null;
+      nextSourceId = prevSourceId && isolatedGroupIds.has(prevSourceId) ? prevSourceId : null;
     } else if (device.params.sourceKind === 'generator') {
       nextSourceId = prevSourceId && generatorIds.has(prevSourceId) ? prevSourceId : null;
     }

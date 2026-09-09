@@ -103,7 +103,7 @@ export const spatialTransformOperator = createRackOperator<SpatialTransformStage
     return applyPendingSpatialTransform(
       state,
       device,
-      stage.groupId,
+      stage.targetGroupId,
       stage.stageIndex,
       isModulated,
       (frameIndex, sampleStepBeats, evaluationWindow) => resolveModulatedDeviceAtFrame(

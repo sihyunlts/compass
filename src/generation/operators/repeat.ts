@@ -150,7 +150,7 @@ export const repeatOperator = createRackOperator<'repeat', 'materialize-all'>(
     applyRepeatEffect(
       state,
       stage.device,
-      stage.groupId,
+      stage.targetGroupId,
       stage.stageIndex,
     ),
     context,

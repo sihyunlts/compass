@@ -38,7 +38,7 @@ const isReferenceGeneratorStage = (
   }
 
   return sourceKind === 'group'
-    ? stage.groupId === sourceId
+    ? stage.memberGroupId === sourceId
     : stage.deviceId === sourceId;
 };
 
@@ -65,7 +65,7 @@ const isReferenceEffectStage = (
   }
 
   if (sourceKind === 'group') {
-    return stage.groupId === sourceId;
+    return stage.memberGroupId === sourceId;
   }
 
   const sourceGroupId = resolveGeneratorGroupId(context.compiledPlan.baseChain, sourceId);
@@ -73,7 +73,7 @@ const isReferenceEffectStage = (
     return false;
   }
 
-  return stage.groupId === sourceGroupId;
+  return stage.memberGroupId === sourceGroupId;
 };
 
 export const shouldApplyReferenceStage = (

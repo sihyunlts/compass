@@ -775,6 +775,7 @@
           onSaveDevicePreset={(deviceId) => presetController.handleSaveDevicePreset(deviceId)}
           onSaveGroupPreset={(groupId) => presetController.handleSaveGroupPreset(groupId)}
           onToggleGroupEnabled={editorSession.commands.toggleGroupEnabled}
+          onToggleGroupIsolated={editorSession.commands.toggleGroupIsolated}
           onToggleCollapse={editorSession.commands.toggleCollapse}
           onRenameDevice={editorSession.commands.renameDevice}
           onRenameGroup={editorSession.commands.renameGroup}
