@@ -105,6 +105,7 @@ class DeviceRackController {
       onScrollMetricsChange: (metrics) => this.options.onScrollMetricsChange(metrics),
       onMiniMapContentRevisionChange: (revision) =>
         this.options.onMiniMapContentRevisionChange(revision),
+      focusSelectedItem: () => this.focusSelectedItem(),
       startRenamingDevice: (deviceId) => this.rename.startRenamingDevice(deviceId),
       startRenamingGroup: (groupId) => this.rename.startRenamingGroup(groupId),
     });
@@ -388,6 +389,13 @@ class DeviceRackController {
       block: 'nearest',
       inline: 'nearest',
     });
+  }
+
+  private focusSelectedItem(): void {
+    const selectedItem = this.rackSelection.state.navigationCursorItem;
+    if (selectedItem) {
+      void this.focusRackItem(selectedItem);
+    }
   }
 
   private async focusRackItem(item: RackSelectionItem): Promise<void> {
