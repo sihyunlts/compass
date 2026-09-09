@@ -110,10 +110,13 @@
       ?? normalizeCustomName(device.name)
       ?? i18n.t(getDeviceMessageKey(device.kind)),
   );
-  const enabledToggleLabel = $derived(
+  const enabledToggleAriaLabel = $derived(
     i18n.t(device.enabled ? 'device.disable' : 'device.enable', {
       name: localizedTitle,
     }),
+  );
+  const enabledToggleHint = $derived(
+    i18n.t(device.enabled ? 'device.disableHint' : 'device.enableHint'),
   );
   const modulationTargetParamKeys = $derived.by(() =>
     new Set(getRendererModulationTargetParamDefinitions(device.kind).map((param) => param.key)));
@@ -278,15 +281,15 @@
           class="round-checkbox device-toggle"
           type="checkbox"
           checked={device.enabled}
-          aria-label={enabledToggleLabel}
-          use:hint={enabledToggleLabel}
+          aria-label={enabledToggleAriaLabel}
+          use:hint={enabledToggleHint}
           onchange={handleEnabledChange}
         />
         <button
           class="preset-save-button"
           type="button"
           aria-label={i18n.t('device.save', { name: localizedTitle })}
-          use:hint={i18n.t('device.save', { name: localizedTitle })}
+          use:hint={i18n.t('device.saveHint')}
           onpointerdown={handleSavePresetPointerDown}
           onclick={handleSavePresetClick}
           oncontextmenu={handleSavePresetContextMenu}

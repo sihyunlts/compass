@@ -553,23 +553,31 @@
                     groupDisplayNameById,
                     col.groupId,
                   )}
-                  {@const groupToggleLabel = i18n.t(
+                  {@const groupToggleAriaLabel = i18n.t(
                     col.enabled ? 'group.disable' : 'group.enable',
                     { name: groupName },
                   )}
-                  {@const groupIsolateLabel = i18n.t(
+                  {@const groupToggleHint = i18n.t(
+                    col.enabled ? 'group.disableHint' : 'group.enableHint',
+                  )}
+                  {@const groupIsolateAriaLabel = i18n.t(
                     col.mode === 'isolate'
                       ? 'group.isolateDisable'
                       : 'group.isolateEnable',
                     { name: groupName },
+                  )}
+                  {@const groupIsolateHint = i18n.t(
+                    col.mode === 'isolate'
+                      ? 'group.isolateDisableHint'
+                      : 'group.isolateEnableHint',
                   )}
                   <div class="group-rail-controls">
                     <input
                       class="group-enabled-toggle round-checkbox"
                       type="checkbox"
                       checked={col.enabled}
-                      aria-label={groupToggleLabel}
-                      use:hint={groupToggleLabel}
+                      aria-label={groupToggleAriaLabel}
+                      use:hint={groupToggleHint}
                       onpointerdown={(event) => controller.handleGroupTogglePointerDown(event)}
                       onclick={(event) => controller.handleGroupToggleClick(event)}
                       onchange={(event) => controller.handleGroupEnabledChange(event, col.groupId)}
@@ -578,7 +586,7 @@
                       class="preset-save-button"
                       type="button"
                       aria-label={i18n.t('group.save', { name: groupName })}
-                      use:hint={i18n.t('group.save', { name: groupName })}
+                      use:hint={i18n.t('group.saveHint')}
                       onpointerdown={(event) => controller.handleGroupSavePointerDown(event)}
                       onclick={(event) => controller.handleGroupSaveClick(event, col.groupId)}
                       oncontextmenu={(event) => controller.handleGroupSaveContextMenu(event)}
@@ -591,9 +599,9 @@
                     class="preset-save-button group-isolate-toggle"
                     class:is-active={col.mode === 'isolate'}
                     type="button"
-                    aria-label={groupIsolateLabel}
+                    aria-label={groupIsolateAriaLabel}
                     aria-pressed={col.mode === 'isolate'}
-                    use:hint={groupIsolateLabel}
+                    use:hint={groupIsolateHint}
                     onpointerdown={(event) => controller.handleGroupIsolatePointerDown(event)}
                     onclick={(event) => controller.handleGroupIsolateClick(
                       event,
