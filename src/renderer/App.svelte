@@ -572,6 +572,10 @@
       'reduce-animation',
       settingsState.reduceAnimation,
     );
+    document.documentElement.classList.toggle(
+      'reduce-blur',
+      settingsState.reduceBlur,
+    );
     appEl.style.setProperty('--sidebar-width', `${uiState.sidebarWidthPx}px`);
     appEl.style.setProperty(
       '--browser-panel-width',
@@ -593,6 +597,7 @@
       {mainWindowAlwaysOnTop}
       locale={i18n.locale}
       reduceAnimation={settingsState.reduceAnimation}
+      reduceBlur={settingsState.reduceBlur}
       themePreset={settingsState.themePreset}
       themeHue={settingsState.themeHue}
       themeSaturation={settingsState.themeSaturation}
@@ -625,6 +630,8 @@
       }}
       onReduceAnimationToggle={(enabled) =>
         settingsController.handleReduceAnimationToggle(enabled)}
+      onReduceBlurToggle={(enabled) =>
+        settingsController.handleReduceBlurToggle(enabled)}
       onThemePresetChange={(presetId) =>
         settingsController.handleThemePresetChange(presetId)}
       onThemeHueChange={(hue) => settingsController.handleThemeHueChange(hue)}

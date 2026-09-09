@@ -353,6 +353,7 @@
     canToggleWindowLayer = false,
     mainWindowAlwaysOnTop = false,
     reduceAnimation = false,
+    reduceBlur = false,
     themePreset = 'default',
     themeHue = 265,
     themeSaturation = 100,
@@ -370,6 +371,7 @@
     onPageSelect = () => {},
     onMainWindowAlwaysOnTopToggle = () => {},
     onReduceAnimationToggle = () => {},
+    onReduceBlurToggle = () => {},
     onThemePresetChange = () => {},
     onThemeHueChange = () => {},
     onThemeSaturationChange = () => {},
@@ -406,6 +408,7 @@
     canToggleWindowLayer?: boolean;
     mainWindowAlwaysOnTop?: boolean;
     reduceAnimation?: boolean;
+    reduceBlur?: boolean;
     themePreset?: ThemeSelectionId;
     themeHue?: number;
     themeSaturation?: number;
@@ -423,6 +426,7 @@
     onPageSelect?: (page: BrowserPage) => void;
     onMainWindowAlwaysOnTopToggle?: () => void;
     onReduceAnimationToggle?: (enabled: boolean) => void;
+    onReduceBlurToggle?: (enabled: boolean) => void;
     onThemePresetChange?: (presetId: ThemePresetId) => void;
     onThemeHueChange?: (hue: number) => void;
     onThemeSaturationChange?: (saturation: number) => void;
@@ -1517,6 +1521,7 @@
           {launchpadMk2Enabled}
           {locale}
           {reduceAnimation}
+          {reduceBlur}
           {themePreset}
           {themeHue}
           {themeSaturation}
@@ -1530,6 +1535,7 @@
           onLaunchpadModelToggle={onLaunchpadModelToggle}
           onLocaleChange={onLocaleChange}
           onReduceAnimationToggle={onReduceAnimationToggle}
+          onReduceBlurToggle={onReduceBlurToggle}
           onThemePresetChange={onThemePresetChange}
           onThemeHueChange={onThemeHueChange}
           onThemeSaturationChange={onThemeSaturationChange}
