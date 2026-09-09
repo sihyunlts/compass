@@ -4,14 +4,15 @@ import {
 } from '../context-menu/types';
 import type { GroupSelectionContext } from '../rack/selection.svelte';
 import type { GeneratorChain } from '../../../shared/model';
+import { normalizeOptionalId } from '../../../shared/normalize-id';
 import { resolveExistingOrderedDeviceIds } from './chain-ops';
 import { sanitizePreviewBpm } from './persistence-storage';
 import type { ChainHistoryKind } from './history-core';
 
-export type RackSelectionSnapshot =
+export type RackSelectionItemSnapshot =
   | {
-      kind: 'devices';
-      deviceIds: string[];
+      kind: 'device';
+      deviceId: string;
     }
   | {
       kind: 'group';
@@ -19,16 +20,10 @@ export type RackSelectionSnapshot =
       memberDeviceIds: string[];
     };
 
-type SelectionLike =
-  | {
-      kind: 'devices';
-      deviceIds: readonly string[];
-    }
-  | {
-      kind: 'group';
-      groupId: string;
-      memberDeviceIds: readonly string[];
-    };
+export interface RackSelectionSnapshot {
+  items: RackSelectionItemSnapshot[];
+  deviceIds: string[];
+}
 
 export const selectPreviewBpmText = (previewBpm: number): string =>
   `BPM ${sanitizePreviewBpm(previewBpm).toFixed(2)}`;
@@ -49,32 +44,22 @@ export const selectClipboardAvailable = (state: {
   clipboardAvailable: boolean;
 }): boolean => state.clipboardAvailable;
 
-const toSelectionSnapshot = (
+const toGroupSelectionItemSnapshot = (
   chain: GeneratorChain,
-  source: SelectionLike,
-): RackSelectionSnapshot | null => {
-  if (source.kind === 'group') {
-    const memberDeviceIds = resolveExistingOrderedDeviceIds(
-      chain.devices,
-      source.memberDeviceIds,
-    );
-    if (memberDeviceIds.length === 0) {
-      return null;
-    }
-    return {
-      kind: 'group',
-      groupId: source.groupId,
-      memberDeviceIds,
-    };
-  }
-
-  const deviceIds = resolveExistingOrderedDeviceIds(chain.devices, source.deviceIds);
-  if (deviceIds.length === 0) {
+  groupId: string,
+  memberDeviceIds: readonly string[],
+): Extract<RackSelectionItemSnapshot, { kind: 'group' }> | null => {
+  const resolvedMemberDeviceIds = resolveExistingOrderedDeviceIds(
+    chain.devices,
+    memberDeviceIds,
+  );
+  if (resolvedMemberDeviceIds.length === 0) {
     return null;
   }
   return {
-    kind: 'devices',
-    deviceIds,
+    kind: 'group',
+    groupId,
+    memberDeviceIds: resolvedMemberDeviceIds,
   };
 };
 
@@ -83,19 +68,46 @@ export const resolveCurrentSelectionSnapshot = (
   selectedGroups: readonly GroupSelectionContext[],
   selectedDeviceIds: readonly string[],
 ): RackSelectionSnapshot | null => {
-  const selectedGroup = selectedGroups[0] ?? null;
-  if (selectedGroup && selectedGroups.length === 1) {
-    return toSelectionSnapshot(chain, {
-      kind: 'group',
-      groupId: selectedGroup.groupId,
-      memberDeviceIds: selectedGroup.memberDeviceIds,
-    });
+  const selectedGroupById = new Map(
+    selectedGroups.map((group): [string, GroupSelectionContext] => [group.groupId, group]),
+  );
+  const selectedDeviceIdSet = new Set(selectedDeviceIds);
+  const emittedGroupIds = new Set<string>();
+  const items: RackSelectionItemSnapshot[] = [];
+  const resolvedDeviceIds = new Set<string>();
+
+  for (const device of chain.devices) {
+    const groupId = normalizeOptionalId(device.groupId);
+    const selectedGroup = groupId ? selectedGroupById.get(groupId) : undefined;
+    if (selectedGroup) {
+      if (!emittedGroupIds.has(groupId)) {
+        const item = toGroupSelectionItemSnapshot(
+          chain,
+          groupId,
+          selectedGroup.memberDeviceIds,
+        );
+        if (item) {
+          items.push(item);
+          for (const memberDeviceId of item.memberDeviceIds) {
+            resolvedDeviceIds.add(memberDeviceId);
+          }
+        }
+        emittedGroupIds.add(groupId);
+      }
+      continue;
+    }
+
+    if (!selectedDeviceIdSet.has(device.id)) {
+      continue;
+    }
+
+    items.push({ kind: 'device', deviceId: device.id });
+    resolvedDeviceIds.add(device.id);
   }
 
-  return toSelectionSnapshot(chain, {
-    kind: 'devices',
-    deviceIds: selectedDeviceIds,
-  });
+  return items.length > 0
+    ? { items, deviceIds: [...resolvedDeviceIds] }
+    : null;
 };
 
 export const resolveSelectionSnapshotFromContextTarget = (
@@ -106,16 +118,26 @@ export const resolveSelectionSnapshotFromContextTarget = (
     return null;
   }
 
-  return target.kind === 'group'
-    ? toSelectionSnapshot(chain, {
-        kind: 'group',
-        groupId: target.groupId,
-        memberDeviceIds: target.memberDeviceIds,
-      })
-    : toSelectionSnapshot(chain, {
-        kind: 'devices',
-        deviceIds: target.deviceIds,
-      });
+  if (target.kind === 'group') {
+    const item = toGroupSelectionItemSnapshot(
+      chain,
+      target.groupId,
+      target.memberDeviceIds,
+    );
+    return item
+      ? { items: [item], deviceIds: [...item.memberDeviceIds] }
+      : null;
+  }
+
+  const deviceIds = resolveExistingOrderedDeviceIds(chain.devices, target.deviceIds);
+  if (deviceIds.length === 0) {
+    return null;
+  }
+
+  return {
+    items: deviceIds.map((deviceId) => ({ kind: 'device', deviceId })),
+    deviceIds,
+  };
 };
 
 export const resolveDeleteSelectionDeviceIds = (

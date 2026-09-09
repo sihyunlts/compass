@@ -76,7 +76,7 @@ export const mountKeyboardShortcuts = (
     ['cut', options.editorSession.commands.cutSelection],
     ['paste', options.editorSession.commands.pasteClipboard],
     ['duplicate', options.editorSession.commands.duplicateSelection],
-    ['selectAll', options.editorSession.commands.selectAllRackDevices],
+    ['selectAll', options.editorSession.commands.selectAllRackItems],
   ];
   const rackCommands: readonly ShortcutCommand[] = [
     ['collapseSelection', options.editorSession.commands.collapseSelection],
@@ -146,7 +146,7 @@ export const mountKeyboardShortcuts = (
     if (matchesAppShortcut(event, 'toggleEnabled', options.platform)) {
       if (!event.repeat) {
         closeContextMenuIfHandled(
-          options.editorSession.commands.toggleSelectedDevicesEnabled(),
+          options.editorSession.commands.toggleRackSelectionEnabled(),
           options.closeContextMenu,
           event,
         );

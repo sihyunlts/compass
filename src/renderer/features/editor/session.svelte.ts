@@ -1,4 +1,6 @@
 import type { BridgeSettings } from '../../../shared/bridge/types';
+import { SvelteSet } from 'svelte/reactivity';
+import { normalizeOptionalId } from '../../../shared/normalize-id';
 import {
   cloneChainForIpc,
   isCurveModulatorNode,
@@ -28,7 +30,7 @@ import type {
   RackInteractionCommit,
 } from '../rack/types';
 import type { RackDropZone } from '../rack/drop-ops';
-import type { GroupSelectionContext } from '../rack/selection.svelte';
+import type { GroupSelectionContext, RackSelectionItem } from '../rack/selection.svelte';
 import {
   applyBridgeSettings as applyEditorBridgeSettings,
   handleAutoCreateLengthChange,
@@ -48,7 +50,7 @@ import {
   EDITOR_HISTORY_META,
   applyBrowserDeviceAdd,
   applyRackCommit,
-  toggleDevicesEnabled,
+  toggleRackSelectionEnabled,
 } from './commands';
 import {
   createEditorHistory,
@@ -146,14 +148,13 @@ export interface EditorSessionState {
 export interface EditorRackBinding {
   getSelectedGroupContexts(): GroupSelectionContext[];
   getOrderedSelectedDeviceIds(): string[];
-  selectAllDevices(ids: string[]): void;
-  setSelectedDeviceIds(
-    ids: readonly string[],
-    orderedDeviceIds?: readonly string[],
-  ): void;
-  setSelectedGroupIds(
-    ids: readonly string[],
-    orderedGroupIds?: readonly string[],
+  selectAllRackItems(): void;
+  setSelectedDeviceIds(ids: readonly string[]): void;
+  setSelectedGroupIds(ids: readonly string[]): void;
+  setSelectedRackItems(
+    deviceIds: readonly string[],
+    groupIds: readonly string[],
+    anchor: RackSelectionItem | null,
   ): void;
   applyNextSelectionAfterDelete(deviceIds: readonly string[]): void;
   clearSelection(): void;
@@ -344,18 +345,16 @@ export class EditorSession {
     cutSelection: (): boolean => this.cutSelection(),
     pasteClipboard: (): boolean => this.pasteClipboard(),
     duplicateSelection: (): boolean => this.duplicateSelection(),
-    toggleSelectedDevicesEnabled: (): boolean => this.toggleSelectedDevicesEnabled(),
+    toggleRackSelectionEnabled: (): boolean => this.toggleRackSelectionEnabled(),
     collapseSelection: (): boolean => this.setSelectedDevicesCollapsed(true),
     expandSelection: (): boolean => this.setSelectedDevicesCollapsed(false),
-    selectAllRackDevices: (): boolean => {
+    selectAllRackItems: (): boolean => {
       const rackBinding = this.rackBinding;
       if (!rackBinding) {
         return false;
       }
 
-      rackBinding.selectAllDevices(
-        this.state.chainState.devices.map((device) => device.id),
-      );
+      rackBinding.selectAllRackItems();
       return true;
     },
     deleteSelection: (): boolean => this.deleteCurrentSelection(),
@@ -651,9 +650,12 @@ export class EditorSession {
     return duplicateEditorSelection(this.buildClipboardContext(), selectionOverride);
   }
 
-  private toggleSelectedDevicesEnabled(): boolean {
-    const selectedDeviceIds = this.rackBinding?.getOrderedSelectedDeviceIds() ?? [];
-    const nextChain = toggleDevicesEnabled(this.state.chainState, selectedDeviceIds);
+  private toggleRackSelectionEnabled(): boolean {
+    const selection = this.resolveCurrentSelection();
+    if (!selection) {
+      return false;
+    }
+    const nextChain = toggleRackSelectionEnabled(this.state.chainState, selection);
     if (!nextChain) {
       return false;
     }
@@ -668,9 +670,7 @@ export class EditorSession {
       return false;
     }
 
-    const selectedDeviceIds = selection.kind === 'group'
-      ? selection.memberDeviceIds
-      : selection.deviceIds;
+    const selectedDeviceIds = selection.deviceIds;
     if (collapsed) {
       mergeCollapsedDeviceIds(this.state, selectedDeviceIds);
     } else {
@@ -714,15 +714,16 @@ export class EditorSession {
       return false;
     }
 
-    if (selection.kind === 'group') {
-      return this.rackBinding.startRenamingGroup(selection.groupId);
+    const selectedOnlyItem = selection.items.length === 1 ? selection.items[0] : null;
+    if (selectedOnlyItem?.kind === 'group') {
+      return this.rackBinding.startRenamingGroup(selectedOnlyItem.groupId);
     }
 
-    if (selection.deviceIds.length !== 1) {
+    if (selectedOnlyItem?.kind !== 'device') {
       return false;
     }
 
-    return this.rackBinding.startRenamingDevice(selection.deviceIds[0]);
+    return this.rackBinding.startRenamingDevice(selectedOnlyItem.deviceId);
   }
 
   private beginRenameFromContextTarget(target: ContextMenuTarget): boolean {
@@ -817,24 +818,17 @@ export class EditorSession {
       return;
     }
 
-    this.rackBinding?.setSelectedDeviceIds(
-      insertedDeviceIds,
-      nextChain.devices.map((device) => device.id),
-    );
+    this.rackBinding?.setSelectedDeviceIds(insertedDeviceIds);
   }
 
   private selectGroupIds(
     groupIds: readonly string[],
-    chain: GeneratorChain,
   ): void {
     if (groupIds.length === 0) {
       return;
     }
 
-    this.rackBinding?.setSelectedGroupIds(
-      groupIds,
-      buildOrderedGroupIds(chain.devices),
-    );
+    this.rackBinding?.setSelectedGroupIds(groupIds);
   }
 
   private selectInsertedGroups(
@@ -844,7 +838,37 @@ export class EditorSession {
     const previousGroupIds = buildOrderedGroupIds(previousChain.devices);
     const insertedGroupIds = buildOrderedGroupIds(nextChain.devices)
       .filter((groupId) => !previousGroupIds.includes(groupId));
-    this.selectGroupIds(insertedGroupIds, nextChain);
+    this.selectGroupIds(insertedGroupIds);
+  }
+
+  private selectInsertedRackItems(
+    previousChain: GeneratorChain,
+    nextChain: GeneratorChain,
+  ): void {
+    const previousDeviceIds = new SvelteSet(previousChain.devices.map((device) => device.id));
+    const insertedDevices = nextChain.devices.filter((device) => !previousDeviceIds.has(device.id));
+    if (insertedDevices.length === 0) {
+      return;
+    }
+
+    const groupIds: string[] = [];
+    const deviceIds: string[] = [];
+    let anchor: RackSelectionItem | null = null;
+    for (const device of insertedDevices) {
+      const groupId = normalizeOptionalId(device.groupId);
+      if (groupId) {
+        if (!groupIds.includes(groupId)) {
+          groupIds.push(groupId);
+          anchor = { kind: 'group', id: groupId };
+        }
+        continue;
+      }
+
+      deviceIds.push(device.id);
+      anchor = { kind: 'device', id: device.id };
+    }
+
+    this.rackBinding?.setSelectedRackItems(deviceIds, groupIds, anchor);
   }
 
   private insertDevicePreset(
@@ -884,7 +908,7 @@ export class EditorSession {
 
     this.applyChainMutation(result.chain, EDITOR_HISTORY_META.insertGroupPreset);
     mergeCollapsedDeviceIds(this.state, result.collapsedDeviceIds);
-    this.selectGroupIds([result.groupId], result.chain);
+    this.selectGroupIds([result.groupId]);
     return result;
   }
 
@@ -938,17 +962,20 @@ export class EditorSession {
         deviceIds: readonly string[],
         meta?: ChainMutationMeta,
       ) => this.deleteDevicesById(deviceIds, meta),
-      deleteGroup: (
-        groupId: string,
-        meta?: ChainMutationMeta,
-      ) => this.deleteGroup(groupId, meta),
       applyInsertedSelection: (
         clipboard: RackClipboard,
         previousChain: EditorSessionState['chainState'],
         nextChain: EditorSessionState['chainState'],
+        collapsedDeviceIds: readonly string[],
       ) => {
+        mergeCollapsedDeviceIds(this.state, collapsedDeviceIds);
         if (clipboard.kind === 'group') {
           this.selectInsertedGroups(previousChain, nextChain);
+          return;
+        }
+
+        if (clipboard.kind === 'rack-items') {
+          this.selectInsertedRackItems(previousChain, nextChain);
           return;
         }
 

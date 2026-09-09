@@ -8,6 +8,7 @@ import {
   createRackClipboard,
   prepareClipboardInsert,
   type RackClipboard,
+  type RackClipboardGroupState,
 } from './rack-clipboard';
 import {
   reconcileGroupStateById,
@@ -21,6 +22,7 @@ import { createDeviceNodeByKind } from './device-node-factory';
 import {
   applyInsertDeviceByDropZone,
   applyInsertDevicesByDropZone,
+  applyInsertDevicesPreservingGroupsByDropZone,
   applyMoveDevicesByDropZone,
   coerceOutsideTargetIdToGroupBoundaryByDevices,
   type RackDropZone,
@@ -60,22 +62,22 @@ const resolvePasteDropZone = (
   selection: RackSelectionSnapshot | null,
   clipboardKind: RackClipboard['kind'],
 ): RackDropZone => {
-  if (clipboardKind === 'group') {
-    if (selection?.kind === 'group') {
+  const selectedLastItem = selection?.items.at(-1) ?? null;
+  if (clipboardKind !== 'devices') {
+    if (selectedLastItem?.kind === 'group') {
       return {
         kind: 'outside',
-        targetId: resolveTailDeviceIdByGroup(chain.devices, selection.groupId),
+        targetId: resolveTailDeviceIdByGroup(chain.devices, selectedLastItem.groupId),
         placement: 'after',
       };
     }
 
-    if (selection?.kind === 'devices') {
-      const selectedLastId = selection.deviceIds[selection.deviceIds.length - 1] ?? null;
+    if (selectedLastItem?.kind === 'device') {
       return {
         kind: 'outside',
         targetId: coerceOutsideTargetIdToGroupBoundaryByDevices(
           chain.devices,
-          selectedLastId,
+          selectedLastItem.deviceId,
           'after',
         ),
         placement: 'after',
@@ -89,17 +91,18 @@ const resolvePasteDropZone = (
     };
   }
 
-  if (selection?.kind === 'group') {
-    const groupTailId = resolveTailDeviceIdByGroup(chain.devices, selection.groupId);
+  const selectedOnlyItem = selection?.items.length === 1 ? selection.items[0] : null;
+  if (selectedOnlyItem?.kind === 'group') {
+    const groupTailId = resolveTailDeviceIdByGroup(chain.devices, selectedOnlyItem.groupId);
     if (groupTailId) {
       return {
         kind: 'inside-group',
-        groupId: selection.groupId,
+        groupId: selectedOnlyItem.groupId,
         targetId: groupTailId,
         placement: 'after',
       };
     }
-  } else if (selection?.kind === 'devices') {
+  } else if (selection) {
     const selectedLastId = selection.deviceIds[selection.deviceIds.length - 1] ?? null;
     if (selectedLastId) {
       const commonGroupId = resolveCommonGroupId(chain.devices, selection.deviceIds);
@@ -136,7 +139,7 @@ const coercePasteDropZone = (
   dropZone: RackDropZone,
   clipboardKind: RackClipboard['kind'],
 ): RackDropZone => {
-  if (clipboardKind !== 'group' || dropZone.kind === 'outside') {
+  if (clipboardKind === 'devices' || dropZone.kind === 'outside') {
     return dropZone;
   }
 
@@ -205,61 +208,108 @@ export const applyRackCommit = (
 export const buildClipboardFromSelection = (
   chain: GeneratorChain,
   selection: RackSelectionSnapshot,
+  collapsedDeviceIds: readonly string[] = [],
 ): RackClipboard | null => {
-  const sourceIds = selection.kind === 'group'
-    ? selection.memberDeviceIds
-    : selection.deviceIds;
-  const sourceDevices = resolveDevicesByIds(chain.devices, sourceIds);
-
-  if (selection.kind === 'group') {
-    return createRackClipboard(sourceDevices, {
-      kind: 'group',
-      enabled: chain.groupStateById[selection.groupId]?.enabled !== false,
-      mode: resolveGroupMode(chain.groupStateById, selection.groupId),
-      name: chain.groupStateById[selection.groupId]?.name ?? null,
-      metadata: chain.groupStateById[selection.groupId]?.metadata,
-    });
+  const selectedOnlyItem = selection.items.length === 1 ? selection.items[0] : null;
+  if (selectedOnlyItem?.kind === 'group') {
+    const sourceDevices = resolveDevicesByIds(chain.devices, selectedOnlyItem.memberDeviceIds);
+    return createRackClipboard(
+      sourceDevices,
+      {
+        kind: 'group',
+        enabled: chain.groupStateById[selectedOnlyItem.groupId]?.enabled !== false,
+        mode: resolveGroupMode(chain.groupStateById, selectedOnlyItem.groupId),
+        name: chain.groupStateById[selectedOnlyItem.groupId]?.name ?? null,
+        metadata: chain.groupStateById[selectedOnlyItem.groupId]?.metadata,
+      },
+      collapsedDeviceIds,
+    );
   }
 
-  return createRackClipboard(sourceDevices, { kind: 'devices' });
+  if (selection.items.every((item) => item.kind === 'device')) {
+    return createRackClipboard(
+      resolveDevicesByIds(chain.devices, selection.deviceIds),
+      { kind: 'devices' },
+      collapsedDeviceIds,
+    );
+  }
+
+  const groupStateById: Record<string, RackClipboardGroupState> = {};
+  for (const item of selection.items) {
+    if (item.kind === 'group') {
+      groupStateById[item.groupId] = {
+        enabled: chain.groupStateById[item.groupId]?.enabled !== false,
+        mode: resolveGroupMode(chain.groupStateById, item.groupId),
+        name: chain.groupStateById[item.groupId]?.name ?? null,
+        metadata: chain.groupStateById[item.groupId]?.metadata,
+      };
+    }
+  }
+  return createRackClipboard(
+    resolveDevicesByIds(chain.devices, selection.deviceIds),
+    { kind: 'rack-items', groupStateById },
+    collapsedDeviceIds,
+  );
 };
 
 export const buildChainWithClipboardPaste = (
   chain: GeneratorChain,
   clipboard: RackClipboard,
   selection: RackSelectionSnapshot | null,
-): GeneratorChain => {
+): { chain: GeneratorChain; idMap: ReadonlyMap<string, string> } => {
   const rawDropZone = resolvePasteDropZone(chain, selection, clipboard.kind);
   const dropZone = coercePasteDropZone(chain, rawDropZone, clipboard.kind);
+  const usedGroupIds = new Set(
+    chain.devices.flatMap((device) => {
+      const groupId = normalizeOptionalId(device.groupId);
+      return groupId ? [groupId] : [];
+    }),
+  );
+  const allocateGroupId = (): string => {
+    let index = 1;
+    while (usedGroupIds.has(`group-${index}`)) {
+      index += 1;
+    }
+    const groupId = `group-${index}`;
+    usedGroupIds.add(groupId);
+    return groupId;
+  };
   const prepared = prepareClipboardInsert(clipboard, {
     allocateDeviceId,
     resolveNextGroupId: () => resolveNextGroupId(chain.devices),
+    allocateGroupId,
   });
 
-  const forcedGroupId = prepared.groupStatePatch
+  const forcedGroupId = prepared.groupStatePatches.length > 0
     ? prepared.forcedGroupId
     : dropZone.kind === 'inside-group'
       ? dropZone.groupId
       : null;
-  const nextDevices = applyInsertDevicesByDropZone(
-    chain.devices,
-    prepared.devices,
-    dropZone,
-    forcedGroupId,
-  );
+  const nextDevices = prepared.preservePreparedGroupIds
+    ? applyInsertDevicesPreservingGroupsByDropZone(
+        chain.devices,
+        prepared.devices,
+        dropZone,
+      )
+    : applyInsertDevicesByDropZone(
+        chain.devices,
+        prepared.devices,
+        dropZone,
+        forcedGroupId,
+      );
 
   const nextChain = withDevices(chain, nextDevices);
-  if (prepared.groupStatePatch) {
-    nextChain.groupStateById[prepared.groupStatePatch.groupId] = {
-      enabled: prepared.groupStatePatch.enabled,
-      mode: prepared.groupStatePatch.mode,
-      name: prepared.groupStatePatch.name,
-      ...(prepared.groupStatePatch.metadata
-        ? { metadata: prepared.groupStatePatch.metadata }
+  for (const patch of prepared.groupStatePatches) {
+    nextChain.groupStateById[patch.groupId] = {
+      enabled: patch.enabled,
+      mode: patch.mode,
+      name: patch.name,
+      ...(patch.metadata
+        ? { metadata: patch.metadata }
         : {}),
     };
   }
-  return nextChain;
+  return { chain: nextChain, idMap: prepared.idMap };
 };
 
 export const applyGroupEnabledChange = (
@@ -339,22 +389,40 @@ export const applyGroupModeChange = (
   });
 };
 
-export const toggleDevicesEnabled = (
+export const toggleRackSelectionEnabled = (
   chain: GeneratorChain,
-  deviceIds: readonly string[],
+  selection: RackSelectionSnapshot,
 ): GeneratorChain | null => {
-  const targetIds = new Set(deviceIds);
-  const targetDevices = chain.devices.filter((device) => targetIds.has(device.id));
-  if (targetDevices.length === 0) {
+  const selectedDeviceIds = new Set(
+    selection.items.flatMap((item) => item.kind === 'device' ? [item.deviceId] : []),
+  );
+  const selectedGroupIds = new Set(
+    selection.items.flatMap((item) => item.kind === 'group' ? [item.groupId] : []),
+  );
+  if (selectedDeviceIds.size === 0 && selectedGroupIds.size === 0) {
     return null;
   }
 
-  const nextEnabled = targetDevices.every((device) => device.enabled === false);
-  return withDevices(
-    chain,
-    chain.devices.map((device) =>
-      targetIds.has(device.id) && device.enabled !== nextEnabled
-        ? { ...device, enabled: nextEnabled }
-        : device),
-  );
+  const areAllSelectedItemsDisabled = selection.items.every((item) =>
+    item.kind === 'group'
+      ? chain.groupStateById[item.groupId]?.enabled === false
+      : chain.devices.find((device) => device.id === item.deviceId)?.enabled === false);
+  const nextEnabled = areAllSelectedItemsDisabled;
+  const nextDevices = chain.devices.map((device) =>
+    selectedDeviceIds.has(device.id) && device.enabled !== nextEnabled
+      ? { ...device, enabled: nextEnabled }
+      : device);
+  const nextGroupStateById = reconcileGroupStateById(chain.groupStateById, nextDevices);
+  for (const groupId of selectedGroupIds) {
+    const groupState = nextGroupStateById[groupId];
+    if (groupState) {
+      nextGroupStateById[groupId] = { ...groupState, enabled: nextEnabled };
+    }
+  }
+
+  return {
+    ...chain,
+    devices: nextDevices,
+    groupStateById: nextGroupStateById,
+  };
 };

@@ -27,7 +27,6 @@ const handoffDeviceSelection = (
   context: GroupingContext,
   removedDeviceIds: readonly string[],
   replacementDeviceIds: readonly string[] = [],
-  nextOrderedDeviceIds?: readonly string[],
 ): void => {
   const rackBinding = context.rackBinding;
   if (!rackBinding) {
@@ -46,10 +45,7 @@ const handoffDeviceSelection = (
   }
 
   const preservedDeviceIds = selectedDeviceIds.filter((id) => !removedIdSet.has(id));
-  rackBinding.setSelectedDeviceIds(
-    [...preservedDeviceIds, ...replacementDeviceIds],
-    nextOrderedDeviceIds,
-  );
+  rackBinding.setSelectedDeviceIds([...preservedDeviceIds, ...replacementDeviceIds]);
 };
 
 export const deleteDevicesById = (
@@ -170,12 +166,19 @@ export const groupDeviceIds = (
     return false;
   }
 
-  return setGroupIdForDevices(
+  const groupId = resolveNextGroupId(context.state.chainState.devices);
+  const didChange = setGroupIdForDevices(
     context,
     targetIds,
-    resolveNextGroupId(context.state.chainState.devices),
+    groupId,
     EDITOR_HISTORY_META.groupCreate,
   );
+  if (!didChange) {
+    return false;
+  }
+
+  context.rackBinding?.setSelectedGroupIds([groupId]);
+  return true;
 };
 
 export const groupCurrentSelection = (

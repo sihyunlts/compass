@@ -467,6 +467,7 @@
           <div class="device-group-body">
             {#each buildGroupColumns(item) as col (col.key)}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
               <div
                 class={col.kind === 'device'
                   ? 'device-slot'
@@ -483,6 +484,8 @@
                       || (lastGroupDeviceId !== undefined
                         && selectedDeviceIds.includes(lastGroupDeviceId))}
                 class:is-renaming={col.kind === 'left-rail' && controller.rename.isRenamingGroup(col.groupId)}
+                data-rack-group-header={col.kind === 'left-rail' ? 'true' : undefined}
+                tabindex={col.kind === 'left-rail' ? -1 : undefined}
                 onpointerdown={col.kind === 'device'
                   ? undefined
                   : controller.rename.isRenamingGroup(col.groupId)
@@ -492,7 +495,7 @@
                   ? undefined
                   : controller.rename.isRenamingGroup(col.groupId)
                     ? undefined
-                  : (event) => controller.handleGroupRailClick(event)}
+                  : (event) => controller.handleGroupRailClick(event, col.groupId)}
                 oncontextmenu={col.kind === 'device'
                   ? undefined
                   : controller.rename.isRenamingGroup(col.groupId)
