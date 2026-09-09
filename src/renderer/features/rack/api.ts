@@ -38,6 +38,7 @@ interface CreateRackViewApiOptions {
   startRenamingGroup: (groupId: string) => boolean;
   hasPointerInteraction: () => boolean;
   setScrollLeft: (nextScrollLeft: number) => void;
+  focusSelectedItem: () => void;
   handleBrowserPointerDown: (
     sourceEvent: PointerEvent,
     source: BrowserInsertSource,
@@ -55,11 +56,13 @@ export const createRackViewApi = (
       deletedIds,
       options.getOrderedDeviceIds(),
     );
+    options.focusSelectedItem();
   },
   getOrderedSelectedDeviceIds: () =>
     options.rackSelection.getOrderedSelectedDeviceIds(options.getOrderedDeviceIds()),
   selectAllRackItems: () => {
     options.rackSelection.selectAll(options.getDevices());
+    options.focusSelectedItem();
   },
   setSelectedDeviceIds: (deviceIds) => {
     const anchorId = deviceIds.at(-1) ?? null;
@@ -69,6 +72,7 @@ export const createRackViewApi = (
       anchorId ? { kind: 'device', id: anchorId } : null,
       options.getDevices(),
     );
+    options.focusSelectedItem();
   },
   setSelectedGroupIds: (groupIds) => {
     const anchorId = groupIds.at(-1) ?? null;
@@ -78,6 +82,7 @@ export const createRackViewApi = (
       anchorId ? { kind: 'group', id: anchorId } : null,
       options.getDevices(),
     );
+    options.focusSelectedItem();
   },
   setSelectedRackItems: (deviceIds, groupIds, anchor) => {
     options.rackSelection.setSelectedRackItems(
@@ -86,6 +91,7 @@ export const createRackViewApi = (
       anchor,
       options.getDevices(),
     );
+    options.focusSelectedItem();
   },
   getSelectedGroupContexts: () =>
     options.rackSelection.getSelectedGroupContexts(options.getDevices()),

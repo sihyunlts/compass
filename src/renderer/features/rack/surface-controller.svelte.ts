@@ -39,6 +39,7 @@ interface RackSurfaceControllerOptions {
   commitRackPresetDrop: (source: Extract<BrowserPresetInsertSource, { kind: 'rack-preset' }>) => void;
   onScrollMetricsChange: (metrics: RackScrollMetrics) => void;
   onMiniMapContentRevisionChange: (revision: number) => void;
+  focusSelectedItem: () => void;
   startRenamingDevice: (deviceId: string) => boolean;
   startRenamingGroup: (groupId: string) => boolean;
 }
@@ -93,6 +94,7 @@ class RackSurfaceController {
       syncAfterRender: () => this.syncAfterRender(),
       startRenamingDevice: options.startRenamingDevice,
       startRenamingGroup: options.startRenamingGroup,
+      focusSelectedItem: options.focusSelectedItem,
       hasPointerInteraction: () => this.hasPointerInteraction(),
       setScrollLeft: (nextScrollLeft) => {
         this.setScrollLeft(nextScrollLeft);
