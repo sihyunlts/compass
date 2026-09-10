@@ -15,7 +15,7 @@
         "groupId": null,
         "name": null,
         "params": {
-          "seed": 1,
+          "seed": 14,
           "angleDeg": 270,
           "density": 4,
           "speed": 1

@@ -2,7 +2,10 @@ import { GENERATED_VELOCITY, POLYLINE_STEP } from '../core/pipeline/constants';
 import type { Polyline } from '../core/core-types';
 import { COMPOSITION_BOUNDS } from '../core/geometry';
 import { buildPathPolyline } from '../core/generators/path';
-import { buildRainPolylines } from '../core/generators/rain';
+import {
+  buildRainPolylines,
+  resolveRainMaxTravelDurationBeats,
+} from '../core/generators/rain';
 import { buildScannerPolyline } from '../core/generators/scanner';
 import { buildSpiralPolyline } from '../core/generators/spiral';
 import { buildRipplePolyline } from '../core/generators/ripple';
@@ -127,6 +130,13 @@ const buildGeneratorPolylines = (
     ),
   );
 };
+
+export const resolveRainGeneratorMaxTravelDurationBeats = (
+  device: Extract<GeneratorNode, { kind: 'rain' }>,
+): number => resolveRainMaxTravelDurationBeats(
+  device.params,
+  COMPOSITION_BOUNDS,
+);
 
 export const rasterizeGeneratorFrame = (
   timeline: GeometryTimeline,

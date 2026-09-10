@@ -1,5 +1,6 @@
 import {
   createRackOperator,
+  isDeviceModulated,
   replaceTimelineAndRefreshRackState,
   resolveModulatedDeviceAtFrame,
   seedGeneratedOriginTimelineState,
@@ -7,7 +8,10 @@ import {
   type RackStageExecutionContext,
   type RackStageOfKind,
 } from './runtime';
-import { rasterizeGeneratorFrame } from '../raster';
+import {
+  rasterizeGeneratorFrame,
+  resolveRainGeneratorMaxTravelDurationBeats,
+} from '../raster';
 import {
   type GenerationState,
 } from '../timeline/state';
@@ -25,15 +29,40 @@ const applyGeneratorDevice = (
 ): GenerationState => {
   const device = stage.device;
   const nextTimeline = beginTimelineStage(state.timeline);
-  // Generators author one canonical pattern. The field result scales that
-  // complete pattern to the requested clip length after rack evaluation.
+  // Generators author one canonical pattern. Rain keeps its natural exit tail;
+  // final normalization scales the completed result to the requested clip.
   const generatorPatternEndBeat = FIXED_TIMELINE_END_BEAT;
   const generatorEvaluationWindow = {
     start: 0,
     end: generatorPatternEndBeat,
   };
-  ensureTimelineFrameCount(nextTimeline, generatorPatternEndBeat);
-  const frameCount = toFrameCount(generatorPatternEndBeat, nextTimeline.sampleStepBeats);
+  const canonicalFrameCount = toFrameCount(
+    generatorPatternEndBeat,
+    nextTimeline.sampleStepBeats,
+  );
+  let generatorRenderEndBeat = generatorPatternEndBeat;
+  if (device.kind === 'rain') {
+    let maxTravelDurationBeats = resolveRainGeneratorMaxTravelDurationBeats(device);
+    if (isDeviceModulated(context.modulationContext, device.id)) {
+      for (let frameIndex = 0; frameIndex < canonicalFrameCount; frameIndex += 1) {
+        const resolvedRain = resolveModulatedDeviceAtFrame(
+          context.modulationContext,
+          device,
+          frameIndex,
+          nextTimeline.sampleStepBeats,
+          generatorEvaluationWindow,
+        );
+        maxTravelDurationBeats = Math.max(
+          maxTravelDurationBeats,
+          resolveRainGeneratorMaxTravelDurationBeats(resolvedRain),
+        );
+      }
+    }
+    generatorRenderEndBeat += maxTravelDurationBeats;
+  }
+
+  ensureTimelineFrameCount(nextTimeline, generatorRenderEndBeat);
+  const frameCount = toFrameCount(generatorRenderEndBeat, nextTimeline.sampleStepBeats);
 
   for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
     rasterizeGeneratorFrame(
@@ -42,7 +71,11 @@ const applyGeneratorDevice = (
       resolveModulatedDeviceAtFrame(
         context.modulationContext,
         device,
-        frameIndex,
+        // The exit tail continues the last authored Rain state; it must not
+        // start a second modulation cycle after emission has ended.
+        device.kind === 'rain'
+          ? Math.min(frameIndex, canonicalFrameCount - 1)
+          : frameIndex,
         nextTimeline.sampleStepBeats,
         generatorEvaluationWindow,
       ),
@@ -51,14 +84,13 @@ const applyGeneratorDevice = (
     );
   }
 
-  const preservesFullPlaybackWindow = device.kind === 'rain';
   return replaceTimelineAndRefreshRackState(
     state,
     nextTimeline,
     seedGeneratedOriginTimelineState(
       state.timelineStateByOriginId,
       stage.deviceId,
-      preservesFullPlaybackWindow ? 'fixed' : 'natural',
+      'natural',
     ),
     context,
   );
