@@ -15,7 +15,7 @@ import {
 } from '../numeric-parameters';
 import type { RendererDeviceSchema } from '../types';
 
-const MAX_COLOR_PERCENT = 400;
+const MAX_COLOR_PERCENT = 500;
 
 export const MAX_COLOR_SLOT_COUNT = 32;
 export const COLOR_SLOT_COUNT_DRAG_PIXELS_PER_STEP = DISCRETE_DRAG_PIXELS_PER_STEP;
