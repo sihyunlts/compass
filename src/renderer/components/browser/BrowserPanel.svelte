@@ -999,18 +999,7 @@
           : null;
       }
 
-      const parentNode = row?.parentId
-        ? visibleTreeNodeById.get(row.parentId)
-        : null;
-      const destination = parentNode
-        ? resolvePresetMoveDestinationForNode(parentNode)
-        : resolvePresetMoveRootDestination(
-            resolvePresetTypeForPage(activePage),
-          );
-      return destination
-        && isValidPresetMoveDestination(destination, entries)
-        ? destination
-        : null;
+      return null;
     }
 
     const presetRoot = element.closest<HTMLElement>('[data-preset-root-type]');
@@ -1877,7 +1866,7 @@
     padding: 0;
     list-style: none;
 
-    li:not(.is-selected):hover {
+    :global(html:not(.is-browser-preset-moving)) & li:not(.is-selected):hover {
       border-radius: var(--radius-4);
       background: var(--color-surface-interactive);
     }
