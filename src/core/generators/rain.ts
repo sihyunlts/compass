@@ -166,10 +166,33 @@ const resolveLaneAxisBounds = (
     : null;
 };
 
+const resolveRainTravelSpeed = (
+  params: RainParams,
+  fieldWidth: number,
+  fieldHeight: number,
+): number => (
+  Math.max(fieldWidth, fieldHeight)
+  / RAIN_REFERENCE_TRAVEL_DURATION_BEATS
+  * params.speed
+);
+
+const resolveMaxLaneAxisSpan = (
+  axis: Vec2,
+  fieldWidth: number,
+  fieldHeight: number,
+): number => Math.min(
+  Math.abs(axis.x) > AXIS_COMPONENT_EPSILON
+    ? fieldWidth / Math.abs(axis.x)
+    : Number.POSITIVE_INFINITY,
+  Math.abs(axis.y) > AXIS_COMPONENT_EPSILON
+    ? fieldHeight / Math.abs(axis.y)
+    : Number.POSITIVE_INFINITY,
+);
+
 export const buildRainPolylines = (
   originId: string,
   params: RainParams,
-  beat01: number,
+  beat: number,
   sampleStepBeats: number,
   velocity: number,
   bounds: Bounds,
@@ -179,16 +202,12 @@ export const buildRainPolylines = (
     || !Number.isFinite(params.angleDeg)
     || !Number.isFinite(params.density)
     || !Number.isFinite(params.speed)
-    || !Number.isFinite(beat01)
+    || !Number.isFinite(beat)
     || !Number.isFinite(sampleStepBeats)
     || params.density <= 0
     || params.speed <= 0
     || sampleStepBeats <= 0
   ) {
-    return [];
-  }
-
-  if (beat01 >= RAIN_TIMELINE_END_BEAT - sampleStepBeats) {
     return [];
   }
 
@@ -231,21 +250,9 @@ export const buildRainPolylines = (
     fieldBounds.maxY
     - fieldBounds.minY
   );
-  const referenceTravelDistance = Math.max(fieldWidth, fieldHeight);
-  const travelSpeed = (
-    referenceTravelDistance
-    / RAIN_REFERENCE_TRAVEL_DURATION_BEATS
-    * params.speed
-  );
+  const travelSpeed = resolveRainTravelSpeed(params, fieldWidth, fieldHeight);
   const averageLaneAxisSpan = (fieldWidth * fieldHeight) / perpSpan;
-  const maxLaneAxisSpan = Math.min(
-    Math.abs(axis.x) > AXIS_COMPONENT_EPSILON
-      ? fieldWidth / Math.abs(axis.x)
-      : Number.POSITIVE_INFINITY,
-    Math.abs(axis.y) > AXIS_COMPONENT_EPSILON
-      ? fieldHeight / Math.abs(axis.y)
-      : Number.POSITIVE_INFINITY,
-  );
+  const maxLaneAxisSpan = resolveMaxLaneAxisSpan(axis, fieldWidth, fieldHeight);
   if (
     !Number.isFinite(travelSpeed)
     || travelSpeed <= 0
@@ -265,12 +272,12 @@ export const buildRainPolylines = (
   const polylines: Polyline[] = [];
   const firstBirthIndex = Math.max(
     Math.floor(
-      (beat01 - maxTravelDurationBeats) / emissionIntervalBeats,
+      (beat - maxTravelDurationBeats) / emissionIntervalBeats,
     ) - 1,
     0,
   );
   const lastBirthIndex = Math.floor(
-    beat01 / emissionIntervalBeats,
+    beat / emissionIntervalBeats,
   );
 
   for (
@@ -287,6 +294,9 @@ export const buildRainPolylines = (
     const birthBeat = (
       (birthIndex + emissionJitter) * emissionIntervalBeats
     );
+    if (birthBeat >= RAIN_TIMELINE_END_BEAT) {
+      continue;
+    }
     const perpFraction = positiveModulo(
       perpRotation + birthIndex * RAIN_PERP_SEQUENCE_STEP,
       1,
@@ -303,16 +313,7 @@ export const buildRainPolylines = (
     }
     const laneAxisSpan = laneAxisBounds.max - laneAxisBounds.min;
     const travelDurationBeats = laneAxisSpan / travelSpeed;
-    const emissionEndBeat = (
-      RAIN_TIMELINE_END_BEAT
-      - travelDurationBeats
-      - sampleStepBeats
-    );
-    if (birthBeat > emissionEndBeat) {
-      continue;
-    }
-
-    const ageBeats = beat01 - birthBeat;
+    const ageBeats = beat - birthBeat;
     const previousAgeBeats = ageBeats - sampleStepBeats;
     if (
       ageBeats < 0
@@ -343,4 +344,30 @@ export const buildRainPolylines = (
   }
 
   return polylines;
+};
+
+export const resolveRainMaxTravelDurationBeats = (
+  params: RainParams,
+  bounds: Bounds,
+): number => {
+  if (!Number.isFinite(params.angleDeg) || !Number.isFinite(params.speed) || params.speed <= 0) {
+    return 0;
+  }
+
+  const basis = toAxisBasis(params.angleDeg);
+  const fieldBounds = expandRainFieldBounds(bounds);
+  const fieldWidth = fieldBounds.maxX - fieldBounds.minX;
+  const fieldHeight = fieldBounds.maxY - fieldBounds.minY;
+  const travelSpeed = resolveRainTravelSpeed(params, fieldWidth, fieldHeight);
+  const maxLaneAxisSpan = resolveMaxLaneAxisSpan(
+    { x: basis.axisX, y: basis.axisY },
+    fieldWidth,
+    fieldHeight,
+  );
+  return Number.isFinite(travelSpeed)
+    && travelSpeed > 0
+    && Number.isFinite(maxLaneAxisSpan)
+    && maxLaneAxisSpan > 0
+    ? maxLaneAxisSpan / travelSpeed
+    : 0;
 };
