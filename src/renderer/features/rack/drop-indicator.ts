@@ -86,12 +86,11 @@ export class RackDropIndicator {
   private resolveInsertionClientX(
     items: readonly HTMLElement[],
     insertionIndex: number,
+    edgeGapPx = this.resolveEdgeIndicatorGapPx(items),
   ): number {
     if (items.length === 0) {
       return this.chainDevices.getBoundingClientRect().left;
     }
-
-    const edgeGapPx = this.resolveEdgeIndicatorGapPx(items);
 
     if (insertionIndex <= 0) {
       return items[0].getBoundingClientRect().left - edgeGapPx;
@@ -182,7 +181,7 @@ export class RackDropIndicator {
     return {
       key: `inside|${dropZone.groupId}|${insertionIndex}`,
       leftInIndicatorSpace: this.toIndicatorSpaceLeft(
-        this.resolveInsertionClientX(slots, insertionIndex),
+        this.resolveInsertionClientX(slots, insertionIndex, 0),
       ),
     };
   }
