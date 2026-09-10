@@ -5,6 +5,7 @@ import { arePresetPathsEqual } from '../../../shared/preset-entry-selection';
 import type { PresetEntryContextTarget } from '../context-menu/types';
 import type { PresetEntrySource } from '../../../shared/presets';
 import { DragAutoScroller } from '../drag-auto-scroll';
+import { performHapticFeedback } from '../../haptics';
 import {
   hideBrowserDragBadge,
   showBrowserDragBadge,
@@ -229,6 +230,7 @@ export class BrowserPresetMoveDrag {
       return;
     }
 
+    performHapticFeedback('alignment');
     const rowId = destination.rowId;
     this.expandTimer = window.setTimeout(() => {
       this.expandTimer = null;
