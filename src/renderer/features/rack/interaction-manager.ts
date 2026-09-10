@@ -15,6 +15,7 @@ import {
 import type { RendererControlChange } from '../../../devices/control-types';
 import type { RackOutputPreviewMode } from './types';
 import { buildGeneratorDeviceIds, buildOrderedGroupIds } from './layout';
+import { performHapticFeedback } from '../../haptics';
 
 /**
  * Coordinates non-selection rack interactions in the main renderer.
@@ -88,6 +89,8 @@ export class RackInteractionManager {
           finalize: true,
         });
       },
+      onAdjustmentChange: () => performHapticFeedback('generic'),
+      onAlignmentReached: () => performHapticFeedback('alignment'),
     });
     this.maskTilePaint = new MaskTilePaintController({
       findDeviceById: this.findDeviceById.bind(this),
@@ -100,9 +103,12 @@ export class RackInteractionManager {
           finalize: true,
         });
       },
+      onTileChange: () => performHapticFeedback('generic'),
     });
     this.numericInputInteraction = new NumericInputInteraction({
       onResetInput: this.tryResetNumericControl.bind(this),
+      onAdjustmentChange: () => performHapticFeedback('generic'),
+      onBoundaryReached: () => performHapticFeedback('alignment'),
     });
   }
 

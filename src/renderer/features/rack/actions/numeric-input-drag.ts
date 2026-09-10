@@ -24,6 +24,8 @@ interface NumericInputDragState {
 
 interface NumericInputInteractionOptions {
   onResetInput: (target: EventTarget | null) => boolean;
+  onAdjustmentChange: () => void;
+  onBoundaryReached: () => void;
 }
 
 const NUMERIC_RESET_DOUBLE_CLICK_WINDOW_MS = 400;
@@ -50,6 +52,12 @@ const createNumericInputDragState = (): NumericInputDragState => ({
 export class NumericInputInteraction {
   private readonly onResetInput: (target: EventTarget | null) => boolean;
 
+  private readonly onAdjustmentChange: () => void;
+
+  private readonly onBoundaryReached: () => void;
+
+  private activeBoundary: 'min' | 'max' | null = null;
+
   private readonly dragState = createNumericInputDragState();
 
   // A lock can be granted after its drag ended, so ownership must outlive drag state cleanup.
@@ -63,6 +71,8 @@ export class NumericInputInteraction {
 
   constructor(options: NumericInputInteractionOptions) {
     this.onResetInput = options.onResetInput;
+    this.onAdjustmentChange = options.onAdjustmentChange;
+    this.onBoundaryReached = options.onBoundaryReached;
   }
 
   handleFocusIn(event: FocusEvent): void {
@@ -383,6 +393,18 @@ export class NumericInputInteraction {
     input.value = nextText;
     this.dragState.didChange = true;
     input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const boundary = this.dragState.min !== null && nextValue === this.dragState.min
+      ? 'min'
+      : this.dragState.max !== null && nextValue === this.dragState.max
+        ? 'max'
+        : null;
+    if (boundary !== null && boundary !== this.activeBoundary) {
+      this.onBoundaryReached();
+    } else {
+      this.onAdjustmentChange();
+    }
+    this.activeBoundary = boundary;
   }
 
   private finalizeChangedInput(input: HTMLInputElement): void {
@@ -404,5 +426,6 @@ export class NumericInputInteraction {
     }
 
     Object.assign(this.dragState, createNumericInputDragState());
+    this.activeBoundary = null;
   }
 }

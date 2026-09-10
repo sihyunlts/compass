@@ -1,7 +1,7 @@
 import type { RackDropZone } from './drop-ops';
 
 type IndicatorLayout = {
-  key: string;
+  slotKey: string;
   leftInIndicatorSpace: number;
 };
 
@@ -15,7 +15,7 @@ export class RackDropIndicator {
 
   private readonly indicator: HTMLElement;
 
-  private lastIndicatorKey: string | null = null;
+  private lastIndicatorSlotKey: string | null = null;
 
   private lastIndicatorLeft: number | null = null;
 
@@ -27,10 +27,10 @@ export class RackDropIndicator {
     this.indicator = options.indicator;
   }
 
-  public sync(info: { didMove: boolean; dropZone: RackDropZone | null } | null): void {
+  public sync(info: { didMove: boolean; dropZone: RackDropZone | null } | null): boolean {
     if (!info || !info.didMove || !info.dropZone) {
       this.clear();
-      return;
+      return false;
     }
 
     const layout = info.dropZone.kind === 'outside'
@@ -39,25 +39,26 @@ export class RackDropIndicator {
 
     if (!layout) {
       this.clear();
-      return;
+      return false;
     }
 
-    if (
-      layout.key === this.lastIndicatorKey
-      && this.lastIndicatorLeft !== null
-      && Math.abs(layout.leftInIndicatorSpace - this.lastIndicatorLeft) < 0.5
-    ) {
-      return;
-    }
+    const didSlotChange = this.lastIndicatorSlotKey !== layout.slotKey;
+    const didVisiblePositionChange = this.lastIndicatorLeft === null
+      || Math.abs(layout.leftInIndicatorSpace - this.lastIndicatorLeft) >= 0.5;
 
-    this.indicator.style.left = `${layout.leftInIndicatorSpace}px`;
+    if (didVisiblePositionChange) {
+      this.indicator.style.left = `${layout.leftInIndicatorSpace}px`;
+      this.lastIndicatorLeft = layout.leftInIndicatorSpace;
+    }
     this.indicator.hidden = false;
-    this.lastIndicatorKey = layout.key;
-    this.lastIndicatorLeft = layout.leftInIndicatorSpace;
+    const shouldPerformHaptic = this.lastIndicatorSlotKey === null
+      || (didSlotChange && didVisiblePositionChange);
+    this.lastIndicatorSlotKey = layout.slotKey;
+    return shouldPerformHaptic;
   }
 
   public clear(): void {
-    this.lastIndicatorKey = null;
+    this.lastIndicatorSlotKey = null;
     this.lastIndicatorLeft = null;
     this.indicator.hidden = true;
     this.indicator.style.removeProperty('left');
@@ -150,7 +151,7 @@ export class RackDropIndicator {
     }
 
     return {
-      key: `outside|${insertionIndex}`,
+      slotKey: `outside|${insertionIndex}`,
       leftInIndicatorSpace: this.toIndicatorSpaceLeft(
         this.resolveInsertionClientX(topLevelItems, insertionIndex),
       ),
@@ -179,7 +180,7 @@ export class RackDropIndicator {
       : baseIndex + 1;
 
     return {
-      key: `inside|${dropZone.groupId}|${insertionIndex}`,
+      slotKey: `inside|${dropZone.groupId}|${insertionIndex}`,
       leftInIndicatorSpace: this.toIndicatorSpaceLeft(
         this.resolveInsertionClientX(slots, insertionIndex, 0),
       ),

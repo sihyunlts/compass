@@ -31,12 +31,13 @@
     type PathTransform,
   } from '../../../shared/model';
   import { i18n } from '../../i18n.svelte';
+  import { performHapticFeedback } from '../../haptics';
   import ControlSurfaceFrame from './ControlSurfaceFrame.svelte';
   import {
     CONTROL_POINT_DRAG_THRESHOLD_PX,
     CONTROL_POINT_SOFT_SNAP_DISTANCE_PX,
     hasExceededControlPointDragThreshold,
-    toSoftSnappedValue,
+    resolveSoftSnap,
   } from './control-point-editor';
   import {
     resolveRotationCursor,
@@ -44,6 +45,10 @@
   } from './rotation-interaction';
 
   type EditorPoint = { x: number; y: number };
+  type SnappedEditorPoint = {
+    point: EditorPoint;
+    snapSignature: string | null;
+  };
   type AlignmentGuides = { x: number | null; y: number | null };
   type AxisSnap = { value: number; target: number | null };
   type RotationFeedbackPosition = {
@@ -141,6 +146,7 @@
     degrees: number;
     snapped: boolean;
   } | null>(null);
+  let lastPathSnapSignature: string | null = null;
 
   const COORDINATE_RANGE = PATH_COORDINATE_MAX - PATH_COORDINATE_MIN;
   const EDITOR_CENTER = PATH_COORDINATE_MIN + COORDINATE_RANGE / 2;
@@ -159,6 +165,15 @@
   const SCALE_SNAP_VALUES = [...GRID_POSITIONS, EDITOR_CENTER];
 
   const roundCoordinate = (value: number): number => Number(value.toFixed(3));
+
+  const performPathSnapHaptic = (snapSignature: string | null): void => {
+    const reachedNewSnap = snapSignature !== null
+      && snapSignature !== lastPathSnapSignature;
+    if (reachedNewSnap) {
+      performHapticFeedback('alignment');
+    }
+    lastPathSnapSignature = snapSignature;
+  };
 
   const toWorldPoint = (
     point: Readonly<EditorPoint>,
@@ -310,7 +325,7 @@
     clientY: number,
     softSnap: boolean,
     constrainToEditor = true,
-  ): EditorPoint | null => {
+  ): SnappedEditorPoint | null => {
     if (!editorEl) {
       return null;
     }
@@ -322,42 +337,51 @@
     const rawRatioY = (clientY - rect.top) / rect.height;
     const ratioX = constrainToEditor ? clamp(rawRatioX, 0, 1) : rawRatioX;
     const ratioY = constrainToEditor ? clamp(rawRatioY, 0, 1) : rawRatioY;
-    const rawX = PATH_COORDINATE_MIN + ratioX * COORDINATE_RANGE;
-    const rawY = PATH_COORDINATE_MAX - ratioY * COORDINATE_RANGE;
+    const snappedX = resolveSoftSnap(
+      PATH_COORDINATE_MIN + ratioX * COORDINATE_RANGE,
+      softSnap ? SNAP_VALUES : [],
+      rect.width / COORDINATE_RANGE,
+    );
+    const snappedY = resolveSoftSnap(
+      PATH_COORDINATE_MAX - ratioY * COORDINATE_RANGE,
+      softSnap ? SNAP_VALUES : [],
+      rect.height / COORDINATE_RANGE,
+    );
     return {
-      x: roundCoordinate(softSnap
-        ? toSoftSnappedValue(rawX, SNAP_VALUES, rect.width / COORDINATE_RANGE)
-        : rawX),
-      y: roundCoordinate(softSnap
-        ? toSoftSnappedValue(rawY, SNAP_VALUES, rect.height / COORDINATE_RANGE)
-        : rawY),
+      point: { x: roundCoordinate(snappedX.value), y: roundCoordinate(snappedY.value) },
+      snapSignature: [
+        snappedX.target === null ? '' : `x:${snappedX.target}`,
+        snappedY.target === null ? '' : `y:${snappedY.target}`,
+      ].filter(Boolean).join('|') || null,
     };
   };
 
-  const resolveLocalEditorPoint = (
+  const resolveSnappedEditorPoint = (
     clientX: number,
     clientY: number,
-    softSnap: boolean,
-  ): EditorPoint | null => {
-    const worldPoint = resolveEditorPointFromClient(clientX, clientY, softSnap);
-    const localPoint = worldPoint ? toLocalPoint(worldPoint) : null;
-    return localPoint
-      ? { x: roundCoordinate(localPoint.x), y: roundCoordinate(localPoint.y) }
+  ): SnappedEditorPoint | null => {
+    const worldPoint = resolveEditorPointFromClient(clientX, clientY, true);
+    const localPoint = worldPoint ? toLocalPoint(worldPoint.point) : null;
+    return worldPoint && localPoint
+      ? {
+        point: { x: roundCoordinate(localPoint.x), y: roundCoordinate(localPoint.y) },
+        snapSignature: worldPoint.snapSignature,
+      }
       : null;
   };
 
   const resolveEditorPoint = (clientX: number, clientY: number): EditorPoint | null =>
-    resolveLocalEditorPoint(clientX, clientY, true);
+    resolveSnappedEditorPoint(clientX, clientY)?.point ?? null;
 
   const resolveUnsnappedEditorPoint = (
     clientX: number,
     clientY: number,
-  ): EditorPoint | null => resolveEditorPointFromClient(clientX, clientY, false);
+  ): EditorPoint | null => resolveEditorPointFromClient(clientX, clientY, false)?.point ?? null;
 
   const resolveUnboundedEditorPoint = (
     clientX: number,
     clientY: number,
-  ): EditorPoint | null => resolveEditorPointFromClient(clientX, clientY, false, false);
+  ): EditorPoint | null => resolveEditorPointFromClient(clientX, clientY, false, false)?.point ?? null;
 
   const toPlotPoint = (point: EditorPoint): EditorPoint => ({
     x: roundCoordinate(((point.x - PATH_COORDINATE_MIN) / COORDINATE_RANGE) * 100),
@@ -1085,15 +1109,16 @@
     point: EditorPoint,
     lockAspectRatio: boolean,
     snapEnabled: boolean,
-  ): void => {
+  ): string | null => {
+    const snapTargets: AlignmentGuides = { x: null, y: null };
     const hasX = Math.abs(startVector.x) > Number.EPSILON;
     const hasY = Math.abs(startVector.y) > Number.EPSILON;
     if (!hasX && !hasY) {
-      return;
+      return null;
     }
     const inverse = invertAffine(startTransform);
     if (!inverse) {
-      return;
+      return null;
     }
     const localPoint = applyAffine(inverse, point);
     const currentVector = {
@@ -1150,8 +1175,10 @@
         let nearest: {
           scale: number;
           distancePx: number;
+          axis: 'x' | 'y';
+          target: number;
         } | null = null;
-        const considerTarget = (targetScale: number): void => {
+        const considerTarget = (targetScale: number, axis: 'x' | 'y', target: number): void => {
           if (Math.abs(targetScale) < minimumScale) {
             return;
           }
@@ -1167,21 +1194,22 @@
             distancePx <= PATH_TRANSFORM_SNAP_DISTANCE_PX
             && (!nearest || distancePx < nearest.distancePx)
           ) {
-            nearest = { scale: targetScale, distancePx };
+            nearest = { scale: targetScale, distancePx, axis, target };
           }
         };
         if (Math.abs(worldVector.x) > Number.EPSILON) {
           for (const target of SCALE_SNAP_VALUES) {
-            considerTarget((target - worldFixedPoint.x) / worldVector.x);
+            considerTarget((target - worldFixedPoint.x) / worldVector.x, 'x', target);
           }
         }
         if (Math.abs(worldVector.y) > Number.EPSILON) {
           for (const target of SCALE_SNAP_VALUES) {
-            considerTarget((target - worldFixedPoint.y) / worldVector.y);
+            considerTarget((target - worldFixedPoint.y) / worldVector.y, 'y', target);
           }
         }
         if (nearest) {
           scale = nearest.scale;
+          snapTargets[nearest.axis] = nearest.target;
         }
       }
       scaleX = hasX ? scale : 1;
@@ -1199,6 +1227,8 @@
         rect?.height ?? 0,
         snapEnabled,
       );
+      snapTargets.x = snappedX.target;
+      snapTargets.y = snappedY.target;
       const snappedLocalPoint = applyAffine(inverse, {
         x: snappedX.value,
         y: snappedY.value,
@@ -1232,7 +1262,7 @@
     rotationFeedback = null;
     const scaleTransform = toSignedScaleTransformAt(scaleX, scaleY, fixedPoint);
     if (!scaleTransform) {
-      return;
+      return null;
     }
     emitGeometry(
       localAnchors,
@@ -1240,6 +1270,17 @@
       false,
       composeAffine(startTransform, scaleTransform),
     );
+    const appliedHandle = toWorldPoint({
+      x: fixedPoint.x + startVector.x,
+      y: fixedPoint.y + startVector.y,
+    });
+    return (['x', 'y'] as const).map((axis) => {
+      const target = snapTargets[axis];
+      const canMoveOnAxis = (hasX && Math.abs(startTransform[axis === 'x' ? 'a' : 'b']) > Number.EPSILON)
+        || (hasY && Math.abs(startTransform[axis === 'x' ? 'c' : 'd']) > Number.EPSILON);
+      return target !== null && canMoveOnAxis && roundCoordinate(appliedHandle[axis]) === target
+        ? `${axis}:${target}` : '';
+    }).filter(Boolean).join('|') || null;
   };
 
   const appendAnchor = (
@@ -1755,13 +1796,18 @@
       )) {
         pointerDidMove = true;
       }
+      const snappedPoint = dragTarget.kind === 'anchor'
+        || dragTarget.kind === 'anchor-handle'
+        || dragTarget.kind === 'handle'
+        ? resolveSnappedEditorPoint(event.clientX, event.clientY)
+        : null;
       const point = dragTarget.kind === 'path-move'
         || dragTarget.kind === 'path-rotate'
         || dragTarget.kind === 'path-scale'
         ? resolveUnboundedEditorPoint(event.clientX, event.clientY)
         : dragTarget.kind === 'anchors-move' || dragTarget.kind === 'marquee'
           ? resolveUnsnappedEditorPoint(event.clientX, event.clientY)
-          : resolveEditorPoint(event.clientX, event.clientY);
+          : snappedPoint?.point ?? null;
       if (!point) {
         return;
       }
@@ -1818,7 +1864,7 @@
             y: dragTarget.startVector.y / 2,
           }
           : dragTarget.startVector;
-        scalePath(
+        const scaleSnapSignature = scalePath(
           dragTarget.startTransform,
           scaleFixedPoint,
           scaleStartVector,
@@ -1826,6 +1872,7 @@
           event.shiftKey,
           !event.ctrlKey,
         );
+        performPathSnapHaptic(scaleSnapSignature);
       } else if (dragTarget.kind === 'anchors-move') {
         pendingMergeTargetId = null;
         moveSelectedAnchors(
@@ -1836,6 +1883,10 @@
           event.shiftKey,
           !event.ctrlKey,
         );
+        performPathSnapHaptic([
+          alignmentGuides.x === null ? '' : `x:${alignmentGuides.x}`,
+          alignmentGuides.y === null ? '' : `y:${alignmentGuides.y}`,
+        ].filter(Boolean).join('|') || null);
       } else if (dragTarget.kind === 'path-move') {
         pendingMergeTargetId = null;
         movePath(
@@ -1846,6 +1897,10 @@
           event.shiftKey,
           !event.ctrlKey,
         );
+        performPathSnapHaptic([
+          alignmentGuides.x === null ? '' : `x:${alignmentGuides.x}`,
+          alignmentGuides.y === null ? '' : `y:${alignmentGuides.y}`,
+        ].filter(Boolean).join('|') || null);
       } else if (dragTarget.kind === 'path-rotate') {
         pendingMergeTargetId = null;
         const angle = Math.atan2(
@@ -1861,6 +1916,9 @@
           event.shiftKey,
           !event.ctrlKey,
         );
+        performPathSnapHaptic(rotationFeedback?.snapped
+          ? `rotation:${rotationFeedback.degrees}`
+          : null);
       } else if (dragTarget.kind === 'anchor') {
         const mergeTarget = resolveMergeTarget(
           dragTarget.anchorId,
@@ -1872,6 +1930,9 @@
           dragTarget.anchorId,
           mergeTarget ? { x: mergeTarget.x, y: mergeTarget.y } : point,
         );
+        performPathSnapHaptic(mergeTarget
+          ? `merge:${mergeTarget.id}`
+          : snappedPoint?.snapSignature ?? null);
       } else if (dragTarget.kind === 'anchor-handle') {
         pendingMergeTargetId = null;
         moveHandle(
@@ -1880,9 +1941,11 @@
           point,
           false,
         );
+        performPathSnapHaptic(snappedPoint?.snapSignature ?? null);
       } else {
         pendingMergeTargetId = null;
         moveHandle(dragTarget.anchorId, dragTarget.handleKind, point, event.altKey);
+        performPathSnapHaptic(snappedPoint?.snapSignature ?? null);
       }
     };
 
@@ -1921,6 +1984,7 @@
         emitGeometry(localAnchors, localClosed, true);
       }
       pointerDidMove = false;
+      lastPathSnapSignature = null;
     };
 
     const handleWindowPointerDown = (event: PointerEvent): void => {

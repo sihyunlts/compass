@@ -6,6 +6,7 @@
     resolveRotationCursor,
     resolveRotationSnap,
   } from './rotation-interaction';
+  import { performHapticFeedback } from '../../haptics';
 
   let {
     mode,
@@ -34,6 +35,7 @@
   let directionPointerId = $state<number | null>(null);
   let draggedDirectionDeg = $state(0);
   let didDragDirection = $state(false);
+  let lastDirectionSnap: number | null = null;
 
   const center = $derived({
     x: (centerX / 9) * 100,
@@ -101,7 +103,7 @@
   const resolvePointerDirection = (
     handle: SVGGElement,
     event: PointerEvent,
-  ): number | null => {
+  ): { value: number; snapped: boolean } | null => {
     const svg = handle.ownerSVGElement;
     if (!svg) {
       return null;
@@ -129,7 +131,10 @@
     const steppedDirection = Math.round(
       resolvedDirectionDeg / directionStep,
     ) * directionStep;
-    return ((steppedDirection % 360) + 360) % 360;
+    return {
+      value: ((steppedDirection % 360) + 360) % 360,
+      snapped: rotationSnap.snapped,
+    };
   };
 
   const handleDirectionPointerDown = (event: PointerEvent): void => {
@@ -143,6 +148,7 @@
     directionPointerId = event.pointerId;
     draggedDirectionDeg = directionDeg;
     didDragDirection = false;
+    lastDirectionSnap = null;
     handle.setPointerCapture(event.pointerId);
   };
 
@@ -152,20 +158,26 @@
     }
 
     event.stopPropagation();
-    const nextDirectionDeg = resolvePointerDirection(
+    const resolvedDirection = resolvePointerDirection(
       event.currentTarget as SVGGElement,
       event,
     );
-    if (
-      nextDirectionDeg === null
-      || Math.abs(nextDirectionDeg - draggedDirectionDeg) < 0.0001
-    ) {
+    if (resolvedDirection === null) {
       return;
     }
 
-    draggedDirectionDeg = nextDirectionDeg;
+    const directionSnap = resolvedDirection.snapped ? resolvedDirection.value : null;
+    const didDirectionChange = Math.abs(resolvedDirection.value - draggedDirectionDeg) >= 0.0001;
+    if (didDirectionChange && directionSnap !== null && directionSnap !== lastDirectionSnap) {
+      performHapticFeedback('alignment');
+    }
+    lastDirectionSnap = directionSnap;
+    if (!didDirectionChange) {
+      return;
+    }
+    draggedDirectionDeg = resolvedDirection.value;
     didDragDirection = true;
-    onDirectionChange(nextDirectionDeg, false);
+    onDirectionChange(resolvedDirection.value, false);
   };
 
   const finishDirectionDrag = (event: PointerEvent): void => {

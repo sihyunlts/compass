@@ -131,6 +131,9 @@ const api: CompassApi = {
     ipcRenderer.invoke(IPC_CHANNELS.requestAppFocus) as Promise<boolean>,
   subscribeAppFocus: (listener) =>
     appFocusListeners.subscribe(listener),
+  performHapticFeedback: (pattern) => {
+    ipcRenderer.send(IPC_CHANNELS.performHapticFeedback, pattern);
+  },
   checkForUpdates: () =>
     ipcRenderer.invoke(IPC_CHANNELS.checkForUpdates),
   openLatestReleasePage: () =>

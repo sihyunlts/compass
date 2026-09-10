@@ -15,6 +15,7 @@ import type {
   RackDropZone,
 } from './drop-ops';
 import { RackDropTargetResolver } from './drop-target-resolver';
+import { performHapticFeedback } from '../../haptics';
 
 /** Drag end result: dropZone may be null; shouldCommit gates reorder/insert persistence. */
 type DragDropPointerUpResult =
@@ -328,6 +329,7 @@ export class RackDragController {
       drag.itemEl.classList.add('is-dragging');
     }
     this.notifyDragUpdate();
+    performHapticFeedback('generic');
   }
 
   private buildPointerUpResult(drag: ActiveDrag): DragDropPointerUpResult {

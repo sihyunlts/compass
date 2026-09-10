@@ -97,6 +97,8 @@ export const parsePreviewWindowControlRequest = (
   return null;
 };
 
+export type HapticFeedbackPattern = 'generic' | 'alignment';
+
 export interface CompassApi {
   platform: ShortcutPlatform;
   sendGeneratedPreview: (
@@ -106,6 +108,7 @@ export interface CompassApi {
   setApplicationLocale: (locale: AppLocale) => Promise<void>;
   requestAppFocus: () => Promise<boolean>;
   subscribeAppFocus: (listener: (isFocused: boolean) => void) => () => void;
+  performHapticFeedback: (pattern: HapticFeedbackPattern) => void;
   checkForUpdates: () => Promise<UpdateCheckResponse>;
   openLatestReleasePage: () => Promise<void>;
   requestLiveTempo: () => Promise<RequestLiveTempoResponse>;

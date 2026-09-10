@@ -1,6 +1,4 @@
-import { app, type BrowserWindow } from 'electron';
-import { createRequire } from 'node:module';
-import path from 'node:path';
+import type { BrowserWindow } from 'electron';
 
 import { getLaunchpadRuntimeMap } from '../domain';
 import {
@@ -25,6 +23,7 @@ import {
   translate,
   type AppLocale,
 } from '../shared/i18n';
+import { loadMacosNativeAddon } from './native-addon-loader';
 
 interface NativeTouchBarLabels {
   play: string;
@@ -66,8 +65,6 @@ interface NativeTouchBarAddon {
   dispose: () => void;
 }
 
-const nativeRequire = createRequire(__filename);
-
 let nativeAddon: NativeTouchBarAddon | null | undefined;
 let activeWindow: BrowserWindow | null = null;
 let currentLocale: AppLocale = 'en';
@@ -84,33 +81,12 @@ const buildLabels = (): NativeTouchBarLabels => ({
 });
 
 const loadNativeAddon = (): NativeTouchBarAddon | null => {
-  if (process.platform !== 'darwin') {
-    return null;
+  if (nativeAddon === undefined) {
+    nativeAddon = loadMacosNativeAddon<NativeTouchBarAddon>(
+      'compass_touchbar.node',
+      'Native Touch Bar module',
+    );
   }
-
-  if (nativeAddon !== undefined) {
-    return nativeAddon;
-  }
-
-  const addonRoot = app.isPackaged
-    ? path.join(process.resourcesPath, 'app.asar.unpacked')
-    : app.getAppPath();
-  const addonPath = path.join(
-    addonRoot,
-    'native',
-    'macos',
-    'build',
-    'Release',
-    'compass_touchbar.node',
-  );
-
-  try {
-    nativeAddon = nativeRequire(addonPath) as NativeTouchBarAddon;
-  } catch (error) {
-    nativeAddon = null;
-    console.warn('Native Touch Bar module is unavailable:', error);
-  }
-
   return nativeAddon;
 };
 

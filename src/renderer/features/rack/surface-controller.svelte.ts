@@ -16,6 +16,7 @@ import type { ChainDragSourceKind, RackDropZone } from './drop-ops';
 import { createRackViewApi, type RackViewApi } from './api';
 import { RackInteractionManager } from './interaction-manager';
 import type { RackSelection } from './selection.svelte';
+import { performHapticFeedback } from '../../haptics';
 
 interface RackSurfaceControllerOptions {
   rackSelection: RackSelection;
@@ -128,7 +129,9 @@ class RackSurfaceController {
       closeContextMenu: this.options.closeContextMenu,
       onDragUpdate: (info) => {
         this.activeDragInfo = info;
-        this.dropIndicator?.sync(info);
+        if (this.dropIndicator?.sync(info)) {
+          performHapticFeedback('alignment');
+        }
       },
     });
 

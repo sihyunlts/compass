@@ -15,6 +15,7 @@ interface MaskTilePaintControllerOptions {
   closeContextMenu: () => void;
   requestTransientPreview: (delayMs?: number) => void;
   commitChange: () => void;
+  onTileChange: () => void;
 }
 
 interface MaskTilePaintState {
@@ -97,6 +98,8 @@ export class MaskTilePaintController {
 
   private readonly commitChange: () => void;
 
+  private readonly onTileChange: () => void;
+
   private readonly state = createMaskTilePaintState();
 
   private readonly pointerSession = new PointerCaptureSession<HTMLElement>({
@@ -112,6 +115,7 @@ export class MaskTilePaintController {
     this.closeContextMenu = options.closeContextMenu;
     this.requestTransientPreview = options.requestTransientPreview;
     this.commitChange = options.commitChange;
+    this.onTileChange = options.onTileChange;
   }
 
   public isActive(): boolean {
@@ -137,7 +141,7 @@ export class MaskTilePaintController {
     this.state.paintMode = device.params.tiles.includes(hit.tileIndex) ? 'remove' : 'add';
 
     this.pointerSession.begin(hit.grid, event.pointerId);
-    this.applyTileChangeWithPreview(hit.deviceId, hit.tileIndex, this.state.paintMode);
+    this.applyTileChangeWithPreview(hit.deviceId, hit.tileIndex, this.state.paintMode, false);
 
     event.preventDefault();
     return true;
@@ -163,6 +167,7 @@ export class MaskTilePaintController {
       this.state.deviceId,
       hit.tileIndex,
       this.state.paintMode,
+      true,
     );
     return true;
   }
@@ -213,6 +218,7 @@ export class MaskTilePaintController {
     deviceId: string,
     tileIndex: number,
     mode: 'add' | 'remove',
+    isDrag: boolean,
   ): void {
     if (!this.applyTileChange(deviceId, tileIndex, mode)) {
       return;
@@ -221,6 +227,9 @@ export class MaskTilePaintController {
     this.state.touched.add(tileIndex);
     this.pointerSession.markChanged();
     this.requestTransientPreview();
+    if (isDrag) {
+      this.onTileChange();
+    }
   }
 
 }
