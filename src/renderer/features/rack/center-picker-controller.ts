@@ -23,6 +23,8 @@ interface CenterPickerControllerOptions {
   requestTransientPreview: (delayMs?: number) => void;
   persistChange: () => void;
   commitReset: () => void;
+  onAdjustmentChange: () => void;
+  onAlignmentReached: () => void;
 }
 
 const isCenterPointDevice = (device: ChainDevice | null): device is CenterPointDevice => (
@@ -113,6 +115,10 @@ export class CenterPickerController {
 
   private readonly commitReset: () => void;
 
+  private readonly onAdjustmentChange: () => void;
+
+  private readonly onAlignmentReached: () => void;
+
   private readonly pointerSession = new PointerCaptureSession<HTMLElement>({
     onChanged: () => this.persistChange(),
     beforeRelease: (surface) => {
@@ -128,6 +134,8 @@ export class CenterPickerController {
     this.requestTransientPreview = options.requestTransientPreview;
     this.persistChange = options.persistChange;
     this.commitReset = options.commitReset;
+    this.onAdjustmentChange = options.onAdjustmentChange;
+    this.onAlignmentReached = options.onAlignmentReached;
   }
 
   public isActive(): boolean {
@@ -227,7 +235,15 @@ export class CenterPickerController {
       return false;
     }
 
-    const { step } = resolvePickerBounds(surface);
+    const { min, max, step } = resolvePickerBounds(surface);
+    const midpoint = snapPickerCoordinate(min + ((max - min) / 2), min, max, step);
+    const reachedAlignment = (
+      Math.abs(device.params.centerX - midpoint) >= 0.0001
+      && Math.abs(point.x - midpoint) < 0.0001
+    ) || (
+      Math.abs(device.params.centerY - midpoint) >= 0.0001
+      && Math.abs(point.y - midpoint) < 0.0001
+    );
     const centerX = writeNumericDeviceParam(device, 'centerX', point.x, step);
     const centerY = writeNumericDeviceParam(device, 'centerY', point.y, step);
     if (centerX === null || centerY === null) {
@@ -236,6 +252,11 @@ export class CenterPickerController {
 
     updateCenterPickerSurface(surface, centerX, centerY);
     this.syncSelection(id);
+    if (reachedAlignment) {
+      this.onAlignmentReached();
+    } else {
+      this.onAdjustmentChange();
+    }
     return true;
   }
 
@@ -282,6 +303,7 @@ export class CenterPickerController {
 
     updateCenterPickerSurface(surface, centerX, centerY);
     this.syncSelection(id);
+    this.onAlignmentReached();
     return true;
   }
 

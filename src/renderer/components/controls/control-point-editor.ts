@@ -9,13 +9,13 @@ export const hasExceededControlPointDragThreshold = (
 ): boolean => Math.abs(clientX - startClientX) > CONTROL_POINT_DRAG_THRESHOLD_PX
   || Math.abs(clientY - startClientY) > CONTROL_POINT_DRAG_THRESHOLD_PX;
 
-export const toSoftSnappedValue = (
+export const resolveSoftSnap = (
   value: number,
   snapPoints: ReadonlyArray<number>,
   spanPx: number,
-): number => {
+): { value: number; target: number | null } => {
   if (snapPoints.length === 0 || !Number.isFinite(spanPx) || spanPx <= 0) {
-    return value;
+    return { value, target: null };
   }
 
   const threshold = CONTROL_POINT_SOFT_SNAP_DISTANCE_PX / spanPx;
@@ -28,5 +28,7 @@ export const toSoftSnappedValue = (
       nearestDistance = distance;
     }
   }
-  return nearestDistance <= threshold ? nearest : value;
+  return nearestDistance <= threshold
+    ? { value: nearest, target: nearest }
+    : { value, target: null };
 };

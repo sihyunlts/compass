@@ -9,6 +9,7 @@
   import NumberField from '../fields/NumberField.svelte';
   import { i18n } from '../../i18n.svelte';
   import { buildNumericInputControlChange } from '../../features/rack/control-target';
+  import { performHapticFeedback } from '../../haptics';
   import TimelineVisualizer from './TimelineVisualizer.svelte';
 
   const SNAP_DIVISION_OPTIONS = [4, 8, 16, 32, 64] as const;
@@ -37,6 +38,8 @@
   }>();
 
   let snapDivisions = $state<(typeof SNAP_DIVISION_OPTIONS)[number]>(16);
+  let rangeDidChange = false;
+  let activeRangeBoundary: 'min' | 'max' | null = null;
   const resolvedMin = $derived(parameter?.input.min ?? 0);
   const resolvedMax = $derived(parameter?.input.max ?? 1);
 
@@ -105,9 +108,15 @@
       return;
     }
 
-    input.value = String(paramKey === 'start'
-      ? clamp(value, resolvedMin, Math.max(resolvedMin, clampedEnd - rangeStep))
-      : clamp(value, Math.min(resolvedMax, clampedStart + rangeStep), resolvedMax));
+    const previousValue = paramKey === 'start' ? resolvedStart : resolvedEnd;
+    const minimum = paramKey === 'start'
+      ? resolvedMin
+      : Math.min(resolvedMax, clampedStart + rangeStep);
+    const maximum = paramKey === 'start'
+      ? Math.max(resolvedMin, clampedEnd - rangeStep)
+      : resolvedMax;
+    const nextValue = clamp(value, minimum, maximum);
+    input.value = String(nextValue);
     const change = buildNumericInputControlChange(event, {
       action: dataAction,
       deviceId,
@@ -117,6 +126,23 @@
     });
     if (change) {
       onControlChange(change);
+    }
+    if (!finalize && Math.abs(nextValue - previousValue) > 0.000001) {
+      rangeDidChange = true;
+      const boundary = Math.abs(nextValue - minimum) < 0.000001
+        ? 'min'
+        : Math.abs(nextValue - maximum) < 0.000001
+          ? 'max'
+          : null;
+      if (boundary !== null && boundary !== activeRangeBoundary) {
+        performHapticFeedback('alignment');
+      } else {
+        performHapticFeedback('generic');
+      }
+      activeRangeBoundary = boundary;
+    } else if (finalize && rangeDidChange) {
+      rangeDidChange = false;
+      activeRangeBoundary = null;
     }
   };
 </script>
@@ -165,6 +191,10 @@
         step={rangeStep}
         value={clampedStart}
         aria-label={i18n.t('control.windowStart')}
+        onpointerdown={() => {
+          rangeDidChange = false;
+          activeRangeBoundary = null;
+        }}
         oninput={(event) => emitControlChange(event, 'start', false)}
         onchange={(event) => emitControlChange(event, 'start', true)}
       />
@@ -176,6 +206,10 @@
         step={rangeStep}
         value={clampedEnd}
         aria-label={i18n.t('control.windowEnd')}
+        onpointerdown={() => {
+          rangeDidChange = false;
+          activeRangeBoundary = null;
+        }}
         oninput={(event) => emitControlChange(event, 'end', false)}
         onchange={(event) => emitControlChange(event, 'end', true)}
       />

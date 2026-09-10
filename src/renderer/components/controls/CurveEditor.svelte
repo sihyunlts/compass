@@ -24,15 +24,20 @@
   import type { DropdownValue } from '../primitives/dropdown-types';
   import FieldShell from '../fields/FieldShell.svelte';
   import { i18n } from '../../i18n.svelte';
+  import { performHapticFeedback } from '../../haptics';
   import {
     hasExceededControlPointDragThreshold,
-    toSoftSnappedValue,
+    resolveSoftSnap,
   } from './control-point-editor';
 
   interface EditableCurve {
     divisions: number;
     nodes: CurveNode[];
   }
+
+  type SnappedCurvePoint = CurvePoint & {
+    snapTargets: { t: number | null; v: number | null };
+  };
 
   type DragTarget =
     | { kind: 'node'; nodeId: string }
@@ -95,6 +100,8 @@
   let localNodes = $state<CurveNode[]>([]);
   let isKeyboardDeleteEnabled = $state(false);
   let divisionsMenuPoint = $state<{ x: number; y: number } | null>(null);
+  let lastDragSnapSignature: string | null = null;
+  let hasInitializedDragSnap = false;
 
   const NODE_DOUBLE_CLICK_WINDOW_MS = 300;
 
@@ -250,7 +257,7 @@
       snapToDivisions?: boolean;
       snapToCenterLine?: boolean;
     },
-  ): { t: number; v: number } | null => {
+  ): SnappedCurvePoint | null => {
     if (!editorEl) {
       return null;
     }
@@ -263,29 +270,55 @@
     const ratioX = clamp((clientX - rect.left) / rect.width, 0, 1);
     const ratioY = clamp((clientY - rect.top) / rect.height, 0, 1);
     const divisionRatio = Math.round((ratioX * divisions)) / divisions;
-    const snappedRatioX = options?.snapToDivisions === false
-      ? ratioX
-      : toSoftSnappedValue(ratioX, [divisionRatio], rect.width);
-    const snappedRatioY = options?.snapToCenterLine === false
-      ? ratioY
-      : toSoftSnappedValue(
-        ratioY,
-        guideValue === null ? [] : [toPlotY(guideValue) / 100],
-        rect.height,
-      );
+    const snappedX = resolveSoftSnap(
+      ratioX,
+      options?.snapToDivisions === false ? [] : [divisionRatio],
+      rect.width,
+    );
+    const snappedY = resolveSoftSnap(
+      ratioY,
+      options?.snapToCenterLine === false || guideValue === null
+        ? [] : [toPlotY(guideValue) / 100],
+      rect.height,
+    );
     const v = clamp(
-      curveValueMax - snappedRatioY * curveValueSpan,
+      curveValueMax - snappedY.value * curveValueSpan,
       curveValueMin,
       curveValueMax,
     );
-
     return {
-      t: roundCurveNumber(snappedRatioX),
+      t: roundCurveNumber(snappedX.value),
       v: roundCurveNumber(v),
+      snapTargets: {
+        t: snappedX.target === null ? null : roundCurveNumber(snappedX.target),
+        v: snappedY.target === null || guideValue === null ? null : roundCurveNumber(guideValue),
+      },
     };
   };
 
-  const insertNodeAtPoint = (point: { t: number; v: number }): void => {
+  const resolveAppliedSnapSignature = (
+    point: CurvePoint,
+    targets: SnappedCurvePoint['snapTargets'],
+  ): string | null => [
+    targets.t !== null && roundCurveNumber(point.t) === targets.t ? `x:${targets.t}` : '',
+    targets.v !== null && roundCurveNumber(point.v) === targets.v ? `y:${targets.v}` : '',
+  ].filter(Boolean).join('|') || null;
+
+  const performCurveSnapHaptic = (snapSignature: string | null): void => {
+    if (!hasInitializedDragSnap) {
+      hasInitializedDragSnap = true;
+      lastDragSnapSignature = snapSignature;
+      return;
+    }
+    if (snapSignature !== null && snapSignature !== lastDragSnapSignature) {
+      performHapticFeedback('alignment');
+    }
+    lastDragSnapSignature = snapSignature;
+  };
+
+  const insertNodeAtPoint = (
+    point: SnappedCurvePoint,
+  ): void => {
     const existingNode = sortedNodes.find((node) => node.t.toFixed(6) === point.t.toFixed(6));
     if (existingNode) {
       selectedNodeId = existingNode.id;
@@ -298,6 +331,10 @@
       v: point.v,
     };
     emitNodes([...sortedNodes, nextNode]);
+    const insertedNode = localNodes.find((node) => node.id === nextNode.id);
+    if (insertedNode && resolveAppliedSnapSignature(insertedNode, point.snapTargets)) {
+      performHapticFeedback('alignment');
+    }
     selectedNodeId = nextNode.id;
   };
 
@@ -321,6 +358,8 @@
     pointerDownClientX = event.clientX;
     pointerDownClientY = event.clientY;
     pointerDidMove = false;
+    lastDragSnapSignature = null;
+    hasInitializedDragSnap = false;
     event.preventDefault();
   };
 
@@ -390,6 +429,11 @@
       ? { ...node, t: nextT, v: point.v }
       : node);
     emitNodes(next);
+    const appliedNode = localNodes.find((node) => node.id === nodeId);
+    performCurveSnapHaptic(appliedNode ? resolveAppliedSnapSignature(appliedNode, {
+      t: isEndpoint ? null : point.snapTargets.t,
+      v: point.snapTargets.v,
+    }) : null);
   };
 
   const updateDraggingSegmentControl = (
@@ -429,6 +473,11 @@
       };
     });
     emitNodes(next);
+    const appliedIndex = localNodes.findIndex((node) => node.id === startNodeId);
+    const appliedPoint = resolveSegmentCurvePoint(localNodes, appliedIndex).point;
+    performCurveSnapHaptic(appliedPoint
+      ? resolveAppliedSnapSignature(appliedPoint, point.snapTargets)
+      : null);
   };
 
   const clearPointerState = (): void => {
@@ -436,6 +485,8 @@
     dragTarget = null;
     activePointerNodeId = null;
     pointerDidMove = false;
+    lastDragSnapSignature = null;
+    hasInitializedDragSnap = false;
   };
 
   const handleEditorDoubleClick = (event: MouseEvent): void => {

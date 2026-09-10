@@ -4,6 +4,7 @@ export const IPC_CHANNELS = {
   setApplicationLocale: 'app:set-locale',
   requestAppFocus: 'app:request-focus',
   appFocusUpdate: 'app:focus-update',
+  performHapticFeedback: 'app:perform-haptic-feedback',
   checkForUpdates: 'app:check-for-updates',
   openLatestReleasePage: 'app:open-latest-release-page',
   requestLiveTempo: 'bridge:request-live-tempo',

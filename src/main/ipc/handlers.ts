@@ -22,6 +22,7 @@ import { PresetService } from '../services/preset-service';
 import { UpdateCheckService } from '../services/update-check-service';
 import { isAppLocale } from '../../shared/i18n';
 import { setApplicationMenuLocale } from '../application-menu';
+import { performHapticFeedback } from '../native-haptics';
 import {
   setMainWindowNativeTouchBarLocale,
   updateMainWindowNativeTouchBarState,
@@ -90,6 +91,15 @@ export const registerIpcHandlers = (
     IPC_CHANNELS.requestAppFocus,
     () => BrowserWindow.getFocusedWindow() !== null,
   );
+
+  ipcMain.on(IPC_CHANNELS.performHapticFeedback, (event, pattern: unknown) => {
+    if (
+      event.sender === getMainWindow()?.webContents
+      && (pattern === 'generic' || pattern === 'alignment')
+    ) {
+      performHapticFeedback(pattern);
+    }
+  });
 
   ipcMain.handle(
     IPC_CHANNELS.checkForUpdates,

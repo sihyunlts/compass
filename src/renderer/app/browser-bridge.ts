@@ -442,6 +442,7 @@ const createBrowserCompassBridge = (): CompassApi => ({
       window.removeEventListener('blur', handleBlur);
     };
   },
+  performHapticFeedback: () => {},
   checkForUpdates: async () => {
     const currentVersion = __APP_VERSION__;
 

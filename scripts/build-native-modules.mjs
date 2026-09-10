@@ -30,6 +30,11 @@ const nativeModules = [
     sources: ['native/macos/touchbar.mm'],
     frameworks: ['AppKit'],
   },
+  {
+    output: 'compass_haptics.node',
+    sources: ['native/macos/haptics.mm'],
+    frameworks: ['AppKit'],
+  },
 ];
 
 const nodePrefix = path.resolve(
