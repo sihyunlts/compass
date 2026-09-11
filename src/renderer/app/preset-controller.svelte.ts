@@ -1048,25 +1048,28 @@ export class PresetController {
 
   public getPresetDeleteTitle(target: PresetDeleteTarget): string {
     if (target.kind === 'preset-entries') {
-      return i18n.t('preset.moveItemsPrompt');
-    }
-
-    return target.entryKind === 'directory'
-      ? i18n.t('preset.moveFolderPrompt')
-      : i18n.t('preset.moveItemPrompt');
-  }
-
-  public getPresetDeleteDescription(target: PresetDeleteTarget): string {
-    if (target.kind === 'preset-entries') {
-      return i18n.t('preset.moveItemsDescription', {
+      return i18n.t('preset.moveItemsPrompt', {
         count: target.entries.length,
       });
     }
 
-    const label = target.relativePath[target.relativePath.length - 1] ?? '';
+    const entryName = target.relativePath[target.relativePath.length - 1] ?? '';
+    const label = target.entryKind === 'file'
+      ? resolvePresetNameFromFileName(entryName, target.presetType) ?? entryName
+      : entryName;
     return target.entryKind === 'directory'
-      ? i18n.t('preset.moveFolderDescription', { label })
-      : i18n.t('preset.moveItemDescription', { label });
+      ? i18n.t('preset.moveFolderPrompt', { label })
+      : i18n.t('preset.moveItemPrompt', { label });
+  }
+
+  public getPresetDeleteDescription(target: PresetDeleteTarget): string {
+    if (target.kind === 'preset-entries') {
+      return i18n.t('preset.moveItemsDescription');
+    }
+
+    return target.entryKind === 'directory'
+      ? i18n.t('preset.moveFolderDescription')
+      : i18n.t('preset.moveItemDescription');
   }
 
   public async handleShowPresetEntryInFolder(target: PresetEntryTarget): Promise<void> {
@@ -1147,8 +1150,8 @@ export class PresetController {
     }
 
     this.state.pendingRackPresetLoadTarget = {
-      label: 'Compass',
-      description: i18n.t('rack.saveBeforeClose'),
+      label: this.state.currentRackDisplayName,
+      description: i18n.t('rack.unsavedChangesLost'),
       load: async () => {
         await this.options.bridgeClient.confirmMainWindowClose();
       },
@@ -1203,8 +1206,14 @@ export class PresetController {
     }
   }
 
-  public getRackPresetLoadDescription(target: PendingRackPresetLoadTarget): string {
-    return target.description ?? i18n.t('rack.saveBeforeOpen', {
+  public getRackPresetLoadDescription(
+    target: PendingRackPresetLoadTarget,
+  ): string {
+    return target.description ?? i18n.t('rack.unsavedChangesLost');
+  }
+
+  public getRackSavePromptTitle(target: PendingRackPresetLoadTarget): string {
+    return i18n.t('rack.saveCurrentPrompt', {
       label: target.label,
     });
   }
@@ -1374,7 +1383,7 @@ export class PresetController {
 
     if (this.state.isRackDirty) {
       this.state.pendingRackPresetLoadTarget = {
-        label: target.label,
+        label: this.state.currentRackDisplayName,
         load,
       };
       this.state.isRackPresetLoadPending = false;
@@ -1415,8 +1424,8 @@ export class PresetController {
 
     if (this.state.isRackDirty) {
       this.state.pendingRackPresetLoadTarget = {
-        label: resolveDefaultRackFileDisplayName(),
-        description: i18n.t('rack.saveBeforeNew'),
+        label: this.state.currentRackDisplayName,
+        description: i18n.t('rack.unsavedChangesLost'),
         load,
       };
       this.state.isRackPresetLoadPending = false;
