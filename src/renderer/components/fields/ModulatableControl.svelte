@@ -2,6 +2,7 @@
 
 <script lang="ts">
   import { onMount, tick, type Snippet } from 'svelte';
+  import { buildNumericInputControlChange } from '../../features/rack/control-target';
   import type { RendererControlChange } from '../../../devices/control-types';
   import {
     formatNumericParameterDisplay,
@@ -94,19 +95,15 @@
     state: ModulationParameterState,
     finalize: boolean,
   ): void => {
-    const input = event.currentTarget;
-    if (!(input instanceof HTMLInputElement)) {
-      return;
-    }
-
-    onControlChange({
+    const change = buildNumericInputControlChange(event, {
       action: 'set-modulation-target-amount',
       deviceId: state.modulatorId,
       paramKey: state.targetId,
-      value: input.value,
       finalize,
-      step: Number(input.step),
     });
+    if (change) {
+      onControlChange(change);
+    }
   };
 
   const updateAmountListPosition = async (): Promise<void> => {

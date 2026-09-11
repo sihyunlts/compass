@@ -134,7 +134,7 @@ export const buildNumericInputControlChange = (
   change: Omit<RendererControlChange, 'value' | 'step'> & { step?: number },
 ): RendererControlChange | null => {
   const input = event.currentTarget;
-  if (!(input instanceof HTMLInputElement)) {
+  if (!(input instanceof HTMLInputElement) || input.value === '' || input.validity.badInput) {
     return null;
   }
 
