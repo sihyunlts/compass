@@ -37,52 +37,15 @@ const createGenericHandlers = (): Readonly<Record<string, ChainControlHandler>> 
   },
 });
 
-const composeDescriptor = (
-  descriptors: readonly RendererControlDescriptor[],
-): RendererControlDescriptor => ({
-  resolveMergeKey: descriptors[0].resolveMergeKey,
-  resolveDefaultValue: descriptors.some((descriptor) => descriptor.resolveDefaultValue)
-    ? (defaultDevice, input) => {
-        for (const descriptor of descriptors) {
-          const value = descriptor.resolveDefaultValue?.(defaultDevice, input);
-          if (value !== null && value !== undefined) {
-            return value;
-          }
-        }
-        return null;
-      }
-    : undefined,
-});
-
 const createDescriptorMap = (): Record<string, RendererControlDescriptor> => {
-  const descriptorsByAction = new Map<string, RendererControlDescriptor[]>();
-
-  for (const [action, descriptor] of Object.entries(GENERIC_CONTROL_DESCRIPTORS)) {
-    descriptorsByAction.set(action, [descriptor]);
-  }
-
+  const descriptors = { ...GENERIC_CONTROL_DESCRIPTORS };
   for (const kind of RENDERER_DEVICE_KINDS) {
     const controls = getRendererDeviceControlDefinition(kind);
-    if (!controls?.descriptors) {
-      continue;
-    }
-
-    for (const [action, descriptor] of Object.entries(controls.descriptors)) {
-      const existing = descriptorsByAction.get(action);
-      if (existing) {
-        existing.push(descriptor);
-        continue;
-      }
-      descriptorsByAction.set(action, [descriptor]);
+    for (const [action, descriptor] of Object.entries(controls?.descriptors ?? {})) {
+      descriptors[action] ??= descriptor;
     }
   }
-
-  return Object.fromEntries(
-    [...descriptorsByAction.entries()].map(([action, descriptors]) => [
-      action,
-      composeDescriptor(descriptors),
-    ]),
-  );
+  return descriptors;
 };
 
 const CHAIN_CONTROL_DESCRIPTORS = createDescriptorMap();
@@ -191,7 +154,8 @@ export const resetNumericControlToDefault = (
     value: target.value,
     finalize: true,
   };
-  const descriptor = resolveControlDescriptor(baseChange);
+  const descriptor = getRendererDeviceControlDefinition(device.kind)
+    ?.descriptors?.[baseChange.action];
   if (!descriptor) {
     return null;
   }
@@ -205,7 +169,7 @@ export const resetNumericControlToDefault = (
     return null;
   }
 
-  const currentValue = Number(target.value);
+  const currentValue = target.valueAsNumber;
   if (Number.isFinite(currentValue) && Math.abs(currentValue - defaultValue) < 0.0001) {
     return null;
   }

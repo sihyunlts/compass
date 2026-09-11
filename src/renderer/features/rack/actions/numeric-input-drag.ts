@@ -87,14 +87,24 @@ export class NumericInputInteraction {
 
   handleKeyDown(event: KeyboardEvent): void {
     const target = event.target;
-    if (!isRackNumericInput(target)) {
+    if (
+      !isRackNumericInput(target) || target.disabled || target.readOnly
+      || event.defaultPrevented || event.isComposing
+    ) {
+      return;
+    }
+
+    if (event.key === 'Backspace' || event.key === 'Delete') {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onResetInput(target);
+      this.overwriteOnTypeInput = target;
+      delete target.dataset.keyboardEditing;
       return;
     }
 
     const isTypingKey = !(
-      event.defaultPrevented
-      || event.isComposing
-      || event.ctrlKey
+      event.ctrlKey
       || event.metaKey
       || event.altKey
       || event.key.length !== 1
