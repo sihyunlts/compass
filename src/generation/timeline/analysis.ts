@@ -37,7 +37,6 @@ type OccupiedCoordinateCandidateCache = Map<string, StrokeOccupiedCoordinateCand
 
 const occupiedCoordinateCandidatesByStroke = new WeakMap<GeometryStroke, OccupiedCoordinateCandidateCache>();
 const occupiedCoordinateCandidatesByPoints = new WeakMap<GeometryStroke['polyline']['points'], OccupiedCoordinateCandidateCache>();
-const TRAILING_COLOR_AGE_BAND_DISTANCE_BIAS_SQUARED = 0.04;
 const RASTER_TIE_EPSILON = 1e-9;
 
 const roundRasterCoordinate = (
@@ -133,8 +132,7 @@ const shouldReplaceOccupiedCoordinate = (
       return candidate.writeOrder > current.stroke.writeOrder;
     }
 
-    const distanceDelta = resolveColorAgeBandBoundaryDistance(candidate, candidateDistanceSquared)
-      - resolveColorAgeBandBoundaryDistance(current.stroke, current.distanceSquared);
+    const distanceDelta = candidateDistanceSquared - current.distanceSquared;
     if (Math.abs(distanceDelta) > 1e-9) {
       return distanceDelta < 0;
     }
@@ -156,18 +154,6 @@ const isRelatedColorAgeBand = (
   && typeof second.polyline.colorAgeBandCount === 'number'
   && first.polyline.colorAgeBandCount === second.polyline.colorAgeBandCount
 );
-
-const resolveColorAgeBandBoundaryDistance = (
-  stroke: GeometryStroke,
-  distanceSquared: number,
-): number => {
-  // The final band has only a preceding neighbor, so keep near-boundary raster
-  // overlap with that neighbor instead of letting the final band swallow it.
-  const trailingBandBias = stroke.polyline.colorAgeBandIndex === stroke.polyline.colorAgeBandCount - 1
-    ? TRAILING_COLOR_AGE_BAND_DISTANCE_BIAS_SQUARED
-    : 0;
-  return distanceSquared + trailingBandBias;
-};
 
 const createOccupiedCoordinate = (
   stroke: GeometryStroke,
