@@ -248,10 +248,6 @@ const applyTrim = (
       state.timeline.sampleStepBeats,
     );
     const { start, end } = device.params;
-    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end > 1 || end <= start) {
-      return null;
-    }
-
     return { start, end, progress: outputProgress };
   },
   context,

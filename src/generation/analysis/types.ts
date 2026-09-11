@@ -9,5 +9,3 @@ export interface SpatialBounds {
   minY: number;
   maxY: number;
 }
-
-export type SpatialRequirement = SpatialBounds | 'all' | 'none';

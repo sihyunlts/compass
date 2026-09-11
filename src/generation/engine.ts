@@ -1,7 +1,6 @@
 import { resolveMutedSources } from '../core/pipeline/groups';
 import { executeCompiledRackPlan } from './operators';
 import { buildCompiledRackPlan } from './plan/compile';
-import { finalizeTimeline } from './timeline';
 import type {
   CanonicalFieldResult,
   CanonicalOutputAdapter,
@@ -17,7 +16,7 @@ export const buildCanonicalFieldResult = (
 ): CanonicalFieldResult => {
   const compiledPlan = buildCompiledRackPlan(chain);
   const { mutedGroupIds, mutedGeneratorIds } = resolveMutedSources(compiledPlan.baseChain);
-  const generatedTimeline = executeCompiledRackPlan(
+  const timeline = executeCompiledRackPlan(
     compiledPlan,
     chain,
     loopLengthBeats,
@@ -26,7 +25,6 @@ export const buildCanonicalFieldResult = (
     mutedGroupIds,
     mutedGeneratorIds,
   );
-  const timeline = finalizeTimeline(generatedTimeline);
 
   return {
     loopLengthBeats,

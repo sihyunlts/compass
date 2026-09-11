@@ -1,6 +1,5 @@
 import { clampBounds } from '../../core/geometry';
-import type { Bounds } from '../../core/core-types';
-import type { SpatialBounds, SpatialRequirement } from './types';
+import type { SpatialBounds } from './types';
 
 export const createSpatialBounds = (
   minX: number,
@@ -13,18 +12,3 @@ export const createSpatialBounds = (
   minY,
   maxY,
 });
-
-export const toBounds = (
-  requirement: SpatialRequirement,
-): Bounds | null => {
-  if (requirement === 'all' || requirement === 'none') {
-    return null;
-  }
-
-  return {
-    minX: requirement.minX,
-    maxX: requirement.maxX,
-    minY: requirement.minY,
-    maxY: requirement.maxY,
-  };
-};

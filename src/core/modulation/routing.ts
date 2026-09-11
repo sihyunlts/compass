@@ -146,7 +146,9 @@ export const collectValidatedModulationRoutes = (
 
 export const stripModulationDevicesFromChain = (
   chain: GeneratorChain,
-): GeneratorChain => {
+): Omit<GeneratorChain, 'devices'> & {
+  devices: Exclude<GeneratorDeviceNode, CurveModulatorNode>[];
+} => {
   const devices = chain.devices.filter((device) => device.kind !== 'modulator');
   const activeGroupIds = new Set<string>();
   for (const device of devices) {

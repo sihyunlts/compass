@@ -1,5 +1,5 @@
 import type { GeneratorChain } from '../../shared/model';
-import type { SpatialRequirement } from '../analysis/types';
+import type { SpatialBounds } from '../analysis/types';
 import type { CompiledRackPlan, CompiledRackStage, RackStageDeviceKind } from '../plan/types';
 import { resolveCompiledRackSampleStepBeats } from '../plan/sampling';
 import { createEmptyGenerationState, type GenerationState } from '../timeline/state';
@@ -136,7 +136,7 @@ export const executeCompiledRackPlan = (
   modulationChain: GeneratorChain,
   loopLengthBeats: number,
   outputAdapter: CanonicalOutputAdapter,
-  generatorOutputBounds: SpatialRequirement,
+  generatorOutputBounds: SpatialBounds,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): GeometryTimeline => {

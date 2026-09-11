@@ -22,8 +22,6 @@ interface ExtractGeometryEventTracksInput {
   timeline: GeometryTimeline;
   targetOriginIds: ReadonlySet<string>;
   frameWindow: FrameWindow;
-  motionUnitDistanceLed?: number;
-  probeStepLed?: number;
 }
 
 interface MutableGeometryStateEvent extends GeometryStateEvent {
@@ -41,8 +39,8 @@ interface OriginCaptureState {
   runStartFrame: number;
 }
 
-const DEFAULT_MOTION_UNIT_DISTANCE_LED = 1;
-const DEFAULT_PROBE_STEP_LED = 0.25;
+const MOTION_UNIT_DISTANCE_LED = 1;
+const PROBE_STEP_LED = 0.25;
 const GEOMETRY_DISTANCE_EPSILON = 1e-6;
 const SAMPLE_MOTION_DISTANCE_LED = 1e-4;
 type SpatialCellKey = number | string;
@@ -65,9 +63,8 @@ const spatialHashBySnapshot = new WeakMap<
 
 const samplePolylineByArcLength = (
   stroke: GeometryStroke,
-  probeStepLed: number,
-  points = stroke.polyline.points,
 ): Float64Array => {
+  const points = stroke.polyline.points;
   if (points.length === 0) {
     return new Float64Array();
   }
@@ -98,8 +95,7 @@ const samplePolylineByArcLength = (
     return new Float64Array([points[0].x, points[0].y]);
   }
 
-  const safeStep = Math.max(probeStepLed, GEOMETRY_DISTANCE_EPSILON);
-  const sampleCount = Math.max(Math.ceil((totalLength - GEOMETRY_DISTANCE_EPSILON) / safeStep), 1);
+  const sampleCount = Math.max(Math.ceil((totalLength - GEOMETRY_DISTANCE_EPSILON) / PROBE_STEP_LED), 1);
   const probeCount = stroke.polyline.closed ? sampleCount : sampleCount + 1;
   const probes = new Float64Array(probeCount * 2);
   let segmentIndex = 0;
@@ -141,11 +137,10 @@ const buildTopologyKey = (
 
 const buildGeometryMotionSnapshot = (
   strokes: ReadonlyArray<GeometryStroke>,
-  probeStepLed = DEFAULT_PROBE_STEP_LED,
 ): GeometryMotionSnapshot => {
   // Visibility clipping changes what is drawn, not how far the source moved.
   // Measure source centerlines so Mask and Symmetry keep the same one-LED clock.
-  const probeChunks = strokes.map((stroke) => samplePolylineByArcLength(stroke, probeStepLed));
+  const probeChunks = strokes.map((stroke) => samplePolylineByArcLength(stroke));
   const probes = concatenateProbes(probeChunks);
   return {
     probes,
@@ -315,7 +310,7 @@ const hasProbesOutsideDistance = (
 const hasGeometryChangedByAtLeast = (
   reference: GeometryMotionSnapshot,
   candidate: GeometryMotionSnapshot,
-  distanceLed = DEFAULT_MOTION_UNIT_DISTANCE_LED,
+  distanceLed = MOTION_UNIT_DISTANCE_LED,
 ): boolean => {
   if (reference.isEmpty !== candidate.isEmpty) {
     return true;
@@ -329,7 +324,7 @@ const hasGeometryChangedByAtLeast = (
 
   const safeDistance = Number.isFinite(distanceLed) && distanceLed > 0
     ? distanceLed
-    : DEFAULT_MOTION_UNIT_DISTANCE_LED;
+    : MOTION_UNIT_DISTANCE_LED;
   const referenceHash = resolveSpatialHash(reference, safeDistance);
   const candidateHash = resolveSpatialHash(candidate, safeDistance);
   return hasProbesOutsideDistance(reference.probes, candidateHash, safeDistance, 1)
@@ -369,13 +364,6 @@ const clampFrameWindow = (
   ),
 });
 
-const resolvePositiveFinite = (
-  value: number | undefined,
-  fallback: number,
-): number => typeof value === 'number' && Number.isFinite(value) && value > 0
-  ? value
-  : fallback;
-
 const closeActiveRun = (
   state: OriginCaptureState,
   endFrameExclusive: number,
@@ -398,14 +386,6 @@ export const extractGeometryEventTracks = (
     return new Map();
   }
 
-  const motionUnitDistanceLed = resolvePositiveFinite(
-    input.motionUnitDistanceLed,
-    DEFAULT_MOTION_UNIT_DISTANCE_LED,
-  );
-  const probeStepLed = resolvePositiveFinite(
-    input.probeStepLed,
-    DEFAULT_PROBE_STEP_LED,
-  );
   const stateByOriginId = new Map<string, OriginCaptureState>();
   for (const originId of input.targetOriginIds) {
     stateByOriginId.set(originId, {
@@ -422,9 +402,6 @@ export const extractGeometryEventTracks = (
     const strokesByOriginId = new Map<string, GeometryStroke[]>();
     for (const stroke of frameStrokes) {
       const originId = stroke.polyline.originId;
-      if (!input.targetOriginIds.has(originId)) {
-        continue;
-      }
       const strokes = strokesByOriginId.get(originId);
       if (strokes) {
         strokes.push(stroke);
@@ -435,7 +412,7 @@ export const extractGeometryEventTracks = (
 
     for (const [originId, state] of stateByOriginId.entries()) {
       const strokes = strokesByOriginId.get(originId) ?? [];
-      const candidate = buildGeometryMotionSnapshot(strokes, probeStepLed);
+      const candidate = buildGeometryMotionSnapshot(strokes);
       if (candidate.isEmpty) {
         if (state.activeRun) {
           closeActiveRun(state, frameIndex);
@@ -475,7 +452,7 @@ export const extractGeometryEventTracks = (
       const reachedMotionUnit = hasRepresentativeMotionUnit(
         activeRun.motionUnitAnchor,
         candidate,
-        motionUnitDistanceLed,
+        MOTION_UNIT_DISTANCE_LED,
       );
       state.events.push({
         frameIndex,

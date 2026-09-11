@@ -11,8 +11,7 @@ import { buildSpiralPolyline } from '../core/generators/spiral';
 import { buildRipplePolyline } from '../core/generators/ripple';
 import { normalizeOptionalId } from '../shared/normalize-id';
 import type { GeneratorNode } from '../shared/model';
-import { toBounds } from './analysis/bounds';
-import type { SpatialRequirement } from './analysis/types';
+import type { SpatialBounds } from './analysis/types';
 import type { GeometryTimeline } from './types';
 import {
   addStrokeToFrame,
@@ -56,19 +55,14 @@ const withCenterlinePointTieBreakDirection = (
 const buildScannerGeneratorPolyline = (
   device: Extract<GeneratorNode, { kind: 'scanner' }>,
   beat01: number,
-  evaluationBounds: SpatialRequirement,
+  evaluationBounds: SpatialBounds,
 ): Polyline | null => {
-  const bounds = toBounds(evaluationBounds);
-  if (!bounds) {
-    return null;
-  }
-
   return buildScannerPolyline(
     device.id,
     device.params,
     beat01,
     GENERATED_VELOCITY,
-    bounds,
+    evaluationBounds,
   );
 };
 
@@ -76,7 +70,7 @@ const buildGeneratorPolylines = (
   device: GeneratorNode,
   beat01: number,
   sampleStepBeats: number,
-  evaluationBounds: SpatialRequirement,
+  evaluationBounds: SpatialBounds,
 ): Polyline[] => {
   if (device.kind === 'ripple') {
     return toPolylineArray(
@@ -143,7 +137,7 @@ export const rasterizeGeneratorFrame = (
   frameIndex: number,
   device: GeneratorNode,
   writeOrder: number,
-  evaluationBounds: SpatialRequirement,
+  evaluationBounds: SpatialBounds,
 ): void => {
   const beat = frameIndex * timeline.sampleStepBeats;
   const polylines = buildGeneratorPolylines(

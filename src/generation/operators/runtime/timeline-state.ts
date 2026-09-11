@@ -129,15 +129,12 @@ export const buildTimelineStateByOriginId = (
 export const seedGeneratedOriginTimelineState = (
   timelineStateByOriginId: ReadonlyMap<string, OriginTimelineState>,
   originId: string,
-  timelineDomain: GenerationTimelineDomain = 'natural',
 ): Map<string, OriginTimelineState> => {
   const nextTimelineStateByOriginId = cloneTimelineStateByOriginId(timelineStateByOriginId);
   nextTimelineStateByOriginId.set(originId, {
     observedWindow: EMPTY_TIMELINE_WINDOW,
-    playbackExtent: timelineDomain === 'fixed'
-      ? DEFAULT_TIMELINE_WINDOW
-      : EMPTY_TIMELINE_WINDOW,
-    timelineDomain,
+    playbackExtent: EMPTY_TIMELINE_WINDOW,
+    timelineDomain: 'natural',
   });
 
   return nextTimelineStateByOriginId;

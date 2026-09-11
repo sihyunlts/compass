@@ -3,7 +3,7 @@ import {
   isDeviceEffectivelyEnabled,
   resolveEffectTargetGroupId,
 } from '../../shared/group-state';
-import { cloneDeviceNode, isCurveModulatorNode, type GeneratorChain } from '../../shared/model';
+import { cloneDeviceNode, type GeneratorChain } from '../../shared/model';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import type { CompiledRackPlan, CompiledRackStage } from './types';
 
@@ -14,7 +14,7 @@ export const buildCompiledRackPlan = (
   const stages: CompiledRackStage[] = [];
 
   for (const device of baseChain.devices) {
-    if (!isDeviceEffectivelyEnabled(baseChain, device) || isCurveModulatorNode(device)) {
+    if (!isDeviceEffectivelyEnabled(baseChain, device)) {
       continue;
     }
 
