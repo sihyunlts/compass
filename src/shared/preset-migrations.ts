@@ -75,6 +75,10 @@ const migrateDeviceFromVersion1 = (value: unknown): unknown => {
     return kind === value.kind ? value : { ...value, kind };
   }
 
+  // Schema 2 also adopts uniform Color age intervals. Its palette and percent
+  // values carry over unchanged; pose-dependent legacy timing cannot be
+  // represented by a parameter conversion and is not retained as a runtime mode.
+
   if (kind === 'modulator') {
     const {
       target,

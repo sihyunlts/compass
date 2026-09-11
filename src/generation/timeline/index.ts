@@ -39,16 +39,19 @@ export const beginTimelineStage = (
 ): GeometryTimeline => {
   const safeEndBeat = Number.isFinite(endBeat) && endBeat > 0 ? endBeat : 1;
   const frameCount = toFrameCount(safeEndBeat, sourceTimeline.sampleStepBeats);
+  const placements: GeometryPlacement[] = [];
+  for (const placement of sourceTimeline.placements) {
+    if (placement.startFrame >= frameCount) continue;
+    placements.push(placement.endFrameExclusive <= frameCount ? placement : {
+      ...placement,
+      endFrameExclusive: frameCount,
+    });
+  }
   return {
     sampleStepBeats: sourceTimeline.sampleStepBeats,
     timeDomainEndBeat: safeEndBeat,
     frameCount,
-    placements: sourceTimeline.placements
-      .filter((placement) => placement.startFrame < frameCount)
-      .map((placement) => placement.endFrameExclusive <= frameCount ? placement : {
-        ...placement,
-        endFrameExclusive: frameCount,
-      }),
+    placements,
     originGroupIdByOriginId: new Map(sourceTimeline.originGroupIdByOriginId),
     nextWriteId: sourceTimeline.nextWriteId,
   };
@@ -150,14 +153,15 @@ export const removeOriginStrokes = (
   frameCount: number,
 ): void => {
   unregisterTimelineOrigins(timeline, targetOriginIds);
-  timeline.placements = timeline.placements.flatMap((placement) => {
+  const placements: GeometryPlacement[] = [];
+  for (const placement of timeline.placements) {
     if (!targetOriginIds.has(placement.stroke.polyline.originId) || placement.startFrame >= frameCount) {
-      return [placement];
+      placements.push(placement);
+    } else if (placement.endFrameExclusive > frameCount) {
+      placements.push({ ...placement, startFrame: frameCount });
     }
-    return placement.endFrameExclusive > frameCount
-      ? [{ ...placement, startFrame: frameCount }]
-      : [];
-  });
+  }
+  timeline.placements = placements;
 };
 
 /** Emits maximal spans with the same ordered set of active placements. */

@@ -3,7 +3,7 @@ import { extractGeometryEventTracks } from '../geometry/event-track';
 import {
   addStrokeToFrameRange,
   beginTimelineStage,
-  unregisterTimelineOrigins,
+  removeOriginStrokes,
 } from '../timeline';
 import type {
   GeometryStroke,
@@ -30,7 +30,6 @@ interface ColorAgeWrite {
   event: GeometryStateEvent;
   startFrame: number;
   endFrameExclusive: number;
-  playbackEndFrameExclusive: number;
   colorAgeBandIndex: number;
   velocity: number;
 }
@@ -40,8 +39,8 @@ const COLOR_AGE_EPSILON = 1e-9;
 const colorizeEventStroke = (
   stroke: GeometryStroke,
   velocity: number,
-  colorAgeBandIndex: number | undefined,
-  colorAgeBandCount: number | undefined,
+  colorAgeBandIndex: number,
+  colorAgeBandCount: number,
   writeOrder: number,
 ): Omit<GeometryStroke, 'writeId'> => ({
   polyline: {
@@ -49,7 +48,6 @@ const colorizeEventStroke = (
     velocity,
     colorAgeBandIndex,
     colorAgeBandCount,
-    points: stroke.polyline.points,
   },
   originGroupId: stroke.originGroupId,
   writeOrder,
@@ -66,12 +64,6 @@ const median = (
     : sorted[middle];
 };
 
-interface ColorEventTiming {
-  positionByEvent: ReadonlyMap<GeometryStateEvent, number>;
-  runEndPosition: number;
-  toOutputFrame(position: number): number;
-}
-
 const groupEventsByRunIndex = (
   events: ReadonlyArray<GeometryStateEvent>,
 ): ReadonlyMap<number, GeometryStateEvent[]> => {
@@ -87,198 +79,90 @@ const groupEventsByRunIndex = (
   return eventsByRunIndex;
 };
 
-const createOutputFrameTiming = (
-  events: ReadonlyArray<GeometryStateEvent>,
-): ColorEventTiming => ({
-  positionByEvent: new Map(events.map((event) => [event, event.frameIndex])),
-  runEndPosition: events[0].runEndFrameExclusive,
-  toOutputFrame: (position) => position,
-});
-
-const createMotionSampleTiming = (
-  events: ReadonlyArray<GeometryStateEvent>,
-): ColorEventTiming => {
-  const positionByEvent = new Map(
-    events.map((event, eventIndex) => [event, eventIndex]),
-  );
-  const lastEventIndex = events.length - 1;
-  const firstFrame = events[0].frameIndex;
-  const lastFrame = events[lastEventIndex].frameIndex;
-  const frameStep = (lastFrame - firstFrame) / lastEventIndex;
-
-  return {
-    positionByEvent,
-    runEndPosition: lastEventIndex
-      + ((events[0].runEndFrameExclusive - lastFrame) / frameStep),
-    toOutputFrame: (position) => {
-      if (position >= lastEventIndex) {
-        return lastFrame + ((position - lastEventIndex) * frameStep);
-      }
-
-      const startEventIndex = Math.floor(position);
-      const startFrame = events[startEventIndex].frameIndex;
-      const endFrame = events[startEventIndex + 1].frameIndex;
-      return startFrame + ((endFrame - startFrame) * (position - startEventIndex));
-    },
-  };
-};
-
-const buildEventTimingByRunIndex = (
-  eventsByRunIndex: ReadonlyMap<number, GeometryStateEvent[]>,
-): ReadonlyMap<number, ColorEventTiming> => {
-  return new Map(
-    Array.from(eventsByRunIndex.entries(), ([runIndex, runEvents]) => {
-      const hasMotionCadence = runEvents.some((event) => event.motionUnitFrameCount > 0);
-      const timing = hasMotionCadence && runEvents.length > 1
-        ? createMotionSampleTiming(runEvents)
-        : createOutputFrameTiming(runEvents);
-      return [runIndex, timing];
-    }),
-  );
-};
-
-const resolveReferenceSpanByRunIndex = (
-  eventsByRunIndex: ReadonlyMap<number, GeometryStateEvent[]>,
-  kernel: CompiledColorAgeKernel,
-): ReadonlyMap<number, number> => {
-  const referenceSpanByRunIndex = new Map<number, number>();
-  for (const [runIndex, runEvents] of eventsByRunIndex.entries()) {
-    const motionCadences = runEvents
-      .map((event) => event.motionUnitFrameCount)
-      .filter((frameCount) => frameCount > 0);
-    if (motionCadences.length > 0) {
-      // The one-LED motion clock excludes stationary dwell, while dense samples
-      // retain every upstream pose used to draw the trail.
-      referenceSpanByRunIndex.set(runIndex, median(motionCadences));
-      continue;
-    }
-
-    const event = runEvents[0];
-    const activeFrameCount = event.runEndFrameExclusive - event.runStartFrame;
-    const kernelUnitCount = (kernel.slots.length * kernel.noteLengthRatio)
-      + ((kernel.slots.length - 1) * kernel.gapRatio);
-    referenceSpanByRunIndex.set(
-      runIndex,
-      activeFrameCount / kernelUnitCount,
-    );
-  }
-
-  return referenceSpanByRunIndex;
-};
-
-const toFirstSampleFrame = (
+const toFirstSampleIndex = (
   frame: number,
 ): number => Math.ceil(frame - COLOR_AGE_EPSILON);
 
-const buildEventWrites = (
+const resolveReferenceSpan = (
   events: ReadonlyArray<GeometryStateEvent>,
   kernel: CompiledColorAgeKernel,
-): ColorAgeWrite[] => {
-  const writes: ColorAgeWrite[] = [];
-  const eventsByRunIndex = groupEventsByRunIndex(events);
-  const referenceSpanByRunIndex = resolveReferenceSpanByRunIndex(
-    eventsByRunIndex,
-    kernel,
-  );
-  const eventTimingByRunIndex = buildEventTimingByRunIndex(eventsByRunIndex);
-  for (let eventIndex = 0; eventIndex < events.length; eventIndex += 1) {
-    const event = events[eventIndex];
-    const timing = eventTimingByRunIndex.get(event.runIndex)!;
-    const eventPosition = timing.positionByEvent.get(event)!;
-    const referenceSpan = referenceSpanByRunIndex.get(event.runIndex)!;
-    const requestedNoteDuration = Math.max(
-      referenceSpan * kernel.noteLengthRatio,
-      1,
-    );
-    const gapDuration = referenceSpan * kernel.gapRatio;
-    const slotStride = requestedNoteDuration + gapDuration;
-    const nextEvent = events[eventIndex + 1];
-    const stateEndPosition = nextEvent?.runIndex === event.runIndex
-      ? timing.positionByEvent.get(nextEvent)!
-      : timing.runEndPosition;
-    const stateSpan = stateEndPosition - eventPosition;
-    // A geometry snapshot already supplies one visible stroke. The first slot,
-    // and every band separated by an explicit Gap, therefore uses only the
-    // centerline sweep above 100%. Gap 0 keeps dense history bands so diagonal
-    // trails retain their existing lattice continuity.
-    const visibleWriteDuration = Math.min(
-      stateSpan,
-      referenceSpan,
-      requestedNoteDuration,
-    ) + Math.max(
-      requestedNoteDuration - referenceSpan,
-      0,
-    );
-
-    const eventWrites: ColorAgeWrite[] = [];
-    for (const slot of kernel.slots) {
-      const isFirstSlot = slot.slotIndex === 0;
-      const usesFootprintAdjustedBand = isFirstSlot || kernel.gapRatio > 0;
-      const rawStartPosition = isFirstSlot
-        ? eventPosition
-        : kernel.gapRatio > 0
-          ? eventPosition + (slot.slotIndex * slotStride)
-          : eventPosition
-            + visibleWriteDuration
-            + ((slot.slotIndex - 1) * requestedNoteDuration);
-      const rawEndPosition = rawStartPosition + (
-        usesFootprintAdjustedBand
-          ? visibleWriteDuration
-          : requestedNoteDuration
-      );
-      const startFrame = toFirstSampleFrame(timing.toOutputFrame(rawStartPosition));
-      const endFrameExclusive = Math.max(
-        toFirstSampleFrame(timing.toOutputFrame(rawEndPosition)),
-        startFrame + 1,
-      );
-      eventWrites.push({
-        event,
-        startFrame,
-        endFrameExclusive,
-        playbackEndFrameExclusive: Math.max(
-          toFirstSampleFrame(timing.toOutputFrame(
-            rawStartPosition + requestedNoteDuration,
-          )),
-          startFrame + 1,
-        ),
-        colorAgeBandIndex: slot.slotIndex,
-        velocity: slot.velocity,
-      });
-    }
-    const finalWrite = eventWrites[eventWrites.length - 1];
-    const stateEndFrame = toFirstSampleFrame(
-      timing.toOutputFrame(stateEndPosition),
-    );
-    if (finalWrite.endFrameExclusive < stateEndFrame) {
-      finalWrite.endFrameExclusive = stateEndFrame;
-    }
-    writes.push(...eventWrites);
-  }
-  return writes;
+): number => {
+  const motionCadences = events
+    .map((event) => event.motionUnitFrameCount)
+    .filter((frameCount) => frameCount > 0);
+  // Retain every pose; the representative one-LED cadence only sets the unit.
+  return motionCadences.length > 0
+    ? median(motionCadences)
+    : (events[0].runEndFrameExclusive - events[0].runStartFrame)
+      / kernel.sequenceEndUnit;
 };
 
-const mergePlaybackExtent = (
-  extents: Map<string, { start: number; end: number }>,
-  originId: string,
-  start: number,
-  end: number,
-): void => {
-  const current = extents.get(originId);
-  if (current) {
-    current.start = Math.min(current.start, start);
-    current.end = Math.max(current.end, end);
-    return;
-  }
-
-  extents.set(originId, { start, end });
+const createMotionSampleClock = (
+  events: ReadonlyArray<GeometryStateEvent>,
+): ((position: number) => number) => {
+  const lastEventIndex = events.length - 1;
+  const sourceEndFrame = events[lastEventIndex].endFrameExclusive;
+  return (position) => {
+    // The clock advances only on a new pose. A shared fractional boundary is
+    // sampled once, so sub-sample slots may be empty rather than overlap.
+    const sampleIndex = toFirstSampleIndex(position);
+    if (sampleIndex <= lastEventIndex) {
+      return events[sampleIndex].frameIndex;
+    }
+    // After the final held pose, consume history at one unit per output sample.
+    return sourceEndFrame + sampleIndex - lastEventIndex - 1;
+  };
 };
+
+function* iterateEventWrites(
+  events: ReadonlyArray<GeometryStateEvent>,
+  kernel: CompiledColorAgeKernel,
+): Generator<ColorAgeWrite> {
+  for (const runEvents of groupEventsByRunIndex(events).values()) {
+    const referenceSpan = resolveReferenceSpan(runEvents, kernel);
+    const toOutputFrame = runEvents.length > 1
+      ? createMotionSampleClock(runEvents)
+      : (position: number) => toFirstSampleIndex(runEvents[0].frameIndex + position);
+
+    const slotCoverage = kernel.coverageIntervals.flatMap((interval) => {
+      const intervalUnits = interval.endUnitExclusive - interval.startUnit;
+      const requestedSpan = intervalUnits * referenceSpan;
+      // The source stroke supplies its own footprint. Add only the sweep beyond
+      // one motion unit, once per connected interval rather than once per color.
+      // Static sources use time alone; they have no motion footprint to subtract.
+      const coverageSpan = runEvents.length > 1
+        ? Math.min(requestedSpan, referenceSpan, 1)
+          + Math.max(requestedSpan - referenceSpan, 0)
+        : requestedSpan;
+      const coverageStart = interval.startUnit * referenceSpan;
+      const toCoveragePosition = (unit: number) => coverageStart
+        + ((unit - interval.startUnit) / intervalUnits * coverageSpan);
+      return interval.slots.map((slot) => ({
+        slot,
+        startPosition: toCoveragePosition(slot.startUnit),
+        endPosition: toCoveragePosition(slot.endUnitExclusive),
+      }));
+    });
+
+    for (let eventIndex = 0; eventIndex < runEvents.length; eventIndex += 1) {
+      for (const { slot, startPosition, endPosition } of slotCoverage) {
+        yield {
+          event: runEvents[eventIndex],
+          startFrame: toOutputFrame(eventIndex + startPosition),
+          endFrameExclusive: toOutputFrame(eventIndex + endPosition),
+          colorAgeBandIndex: slot.slotIndex,
+          velocity: slot.velocity,
+        };
+      }
+    }
+  }
+}
 
 export const materializeColorTimeline = (
   input: ColorTimelineMaterializationInput,
 ): ColorTimelineMaterializationResult => {
   const writes: ColorAgeWrite[] = [];
   const playbackExtentByOriginId = new Map<string, { start: number; end: number }>();
-  const usesNearestColorBoundary = input.kernel.noteLengthRatio < 1;
   let outputEndFrameExclusive = input.sourceTimeline.frameCount;
   const eventsByOriginId = extractGeometryEventTracks({
     timeline: input.sourceTimeline,
@@ -291,19 +175,16 @@ export const materializeColorTimeline = (
 
   for (const originId of input.targetOriginIds) {
     const events = eventsByOriginId.get(originId) ?? [];
-    const originWrites = buildEventWrites(events, input.kernel);
-    for (const write of originWrites) {
+    let originStart = Infinity;
+    let originEnd = -Infinity;
+    for (const write of iterateEventWrites(events, input.kernel)) {
       writes.push(write);
-      outputEndFrameExclusive = Math.max(
-        outputEndFrameExclusive,
-        write.playbackEndFrameExclusive,
-      );
-      mergePlaybackExtent(
-        playbackExtentByOriginId,
-        originId,
-        write.startFrame * input.sourceTimeline.sampleStepBeats,
-        write.playbackEndFrameExclusive * input.sourceTimeline.sampleStepBeats,
-      );
+      originStart = Math.min(originStart, write.startFrame * input.sourceTimeline.sampleStepBeats);
+      originEnd = Math.max(originEnd, write.endFrameExclusive * input.sourceTimeline.sampleStepBeats);
+      outputEndFrameExclusive = Math.max(outputEndFrameExclusive, write.endFrameExclusive);
+    }
+    if (originStart < Infinity) {
+      playbackExtentByOriginId.set(originId, { start: originStart, end: originEnd });
     }
   }
 
@@ -312,7 +193,7 @@ export const materializeColorTimeline = (
     outputEndFrameExclusive * input.sourceTimeline.sampleStepBeats,
   );
   const timelineStage = beginTimelineStage(input.sourceTimeline, outputEndBeat);
-  unregisterTimelineOrigins(timelineStage, input.targetOriginIds);
+  removeOriginStrokes(timelineStage, input.targetOriginIds, timelineStage.frameCount);
 
   for (const write of writes) {
     for (const stroke of write.event.strokes) {
@@ -323,8 +204,8 @@ export const materializeColorTimeline = (
         colorizeEventStroke(
           stroke,
           write.velocity,
-          usesNearestColorBoundary ? write.colorAgeBandIndex : undefined,
-          usesNearestColorBoundary ? input.kernel.slots.length : undefined,
+          write.colorAgeBandIndex,
+          input.kernel.slotCount,
           input.writeOrder,
         ),
       );

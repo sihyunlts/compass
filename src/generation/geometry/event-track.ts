@@ -4,6 +4,8 @@ import type { GeometryStroke, GeometryTimeline } from '../types';
 
 export interface GeometryStateEvent {
   frameIndex: number;
+  /** The source holds this pose until the next change or the end of its run. */
+  endFrameExclusive: number;
   runIndex: number;
   runStartFrame: number;
   runEndFrameExclusive: number;
@@ -368,6 +370,7 @@ const closeActiveRun = (
   state: OriginCaptureState,
   endFrameExclusive: number,
 ): void => {
+  state.events[state.events.length - 1].endFrameExclusive = endFrameExclusive;
   for (let index = state.events.length - 1; index >= 0; index -= 1) {
     const event = state.events[index];
     if (event.runIndex !== state.runIndex) {
@@ -426,6 +429,7 @@ export const extractGeometryEventTracks = (
         state.runStartFrame = frameIndex;
         state.events.push({
           frameIndex,
+          endFrameExclusive: frameWindow.endFrameExclusive,
           runIndex: state.runIndex,
           runStartFrame: state.runStartFrame,
           runEndFrameExclusive: frameWindow.endFrameExclusive,
@@ -454,8 +458,10 @@ export const extractGeometryEventTracks = (
         candidate,
         MOTION_UNIT_DISTANCE_LED,
       );
+      state.events[state.events.length - 1].endFrameExclusive = frameIndex;
       state.events.push({
         frameIndex,
+        endFrameExclusive: frameWindow.endFrameExclusive,
         runIndex: state.runIndex,
         runStartFrame: state.runStartFrame,
         runEndFrameExclusive: frameWindow.endFrameExclusive,
