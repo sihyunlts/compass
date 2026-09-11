@@ -19,11 +19,11 @@
   } from '../../../core/generators/path';
   import {
     applyAffine,
-    composeAffine,
     invertAffine,
     toRotateTransformAt,
     toTranslationTransform,
   } from '../../../core/geometry';
+  import { composePathTransform, setPathScalesAt, toPathAffine } from '../../../core/path-transform';
   import { clamp } from '../../../shared/math';
   import {
     clonePathAnchors,
@@ -51,11 +51,6 @@
   };
   type AlignmentGuides = { x: number | null; y: number | null };
   type AxisSnap = { value: number; target: number | null };
-  type RotationFeedbackPosition = {
-    x: number;
-    y: number;
-    placement: 'above' | 'below';
-  };
   type HandleKind = 'handleIn' | 'handleOut';
   type Selection =
     | { kind: 'anchors'; anchorIds: string[] }
@@ -83,7 +78,6 @@
       startAngle: number;
       startRotationRadians: number;
       startTransform: PathTransform;
-      feedbackPosition: RotationFeedbackPosition;
     }
     | {
       kind: 'path-scale';
@@ -142,10 +136,6 @@
   let connectionOriginAnchorId = $state<string | null>(null);
   let pendingAppendEndpoint = $state<'start' | 'end' | null>(null);
   let alignmentGuides = $state<AlignmentGuides>({ x: null, y: null });
-  let rotationFeedback = $state<{
-    degrees: number;
-    snapped: boolean;
-  } | null>(null);
   let lastPathSnapSignature: string | null = null;
 
   const COORDINATE_RANGE = PATH_COORDINATE_MAX - PATH_COORDINATE_MIN;
@@ -178,39 +168,14 @@
   const toWorldPoint = (
     point: Readonly<EditorPoint>,
     pathTransform: Readonly<PathTransform> = localTransform,
-  ): EditorPoint => applyAffine(pathTransform, point);
+  ): EditorPoint => applyAffine(toPathAffine(pathTransform), point);
 
   const toLocalPoint = (
     point: Readonly<EditorPoint>,
     pathTransform: Readonly<PathTransform> = localTransform,
   ): EditorPoint | null => {
-    const inverse = invertAffine(pathTransform);
+    const inverse = invertAffine(toPathAffine(pathTransform));
     return inverse ? applyAffine(inverse, point) : null;
-  };
-
-  const toSignedScaleTransformAt = (
-    scaleX: number,
-    scaleY: number,
-    center: Readonly<EditorPoint>,
-  ): PathTransform | null => {
-    if (
-      !Number.isFinite(scaleX)
-      || !Number.isFinite(scaleY)
-      || !Number.isFinite(center.x)
-      || !Number.isFinite(center.y)
-      || Math.abs(scaleX) < Number.EPSILON
-      || Math.abs(scaleY) < Number.EPSILON
-    ) {
-      return null;
-    }
-    return {
-      a: scaleX,
-      b: 0,
-      c: 0,
-      d: scaleY,
-      tx: center.x - center.x * scaleX,
-      ty: center.y - center.y * scaleY,
-    };
   };
 
   const resolveSignedMinimumScale = (
@@ -231,9 +196,10 @@
     if (!rect) {
       return 0;
     }
+    const affine = toPathAffine(pathTransform);
     const worldVector = {
-      x: pathTransform.a * vector.x + pathTransform.b * vector.y,
-      y: pathTransform.c * vector.x + pathTransform.d * vector.y,
+      x: affine.a * vector.x + affine.b * vector.y,
+      y: affine.c * vector.x + affine.d * vector.y,
     };
     return Math.hypot(
       worldVector.x * rect.width / COORDINATE_RANGE,
@@ -506,25 +472,21 @@
         id: 'north-west',
         point: { x: bounds.minX, y: bounds.maxY },
         fixedPoint: { x: bounds.maxX, y: bounds.minY },
-        cursor: isHorizontal ? 'ew-resize' : isVertical ? 'ns-resize' : 'nwse-resize',
       },
       {
         id: 'north-east',
         point: { x: bounds.maxX, y: bounds.maxY },
         fixedPoint: { x: bounds.minX, y: bounds.minY },
-        cursor: isHorizontal ? 'ew-resize' : isVertical ? 'ns-resize' : 'nesw-resize',
       },
       {
         id: 'south-east',
         point: { x: bounds.maxX, y: bounds.minY },
         fixedPoint: { x: bounds.minX, y: bounds.maxY },
-        cursor: isHorizontal ? 'ew-resize' : isVertical ? 'ns-resize' : 'nwse-resize',
       },
       {
         id: 'south-west',
         point: { x: bounds.minX, y: bounds.minY },
         fixedPoint: { x: bounds.maxX, y: bounds.maxY },
-        cursor: isHorizontal ? 'ew-resize' : isVertical ? 'ns-resize' : 'nesw-resize',
       },
     ];
     const scaleHandlePositions: string[] = [];
@@ -596,62 +558,12 @@
     ];
     const worldCorners = localCorners.map((point) => toWorldPoint(point));
     const plottedCorners = worldCorners.map((point) => toPlotPoint(point));
-    const worldBounds = {
-      minX: Math.min(...worldCorners.map((point) => point.x)),
-      minY: Math.min(...worldCorners.map((point) => point.y)),
-      maxX: Math.max(...worldCorners.map((point) => point.x)),
-      maxY: Math.max(...worldCorners.map((point) => point.y)),
-    };
-    const topLeft = toPlotPoint({ x: worldBounds.minX, y: worldBounds.maxY });
-    const bottomRight = toPlotPoint({ x: worldBounds.maxX, y: worldBounds.minY });
     return {
       center,
-      localCenter,
-      localBounds: bounds,
       polygon: plottedCorners.map((point) => `${point.x},${point.y}`).join(' '),
-      left: topLeft.x,
-      top: topLeft.y,
-      width: bottomRight.x - topLeft.x,
-      height: bottomRight.y - topLeft.y,
       scaleHandles,
     };
   });
-  const rotationFeedbackPosition = $derived(
-    rotationFeedback && dragTarget?.kind === 'path-rotate'
-      ? dragTarget.feedbackPosition
-      : null,
-  );
-
-  const resolveRotationFeedbackPosition = (
-    selectionBounds: NonNullable<typeof pathSelection>,
-  ): RotationFeedbackPosition => {
-    const center = toPlotPoint(selectionBounds.center);
-    const radius = Math.hypot(
-      selectionBounds.width / 2,
-      selectionBounds.height / 2,
-    );
-    const aboveY = center.y - radius;
-    const belowY = center.y + radius;
-    if (aboveY >= 10) {
-      return {
-        x: clamp(center.x, 12, 88),
-        y: clamp(aboveY, 8, 92),
-        placement: 'above',
-      };
-    }
-    if (belowY <= 90) {
-      return {
-        x: clamp(center.x, 12, 88),
-        y: clamp(belowY, 8, 92),
-        placement: 'below',
-      };
-    }
-    return {
-      x: clamp(center.x, 12, 88),
-      y: 8,
-      placement: 'below',
-    };
-  };
   const marqueeBox = $derived.by(() => {
     if (dragTarget?.kind !== 'marquee' || !pointerDidMove) {
       return null;
@@ -684,7 +596,7 @@
       previewStartAnchorId,
       previewDirection,
       clamp(previewProgress01, 0, 1),
-      localTransform,
+      toPathAffine(localTransform),
     );
     return point ? toPlotPoint(point) : null;
   });
@@ -989,12 +901,11 @@
       x: appliesSnapX ? (usesCenterX ? EDITOR_CENTER : snappedEdgesX.target) : null,
       y: appliesSnapY ? (usesCenterY ? EDITOR_CENTER : snappedEdgesY.target) : null,
     };
-    rotationFeedback = null;
     emitGeometry(
       localAnchors,
       localClosed,
       false,
-      composeAffine(
+      composePathTransform(
         toTranslationTransform(deltaX, deltaY),
         startTransform,
       ),
@@ -1031,7 +942,7 @@
       rect?.height ?? 0,
       snapEnabled && (!lockAxis || rawDelta.y !== 0),
     );
-    const inverse = invertAffine(localTransform);
+    const inverse = invertAffine(toPathAffine(localTransform));
     if (!inverse) {
       return;
     }
@@ -1049,7 +960,6 @@
         ? snappedDeltaY.target
         : null,
     };
-    rotationFeedback = null;
     emitGeometry(startAnchors.map((anchor) => selectedIds.has(anchor.id)
       ? {
         ...anchor,
@@ -1067,7 +977,7 @@
     point: EditorPoint,
     lockToIncrement: boolean,
     snapEnabled: boolean,
-  ): void => {
+  ): string | null => {
     const requestedRotation = startRotationRadians + angle;
     const rect = editorEl?.getBoundingClientRect();
     const radiusPx = rect
@@ -1087,19 +997,18 @@
     const resolvedRotationDegrees = ((rawDegrees + 180) % 360 + 360) % 360 - 180;
     const resolvedAngle = resolvedRotation - startRotationRadians;
     alignmentGuides = { x: null, y: null };
-    rotationFeedback = {
-      degrees: Math.round(resolvedRotationDegrees),
-      snapped: rotationSnap.snapped,
-    };
     emitGeometry(
       localAnchors,
       localClosed,
       false,
-      composeAffine(
+      composePathTransform(
         toRotateTransformAt(resolvedAngle * 180 / Math.PI, center),
         startTransform,
       ),
     );
+    return rotationSnap.snapped
+      ? `rotation:${Math.round(resolvedRotationDegrees)}`
+      : null;
   };
 
   const scalePath = (
@@ -1116,7 +1025,14 @@
     if (!hasX && !hasY) {
       return null;
     }
-    const inverse = invertAffine(startTransform);
+    const scaleReference = setPathScalesAt(
+      startTransform,
+      startTransform.scaleX === 0 ? 1 : startTransform.scaleX,
+      startTransform.scaleY === 0 ? 1 : startTransform.scaleY,
+      fixedPoint,
+    );
+    const referenceAffine = toPathAffine(scaleReference);
+    const inverse = invertAffine(referenceAffine);
     if (!inverse) {
       return null;
     }
@@ -1128,14 +1044,14 @@
     const rect = editorEl?.getBoundingClientRect();
     const xVectorLengthPx = hasX
       ? resolveTransformedVectorLengthPx(
-        startTransform,
+        scaleReference,
         { x: startVector.x, y: 0 },
         rect,
       )
       : 0;
     const yVectorLengthPx = hasY
       ? resolveTransformedVectorLengthPx(
-        startTransform,
+        scaleReference,
         { x: 0, y: startVector.y },
         rect,
       )
@@ -1159,8 +1075,8 @@
       );
       let scale = resolveSignedMinimumScale(requestedScale, minimumScale);
       if (snapEnabled && rect) {
-        const worldFixedPoint = applyAffine(startTransform, fixedPoint);
-        const worldStartPoint = applyAffine(startTransform, {
+        const worldFixedPoint = applyAffine(referenceAffine, fixedPoint);
+        const worldStartPoint = applyAffine(referenceAffine, {
           x: fixedPoint.x + startVector.x,
           y: fixedPoint.y + startVector.y,
         });
@@ -1259,16 +1175,16 @@
         : 1;
     }
     alignmentGuides = { x: null, y: null };
-    rotationFeedback = null;
-    const scaleTransform = toSignedScaleTransformAt(scaleX, scaleY, fixedPoint);
-    if (!scaleTransform) {
-      return null;
-    }
     emitGeometry(
       localAnchors,
       localClosed,
       false,
-      composeAffine(startTransform, scaleTransform),
+      setPathScalesAt(
+        scaleReference,
+        scaleReference.scaleX * scaleX,
+        scaleReference.scaleY * scaleY,
+        fixedPoint,
+      ),
     );
     const appliedHandle = toWorldPoint({
       x: fixedPoint.x + startVector.x,
@@ -1276,8 +1192,8 @@
     });
     return (['x', 'y'] as const).map((axis) => {
       const target = snapTargets[axis];
-      const canMoveOnAxis = (hasX && Math.abs(startTransform[axis === 'x' ? 'a' : 'b']) > Number.EPSILON)
-        || (hasY && Math.abs(startTransform[axis === 'x' ? 'c' : 'd']) > Number.EPSILON);
+      const canMoveOnAxis = (hasX && Math.abs(referenceAffine[axis === 'x' ? 'a' : 'c']) > Number.EPSILON)
+        || (hasY && Math.abs(referenceAffine[axis === 'x' ? 'b' : 'd']) > Number.EPSILON);
       return target !== null && canMoveOnAxis && roundCoordinate(appliedHandle[axis]) === target
         ? `${axis}:${target}` : '';
     }).filter(Boolean).join('|') || null;
@@ -1393,7 +1309,6 @@
     pointerDidMove = false;
     pendingMergeTargetId = null;
     alignmentGuides = { x: null, y: null };
-    rotationFeedback = null;
     event.preventDefault();
     event.stopPropagation();
   };
@@ -1448,7 +1363,6 @@
       ),
       startRotationRadians: Math.atan2(localTransform.c, localTransform.a),
       startTransform: { ...localTransform },
-      feedbackPosition: resolveRotationFeedbackPosition(pathSelection),
     });
   };
 
@@ -1482,7 +1396,6 @@
     pendingMergeTargetId = null;
     connectionOriginAnchorId = null;
     alignmentGuides = { x: null, y: null };
-    rotationFeedback = null;
     if (!preserveAppendEndpoint) {
       pendingAppendEndpoint = null;
     }
@@ -1907,7 +1820,7 @@
           point.y - dragTarget.center.y,
           point.x - dragTarget.center.x,
         ) - dragTarget.startAngle;
-        rotatePath(
+        const rotationSnapSignature = rotatePath(
           dragTarget.startTransform,
           dragTarget.center,
           angle,
@@ -1916,9 +1829,7 @@
           event.shiftKey,
           !event.ctrlKey,
         );
-        performPathSnapHaptic(rotationFeedback?.snapped
-          ? `rotation:${rotationFeedback.degrees}`
-          : null);
+        performPathSnapHaptic(rotationSnapSignature);
       } else if (dragTarget.kind === 'anchor') {
         const mergeTarget = resolveMergeTarget(
           dragTarget.anchorId,
@@ -1958,7 +1869,6 @@
       dragTarget = null;
       pendingMergeTargetId = null;
       alignmentGuides = { x: null, y: null };
-      rotationFeedback = null;
       if (completedDrag.kind === 'marquee') {
         if (!pointerDidMove) {
           clearEditorFocus(true);
@@ -2123,17 +2033,6 @@
           ></button>
         {/each}
       {/if}
-      {#if rotationFeedback && rotationFeedbackPosition}
-        <span
-          class="path-editor-transform-value"
-          class:is-snapped={rotationFeedback.snapped}
-          class:is-above={rotationFeedbackPosition.placement === 'above'}
-          class:is-below={rotationFeedbackPosition.placement === 'below'}
-          style={`left:${rotationFeedbackPosition.x}%;top:${rotationFeedbackPosition.y}%;`}
-          aria-hidden="true"
-        >{rotationFeedback.degrees}°</span>
-      {/if}
-
       {#if !readonly || onAnchorSelect}
         {#each plottedAnchors as anchor (anchor.id)}
           <button
@@ -2348,32 +2247,6 @@
 
     &.is-south-west.is-inside {
       transform: translate(0, -100%);
-    }
-  }
-
-  .path-editor-transform-value {
-    position: absolute;
-    z-index: 3;
-    padding: 0.12rem 0.3rem;
-    border: 1px solid var(--color-border-secondary);
-    border-radius: var(--radius-4);
-    background: var(--color-surface);
-    color: var(--color-text-secondary);
-    font-size: 0.65rem;
-    line-height: 1;
-    pointer-events: none;
-
-    &.is-above {
-      transform: translate(-50%, -165%);
-    }
-
-    &.is-below {
-      transform: translate(-50%, 65%);
-    }
-
-    &.is-snapped {
-      border-color: var(--device-control-accent, var(--color-surface-inverse));
-      color: var(--color-text-primary);
     }
   }
 

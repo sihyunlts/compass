@@ -101,9 +101,6 @@ export const createChainControlHandlers = (
   );
 };
 
-const resolveControlDescriptor = (change: RendererControlChange): RendererControlDescriptor | null =>
-  CHAIN_CONTROL_DESCRIPTORS[change.action] ?? null;
-
 export const applyChainControlChange = (
   change: RendererControlChange,
   findDeviceById: (id: string) => GeneratorDeviceNode | null,
@@ -125,7 +122,7 @@ export const applyChainControlChange = (
 export const resolveChainControlMergeKey = (
   change: RendererControlChange,
 ): string | null => {
-  const descriptor = resolveControlDescriptor(change);
+  const descriptor = CHAIN_CONTROL_DESCRIPTORS[change.action];
   return descriptor?.resolveMergeKey(change) ?? null;
 };
 
@@ -178,6 +175,5 @@ export const resetNumericControlToDefault = (
   return {
     ...baseChange,
     value: defaultValue,
-    finalize: true,
   };
 };

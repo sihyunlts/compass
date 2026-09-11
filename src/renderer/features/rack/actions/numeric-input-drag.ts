@@ -291,12 +291,12 @@ export class NumericInputInteraction {
   }
 
   private resolveNumberStep(input: HTMLInputElement): number {
-    const parsedStep = Number(input.step);
+    const parsedStep = Number(input.dataset.dragStep ?? input.step);
     return Number.isFinite(parsedStep) && parsedStep > 0 ? parsedStep : 1;
   }
 
   private resolveStepDecimals(input: HTMLInputElement): number {
-    const stepText = input.step;
+    const stepText = input.dataset.dragStep ?? input.step;
     if (!stepText || stepText === 'any') {
       return 0;
     }

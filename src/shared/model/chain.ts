@@ -77,12 +77,15 @@ export interface PathAnimation {
 }
 
 export interface PathTransform {
+  // The invertible basis retains both axis directions when a size is zero.
   a: number;
   b: number;
   c: number;
   d: number;
   tx: number;
   ty: number;
+  scaleX: number;
+  scaleY: number;
 }
 
 export interface PathParams {

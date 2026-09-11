@@ -31,7 +31,9 @@
             "c": 0,
             "d": 1,
             "tx": 0,
-            "ty": 0
+            "ty": 0,
+            "scaleX": 1,
+            "scaleY": 1
           },
           "animation": {
             "enabled": false,

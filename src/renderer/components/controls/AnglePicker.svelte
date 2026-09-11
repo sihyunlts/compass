@@ -152,7 +152,7 @@
       </div>
       <input
         class="angle-picker-number-input"
-        class:has-display-unit={resolvedUnit !== undefined}
+        class:has-display-overlay={resolvedUnit !== undefined}
         type="number"
         min={resolvedMin}
         max={resolvedMax}
