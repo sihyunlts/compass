@@ -90,7 +90,6 @@ const applyGeneratorDevice = (
     seedGeneratedOriginTimelineState(
       state.timelineStateByOriginId,
       stage.deviceId,
-      'natural',
     ),
     context,
   );

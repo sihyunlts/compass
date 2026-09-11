@@ -1,5 +1,5 @@
 import type { AffineTransform, Polyline } from '../core/core-types';
-import type { SpatialRequirement } from './analysis/types';
+import type { SpatialBounds } from './analysis/types';
 
 export interface GeometryMask {
   readonly contains: (x: number, y: number) => boolean;
@@ -58,7 +58,7 @@ export interface CanonicalFieldResult {
 }
 
 export interface GenerationExecutionContext {
-  generatorOutputBounds: SpatialRequirement;
+  generatorOutputBounds: SpatialBounds;
 }
 
 export interface CanonicalSpatialMask {

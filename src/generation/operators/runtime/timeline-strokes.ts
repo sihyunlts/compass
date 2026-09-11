@@ -73,22 +73,6 @@ export const buildTargetOriginIds = (
   return originIds;
 };
 
-const resolveIntraWriteOrder = (
-  writeOrder: number,
-): number => {
-  if (!Number.isFinite(writeOrder)) {
-    return 0;
-  }
-
-  const baseOrder = Math.trunc(writeOrder);
-  return writeOrder - baseOrder;
-};
-
-const resolveStageWriteOrder = (
-  writeOrder: number,
-  stroke: GeometryStroke,
-): number => writeOrder + resolveIntraWriteOrder(stroke.writeOrder);
-
 const transformMask = (
   mask: GeometryMask,
   transform: AffineTransform,
@@ -119,7 +103,7 @@ export const transformStroke = (
   return {
     polyline,
     originGroupId: stroke.originGroupId,
-    writeOrder: resolveStageWriteOrder(writeOrder, stroke),
+    writeOrder,
     masks: transform
       ? stroke.masks.map((mask) => resolveMask(mask, transform))
       : stroke.masks,
@@ -154,10 +138,6 @@ export const buildSourceStrokesByOriginAndFrame = (
 
   for (const { frameIndex, strokes } of iterateTimelineFrames(timeline, undefined, targetOriginIds)) {
     for (const stroke of strokes) {
-      if (!targetOriginIds.has(stroke.polyline.originId)) {
-        continue;
-      }
-
       let frameMap = strokesByOriginId.get(stroke.polyline.originId);
       if (!frameMap) {
         frameMap = new Map<number, GeometryStroke[]>();

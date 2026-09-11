@@ -17,12 +17,11 @@ interface MonotoneFrameRun extends FrameWindow {
 // interval maps to one output interval, found without expanding its strokes.
 const splitMonotoneFrameRuns = (
   indices: ReadonlyArray<number | null>,
-  frameCount: number,
 ): MonotoneFrameRun[] => {
   const runs: MonotoneFrameRun[] = [];
   let startFrame = 0;
   let direction = 0;
-  const endFrame = Math.min(indices.length, frameCount);
+  const endFrame = indices.length;
   for (let frame = 0; frame <= endFrame; frame += 1) {
     const current = frame < endFrame ? indices[frame] : null;
     if (current === null) {
@@ -66,7 +65,7 @@ const lowerBoundFrame = (
 export const createFrameIndexWindowMapper = (
   indices: ReadonlyArray<number | null>,
 ): OriginFrameRemap['mapSourceWindow'] => {
-  const runs = splitMonotoneFrameRuns(indices, indices.length);
+  const runs = splitMonotoneFrameRuns(indices);
   return (window) => runs.map((run) => ({
     startFrame: lowerBoundFrame(run, indices, run.ascending ? window.startFrame : window.endFrameExclusive),
     endFrameExclusive: lowerBoundFrame(run, indices, run.ascending ? window.endFrameExclusive : window.startFrame),

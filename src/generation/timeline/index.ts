@@ -160,13 +160,6 @@ export const removeOriginStrokes = (
   });
 };
 
-export const finalizeTimeline = (timeline: GeometryTimeline): GeometryTimeline => {
-  const endBeat = Math.max(timeline.timeDomainEndBeat, 1);
-  return toFrameCount(endBeat, timeline.sampleStepBeats) === timeline.frameCount
-    ? timeline
-    : beginTimelineStage(timeline, endBeat);
-};
-
 /** Emits maximal spans with the same ordered set of active placements. */
 export function* iterateTimelineSpans(
   timeline: GeometryTimeline,

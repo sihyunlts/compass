@@ -5,7 +5,7 @@ import type {
   GeneratorEffectNode,
   GeneratorNode,
 } from '../../../shared/model';
-import type { SpatialRequirement } from '../../analysis/types';
+import type { SpatialBounds } from '../../analysis/types';
 import type {
   CompiledRackPlan,
   CompiledRackStage,
@@ -29,7 +29,7 @@ export interface MaskSourceReferenceContext {
   sampleStepBeats: number;
   outputAdapter: CanonicalOutputAdapter;
   modulationContext: ModulationContext;
-  generatorOutputBounds: SpatialRequirement;
+  generatorOutputBounds: SpatialBounds;
   mutedGroupIds: ReadonlySet<string>;
   mutedGeneratorIds: ReadonlySet<string>;
   timelineBySourceKey: Map<string, GeometryTimeline>;
@@ -51,7 +51,7 @@ export interface RackStageExecutionContext {
   compiledPlan: CompiledRackPlan;
   outputAdapter: CanonicalOutputAdapter;
   modulationContext: ModulationContext;
-  generatorOutputBounds: SpatialRequirement;
+  generatorOutputBounds: SpatialBounds;
   mutedGroupIds: ReadonlySet<string>;
   mutedGeneratorIds: ReadonlySet<string>;
   referenceContext: MaskSourceReferenceContext;
