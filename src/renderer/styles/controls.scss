@@ -74,15 +74,15 @@ input {
       caret-color: currentColor;
     }
 
-    &.has-display-unit {
+    &.has-display-overlay {
       color: transparent;
     }
 
-    &.has-display-unit[data-keyboard-editing='true']:focus {
+    &.has-display-overlay[data-keyboard-editing='true']:focus {
       color: var(--color-text-primary);
     }
 
-    &.has-display-unit[data-keyboard-editing='true']:focus + .numeric-value-display {
+    &.has-display-overlay[data-keyboard-editing='true']:focus + .numeric-value-display {
       display: none;
     }
   }

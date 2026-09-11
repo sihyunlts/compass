@@ -28,6 +28,8 @@ export const IDENTITY_PATH_TRANSFORM = Object.freeze<PathTransform>({
   d: 1,
   tx: 0,
   ty: 0,
+  scaleX: 1,
+  scaleY: 1,
 });
 
 export const sanitizePathTransform = (value: unknown): PathTransform => {
@@ -41,6 +43,8 @@ export const sanitizePathTransform = (value: unknown): PathTransform => {
     d: toFiniteNumber(value.d, Number.NaN),
     tx: toFiniteNumber(value.tx, Number.NaN),
     ty: toFiniteNumber(value.ty, Number.NaN),
+    scaleX: toFiniteNumber(value.scaleX, Number.NaN),
+    scaleY: toFiniteNumber(value.scaleY, Number.NaN),
   };
   const determinant = affineLinearDeterminant(transform);
   if (
@@ -56,6 +60,8 @@ export const sanitizePathTransform = (value: unknown): PathTransform => {
     d: Number(transform.d.toFixed(6)),
     tx: Number(transform.tx.toFixed(6)),
     ty: Number(transform.ty.toFixed(6)),
+    scaleX: transform.scaleX,
+    scaleY: transform.scaleY,
   };
 };
 

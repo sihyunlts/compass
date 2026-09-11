@@ -1,10 +1,10 @@
-import type { Bounds, Polyline, Vec2 } from '../core-types';
+import type { AffineTransform, Bounds, Polyline, Vec2 } from '../core-types';
 import { applyAffine, IDENTITY_AFFINE } from '../geometry';
+import { toPathAffine } from '../path-transform';
 import type {
   PathAnchor,
   PathHandle,
   PathParams,
-  PathTransform,
 } from '../../shared/model';
 
 const PATH_FLATTEN_MAX_ERROR = 0.025;
@@ -179,7 +179,7 @@ const flattenCubic = (
 const buildFlattenedPathGeometry = (
   anchors: readonly PathAnchor[],
   closed: boolean,
-  transform: Readonly<PathTransform>,
+  transform: Readonly<AffineTransform>,
 ): FlattenedPathGeometry => {
   if (anchors.length < 2) {
     return {
@@ -222,7 +222,7 @@ const buildFlattenedPathGeometry = (
 const flattenPathGeometry = (
   anchors: readonly PathAnchor[],
   closed: boolean,
-  transform: Readonly<PathTransform>,
+  transform: Readonly<AffineTransform>,
 ): FlattenedPathGeometry => {
   let cached = geometryCache.get(anchors);
   if (!cached) {
@@ -288,7 +288,7 @@ export const sampleAnimatedPathAtProgress = (
   startAnchorId: string,
   direction: PathParams['animation']['direction'],
   progress01: number,
-  transform: Readonly<PathTransform> = IDENTITY_AFFINE,
+  transform: Readonly<AffineTransform> = IDENTITY_AFFINE,
 ): Vec2 | null => {
   const geometry = flattenPathGeometry(anchors, closed, transform);
   const clampedProgress = Math.min(Math.max(progress01, 0), 1);
@@ -321,7 +321,8 @@ export const buildPathPolyline = (
     return null;
   }
 
-  const geometry = flattenPathGeometry(params.anchors, params.closed, params.transform);
+  const transform = toPathAffine(params.transform);
+  const geometry = flattenPathGeometry(params.anchors, params.closed, transform);
   if (params.animation.enabled) {
     const point = sampleAnimatedPathAtProgress(
       params.anchors,
@@ -329,7 +330,7 @@ export const buildPathPolyline = (
       params.animation.startAnchorId,
       params.animation.direction,
       progress01,
-      params.transform,
+      transform,
     );
     if (!point) {
       return null;

@@ -38,7 +38,9 @@
     dataParam,
     parameter,
     display,
+    displayText,
     step,
+    dragStep,
     min,
     max,
     dragPixelsPerStep,
@@ -61,7 +63,9 @@
     dataParam?: string;
     parameter?: NumericParameterRule;
     display?: NumericParameterDisplay;
+    displayText?: string;
     step?: number | string;
+    dragStep?: number;
     min?: number | string;
     max?: number | string;
     dragPixelsPerStep?: number;
@@ -87,6 +91,9 @@
   const resolvedDisplay = $derived(display ?? parameter?.display);
   const resolvedUnit = $derived(resolvedDisplay?.unit);
   const resolvedAriaLabel = $derived(ariaLabel ?? label);
+  const resolvedClassName = $derived(
+    `${className} ${disabled ? 'number-field-disabled' : ''}`.trim(),
+  );
   const modulationDomain = $derived(resolveModulationDisplayDomain({
     min: resolvedMin,
     max: resolvedMax,
@@ -125,6 +132,10 @@
       ? formatNumericParameterDisplay(resolvedDisplay, value, valueText)
       : valueText;
   });
+  const hasDisplayOverlay = $derived(
+    displayText !== undefined || resolvedUnit !== undefined,
+  );
+  const resolvedDisplayText = $derived(displayText ?? displayValue);
 
   const emitChange = (event: Event, finalize: boolean): void => {
     const change = buildNumericInputControlChange(event, {
@@ -137,6 +148,7 @@
       onControlChange(change);
     }
   };
+
 </script>
 
 <FieldShell
@@ -145,7 +157,7 @@
   {size}
   {labelVisibility}
   {fill}
-  class={className}
+  class={resolvedClassName}
 >
   <ModulatableControl
     class="field-control number-field-control"
@@ -161,9 +173,10 @@
     {onControlChange}
   >
     <input
-      class:has-display-unit={resolvedUnit !== undefined}
+      class:has-display-overlay={hasDisplayOverlay}
       type="number"
       step={resolvedStep}
+      data-drag-step={dragStep}
       min={resolvedMin}
       max={resolvedMax}
       value={value}
@@ -179,13 +192,13 @@
       oninput={(event: Event) => emitChange(event, false)}
       onchange={(event: Event) => emitChange(event, true)}
     />
-    {#if resolvedUnit}
+    {#if hasDisplayOverlay}
       <span
         class="numeric-value-display number-field-display-value"
         class:is-compact={size === 'compact'}
         aria-hidden="true"
       >
-        {displayValue}
+        {resolvedDisplayText}
       </span>
     {/if}
     <ModulationIndicator
@@ -197,6 +210,14 @@
 </FieldShell>
 
 <style lang="scss">
+  :global(.control-field.number-field-disabled) {
+    opacity: 0.6;
+  }
+
+  :global(.number-field-control > input:disabled) {
+    cursor: default;
+  }
+
   :global(.number-field-control) {
     overflow: hidden;
     border-radius: var(--radius-4);

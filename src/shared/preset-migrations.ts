@@ -125,7 +125,7 @@ const migrateDeviceFromVersion1 = (value: unknown): unknown => {
     };
   }
 
-  if (kind === 'path' && Object.hasOwn(value.params, 'points')) {
+  if (kind === 'path') {
     const {
       points,
       ...currentParams
@@ -146,6 +146,13 @@ const migrateDeviceFromVersion1 = (value: unknown): unknown => {
       params: {
         ...currentParams,
         anchors,
+        transform: {
+          ...(isRecord(currentParams.transform)
+            ? currentParams.transform
+            : { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 }),
+          scaleX: 1,
+          scaleY: 1,
+        },
       },
     };
   }

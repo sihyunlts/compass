@@ -42,7 +42,7 @@ const createStaticPath = (
     ],
     closed: false,
     fill: false,
-    transform: { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 },
+    transform: { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0, scaleX: 1, scaleY: 1 },
     animation: {
       enabled: false,
       direction: 'forward',
