@@ -6,6 +6,7 @@ import {
   removeOriginStrokes,
 } from '../timeline';
 import type {
+  ColorLayer,
   GeometryStroke,
   GeometryTimeline,
 } from '../types';
@@ -30,7 +31,6 @@ interface ColorAgeWrite {
   event: GeometryStateEvent;
   startFrame: number;
   endFrameExclusive: number;
-  colorAgeBandIndex: number;
   velocity: number;
 }
 
@@ -39,19 +39,22 @@ const COLOR_AGE_EPSILON = 1e-9;
 const colorizeEventStroke = (
   stroke: GeometryStroke,
   velocity: number,
-  colorAgeBandIndex: number,
-  colorAgeBandCount: number,
+  layer: ColorLayer,
+  event: GeometryStateEvent,
   writeOrder: number,
 ): Omit<GeometryStroke, 'writeId'> => ({
   polyline: {
     ...stroke.polyline,
     velocity,
-    colorAgeBandIndex,
-    colorAgeBandCount,
   },
   originGroupId: stroke.originGroupId,
   writeOrder,
   masks: stroke.masks,
+  pathId: stroke.pathId,
+  colorBinding: {
+    layer, sourceFrame: event.frameIndex, sourceEndFrameExclusive: event.endFrameExclusive,
+    sourceOrder: stroke.writeId,
+  },
 });
 
 const median = (
@@ -150,7 +153,6 @@ function* iterateEventWrites(
           event: runEvents[eventIndex],
           startFrame: toOutputFrame(eventIndex + startPosition),
           endFrameExclusive: toOutputFrame(eventIndex + endPosition),
-          colorAgeBandIndex: slot.slotIndex,
           velocity: slot.velocity,
         };
       }
@@ -161,7 +163,7 @@ function* iterateEventWrites(
 export const materializeColorTimeline = (
   input: ColorTimelineMaterializationInput,
 ): ColorTimelineMaterializationResult => {
-  const writes: ColorAgeWrite[] = [];
+  const writes: Array<ColorAgeWrite & { layer: ColorLayer }> = [];
   const playbackExtentByOriginId = new Map<string, { start: number; end: number }>();
   let outputEndFrameExclusive = input.sourceTimeline.frameCount;
   const eventsByOriginId = extractGeometryEventTracks({
@@ -173,12 +175,14 @@ export const materializeColorTimeline = (
     },
   });
 
+  let nextLayerOrder = input.sourceTimeline.nextWriteId;
   for (const originId of input.targetOriginIds) {
     const events = eventsByOriginId.get(originId) ?? [];
+    const layer: ColorLayer = { order: [nextLayerOrder++] };
     let originStart = Infinity;
     let originEnd = -Infinity;
     for (const write of iterateEventWrites(events, input.kernel)) {
-      writes.push(write);
+      writes.push({ ...write, layer });
       originStart = Math.min(originStart, write.startFrame * input.sourceTimeline.sampleStepBeats);
       originEnd = Math.max(originEnd, write.endFrameExclusive * input.sourceTimeline.sampleStepBeats);
       outputEndFrameExclusive = Math.max(outputEndFrameExclusive, write.endFrameExclusive);
@@ -204,8 +208,8 @@ export const materializeColorTimeline = (
         colorizeEventStroke(
           stroke,
           write.velocity,
-          write.colorAgeBandIndex,
-          input.kernel.slotCount,
+          write.layer,
+          write.event,
           input.writeOrder,
         ),
       );

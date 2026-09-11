@@ -9,6 +9,7 @@ import {
   toRoundedCoordinateKey,
 } from '../coordinates';
 import type {
+  ColorLayer,
   GeometryMask,
   GeometryStroke,
 } from '../types';
@@ -122,68 +123,124 @@ const toCandidateBounds = (
     : null;
 };
 
-const shouldReplaceOccupiedCoordinate = (
-  candidate: GeometryStroke,
-  candidateDistanceSquared: number,
-  current: OccupiedCoordinate,
-): boolean => {
-  if (isRelatedColorAgeBand(candidate, current.stroke)) {
-    if (Math.abs(candidate.writeOrder - current.stroke.writeOrder) > 1e-9) {
-      return candidate.writeOrder > current.stroke.writeOrder;
+const compareLayerOrder = (left: ReadonlyArray<number>, right: ReadonlyArray<number>): number => {
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    if (left[index] !== right[index]) return left[index] - right[index];
+  }
+  return left.length - right.length;
+};
+
+interface RankedCoordinate extends OccupiedCoordinate {
+  distanceRank: number;
+}
+
+interface CoordinatePath {
+  latest: RankedCoordinate;
+  samplesByEnd: Map<number, RankedCoordinate>;
+}
+
+interface CoordinateLayers {
+  writeOrder: number;
+  plainWinner?: RankedCoordinate;
+  pathsByLayer: Map<ColorLayer, Map<string, CoordinatePath>>;
+}
+
+const compareSampleOrder = (left: GeometryStroke, right: GeometryStroke): number => {
+  const frameOrder = left.colorBinding!.sourceFrame - right.colorBinding!.sourceFrame;
+  if (frameOrder !== 0) return frameOrder;
+  // Copy identity survives transformations on either side of Color.
+  if (left.pathId !== right.pathId) return left.pathId > right.pathId ? 1 : -1;
+  return left.colorBinding!.sourceOrder - right.colorBinding!.sourceOrder;
+};
+
+const isNearerSample = (left: RankedCoordinate, right: RankedCoordinate): boolean =>
+  left.distanceRank < right.distanceRank
+  || (left.distanceRank === right.distanceRank
+    && compareSampleOrder(left.stroke, right.stroke) > 0);
+
+const resolveLatestPassage = (path: CoordinatePath): RankedCoordinate => {
+  let sample: RankedCoordinate | undefined = path.latest;
+  let winner = sample;
+  // Adjacent source poses touching this LED form one passage. A missing pose
+  // separates a later return from old history, including self-intersections.
+  while (sample) {
+    if (isNearerSample(sample, winner)) winner = sample;
+    sample = path.samplesByEnd.get(sample.stroke.colorBinding!.sourceFrame);
+  }
+  return winner;
+};
+
+/** Resolve a path's color boundary, then crossing paths, then authored layers. */
+export class CoordinateColorResolver<TKey> {
+  private readonly coordinates = new Map<TKey, CoordinateLayers>();
+
+  add(key: TKey, stroke: GeometryStroke, x: number, y: number, distanceSquared: number): void {
+    let coordinate = this.coordinates.get(key);
+    if (coordinate && coordinate.writeOrder > stroke.writeOrder) return;
+    if (!coordinate || coordinate.writeOrder < stroke.writeOrder) {
+      coordinate = { writeOrder: stroke.writeOrder, pathsByLayer: new Map() };
+      this.coordinates.set(key, coordinate);
     }
 
-    const distanceDelta = candidateDistanceSquared - current.distanceSquared;
-    if (Math.abs(distanceDelta) > 1e-9) {
-      return distanceDelta < 0;
+    // Quantize once so distance ties cannot depend on candidate traversal order.
+    const candidate = { stroke, x, y, distanceSquared, distanceRank: Math.round(distanceSquared / 1e-9) };
+    const binding = stroke.colorBinding;
+    if (!binding) {
+      if (!coordinate.plainWinner || stroke.writeId > coordinate.plainWinner.stroke.writeId) {
+        coordinate.plainWinner = candidate;
+      }
+      return;
+    }
+
+    let paths = coordinate.pathsByLayer.get(binding.layer);
+    if (!paths) {
+      paths = new Map();
+      coordinate.pathsByLayer.set(binding.layer, paths);
+    }
+    let path = paths.get(stroke.pathId);
+    if (!path) {
+      path = { latest: candidate, samplesByEnd: new Map() };
+      paths.set(stroke.pathId, path);
+    }
+    const previous = path.samplesByEnd.get(binding.sourceEndFrameExclusive);
+    if (previous && !isNearerSample(candidate, previous)) return;
+    path.samplesByEnd.set(binding.sourceEndFrameExclusive, candidate);
+    if (binding.sourceFrame >= path.latest.stroke.colorBinding!.sourceFrame) {
+      path.latest = candidate;
     }
   }
 
-  return candidate.writeOrder > current.stroke.writeOrder
-    || (candidate.writeOrder === current.stroke.writeOrder && candidate.writeId > current.stroke.writeId);
-};
+  get(key: TKey): OccupiedCoordinate | undefined {
+    const coordinate = this.coordinates.get(key);
+    if (!coordinate) return undefined;
+    // Only the top authored layer can contribute. Resolve passages once, after
+    // choosing that layer, rather than scanning histories of covered layers.
+    let topPaths: Map<string, CoordinatePath> | undefined;
+    let layerOrder: ReadonlyArray<number> | undefined = coordinate.plainWinner
+      ? [coordinate.plainWinner.stroke.writeId]
+      : undefined;
+    for (const [layer, paths] of coordinate.pathsByLayer) {
+      if (!layerOrder || compareLayerOrder(layer.order, layerOrder) > 0) {
+        topPaths = paths;
+        layerOrder = layer.order;
+      }
+    }
+    if (!topPaths) return coordinate.plainWinner;
 
-const isRelatedColorAgeBand = (
-  first: GeometryStroke,
-  second: GeometryStroke,
-): boolean => (
-  first.polyline.originId === second.polyline.originId
-  && first.originGroupId === second.originGroupId
-  && typeof first.polyline.colorAgeBandIndex === 'number'
-  && typeof second.polyline.colorAgeBandIndex === 'number'
-  && typeof first.polyline.colorAgeBandCount === 'number'
-  && typeof second.polyline.colorAgeBandCount === 'number'
-  && first.polyline.colorAgeBandCount === second.polyline.colorAgeBandCount
-);
-
-const createOccupiedCoordinate = (
-  stroke: GeometryStroke,
-  x: number,
-  y: number,
-  distanceSquared: number,
-): OccupiedCoordinate => ({
-  stroke,
-  x,
-  y,
-  distanceSquared,
-});
-
-export const writeOccupiedCoordinateWinner = <TKey>(
-  winners: Map<TKey, OccupiedCoordinate>,
-  key: TKey,
-  stroke: GeometryStroke,
-  x: number,
-  y: number,
-  distanceSquared: number,
-): void => {
-  const current = winners.get(key);
-  if (!current) {
-    winners.set(key, createOccupiedCoordinate(stroke, x, y, distanceSquared));
-  } else if (shouldReplaceOccupiedCoordinate(stroke, distanceSquared, current)) {
-    // This record belongs to one coordinate in the current projection only.
-    current.stroke = stroke;
-    current.distanceSquared = distanceSquared;
+    let winner: RankedCoordinate | undefined;
+    for (const path of topPaths.values()) {
+      const candidate = resolveLatestPassage(path);
+      if (!winner || compareSampleOrder(candidate.stroke, winner.stroke) > 0) {
+        winner = candidate;
+      }
+    }
+    return winner;
   }
-};
+
+  *entries(): Generator<[TKey, OccupiedCoordinate]> {
+    for (const key of this.coordinates.keys()) yield [key, this.get(key)!];
+  }
+}
 
 const collectCenterlineCandidateCoordinates = (
   stroke: GeometryStroke,

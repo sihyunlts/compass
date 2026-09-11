@@ -13,8 +13,7 @@ import type { LaunchpadButton } from '../shared/model';
 import { createSpatialBounds } from './analysis/bounds';
 import {
   collectStrokeOccupiedCoordinateCandidates,
-  writeOccupiedCoordinateWinner,
-  type OccupiedCoordinate,
+  CoordinateColorResolver,
   type OccupiedCoordinateCandidateBounds,
 } from './timeline/analysis';
 import {
@@ -460,8 +459,8 @@ const resolveActiveByPitchFromFrameStrokes = (
   mutedGeneratorIds: ReadonlySet<string>,
 ): Map<number, SampledActivePitch> => {
   const activeByPitch = new Map<number, SampledActivePitch>();
-  const integerWinnerByCoordinateGroup = new Map<CoordinateGroup, OccupiedCoordinate>();
-  const fractionalWinnerByCoordinateGroup = new Map<CoordinateGroup, OccupiedCoordinate>();
+  const integerWinnerByCoordinateGroup = new CoordinateColorResolver<CoordinateGroup>();
+  const fractionalWinnerByCoordinateGroup = new CoordinateColorResolver<CoordinateGroup>();
 
   for (const stroke of strokes) {
     if (!isVisibleStroke(stroke, mutedGroupIds, mutedGeneratorIds)) {
@@ -475,8 +474,7 @@ const resolveActiveByPitchFromFrameStrokes = (
       resolveStrokeOutputProjection,
     )) {
       const { coordinateGroup } = hit;
-      writeOccupiedCoordinateWinner(
-        integerWinnerByCoordinateGroup,
+      integerWinnerByCoordinateGroup.add(
         coordinateGroup,
         stroke,
         coordinateGroup.x,
@@ -491,8 +489,7 @@ const resolveActiveByPitchFromFrameStrokes = (
       resolveStrokeOutputProjection,
     )) {
       const { coordinateGroup } = hit;
-      writeOccupiedCoordinateWinner(
-        fractionalWinnerByCoordinateGroup,
+      fractionalWinnerByCoordinateGroup.add(
         coordinateGroup,
         stroke,
         coordinateGroup.x,
@@ -502,7 +499,7 @@ const resolveActiveByPitchFromFrameStrokes = (
     }
   }
 
-  for (const [coordinateGroup, winner] of integerWinnerByCoordinateGroup) {
+  for (const [coordinateGroup, winner] of integerWinnerByCoordinateGroup.entries()) {
     for (const button of coordinateGroup.buttons) {
       if (button.output.kind !== 'note') {
         continue;

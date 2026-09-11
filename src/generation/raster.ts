@@ -158,6 +158,7 @@ export const rasterizeGeneratorFrame = (
       polyline: withCenterlinePointTieBreakDirection(polyline),
       originGroupId: normalizeOptionalId(device.groupId),
       writeOrder,
+      pathId: String(polyline.sourcePathId ?? 0),
     });
   }
 };

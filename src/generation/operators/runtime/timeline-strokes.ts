@@ -104,6 +104,8 @@ export const transformStroke = (
     polyline,
     originGroupId: stroke.originGroupId,
     writeOrder,
+    colorBinding: stroke.colorBinding,
+    pathId: stroke.pathId,
     masks: transform
       ? stroke.masks.map((mask) => resolveMask(mask, transform))
       : stroke.masks,
@@ -167,3 +169,9 @@ export const toSourceFrameIndex = (
     frameCount - 1,
   );
 };
+
+/** Preserve copy lineage both before and after Color is materialized. */
+export const copyStrokePath = <T extends Pick<GeometryStroke, 'pathId'>>(
+  stroke: T,
+  copyIndex: number,
+): T => ({ ...stroke, pathId: `${stroke.pathId}/${copyIndex}` });

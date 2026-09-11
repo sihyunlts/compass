@@ -16,6 +16,7 @@ import type { SymmetryEffectNode } from '../../shared/model';
 import type { GenerationState } from '../timeline/state';
 import { createIdentityMask } from '../timeline';
 import type { GeometryStroke } from '../types';
+import { copyStrokePath } from './runtime/timeline-strokes';
 
 const buildSymmetryStrokeRewrite = (
   effect: SymmetryEffectNode,
@@ -44,7 +45,9 @@ const buildSymmetryStrokeRewrite = (
     : null;
 
   return (stroke) => plan.steps.map((step, index) => {
-    const transformedStroke = transformStroke(stroke, step.transform, writeOrder);
+    const transformedStroke = copyStrokePath(
+      transformStroke(stroke, step.transform, writeOrder), index,
+    );
     const targetSectorMask = targetSectorMasks?.[index];
     if (!targetSectorMask) {
       return transformedStroke;

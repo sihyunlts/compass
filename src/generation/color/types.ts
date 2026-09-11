@@ -1,5 +1,4 @@
 interface CompiledColorAgeSlot {
-  slotIndex: number;
   velocity: number;
   startUnit: number;
   endUnitExclusive: number;
@@ -13,6 +12,5 @@ interface ColorCoverageInterval {
 
 export interface CompiledColorAgeKernel {
   sequenceEndUnit: number;
-  slotCount: number;
   coverageIntervals: ReadonlyArray<ColorCoverageInterval>;
 }

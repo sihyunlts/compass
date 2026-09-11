@@ -21,13 +21,13 @@ export interface AffineTransform {
 
 export interface Polyline {
   readonly points: ReadonlyArray<Readonly<Vec2>>;
+  /** Stable identity for independently moving parts emitted by one generator. */
+  readonly sourcePathId?: number;
   /** A line extends through its two support points; other paths end at their vertices. */
   readonly extent?: 'line';
   readonly closed: boolean;
   readonly originId: string;
   readonly velocity: number;
-  readonly colorAgeBandIndex?: number;
-  readonly colorAgeBandCount?: number;
   readonly rasterMode?: 'centerline' | 'fill';
   readonly rasterTieBreakDirection?: Readonly<Vec2>;
 }

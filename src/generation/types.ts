@@ -9,9 +9,22 @@ export interface GeometryMask {
 export interface GeometryStroke {
   readonly polyline: Polyline;
   readonly originGroupId: string | null;
+  /** Stable source/copy path, shared by consecutive poses of that path. */
+  readonly pathId: string;
   readonly writeOrder: number;
   readonly writeId: number;
   readonly masks: ReadonlyArray<GeometryMask>;
+  readonly colorBinding?: {
+    readonly layer: ColorLayer;
+    readonly sourceFrame: number;
+    readonly sourceEndFrameExclusive: number;
+    readonly sourceOrder: number;
+  };
+}
+
+/** Identity and fixed stacking order of one Color application to one origin. */
+export interface ColorLayer {
+  readonly order: ReadonlyArray<number>;
 }
 
 export interface GeometryPlacement {

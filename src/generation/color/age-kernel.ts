@@ -7,7 +7,6 @@ export const compileColorAgeKernel = (
   const noteLengthRatio = config.noteLengthPercent / 100;
   const gapRatio = config.gapPercent / 100;
   const slots = config.velocities.map((velocity, slotIndex) => ({
-    slotIndex,
     velocity,
     startUnit: slotIndex * (noteLengthRatio + gapRatio),
     endUnitExclusive: (slotIndex * (noteLengthRatio + gapRatio)) + noteLengthRatio,
@@ -16,7 +15,6 @@ export const compileColorAgeKernel = (
   return {
     sequenceEndUnit: (config.velocities.length * noteLengthRatio)
       + ((config.velocities.length - 1) * gapRatio),
-    slotCount: slots.length,
     coverageIntervals: gapRatio === 0
       ? [{
           startUnit: slots[0].startUnit,

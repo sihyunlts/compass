@@ -6,7 +6,7 @@ import {
   createRackOperator,
   materializeRackState,
 } from './runtime';
-import { buildSourceStrokesByOriginAndFrame } from './runtime/timeline-strokes';
+import { buildSourceStrokesByOriginAndFrame, copyStrokePath } from './runtime/timeline-strokes';
 import { toFrameWindow } from '../timeline';
 import { DEFAULT_TIMELINE_WINDOW } from '../timeline/temporal-window';
 import type {
@@ -15,7 +15,7 @@ import type {
   OriginTimelineState,
   PendingStrokeRewriteFrameWrite,
 } from '../timeline/state';
-import type { GeometryTimeline } from '../types';
+import type { ColorLayer, GeometryStroke, GeometryTimeline } from '../types';
 import {
   buildFixedTimelineStateOverrides,
   resolveCanonicalSourceWindow,
@@ -38,6 +38,35 @@ const buildRepeatedFrameWrites = (
     PendingStrokeRewriteFrameWrite['strokes'][number][]
   >();
   const intervalRatio = intervalPercent / 100;
+  const repeatedLayers = new Map<ColorLayer, Map<number, ColorLayer>>();
+  const repeatedStrokes = new Map<GeometryStroke, Map<number, Omit<GeometryStroke, 'writeId'>>>();
+  const repeatStroke = (stroke: GeometryStroke, repeatIndex: number): Omit<GeometryStroke, 'writeId'> => {
+    let copies = repeatedStrokes.get(stroke);
+    if (!copies) {
+      copies = new Map();
+      repeatedStrokes.set(stroke, copies);
+    }
+    const cached = copies.get(repeatIndex);
+    if (cached) return cached;
+
+    let result = copyStrokePath(transformStroke(stroke, null, writeOrder), repeatIndex);
+    const binding = stroke.colorBinding;
+    if (binding) {
+      let layers = repeatedLayers.get(binding.layer);
+      if (!layers) {
+        layers = new Map();
+        repeatedLayers.set(binding.layer, layers);
+      }
+      let layer = layers.get(repeatIndex);
+      if (!layer) {
+        layer = { order: [...binding.layer.order, repeatIndex] };
+        layers.set(repeatIndex, layer);
+      }
+      result = { ...result, colorBinding: { ...binding, layer } };
+    }
+    copies.set(repeatIndex, result);
+    return result;
+  };
   const repeatDurationRatio = 1 / (1 + (repeatCount - 1) * intervalRatio);
   const repeatStartStepRatio = repeatDurationRatio * intervalRatio;
 
@@ -97,9 +126,9 @@ const buildRepeatedFrameWrites = (
           continue;
         }
 
-        destinationStrokes.push(
-          ...sourceStrokes.map((stroke) => transformStroke(stroke, null, writeOrder)),
-        );
+        for (const stroke of sourceStrokes) {
+          destinationStrokes.push(repeatStroke(stroke, repeatIndex));
+        }
       }
 
       if (destinationStrokes.length > 0) {

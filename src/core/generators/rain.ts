@@ -335,6 +335,7 @@ export const buildRainPolylines = (
     };
 
     polylines.push({
+      sourcePathId: birthIndex,
       points: [currentPoint],
       closed: false,
       originId,
