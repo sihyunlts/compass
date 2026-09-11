@@ -885,7 +885,9 @@
 
   <ModalDialog
     open={presetState.pendingRackPresetLoadTarget !== null}
-    title={i18n.t('rack.saveCurrentPrompt')}
+    title={presetState.pendingRackPresetLoadTarget
+      ? presetController.getRackSavePromptTitle(presetState.pendingRackPresetLoadTarget)
+      : ''}
     description={presetState.pendingRackPresetLoadTarget
       ? presetController.getRackPresetLoadDescription(presetState.pendingRackPresetLoadTarget)
       : null}
