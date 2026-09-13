@@ -3,6 +3,8 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { IPC_CHANNELS } from './shared/contracts/ipc/channels';
 import type { PresetFileKind } from './shared/presets';
 import type {
+  CopyPresetEntriesRequest,
+  CopyPresetEntriesResponse,
   CreatePresetFolderRequest,
   CreatePresetFolderResponse,
   DeletePresetEntriesRequest,
@@ -212,6 +214,11 @@ const api: CompassApi = {
       IPC_CHANNELS.movePresetEntries,
       request,
     ) as Promise<MovePresetEntriesResponse>,
+  copyPresetEntries: (request: CopyPresetEntriesRequest) =>
+    ipcRenderer.invoke(
+      IPC_CHANNELS.copyPresetEntries,
+      request,
+    ) as Promise<CopyPresetEntriesResponse>,
   readPresetEntry: <K extends PresetFileKind>(request: ReadPresetEntryRequest<K>) =>
     ipcRenderer.invoke(IPC_CHANNELS.readPresetEntry, request) as Promise<ReadPresetEntryResponse<K>>,
 };

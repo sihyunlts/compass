@@ -226,6 +226,11 @@ export interface MovePresetEntriesRequest {
   destination: UserPresetEntryRequest;
 }
 
+export interface CopyPresetEntriesRequest {
+  entries: DeletePresetEntryRequest[];
+  destination?: UserPresetEntryRequest;
+}
+
 export interface MovedPresetEntry extends PresetEntrySelectionItem {
   sourcePath: string;
   filePath: string;
@@ -254,6 +259,16 @@ export type MovePresetEntriesResponse =
   | {
       status: 'ok';
       entries: MovedPresetEntry[];
+    }
+  | {
+      status: 'error';
+      message: string;
+    };
+
+export type CopyPresetEntriesResponse =
+  | {
+      status: 'ok';
+      entries: PresetEntrySelectionItem[];
     }
   | {
       status: 'error';

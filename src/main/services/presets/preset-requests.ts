@@ -1,4 +1,5 @@
 import type {
+  CopyPresetEntriesRequest,
   CreatePresetFolderRequest,
   DeletePresetEntriesRequest,
   MovePresetEntriesRequest,
@@ -245,6 +246,28 @@ export const parseMovePresetEntriesRequest = (
   return {
     entries: entriesRequest.entries,
     destination,
+  };
+};
+
+export const parseCopyPresetEntriesRequest = (
+  value: unknown,
+): CopyPresetEntriesRequest | null => {
+  const entriesRequest = parseDeletePresetEntriesRequest(value);
+  if (!entriesRequest || typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const rawDestination = (value as { destination?: unknown }).destination;
+  const destination = rawDestination === undefined
+    ? undefined
+    : parseUserPresetEntryPath(rawDestination);
+  if (rawDestination !== undefined && !destination) {
+    return null;
+  }
+
+  return {
+    entries: entriesRequest.entries,
+    ...(destination ? { destination } : {}),
   };
 };
 

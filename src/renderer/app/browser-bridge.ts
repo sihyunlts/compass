@@ -5,10 +5,12 @@ import {
 } from '../../shared/bundled-rack-presets';
 import {
   isDeviceBrowserSystemDirectoryPath,
+  resolveDeviceBrowserSystemDirectoryPath,
 } from '../../devices/browser-categories';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import { resolveShortcutPlatform } from '../../shared/keyboard-shortcuts';
 import { normalizeAuthoredMetadata } from '../../shared/model';
+import { preparePresetEntryCopy } from '../../shared/preset-entry-copy';
 import {
   preparePresetEntryMove,
   type PresetEntryMovePlan,
@@ -898,6 +900,87 @@ const createBrowserCompassBridge = (): CompassApi => ({
         relativePath: [...plan.relativePath],
         sourcePath: toVirtualPresetPath(presetType, plan.entry.relativePath),
         filePath: toVirtualPresetPath(presetType, plan.relativePath),
+      })),
+    };
+  },
+  copyPresetEntries: async (request) => {
+    const store = readStore();
+    const copyPlan = preparePresetEntryCopy(
+      request.entries,
+      request.destination,
+      collectStorePaths(store),
+    );
+    if (copyPlan.status === 'error') {
+      return copyPlan;
+    }
+
+    const presetType = copyPlan.plans[0].entry.presetType;
+    if (!copyPlan.plans.every(({ entry }) => hasStoreEntry(store, entry))) {
+      return {
+        status: 'error',
+        message: 'Preset item type does not match the request.',
+      };
+    }
+
+    for (const plan of copyPlan.plans) {
+      const parentPath = plan.relativePath.slice(0, -1);
+      const destinationExists = parentPath.length === 0
+        || store.folders[presetType].some((path) =>
+          relativePathEquals(path, parentPath));
+      if (!destinationExists) {
+        if (
+          presetType !== 'device'
+          || !resolveDeviceBrowserSystemDirectoryPath(parentPath)
+        ) {
+          return { status: 'error', message: 'Destination folder does not exist.' };
+        }
+        for (let index = 0; index < parentPath.length; index += 1) {
+          const folderPath = parentPath.slice(0, index + 1);
+          if (!store.folders[presetType].some((path) =>
+            relativePathCollides(path, folderPath))) {
+            store.folders[presetType].push(folderPath);
+          }
+        }
+      }
+    }
+
+    const sourceFolders = [...store.folders[presetType]];
+    const sourceFiles = [...store.files];
+    for (const plan of copyPlan.plans) {
+      if (plan.entry.entryKind === 'directory') {
+        for (const folderPath of sourceFolders) {
+          if (relativePathContains(plan.entry.relativePath, folderPath)) {
+            store.folders[presetType].push([
+              ...plan.relativePath,
+              ...folderPath.slice(plan.entry.relativePath.length),
+            ]);
+          }
+        }
+      }
+
+      for (const sourceFile of sourceFiles.filter((file) =>
+        file.presetType === presetType
+        && (plan.entry.entryKind === 'directory'
+          ? relativePathContains(plan.entry.relativePath, file.relativePath)
+          : relativePathEquals(plan.entry.relativePath, file.relativePath)))) {
+        store.files.push({
+          ...sourceFile,
+          relativePath: [
+            ...plan.relativePath,
+            ...sourceFile.relativePath.slice(plan.entry.relativePath.length),
+          ],
+          payload: clonePreset(sourceFile.payload),
+        });
+      }
+    }
+
+    writeStore(store);
+    return {
+      status: 'ok',
+      entries: copyPlan.plans.map((plan) => ({
+        presetType,
+        entryKind: plan.entry.entryKind,
+        relativePath: [...plan.relativePath],
       })),
     };
   },

@@ -277,6 +277,12 @@ export const registerIpcHandlers = (
   );
 
   ipcMain.handle(
+    IPC_CHANNELS.copyPresetEntries,
+    (_event, request) =>
+      presetService.copyPresetEntries(request),
+  );
+
+  ipcMain.handle(
     IPC_CHANNELS.readPresetEntry,
     (_event, request) =>
       presetService.readPresetEntry(request),

@@ -41,6 +41,7 @@
     PresetEntryContextTarget,
   } from '../../features/context-menu/types';
   import {
+    canCopyPresetContextTarget,
     canDeletePresetContextTarget,
     canRenamePresetContextTarget,
   } from '../../features/context-menu/types';
@@ -349,6 +350,7 @@
     presetErrorText = null,
     pendingPresetFolderDraft = null,
     presetEntrySelectionTarget = null,
+    browserClipboardPresetType = null,
     reserveTitlebarSpace = true,
     canToggleWindowLayer = false,
     mainWindowAlwaysOnTop = false,
@@ -395,6 +397,9 @@
     onPresetEntrySelectionHandled = () => {},
     onPresetRenameRequest = () => {},
     onPresetDeleteRequest = () => {},
+    onPresetCopyRequest = () => {},
+    onPresetPasteRequest = () => {},
+    onPresetDuplicateRequest = () => {},
   } = $props<{
     activePage?: BrowserPage;
     platform: ShortcutPlatform;
@@ -404,6 +409,7 @@
     presetErrorText?: string | null;
     pendingPresetFolderDraft?: PendingPresetFolderDraft | null;
     presetEntrySelectionTarget?: PresetEntrySelectionTarget | null;
+    browserClipboardPresetType?: PresetFileKind | null;
     reserveTitlebarSpace?: boolean;
     canToggleWindowLayer?: boolean;
     mainWindowAlwaysOnTop?: boolean;
@@ -464,6 +470,9 @@
     onPresetEntrySelectionHandled?: (token: number) => void;
     onPresetRenameRequest?: (target: PresetEntryContextTarget) => void;
     onPresetDeleteRequest?: (target: PresetBrowserContextTarget) => void;
+    onPresetCopyRequest?: (target: PresetBrowserContextTarget) => void;
+    onPresetPasteRequest?: (target: PresetEntryContextTarget) => void | Promise<void>;
+    onPresetDuplicateRequest?: (target: PresetBrowserContextTarget) => void | Promise<void>;
   }>();
 
   let expandedFolderIds = $state<string[]>([]);
@@ -1154,6 +1163,36 @@
         ? resolveSelectedPresetContextMenuTarget(clickedPresetTarget)
         : clickedPresetTarget
       : null;
+
+    if (matchesAppShortcut(event, 'copy', platform)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (selectedPresetTarget && canCopyPresetContextTarget(selectedPresetTarget)) {
+        onPresetCopyRequest(selectedPresetTarget);
+      }
+      return;
+    }
+
+    if (matchesAppShortcut(event, 'duplicate', platform)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (selectedPresetTarget && canCopyPresetContextTarget(selectedPresetTarget)) {
+        void onPresetDuplicateRequest(selectedPresetTarget);
+      }
+      return;
+    }
+
+    if (matchesAppShortcut(event, 'paste', platform)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (
+        clickedPresetTarget?.source === 'user'
+        && clickedPresetTarget.presetType === browserClipboardPresetType
+      ) {
+        void onPresetPasteRequest(clickedPresetTarget);
+      }
+      return;
+    }
 
     if (matchesAppShortcut(event, 'renameSelection', platform)) {
       event.preventDefault();

@@ -1,5 +1,6 @@
 <script lang="ts">
   import {
+    canCopyPresetContextTarget,
     canDeletePresetContextTarget,
     canRenamePresetContextTarget,
     isPresetBrowserContextTarget,
@@ -32,6 +33,7 @@
     onUngroupGroup,
     onDisconnectModulation,
     clipboardAvailable = false,
+    browserClipboardPresetType = null,
   } = $props<{
     platform: ShortcutPlatform;
     onCopy: (target: ContextMenuTarget) => void;
@@ -50,6 +52,7 @@
       modulatorId?: string,
     ) => void;
     clipboardAvailable?: boolean;
+    browserClipboardPresetType?: PresetEntryContextTarget['presetType'] | null;
   }>();
 
   let isOpen = $state(false);
@@ -70,8 +73,10 @@
   const canShowInFolder = $derived.by(() =>
     target?.kind === 'preset-entry' && target.source === 'user');
   const canPasteForTarget = $derived.by(() =>
-    isRackSelectionContextTarget(target)
-    && clipboardAvailable);
+    (isRackSelectionContextTarget(target) && clipboardAvailable)
+    || (target?.kind === 'preset-entry'
+      && target.source === 'user'
+      && browserClipboardPresetType === target.presetType));
   type ClipboardActionKind = 'copy' | 'cut' | 'paste' | 'duplicate';
   type ClipboardActionMeta = {
     id: string;
@@ -97,10 +102,20 @@
       shortcutId: 'duplicate',
     },
   ];
-  const visibleClipboardActions = $derived.by(() =>
-    isRackSelectionContextTarget(target)
-      ? CLIPBOARD_ACTIONS.filter((action) => !action.requiresClipboard || canPasteForTarget)
-      : []);
+  const visibleClipboardActions = $derived.by(() => {
+    if (isRackSelectionContextTarget(target)) {
+      return CLIPBOARD_ACTIONS.filter((action) =>
+        !action.requiresClipboard || canPasteForTarget);
+    }
+    if (isPresetBrowserContextTarget(target)) {
+      const canCopy = canCopyPresetContextTarget(target);
+      return CLIPBOARD_ACTIONS.filter((action) =>
+        action.kind === 'paste'
+          ? canPasteForTarget
+          : (action.kind === 'copy' || action.kind === 'duplicate') && canCopy);
+    }
+    return [];
+  });
   const canRenameTarget = $derived.by(() => {
     if (target?.kind === 'preset-entry') {
       return canRenamePresetContextTarget(target);
@@ -254,6 +269,17 @@
 </button>
 {/snippet}
 
+{#snippet clipboardMenuItems()}
+{#each visibleClipboardActions as action (action.id)}
+  {@render menuItem(
+    action.id,
+    i18n.t(action.labelKey),
+    () => handleClipboardAction(action.kind),
+    action.shortcutId,
+  )}
+{/each}
+{/snippet}
+
 <FloatingDropdown
   open={isOpen}
   {anchorPoint}
@@ -266,9 +292,6 @@
       {#if canShowInfo}
         {@render menuItem('context-info', i18n.t('context.info'), handleInfoClick)}
       {/if}
-      {#if canCreatePresetFolder}
-        {@render menuItem('context-new-folder', i18n.t('context.newFolder'), handleCreatePresetFolderClick)}
-      {/if}
       {#if canRenameTarget}
         {@render menuItem(
           'context-rename',
@@ -277,8 +300,18 @@
           'renameSelection',
         )}
       {/if}
+      {#if visibleClipboardActions.length > 0 && (canShowInfo || canRenameTarget)}
+        <hr class="floating-menu-separator" />
+      {/if}
+      {@render clipboardMenuItems()}
+      {#if canCreatePresetFolder && (canShowInfo || canRenameTarget || visibleClipboardActions.length > 0)}
+        <hr class="floating-menu-separator" />
+      {/if}
+      {#if canCreatePresetFolder}
+        {@render menuItem('context-new-folder', i18n.t('context.newFolder'), handleCreatePresetFolderClick)}
+      {/if}
       {#if isDeletablePresetTarget}
-        {#if canCreatePresetFolder || canRenameTarget}
+        {#if canShowInfo || canRenameTarget || visibleClipboardActions.length > 0 || canCreatePresetFolder}
           <hr class="floating-menu-separator" />
         {/if}
         {@render menuItem(
@@ -287,11 +320,11 @@
           handleDeleteClick,
           'deletePresetEntries',
         )}
-        {#if canShowInFolder}
-          <hr class="floating-menu-separator" />
-        {/if}
       {/if}
       {#if canShowInFolder}
+        {#if canShowInfo || canRenameTarget || visibleClipboardActions.length > 0 || canCreatePresetFolder || isDeletablePresetTarget}
+          <hr class="floating-menu-separator" />
+        {/if}
         {@render menuItem('context-show-in-folder', i18n.t('context.showInFolder'), handleShowInFolderClick)}
       {/if}
     {:else if target.kind === 'modulation-parameter'}
@@ -320,14 +353,6 @@
       {#if canShowInfo}
         {@render menuItem('context-info', i18n.t('context.info'), handleInfoClick)}
       {/if}
-      {#each visibleClipboardActions as action (action.id)}
-        {@render menuItem(
-          action.id,
-          i18n.t(action.labelKey),
-          () => handleClipboardAction(action.kind),
-          action.shortcutId,
-        )}
-      {/each}
       {#if canRenameTarget}
         {@render menuItem(
           'context-rename',
@@ -336,6 +361,10 @@
           'renameSelection',
         )}
       {/if}
+      {#if (canShowInfo || canRenameTarget) && visibleClipboardActions.length > 0}
+        <hr class="floating-menu-separator" />
+      {/if}
+      {@render clipboardMenuItems()}
       <hr class="floating-menu-separator" />
       {#if target.kind === 'devices'}
         {@render menuItem(

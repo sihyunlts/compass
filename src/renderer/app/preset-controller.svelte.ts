@@ -17,6 +17,7 @@ import {
 } from '../device-i18n';
 import { i18n } from '../i18n.svelte';
 import type {
+  CopyPresetEntriesRequest,
   CreatePresetFolderRequest,
   DeletedPresetEntry,
   MovedPresetEntry,
@@ -39,10 +40,12 @@ import type {
   PresetEntrySelectionTarget,
 } from '../features/browser/types';
 import { resolvePresetFileErrorMessage } from '../features/browser/preset-file-error';
-import type {
-  ContextMenuTarget,
-  PresetDeleteContextTarget,
-  PresetEntryContextTarget,
+import {
+  canCopyPresetContextTarget,
+  type ContextMenuTarget,
+  type PresetBrowserContextTarget,
+  type PresetDeleteContextTarget,
+  type PresetEntryContextTarget,
 } from '../features/context-menu/types';
 import type {
   BrowserInsertSource,
@@ -126,6 +129,7 @@ type RackOpenTarget = {
 };
 
 interface PresetControllerState {
+  browserClipboardEntries: PresetEntryContextTarget[];
   presetTree: BrowserTreePresetFolderNode[];
   presetOccupiedPaths: PresetEntryPath[];
   presetErrorText: string | null;
@@ -267,6 +271,7 @@ export class PresetController {
   private defaultRackFileDisplayName = resolveDefaultRackFileDisplayName();
 
   public readonly state: PresetControllerState = $state({
+    browserClipboardEntries: [],
     presetTree: [],
     presetOccupiedPaths: [],
     presetErrorText: null,
@@ -997,6 +1002,72 @@ export class PresetController {
       await this.loadTree();
       this.setPresetEntrySelectionTarget(response.entries);
     }, 'status.presetMoveFailed');
+  }
+
+  public copyBrowserEntries(target: PresetBrowserContextTarget): void {
+    if (!canCopyPresetContextTarget(target)) {
+      return;
+    }
+
+    const entries = target.kind === 'preset-entry' ? [target] : target.entries;
+    this.state.browserClipboardEntries = entries.map((entry) => ({
+      ...entry,
+      relativePath: [...entry.relativePath],
+    }));
+  }
+
+  public async duplicateBrowserEntries(target: PresetBrowserContextTarget): Promise<void> {
+    const entries = target.kind === 'preset-entry' ? [target] : target.entries;
+    await this.copyBrowserEntriesTo(entries);
+  }
+
+  public async pasteBrowserEntries(target: PresetEntryContextTarget): Promise<void> {
+    const entries = this.state.browserClipboardEntries;
+    if (
+      entries.length === 0
+      || target.source !== 'user'
+      || target.presetType !== entries[0].presetType
+    ) {
+      return;
+    }
+
+    const relativePath = target.entryKind === 'directory'
+      ? target.relativePath
+      : target.relativePath.slice(0, -1);
+    await this.copyBrowserEntriesTo(entries, {
+      presetType: target.presetType,
+      source: 'user',
+      relativePath: [...relativePath],
+    });
+  }
+
+  private async copyBrowserEntriesTo(
+    entries: readonly PresetEntryContextTarget[],
+    destination?: CopyPresetEntriesRequest['destination'],
+  ): Promise<void> {
+    if (!canCopyPresetContextTarget({ kind: 'preset-entries', entries })) {
+      return;
+    }
+
+    await this.runPresetAction(async () => {
+      const response = await this.options.bridgeClient.copyPresetEntries({
+        entries: entries.map((entry) => ({
+          presetType: entry.presetType,
+          source: 'user',
+          relativePath: [...entry.relativePath],
+          entryKind: entry.entryKind,
+        })),
+        ...(destination ? { destination } : {}),
+      });
+      if (response.status === 'error') {
+        await this.loadTree();
+        this.showError('status.presetCopyFailed', response.message);
+        return;
+      }
+
+      await this.loadTree();
+      this.setPresetEntrySelectionTarget(response.entries);
+    }, 'status.presetCopyFailed');
   }
 
   public closePresetDeleteDialog(): void {

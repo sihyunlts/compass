@@ -17,9 +17,7 @@ export type PresetBrowserContextTarget =
   | PresetEntryContextTarget
   | PresetEntriesContextTarget;
 
-export type PresetDeleteContextTarget =
-  | PresetEntryContextTarget
-  | PresetEntriesContextTarget;
+export type PresetDeleteContextTarget = PresetBrowserContextTarget;
 
 export type ContextMenuTarget =
   | {
@@ -68,7 +66,7 @@ export const isPresetBrowserContextTarget = (
 export const isPresetDeleteContextTarget = (
   target: ContextMenuTarget,
 ): target is PresetDeleteContextTarget =>
-  target.kind === 'preset-entry' || target.kind === 'preset-entries';
+  isPresetBrowserContextTarget(target);
 
 export const canRenamePresetContextTarget = (
   target: PresetBrowserContextTarget,
@@ -81,13 +79,16 @@ export const canRenamePresetContextTarget = (
 export const canDeletePresetContextTarget = (
   target: PresetBrowserContextTarget,
 ): boolean => target.kind === 'preset-entry'
-  ? target.relativePath.length > 0
-    && target.source === 'user'
-    && !target.isSystemFolder
+  ? canRenamePresetContextTarget(target)
   : target.entries.length > 0
-    && target.entries.every(
-      (entry) =>
-        entry.relativePath.length > 0
-        && entry.source === 'user'
-        && !entry.isSystemFolder,
-    );
+    && target.entries.every(canRenamePresetContextTarget);
+
+export const canCopyPresetContextTarget = (
+  target: PresetBrowserContextTarget,
+): boolean => {
+  const entries = target.kind === 'preset-entry' ? [target] : target.entries;
+  return entries.length > 0
+    && entries.every((entry) =>
+      canRenamePresetContextTarget(entry)
+      && entry.presetType === entries[0].presetType);
+};

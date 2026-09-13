@@ -337,6 +337,7 @@ export const ko = {
   'status.deviceSaved': '디바이스를 저장했습니다.',
   'status.moveToTrashFailed': '휴지통으로 이동하지 못했습니다.',
   'status.presetMoveFailed': '프리셋 항목을 이동하지 못했습니다.',
+  'status.presetCopyFailed': '프리셋 항목을 복사하지 못했습니다.',
   'status.deviceBuildFailed': '디바이스를 만들 수 없습니다.',
   'status.deviceSaveFailed': '디바이스를 저장하지 못했습니다.',
   'status.dropOntoRack': '항목을 랙에 놓아 불러오세요.',

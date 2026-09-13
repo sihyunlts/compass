@@ -2,6 +2,8 @@ import type { LiveTempoUpdate } from '../../bridge/types';
 import type { AppLocale } from '../../i18n';
 import type { PresetFileKind } from '../../presets';
 import type {
+  CopyPresetEntriesRequest,
+  CopyPresetEntriesResponse,
   CreatePresetFolderRequest,
   CreatePresetFolderResponse,
   DeletePresetEntriesRequest,
@@ -175,6 +177,9 @@ export interface CompassApi {
   movePresetEntries: (
     request: MovePresetEntriesRequest,
   ) => Promise<MovePresetEntriesResponse>;
+  copyPresetEntries: (
+    request: CopyPresetEntriesRequest,
+  ) => Promise<CopyPresetEntriesResponse>;
   readPresetEntry: <K extends PresetFileKind>(
     request: ReadPresetEntryRequest<K>,
   ) => Promise<ReadPresetEntryResponse<K>>;

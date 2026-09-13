@@ -35,5 +35,6 @@ export const IPC_CHANNELS = {
   showPresetEntryInFolder: 'preset:show-entry-in-folder',
   deletePresetEntries: 'preset:delete-entries',
   movePresetEntries: 'preset:move-entries',
+  copyPresetEntries: 'preset:copy-entries',
   readPresetEntry: 'preset:read-entry',
 } as const;

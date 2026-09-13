@@ -4,12 +4,14 @@ import { constants, type Dirent } from 'node:fs';
 import {
   access,
   copyFile,
+  cp,
   link,
   lstat,
   mkdir,
   readdir,
   readFile,
   rename,
+  rm,
   rmdir,
   unlink,
   writeFile,
@@ -18,6 +20,7 @@ import path from 'node:path';
 
 import {
   GENERATE_DEVICE_CATEGORY_DIRECTORY_NAME,
+  resolveDeviceBrowserSystemDirectoryPath,
 } from '../../../devices/browser-categories';
 import { getRendererDeviceLabel } from '../../../devices/schema-registry';
 import type {
@@ -25,6 +28,8 @@ import type {
   ReadPresetEntryResponse,
 } from '../../../shared/contracts/ipc/presets';
 import type { PresetEntryMovePlan } from '../../../shared/preset-entry-move';
+import type { PresetEntryCopyPlan } from '../../../shared/preset-entry-copy';
+import type { PresetEntrySelectionItem } from '../../../shared/preset-entry-selection';
 import {
   parsePresetFileText,
   type PresetFile,
@@ -357,6 +362,92 @@ export class PresetStorage {
         createDestination,
       )
     );
+  }
+
+  public async copyPresetEntries(
+    presetType: PresetFileKind,
+    plans: readonly PresetEntryCopyPlan[],
+  ): Promise<PresetEntrySelectionItem[]> {
+    return this.enqueuePresetEntryMutation(async () => {
+      const rootDirectory = await this.resolvePresetDirectory(presetType);
+      const resolvedPlans = plans.map(({ entry, relativePath }) => {
+        const sourcePath = resolvePresetPath(rootDirectory, entry.relativePath);
+        const parentRelativePath = relativePath.slice(0, -1);
+        const destinationDirectory = resolvePresetPath(rootDirectory, parentRelativePath);
+        const targetPath = resolvePresetPath(rootDirectory, relativePath);
+        if (!sourcePath || !destinationDirectory || !targetPath) {
+          throw new Error('Invalid preset item path.');
+        }
+        return {
+          entry,
+          relativePath,
+          parentRelativePath,
+          sourcePath,
+          destinationDirectory,
+          targetPath,
+        };
+      });
+
+      for (const plan of resolvedPlans) {
+        await this.ensurePresetEntryKind(plan.sourcePath, plan.entry.entryKind);
+        if (
+          presetType === 'device'
+          && resolveDeviceBrowserSystemDirectoryPath(plan.parentRelativePath)
+        ) {
+          await mkdir(plan.destinationDirectory, { recursive: true });
+        }
+        await this.ensurePresetEntryKind(plan.destinationDirectory, 'directory');
+        await this.ensureDirectoryEntryNameAvailable(
+          plan.destinationDirectory,
+          path.basename(plan.targetPath),
+        );
+      }
+
+      const completedPlans: typeof resolvedPlans = [];
+      try {
+        for (const plan of resolvedPlans) {
+          const stagingPath = path.join(
+            plan.destinationDirectory,
+            `.compass-copy-${randomUUID()}`,
+          );
+          try {
+            await cp(plan.sourcePath, stagingPath, {
+              recursive: true,
+              force: false,
+              errorOnExist: true,
+              mode: constants.COPYFILE_EXCL,
+            });
+            await this.movePresetEntryWithoutReplacing({
+              entryKind: plan.entry.entryKind,
+              sourcePath: stagingPath,
+              filePath: plan.targetPath,
+            });
+            completedPlans.push(plan);
+          } finally {
+            await rm(stagingPath, { recursive: true, force: true });
+          }
+        }
+      } catch (error) {
+        let rollbackFailed = false;
+        for (const plan of completedPlans.reverse()) {
+          try {
+            await rm(plan.targetPath, { recursive: true, force: true });
+          } catch {
+            rollbackFailed = true;
+          }
+        }
+        if (rollbackFailed) {
+          throw new Error('Copy failed and some preset copies could not be removed.', { cause: error });
+        }
+        throw error;
+      }
+
+      return resolvedPlans.map((plan) => ({
+        presetType,
+        entryKind: plan.entry.entryKind,
+        relativePath: plan.relativePath,
+      }));
+    });
   }
 
   public async trashPresetEntries(

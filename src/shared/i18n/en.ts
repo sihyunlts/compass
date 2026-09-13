@@ -335,6 +335,7 @@ export const en = {
   'status.deviceSaved': 'Device saved.',
   'status.moveToTrashFailed': 'Move to Trash failed.',
   'status.presetMoveFailed': 'Preset item move failed.',
+  'status.presetCopyFailed': 'Preset item copy failed.',
   'status.deviceBuildFailed': 'Unable to build device.',
   'status.deviceSaveFailed': 'Device save failed.',
   'status.dropOntoRack': 'Drop the item onto the rack to load it.',

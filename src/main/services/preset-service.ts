@@ -4,6 +4,7 @@ import { watch, type FSWatcher } from 'node:fs';
 import { isDeviceBrowserSystemDirectoryPath } from '../../devices/browser-categories';
 import { readBundledRackPreset } from '../../shared/bundled-rack-presets';
 import type {
+  CopyPresetEntriesResponse,
   CreatePresetFolderResponse,
   DeletedPresetEntry,
   DeletePresetEntriesResponse,
@@ -24,6 +25,7 @@ import {
   type PresetFileKind,
 } from '../../shared/presets';
 import { preparePresetEntryMove } from '../../shared/preset-entry-move';
+import { preparePresetEntryCopy } from '../../shared/preset-entry-copy';
 import { normalizePresetEntrySelection } from '../../shared/preset-entry-selection';
 import { PRESET_FILE_SPECS } from './presets/preset-config';
 import { PresetBrowserTreeBuilder } from './presets/preset-browser-tree';
@@ -33,6 +35,7 @@ import {
   resolvePresetPath,
 } from './presets/preset-paths';
 import {
+  parseCopyPresetEntriesRequest,
   parseCreatePresetFolderRequest,
   parseDeletePresetEntriesRequest,
   parseMovePresetEntriesRequest,
@@ -674,6 +677,40 @@ export class PresetService {
       return {
         status: 'error',
         message: toErrorMessage(error, 'Failed to move preset items.'),
+      };
+    }
+  }
+
+  public async copyPresetEntries(
+    request: unknown,
+  ): Promise<CopyPresetEntriesResponse> {
+    const parsedRequest = parseCopyPresetEntriesRequest(request);
+    if (!parsedRequest) {
+      return { status: 'error', message: 'Invalid preset copy request.' };
+    }
+
+    try {
+      const presetType = parsedRequest.entries[0].presetType;
+      const occupiedPaths = await this.browserTreeBuilder.listOccupiedPaths(presetType);
+      const copyPlan = preparePresetEntryCopy(
+        parsedRequest.entries,
+        parsedRequest.destination,
+        occupiedPaths,
+      );
+      if (copyPlan.status === 'error') {
+        return copyPlan;
+      }
+      return {
+        status: 'ok',
+        entries: await this.storage.copyPresetEntries(
+          presetType,
+          copyPlan.plans,
+        ),
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        message: toErrorMessage(error, 'Failed to copy preset items.'),
       };
     }
   }

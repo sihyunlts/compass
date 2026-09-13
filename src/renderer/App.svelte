@@ -19,6 +19,7 @@
   import BrowserPanel from './components/browser/BrowserPanel.svelte';
   import type { BrowserPage } from './features/browser/types';
   import {
+    isPresetBrowserContextTarget,
     isPresetDeleteContextTarget,
     type ContextMenuTarget,
   } from './features/context-menu/types';
@@ -400,6 +401,30 @@
     editorSession.commands.deleteFromContextTarget(target);
   };
 
+  const handleContextMenuCopy = (target: ContextMenuTarget): void => {
+    if (isPresetBrowserContextTarget(target)) {
+      presetController.copyBrowserEntries(target);
+      return;
+    }
+    editorSession.commands.copyFromContextTarget(target);
+  };
+
+  const handleContextMenuPaste = (target: ContextMenuTarget): void => {
+    if (target.kind === 'preset-entry') {
+      void presetController.pasteBrowserEntries(target);
+      return;
+    }
+    editorSession.commands.pasteFromContextTarget(target);
+  };
+
+  const handleContextMenuDuplicate = (target: ContextMenuTarget): void => {
+    if (isPresetBrowserContextTarget(target)) {
+      void presetController.duplicateBrowserEntries(target);
+      return;
+    }
+    editorSession.commands.duplicateFromContextTarget(target);
+  };
+
   const handleContextMenuCreatePresetFolder = (
     target: Extract<ContextMenuTarget, { kind: 'preset-entry' }>,
   ): void => {
@@ -608,6 +633,7 @@
       presetErrorText={presetState.presetErrorText}
       pendingPresetFolderDraft={presetState.pendingPresetFolderDraft}
       presetEntrySelectionTarget={presetState.presetEntrySelectionTarget}
+      browserClipboardPresetType={presetState.browserClipboardEntries[0]?.presetType ?? null}
       launchpadMk2Enabled={uiState.launchpadModel === 'mk2'}
       {paletteDescription}
       paletteRevision={settingsState.paletteRevision}
@@ -666,6 +692,9 @@
         presetController.clearPresetEntrySelectionTarget(token)}
       onPresetRenameRequest={handleContextMenuRename}
       onPresetDeleteRequest={handleContextMenuDelete}
+      onPresetCopyRequest={(target) => presetController.copyBrowserEntries(target)}
+      onPresetPasteRequest={(target) => presetController.pasteBrowserEntries(target)}
+      onPresetDuplicateRequest={(target) => presetController.duplicateBrowserEntries(target)}
     />
 
     {#if uiState.sidebarPage !== 'settings'}
@@ -819,10 +848,10 @@
   <ContextMenu
     bind:this={contextMenuComponent}
     platform={bridgeClient.platform}
-    onCopy={editorSession.commands.copyFromContextTarget}
+    onCopy={handleContextMenuCopy}
     onCut={editorSession.commands.cutFromContextTarget}
-    onPaste={editorSession.commands.pasteFromContextTarget}
-    onDuplicate={editorSession.commands.duplicateFromContextTarget}
+    onPaste={handleContextMenuPaste}
+    onDuplicate={handleContextMenuDuplicate}
     onRename={handleContextMenuRename}
     onInfo={authoredInfoController.openFromContextTarget}
     onDelete={handleContextMenuDelete}
@@ -832,6 +861,7 @@
     onUngroupGroup={editorSession.commands.ungroupGroup}
     onDisconnectModulation={editorSession.commands.disconnectModulation}
     clipboardAvailable={clipboardAvailable}
+    browserClipboardPresetType={presetState.browserClipboardEntries[0]?.presetType ?? null}
   />
 
   <AuthoredInfoDialog
