@@ -9,15 +9,25 @@ export interface GeometryStateEvent {
   runIndex: number;
   runStartFrame: number;
   runEndFrameExclusive: number;
-  // Non-zero only when this dense pose crosses the next one-LED motion unit.
-  motionUnitFrameCount: number;
+  /** Completed one-LED motion units from paths alive at this pose. */
+  motionUnitFrameCounts: ReadonlyArray<number>;
   strokes: ReadonlyArray<GeometryStroke>;
 }
 
-interface GeometryMotionSnapshot {
+interface GeometryProbeSnapshot {
   probes: Float64Array;
   topologyKey: string;
   isEmpty: boolean;
+}
+
+interface GeometryMotionSnapshot extends GeometryProbeSnapshot {
+  paths: ReadonlyMap<string, GeometryProbeSnapshot>;
+}
+
+interface PathMotionState {
+  lastSample: GeometryProbeSnapshot;
+  motionUnitAnchor: GeometryProbeSnapshot;
+  movingFrameCountSinceUnit: number;
 }
 
 interface ExtractGeometryEventTracksInput {
@@ -34,8 +44,7 @@ interface OriginCaptureState {
   events: MutableGeometryStateEvent[];
   activeRun: {
     lastSample: GeometryMotionSnapshot;
-    motionUnitAnchor: GeometryMotionSnapshot;
-    movingFrameCountSinceUnit: number;
+    motionByPath: Map<string, PathMotionState>;
   } | null;
   runIndex: number;
   runStartFrame: number;
@@ -58,8 +67,9 @@ interface SpatialHash {
   nextProbeIndex: Int32Array;
 }
 
-const spatialHashBySnapshot = new WeakMap<
-  GeometryMotionSnapshot,
+// Whole-source and per-path snapshots can share the same immutable probes.
+const spatialHashByProbes = new WeakMap<
+  Float64Array,
   Map<number, SpatialHash>
 >();
 
@@ -142,10 +152,21 @@ const buildGeometryMotionSnapshot = (
 ): GeometryMotionSnapshot => {
   // Visibility clipping changes what is drawn, not how far the source moved.
   // Measure source centerlines so Mask and Symmetry keep the same one-LED clock.
-  const probeChunks = strokes.map((stroke) => samplePolylineByArcLength(stroke));
+  const chunksByPath = new Map<string, Float64Array[]>();
+  const probeChunks = strokes.map((stroke) => {
+    const probes = samplePolylineByArcLength(stroke);
+    const chunks = chunksByPath.get(stroke.pathId) ?? [];
+    chunks.push(probes);
+    chunksByPath.set(stroke.pathId, chunks);
+    return probes;
+  });
   const probes = concatenateProbes(probeChunks);
   return {
     probes,
+    paths: new Map(Array.from(chunksByPath, ([pathId, chunks]) => {
+      const pathProbes = concatenateProbes(chunks);
+      return [pathId, { probes: pathProbes, topologyKey: pathId, isEmpty: pathProbes.length === 0 }];
+    })),
     topologyKey: buildTopologyKey(strokes),
     isEmpty: probes.length === 0,
   };
@@ -238,13 +259,13 @@ const buildSpatialHash = (
 };
 
 const resolveSpatialHash = (
-  snapshot: GeometryMotionSnapshot,
+  snapshot: GeometryProbeSnapshot,
   cellSize: number,
 ): SpatialHash => {
-  let hashByCellSize = spatialHashBySnapshot.get(snapshot);
+  let hashByCellSize = spatialHashByProbes.get(snapshot.probes);
   if (!hashByCellSize) {
     hashByCellSize = new Map();
-    spatialHashBySnapshot.set(snapshot, hashByCellSize);
+    spatialHashByProbes.set(snapshot.probes, hashByCellSize);
   }
 
   const cached = hashByCellSize.get(cellSize);
@@ -310,8 +331,8 @@ const hasProbesOutsideDistance = (
 };
 
 const hasGeometryChangedByAtLeast = (
-  reference: GeometryMotionSnapshot,
-  candidate: GeometryMotionSnapshot,
+  reference: GeometryProbeSnapshot,
+  candidate: GeometryProbeSnapshot,
   distanceLed = MOTION_UNIT_DISTANCE_LED,
 ): boolean => {
   if (reference.isEmpty !== candidate.isEmpty) {
@@ -334,8 +355,8 @@ const hasGeometryChangedByAtLeast = (
 };
 
 const hasRepresentativeMotionUnit = (
-  reference: GeometryMotionSnapshot,
-  candidate: GeometryMotionSnapshot,
+  reference: GeometryProbeSnapshot,
+  candidate: GeometryProbeSnapshot,
   distanceLed: number,
 ): boolean => {
   // Pose retention detects ANY change; the Color unit measures the median
@@ -353,6 +374,38 @@ const hasRepresentativeMotionUnit = (
     distanceLed,
     Math.ceil(candidate.probes.length / 4),
   );
+};
+
+const capturePathMotionUnits = (
+  motionByPath: Map<string, PathMotionState>,
+  snapshot: GeometryMotionSnapshot,
+): number[] => {
+  const completedUnits: number[] = [];
+  // A Repeat copy or Rain particle has its own lifetime. Never compare its
+  // position to a different path, or keep an anchor after that path has ended.
+  for (const pathId of motionByPath.keys()) {
+    if (!snapshot.paths.has(pathId)) motionByPath.delete(pathId);
+  }
+  for (const [pathId, candidate] of snapshot.paths) {
+    const state = motionByPath.get(pathId);
+    if (!state) {
+      motionByPath.set(pathId, {
+        lastSample: candidate,
+        motionUnitAnchor: candidate,
+        movingFrameCountSinceUnit: 0,
+      });
+      continue;
+    }
+    if (!hasGeometryChangedByAtLeast(state.lastSample, candidate, SAMPLE_MOTION_DISTANCE_LED)) continue;
+    state.movingFrameCountSinceUnit += 1;
+    if (hasRepresentativeMotionUnit(state.motionUnitAnchor, candidate, MOTION_UNIT_DISTANCE_LED)) {
+      completedUnits.push(state.movingFrameCountSinceUnit);
+      state.motionUnitAnchor = candidate;
+      state.movingFrameCountSinceUnit = 0;
+    }
+    state.lastSample = candidate;
+  }
+  return completedUnits;
 };
 
 const clampFrameWindow = (
@@ -433,14 +486,14 @@ export const extractGeometryEventTracks = (
           runIndex: state.runIndex,
           runStartFrame: state.runStartFrame,
           runEndFrameExclusive: frameWindow.endFrameExclusive,
-          motionUnitFrameCount: 0,
+          motionUnitFrameCounts: [],
           strokes: [...strokes],
         });
         state.activeRun = {
           lastSample: candidate,
-          motionUnitAnchor: candidate,
-          movingFrameCountSinceUnit: 0,
+          motionByPath: new Map(),
         };
+        capturePathMotionUnits(state.activeRun.motionByPath, candidate);
         continue;
       }
 
@@ -452,12 +505,7 @@ export const extractGeometryEventTracks = (
         continue;
       }
 
-      activeRun.movingFrameCountSinceUnit += 1;
-      const reachedMotionUnit = hasRepresentativeMotionUnit(
-        activeRun.motionUnitAnchor,
-        candidate,
-        MOTION_UNIT_DISTANCE_LED,
-      );
+      const motionUnitFrameCounts = capturePathMotionUnits(activeRun.motionByPath, candidate);
       state.events[state.events.length - 1].endFrameExclusive = frameIndex;
       state.events.push({
         frameIndex,
@@ -465,16 +513,10 @@ export const extractGeometryEventTracks = (
         runIndex: state.runIndex,
         runStartFrame: state.runStartFrame,
         runEndFrameExclusive: frameWindow.endFrameExclusive,
-        motionUnitFrameCount: reachedMotionUnit
-          ? activeRun.movingFrameCountSinceUnit
-          : 0,
+        motionUnitFrameCounts,
         strokes: [...strokes],
       });
       activeRun.lastSample = candidate;
-      if (reachedMotionUnit) {
-        activeRun.motionUnitAnchor = candidate;
-        activeRun.movingFrameCountSinceUnit = 0;
-      }
     }
   }
 

@@ -90,9 +90,7 @@ const resolveReferenceSpan = (
   events: ReadonlyArray<GeometryStateEvent>,
   kernel: CompiledColorAgeKernel,
 ): number => {
-  const motionCadences = events
-    .map((event) => event.motionUnitFrameCount)
-    .filter((frameCount) => frameCount > 0);
+  const motionCadences = events.flatMap((event) => event.motionUnitFrameCounts);
   // Retain every pose; the representative one-LED cadence only sets the unit.
   return motionCadences.length > 0
     ? median(motionCadences)
