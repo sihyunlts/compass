@@ -32,6 +32,7 @@ interface ColorAgeWrite {
   startFrame: number;
   endFrameExclusive: number;
   velocity: number;
+  prioritizesSourcePose: boolean;
 }
 
 const COLOR_AGE_EPSILON = 1e-9;
@@ -147,12 +148,23 @@ function* iterateEventWrites(
 
     for (let eventIndex = 0; eventIndex < runEvents.length; eventIndex += 1) {
       for (const { slot, startPosition, endPosition } of slotCoverage) {
-        yield {
+        const write: ColorAgeWrite = {
           event: runEvents[eventIndex],
           startFrame: toOutputFrame(eventIndex + startPosition),
           endFrameExclusive: toOutputFrame(eventIndex + endPosition),
           velocity: slot.velocity,
+          prioritizesSourcePose: false,
         };
+        if (slot.startUnit === 0) {
+          // Split the existing first-color coverage at the end of the held
+          // source pose. The trail keeps its normal layer and timing.
+          const sourceEnd = Math.min(write.endFrameExclusive, write.event.endFrameExclusive);
+          if (write.startFrame < sourceEnd) {
+            yield { ...write, endFrameExclusive: sourceEnd, prioritizesSourcePose: true };
+            write.startFrame = sourceEnd;
+          }
+        }
+        yield write;
       }
     }
   }
@@ -177,10 +189,11 @@ export const materializeColorTimeline = (
   for (const originId of input.targetOriginIds) {
     const events = eventsByOriginId.get(originId) ?? [];
     const layer: ColorLayer = { order: [nextLayerOrder++] };
+    const sourcePoseLayer: ColorLayer = { order: [...layer.order, 1] };
     let originStart = Infinity;
     let originEnd = -Infinity;
     for (const write of iterateEventWrites(events, input.kernel)) {
-      writes.push({ ...write, layer });
+      writes.push({ ...write, layer: write.prioritizesSourcePose ? sourcePoseLayer : layer });
       originStart = Math.min(originStart, write.startFrame * input.sourceTimeline.sampleStepBeats);
       originEnd = Math.max(originEnd, write.endFrameExclusive * input.sourceTimeline.sampleStepBeats);
       outputEndFrameExclusive = Math.max(outputEndFrameExclusive, write.endFrameExclusive);
