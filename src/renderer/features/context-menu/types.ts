@@ -17,6 +17,17 @@ export type PresetBrowserContextTarget =
   | PresetEntryContextTarget
   | PresetEntriesContextTarget;
 
+export const resolvePresetSelectionContextTarget = (
+  clickedTarget: PresetEntryContextTarget,
+  selectedTargets: readonly PresetEntryContextTarget[],
+): PresetBrowserContextTarget => {
+  if (clickedTarget.isSystemFolder) return clickedTarget;
+  const editableTargets = selectedTargets.filter((target) => !target.isSystemFolder);
+  return editableTargets.length > 1
+    ? { kind: 'preset-entries', entries: editableTargets }
+    : clickedTarget;
+};
+
 export type PresetDeleteContextTarget = PresetBrowserContextTarget;
 
 export type ContextMenuTarget =

@@ -24,6 +24,8 @@
     getDeviceBrowserIcon,
     mergeDevicePresetTree,
   } from '../../features/editor/device-browser-categories';
+  import BrowserEntryContent from './BrowserEntryContent.svelte';
+  import BrowserEntryNameInput from './BrowserEntryNameInput.svelte';
   import Button from '../primitives/Button.svelte';
   import SidebarSettingsPage from './SidebarSettingsPage.svelte';
   import type {
@@ -45,6 +47,7 @@
     canCopyPresetContextTarget,
     canDeletePresetContextTarget,
     canRenamePresetContextTarget,
+    resolvePresetSelectionContextTarget,
   } from '../../features/context-menu/types';
   import {
     matchesAppShortcut,
@@ -69,6 +72,7 @@
   import { hasAdditiveSelectionModifier } from '../../features/selection/ordered-selection';
   import { createPresetPreviewHintController } from '../../features/browser/preset-preview-hint';
   import { resolvePresetFileErrorMessage } from '../../features/browser/preset-file-error';
+  import { resolvePresetBrowserEntryIcon } from '../../features/browser/preset-entry-presentation';
   import { hint, type HintInput } from '../overlays/hint';
 
   interface VisibleTreeRow {
@@ -487,9 +491,6 @@
   const browserSelection = createBrowserSelection();
   let focusedRowId = $state<string | null>(null);
   let detachedKeyboardFocusRowId = $state<string | null>(null);
-  let pendingPresetFolderInputEl = $state<HTMLInputElement | null>(null);
-  let skipPendingPresetFolderBlurId = $state<string | null>(null);
-  let focusedPresetDraftKey = $state<string | null>(null);
   let browserPagePanelEl = $state<HTMLDivElement | null>(null);
 
   const BROWSER_PAGE_EDGE_TRANSITION_DISTANCE_PX = 32;
@@ -606,18 +607,6 @@
   const selectedRowIdSet = $derived.by(
     () => new Set(browserSelection.state.selectedRowIds),
   );
-  const pendingPresetDraftKey = $derived(
-    pendingPresetFolderDraft
-      ? [
-          pendingPresetFolderDraft.mode,
-          pendingPresetFolderDraft.entryKind,
-          pendingPresetFolderDraft.presetType,
-          pendingPresetFolderDraft.relativePath.join('/'),
-          pendingPresetFolderDraft.temporaryId ?? '',
-        ].join(':')
-      : null,
-  );
-
   const isFolderExpanded = (folderId: string): boolean =>
     expandedFolderIdSet.has(folderId);
 
@@ -636,17 +625,11 @@
     rowId: string,
     event: KeyboardEvent,
   ): Promise<void> => {
-    if (event.shiftKey) {
-      detachedKeyboardFocusRowId = null;
-      browserSelection.selectRange(
-        rowId,
-        hasAdditiveSelectionModifier(event),
-        visibleRowIds,
-      );
-    } else if (!hasAdditiveSelectionModifier(event)) {
-      selectSingleRow(rowId);
-    } else {
+    browserSelection.selectFromFocusMove(rowId, event, visibleRowIds);
+    if (!event.shiftKey && hasAdditiveSelectionModifier(event)) {
       detachedKeyboardFocusRowId = rowId;
+    } else {
+      detachedKeyboardFocusRowId = null;
     }
 
     await focusRow(rowId);
@@ -668,30 +651,14 @@
     if (node.kind === 'folder') {
       return node.treeKind === 'device'
         ? getDeviceBrowserCategoryIcon(node.categoryId)
-        : node.icon ?? 'folder';
+        : resolvePresetBrowserEntryIcon(node);
     }
 
     if (node.kind === 'device') {
       return getDeviceBrowserIcon(node.deviceKind);
     }
 
-    if (node.loadStatus === 'error') {
-      return 'error';
-    }
-
-    if (node.presetType === 'device' && node.deviceKind) {
-      return getDeviceBrowserIcon(node.deviceKind);
-    }
-
-    if (node.presetType === 'group') {
-      return 'combine_columns';
-    }
-
-    if (node.presetType === 'rack') {
-      return 'view_week';
-    }
-
-    return 'tune';
+    return resolvePresetBrowserEntryIcon(node);
   };
 
   const resolveTreeNodeAccentStyle = (
@@ -837,17 +804,10 @@
       .map((node) => resolvePresetContextMenuTarget(node))
       .filter(
         (target): target is PresetEntryContextTarget =>
-          target !== null && !target.isSystemFolder,
+          target !== null,
       );
 
-    if (selectedTargets.length <= 1) {
-      return clickedTarget;
-    }
-
-    return {
-      kind: 'preset-entries',
-      entries: selectedTargets,
-    };
+    return resolvePresetSelectionContextTarget(clickedTarget, selectedTargets);
   };
 
   const isMovablePresetEntry = (
@@ -1099,21 +1059,7 @@
     }
 
     focusedRowId = row.node.id;
-    if (event.shiftKey) {
-      browserSelection.selectRange(
-        row.node.id,
-        hasAdditiveSelectionModifier(event),
-        visibleRowIds,
-      );
-      return;
-    }
-
-    if (hasAdditiveSelectionModifier(event)) {
-      browserSelection.toggle(row.node.id, visibleRowIds);
-      return;
-    }
-
-    selectSingleRow(row.node.id);
+    browserSelection.selectFromPointer(row.node.id, event, visibleRowIds);
   };
 
   const handleTreeItemPointerDown = (
@@ -1246,19 +1192,10 @@
         return;
       }
 
-      if (event.shiftKey) {
-        detachedKeyboardFocusRowId = null;
-        browserSelection.selectRange(
-          row.node.id,
-          hasAdditiveSelectionModifier(event),
-          visibleRowIds,
-        );
-      } else {
-        browserSelection.toggle(row.node.id, visibleRowIds);
-        detachedKeyboardFocusRowId = browserSelection.includes(row.node.id)
-          ? null
-          : row.node.id;
-      }
+      browserSelection.selectFromToggleKey(row.node.id, event, visibleRowIds);
+      detachedKeyboardFocusRowId = browserSelection.includes(row.node.id)
+        ? null
+        : row.node.id;
       focusedRowId = row.node.id;
       return;
     }
@@ -1328,24 +1265,6 @@
     event.preventDefault();
   };
 
-  const handlePendingPresetFolderDraftCommit = (): void => {
-    void onPendingPresetFolderDraftCommit();
-  };
-
-  const handlePendingPresetFolderDraftBlur = (rowId: string): void => {
-    if (skipPendingPresetFolderBlurId === rowId) {
-      skipPendingPresetFolderBlurId = null;
-      return;
-    }
-
-    if ((pendingPresetFolderDraft?.draftName.trim() ?? '').length === 0) {
-      onPendingPresetFolderDraftCancel();
-      return;
-    }
-
-    handlePendingPresetFolderDraftCommit();
-  };
-
   const matchesPresetEntrySelection = (
     row: VisibleTreeRow,
     entry: PresetEntrySelectionTarget['entries'][number],
@@ -1396,7 +1315,6 @@
   $effect(() => {
     const draft = pendingPresetFolderDraft;
     if (!draft) {
-      focusedPresetDraftKey = null;
       return;
     }
 
@@ -1426,14 +1344,6 @@
       selectSingleRow(targetRowId);
     }
     focusedRowId = targetRowId;
-
-    if (focusedPresetDraftKey !== pendingPresetDraftKey) {
-      focusedPresetDraftKey = pendingPresetDraftKey;
-      void tick().then(() => {
-        pendingPresetFolderInputEl?.focus();
-        pendingPresetFolderInputEl?.select();
-      });
-    }
   });
 
   $effect(() => {
@@ -1466,7 +1376,17 @@
     });
   });
 
-  onMount(() => presetMoveDrag.mount());
+  onMount(() => {
+    const unmountPresetMoveDrag = presetMoveDrag.mount();
+    const unmountOutsideSelectionClear = browserSelection.mountClearOnOutsidePointer(
+      '[data-browser-row-id]',
+    );
+
+    return () => {
+      unmountPresetMoveDrag();
+      unmountOutsideSelectionClear();
+    };
+  });
 </script>
 
 <aside
@@ -1596,17 +1516,11 @@
           aria-multiselectable="true"
           aria-label={activeTreeAriaLabel}
         >
-          {#each visibleRows as row, rowIndex (row.node.id)}
+          {#each visibleRows as row (row.node.id)}
             {@const isSelected = selectedRowIdSet.has(row.node.id)}
             <li
               role="none"
               class:is-selected={isSelected}
-              class:has-selected-previous={isSelected
-                && rowIndex > 0
-                && selectedRowIdSet.has(visibleRows[rowIndex - 1].node.id)}
-              class:has-selected-next={isSelected
-                && rowIndex < visibleRows.length - 1
-                && selectedRowIdSet.has(visibleRows[rowIndex + 1].node.id)}
             >
               <div
                 use:registerTreeItem={row.node.id}
@@ -1666,7 +1580,7 @@
                     ? i18n.t('browser.collapseFolder')
                     : i18n.t('browser.expandFolder')}
                   <button
-                    class="browser-tree-leading-slot browser-tree-disclosure-slot browser-tree-chevron"
+                    class="browser-tree-disclosure-slot browser-tree-chevron"
                     type="button"
                     aria-label={folderToggleLabel}
                     tabindex="-1"
@@ -1681,61 +1595,32 @@
                     }}
                     ondblclick={(event) => event.stopPropagation()}
                   >
-                    <span class="material-symbols-rounded" aria-hidden="true">
+                    <span class="browser-chevron-icon material-symbols-rounded" aria-hidden="true">
                       {isFolderExpanded(row.node.id) ? 'expand_more' : 'chevron_right'}
                     </span>
                   </button>
                 {:else}
                   <span
-                    class="browser-tree-leading-slot browser-tree-disclosure-slot"
+                    class="browser-tree-disclosure-slot"
                     aria-hidden="true"
                   ></span>
                 {/if}
-                <span
-                  class="browser-tree-leading-slot browser-tree-item-icon browser-entry-icon material-symbols-rounded"
-                  style={resolveTreeNodeAccentStyle(row.node)}
-                  aria-hidden="true"
-                >
-                  {resolveTreeNodeIcon(row.node)}
-                </span>
-                {#if isEditingPresetFolderRow(row.node, pendingPresetFolderDraft)}
-                  <input
-                    bind:this={pendingPresetFolderInputEl}
-                    class="browser-tree-item-input"
-                    type="text"
+                {#snippet folderEditor()}
+                  <BrowserEntryNameInput
                     value={pendingPresetFolderDraft?.draftName ?? ''}
-                    aria-label={pendingPresetFolderDraft?.entryKind === 'file'
+                    ariaLabel={pendingPresetFolderDraft?.entryKind === 'file'
                       ? i18n.t('browser.presetFileName')
                       : i18n.t('browser.presetFolderName')}
-                    onpointerdown={(event) => event.stopPropagation()}
-                    onclick={(event) => event.stopPropagation()}
-                    ondblclick={(event) => event.stopPropagation()}
-                    oninput={(event) => {
-                      const target = event.currentTarget;
-                      if (!(target instanceof HTMLInputElement)) {
-                        return;
-                      }
-                      onPendingPresetFolderDraftNameChange(target.value);
-                    }}
-                    onkeydown={(event) => {
-                      event.stopPropagation();
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        skipPendingPresetFolderBlurId = row.node.id;
-                        handlePendingPresetFolderDraftCommit();
-                        return;
-                      }
-                      if (event.key === 'Escape') {
-                        event.preventDefault();
-                        skipPendingPresetFolderBlurId = row.node.id;
-                        onPendingPresetFolderDraftCancel();
-                      }
-                    }}
-                    onblur={() => handlePendingPresetFolderDraftBlur(row.node.id)}
-                  />
-                {:else}
-                  <span class="browser-tree-item-label">{resolveTreeNodeLabel(row.node)}</span>
-                {/if}
+                    onValueChange={onPendingPresetFolderDraftNameChange}
+                    onCommit={onPendingPresetFolderDraftCommit}
+                    onCancel={onPendingPresetFolderDraftCancel} />
+                {/snippet}
+                <BrowserEntryContent
+                  icon={resolveTreeNodeIcon(row.node)}
+                  iconStyle={resolveTreeNodeAccentStyle(row.node)}
+                  label={resolveTreeNodeLabel(row.node)}
+                  children={isEditingPresetFolderRow(row.node, pendingPresetFolderDraft) ? folderEditor : undefined}
+                />
               </div>
             </li>
           {/each}
@@ -1925,19 +1810,21 @@
       background: var(--color-surface-active);
       border-radius: var(--radius-4);
 
-      &.has-selected-previous {
+      & + li.is-selected {
         border-top-left-radius: 0;
         border-top-right-radius: 0;
       }
 
-      &.has-selected-next {
+      &:has(+ li.is-selected) {
         border-bottom-left-radius: 0;
         border-bottom-right-radius: 0;
       }
     }
   }
 
-  .browser-tree-leading-slot {
+  .browser-tree-disclosure-slot {
+    width: 0.75rem;
+    flex: 0 0 0.75rem;
     height: 1.5rem;
     display: flex;
     align-items: center;
@@ -1949,17 +1836,6 @@
     padding: 0;
     background: transparent;
     color: var(--color-text-secondary);
-
-    .material-symbols-rounded {
-      font-size: var(--text-16);
-      line-height: 1;
-      font-variation-settings: 'FILL' 1, 'wght' 400;
-    }
-  }
-
-  .browser-tree-disclosure-slot {
-    width: 0.75rem;
-    flex: 0 0 0.75rem;
   }
 
   .browser-tree-item {
@@ -2004,32 +1880,7 @@
     &.has-preset-load-error {
       color: var(--color-text-secondary);
 
-      .browser-entry-icon {
-        color: var(--color-text-tertiary);
-      }
-    }
-
-    &-icon {
-      width: 1.25rem;
-      flex: 0 0 1.25rem;
-      margin-right: var(--gap-2);
-    }
-
-    &-label {
-      flex: 1 1 auto;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    &-input {
-      flex: 1 1 0;
-      min-width: 0;
-      width: 0;
-      height: 1.5rem;
-      padding: 0;
-      font: inherit;
+      --browser-icon-accent: var(--color-text-tertiary);
     }
   }
 

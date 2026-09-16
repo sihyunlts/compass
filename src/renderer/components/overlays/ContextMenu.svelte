@@ -10,7 +10,6 @@
     type PresetEntryContextTarget,
   } from '../../features/context-menu/types';
   import { i18n } from '../../i18n.svelte';
-  import type { MessageKey } from '../../../shared/i18n';
   import {
     resolveShortcutPresentation,
     type AppShortcutId,
@@ -36,18 +35,18 @@
     browserClipboardPresetType = null,
   } = $props<{
     platform: ShortcutPlatform;
-    onCopy: (target: ContextMenuTarget) => void;
-    onCut: (target: ContextMenuTarget) => void;
-    onPaste: (target: ContextMenuTarget) => void;
-    onDuplicate: (target: ContextMenuTarget) => void;
-    onRename: (target: ContextMenuTarget) => void;
-    onInfo: (target: ContextMenuTarget) => void;
-    onDelete: (target: ContextMenuTarget) => void;
-    onCreatePresetFolder: (target: PresetEntryContextTarget) => void;
-    onShowInFolder: (target: PresetEntryContextTarget) => void;
-    onGroup: (ids: string[]) => void;
-    onUngroupGroup: (groupId: string) => void;
-    onDisconnectModulation: (
+    onCopy?: (target: ContextMenuTarget) => void;
+    onCut?: (target: ContextMenuTarget) => void;
+    onPaste?: (target: ContextMenuTarget) => void;
+    onDuplicate?: (target: ContextMenuTarget) => void;
+    onRename?: (target: ContextMenuTarget) => void;
+    onInfo?: (target: ContextMenuTarget) => void;
+    onDelete?: (target: ContextMenuTarget) => void;
+    onCreatePresetFolder?: (target: PresetEntryContextTarget) => void;
+    onShowInFolder?: (target: PresetEntryContextTarget) => void;
+    onGroup?: (ids: string[]) => void;
+    onUngroupGroup?: (groupId: string) => void;
+    onDisconnectModulation?: (
       target: ModulationParameterContextTarget,
       modulatorId?: string,
     ) => void;
@@ -62,61 +61,40 @@
   const isPresetBrowserTarget = $derived.by(() =>
     isPresetBrowserContextTarget(target));
   const isDeletablePresetTarget = $derived(
-    isPresetBrowserContextTarget(target)
+    onDelete && isPresetBrowserContextTarget(target)
       ? canDeletePresetContextTarget(target)
       : false,
   );
   const canCreatePresetFolder = $derived.by(() =>
-    target?.kind === 'preset-entry'
+    Boolean(onCreatePresetFolder)
+    && target?.kind === 'preset-entry'
     && target.entryKind === 'directory'
     && target.source === 'user');
   const canShowInFolder = $derived.by(() =>
-    target?.kind === 'preset-entry' && target.source === 'user');
+    Boolean(onShowInFolder)
+    && target?.kind === 'preset-entry'
+    && target.source === 'user');
   const canPasteForTarget = $derived.by(() =>
-    (isRackSelectionContextTarget(target) && clipboardAvailable)
+    Boolean(onPaste)
+    && ((isRackSelectionContextTarget(target) && clipboardAvailable)
     || (target?.kind === 'preset-entry'
       && target.source === 'user'
-      && browserClipboardPresetType === target.presetType));
-  type ClipboardActionKind = 'copy' | 'cut' | 'paste' | 'duplicate';
-  type ClipboardActionMeta = {
-    id: string;
-    kind: ClipboardActionKind;
-    labelKey: MessageKey;
-    shortcutId: AppShortcutId;
-    requiresClipboard?: boolean;
-  };
-  const CLIPBOARD_ACTIONS: readonly ClipboardActionMeta[] = [
-    { id: 'context-cut', kind: 'cut', labelKey: 'context.cut', shortcutId: 'cut' },
-    { id: 'context-copy', kind: 'copy', labelKey: 'context.copy', shortcutId: 'copy' },
-    {
-      id: 'context-paste',
-      kind: 'paste',
-      labelKey: 'context.paste',
-      shortcutId: 'paste',
-      requiresClipboard: true,
-    },
-    {
-      id: 'context-duplicate',
-      kind: 'duplicate',
-      labelKey: 'context.duplicate',
-      shortcutId: 'duplicate',
-    },
-  ];
-  const visibleClipboardActions = $derived.by(() => {
-    if (isRackSelectionContextTarget(target)) {
-      return CLIPBOARD_ACTIONS.filter((action) =>
-        !action.requiresClipboard || canPasteForTarget);
-    }
+      && browserClipboardPresetType === target.presetType)));
+  const CLIPBOARD_ACTIONS = ['cut', 'copy', 'paste', 'duplicate'] as const;
+  type ClipboardActionKind = (typeof CLIPBOARD_ACTIONS)[number];
+  const clipboardHandlers = $derived({ copy: onCopy, cut: onCut, paste: onPaste, duplicate: onDuplicate });
+  const visibleClipboardActions = $derived(CLIPBOARD_ACTIONS.filter((kind) => {
+    if (!clipboardHandlers[kind]) return false;
+    if (kind === 'paste') return canPasteForTarget;
     if (isPresetBrowserContextTarget(target)) {
-      const canCopy = canCopyPresetContextTarget(target);
-      return CLIPBOARD_ACTIONS.filter((action) =>
-        action.kind === 'paste'
-          ? canPasteForTarget
-          : (action.kind === 'copy' || action.kind === 'duplicate') && canCopy);
+      return kind !== 'cut' && canCopyPresetContextTarget(target);
     }
-    return [];
-  });
+    return isRackSelectionContextTarget(target);
+  }));
   const canRenameTarget = $derived.by(() => {
+    if (!onRename) {
+      return false;
+    }
     if (target?.kind === 'preset-entry') {
       return canRenamePresetContextTarget(target);
     }
@@ -126,13 +104,13 @@
     return target.kind === 'group' || target.deviceIds.length === 1;
   });
   const canShowInfo = $derived.by(() =>
-    (
+    Boolean(onInfo) && (
       target?.kind === 'preset-entry'
       && target.entryKind === 'file'
       && target.canShowInfo !== false
-    )
-    || target?.kind === 'group'
-    || (target?.kind === 'devices' && target.deviceIds.length === 1));
+      || target?.kind === 'group'
+      || (target?.kind === 'devices' && target.deviceIds.length === 1)
+    ));
   export function open(clientX: number, clientY: number, nextTarget: ContextMenuTarget) {
     if (
       (nextTarget.kind === 'devices' && nextTarget.deviceIds.length === 0)
@@ -153,7 +131,7 @@
   }
 
   function handleDeleteClick() {
-    if (!target) {
+    if (!target || !onDelete) {
       return;
     }
     onDelete(target);
@@ -169,21 +147,13 @@
       return;
     }
 
-    if (kind === 'copy') {
-      onCopy(target);
-    } else if (kind === 'cut') {
-      onCut(target);
-    } else if (kind === 'paste') {
-      onPaste(target);
-    } else {
-      onDuplicate(target);
-    }
+    clipboardHandlers[kind]?.(target);
 
     close();
   }
 
   function handleRenameClick() {
-    if (!target || !canRenameTarget) {
+    if (!target || !canRenameTarget || !onRename) {
       return;
     }
 
@@ -192,7 +162,7 @@
   }
 
   function handleInfoClick() {
-    if (!target || !canShowInfo) {
+    if (!target || !canShowInfo || !onInfo) {
       return;
     }
 
@@ -201,7 +171,7 @@
   }
 
   function handleShowInFolderClick() {
-    if (target?.kind !== 'preset-entry') {
+    if (target?.kind !== 'preset-entry' || !onShowInFolder) {
       return;
     }
 
@@ -210,7 +180,11 @@
   }
 
   function handleCreatePresetFolderClick() {
-    if (target?.kind !== 'preset-entry' || target.entryKind !== 'directory') {
+    if (
+      target?.kind !== 'preset-entry'
+      || target.entryKind !== 'directory'
+      || !onCreatePresetFolder
+    ) {
       return;
     }
 
@@ -219,7 +193,7 @@
   }
 
   function handleGroupClick() {
-    if (target?.kind !== 'devices') {
+    if (target?.kind !== 'devices' || !onGroup) {
       return;
     }
     onGroup([...target.deviceIds]);
@@ -227,7 +201,7 @@
   }
 
   function handleUngroupClick() {
-    if (target?.kind !== 'group') {
+    if (target?.kind !== 'group' || !onUngroupGroup) {
       return;
     }
     onUngroupGroup(target.groupId);
@@ -235,7 +209,7 @@
   }
 
   function handleDisconnectModulationClick(modulatorId?: string) {
-    if (target?.kind !== 'modulation-parameter') {
+    if (target?.kind !== 'modulation-parameter' || !onDisconnectModulation) {
       return;
     }
 
@@ -270,12 +244,12 @@
 {/snippet}
 
 {#snippet clipboardMenuItems()}
-{#each visibleClipboardActions as action (action.id)}
+{#each visibleClipboardActions as kind (kind)}
   {@render menuItem(
-    action.id,
-    i18n.t(action.labelKey),
-    () => handleClipboardAction(action.kind),
-    action.shortcutId,
+    `context-${kind}`,
+    i18n.t(`context.${kind}`),
+    () => handleClipboardAction(kind),
+    kind,
   )}
 {/each}
 {/snippet}

@@ -22,6 +22,7 @@ export interface BrowserTreeDeviceFolderNode extends BrowserTreeBaseFolderNode {
 }
 
 export interface BrowserTreePresetFolderNode extends BrowserTreeBaseFolderNode {
+  children: (BrowserTreePresetFolderNode | BrowserTreePresetLeafNode)[];
   treeKind: 'preset';
   presetType: PresetFileKind;
   source: PresetEntrySource;

@@ -1,9 +1,13 @@
+import { getRendererDeviceLabel } from '../../devices/registry-core';
+import { browserPresetSaveDialog } from './browser-preset-save-dialog.svelte';
 import { LIVE_BRIDGE_TARGET } from '../../shared/bridge/protocol';
 import {
   buildBundledRackPresetCollectionNode,
   readBundledRackPreset,
 } from '../../shared/bundled-rack-presets';
 import {
+  DEVICE_BROWSER_CATEGORY_DEFINITIONS,
+  getDeviceBrowserCategoryDirectoryName,
   isDeviceBrowserSystemDirectoryPath,
   resolveDeviceBrowserSystemDirectoryPath,
 } from '../../devices/browser-categories';
@@ -29,6 +33,7 @@ import type {
   ReadPresetEntryRequest,
   ReadPresetEntryResponse,
   SavePresetFileRequest,
+  SavePresetFileResponse,
 } from '../../shared/contracts/ipc/presets';
 import {
   PRESET_FILE_EXTENSIONS,
@@ -49,6 +54,13 @@ import {
 import { resolveUpdateCheckResponse } from '../../shared/releases/update-check';
 
 const STORAGE_KEY = 'compass:web-bridge:preset-store:v1';
+
+// Request factories stay in the renderer; only their result crosses native IPC.
+export interface RendererCompassApi extends CompassApi {
+  savePresetFile: (
+    request: SavePresetFileRequest | (() => SavePresetFileRequest),
+  ) => Promise<SavePresetFileResponse>;
+}
 const VIRTUAL_PRESET_ROOT = 'browser://presets';
 const ROOT_LABELS: Record<PresetFileKind, string> = {
   device: 'Devices',
@@ -92,7 +104,10 @@ const readDevUpdateCheckOverride = (): string | null => {
 
 const createEmptyStore = (): BrowserPresetStore => ({
   folders: {
-    device: [],
+    device: DEVICE_BROWSER_CATEGORY_DEFINITIONS.flatMap((category) => [
+      [category.directoryName],
+      ...category.deviceKinds.map((kind) => [category.directoryName, getRendererDeviceLabel(kind)]),
+    ]),
     group: [],
     rack: [],
   },
@@ -175,10 +190,15 @@ const readStore = (): BrowserPresetStore => {
     const store = createEmptyStore();
     for (const presetType of Object.keys(store.folders) as PresetFileKind[]) {
       const rawFolders = parsed.folders[presetType];
-      store.folders[presetType] = Array.isArray(rawFolders)
+      const savedFolders = Array.isArray(rawFolders)
         ? rawFolders.filter((path): path is string[] =>
             Array.isArray(path) && path.every((segment) => typeof segment === 'string'))
         : [];
+      for (const folder of savedFolders) {
+        if (!store.folders[presetType].some((path) => relativePathCollides(path, folder))) {
+          store.folders[presetType].push(folder);
+        }
+      }
     }
 
     for (const file of parsed.files) {
@@ -339,6 +359,7 @@ const upsertPresetFile = <K extends PresetFileKind>(
   presetType: K,
   relativePath: string[],
   payload: Extract<PresetFile, { presetType: K }>,
+  overwrite = false,
 ): boolean => {
   if (
     store.folders[presetType].some((path) =>
@@ -350,6 +371,9 @@ const upsertPresetFile = <K extends PresetFileKind>(
   const existingIndex = store.files.findIndex((file) =>
     file.presetType === presetType
     && relativePathCollides(file.relativePath, relativePath));
+  if (existingIndex !== -1 && !overwrite) {
+    return false;
+  }
   const entry: BrowserPresetEntry = {
     presetType,
     relativePath,
@@ -426,7 +450,7 @@ const applyBrowserPresetInfoChange = (
 
 const createNoopSubscription = (): (() => void) => () => {};
 
-const createBrowserCompassBridge = (): CompassApi => ({
+const createBrowserCompassBridge = (): RendererCompassApi => ({
   platform: resolveShortcutPlatform(navigator.userAgent),
   sendGeneratedPreview: async () => {
     throw new Error('Desktop app required to send to Ableton.');
@@ -508,26 +532,45 @@ const createBrowserCompassBridge = (): CompassApi => ({
     window.open(url, '_blank', 'noopener,noreferrer');
   },
   getPathForFile: () => null,
-  savePresetFile: async (request: SavePresetFileRequest) => {
+  savePresetFile: async (requestOrFactory) => {
+    const buildRequest = typeof requestOrFactory === 'function'
+      ? requestOrFactory : () => requestOrFactory;
+    const request = buildRequest();
     const presetType = request.payload.presetType;
-    const fileName = ensurePresetExtension(
-      sanitizeFileStem(request.suggestedName, ROOT_LABELS[presetType].slice(0, -1) || 'Preset'),
+    const defaultFolder = request.payload.presetType === 'device'
+      ? [getDeviceBrowserCategoryDirectoryName(request.payload.device.kind),
+          getRendererDeviceLabel(request.payload.device.kind)]
+      : [];
+    return browserPresetSaveDialog.show({
+      name: sanitizeFileStem(request.suggestedName, ROOT_LABELS[presetType].slice(0, -1)),
       presetType,
-    );
-    const relativePath = [fileName];
-    const store = readStore();
-    if (!upsertPresetFile(store, presetType, relativePath, request.payload)) {
-      return {
-        status: 'error',
-        message: 'A folder with that name already exists.',
-      };
-    }
-    writeStore(store);
-
-    return {
-      status: 'saved',
-      filePath: toVirtualPresetPath(presetType, relativePath),
-    };
+      folder: defaultFolder,
+      save: (name, folder, approvedConflict) => {
+        if (!isValidPathSegment(name)) {
+          return { status: 'invalid-name' };
+        }
+        const store = readStore();
+        if (folder.length && !store.folders[presetType].some((path) =>
+          relativePathEquals(path, folder))) {
+          return { status: 'missing-folder' };
+        }
+        const relativePath = [...folder, ensurePresetExtension(name.trim(), presetType)];
+        if (store.folders[presetType].some((path) => relativePathCollides(path, relativePath))) {
+          return { status: 'folder-conflict' };
+        }
+        const existing = store.files.find((file) => file.presetType === presetType
+          && relativePathCollides(file.relativePath, relativePath));
+        const conflict = existing ? JSON.stringify(existing) : null;
+        if (conflict && conflict !== approvedConflict) {
+          return { status: 'conflict', conflict };
+        }
+        if (!upsertPresetFile(store, presetType, relativePath, buildRequest().payload, conflict !== null)) {
+          return { status: 'folder-conflict' };
+        }
+        writeStore(store);
+        return { status: 'saved', filePath: toVirtualPresetPath(presetType, relativePath) };
+      },
+    });
   },
   saveRackFile: async (request) => {
     const parsed = parseVirtualPresetPath(request.filePath);
@@ -540,7 +583,7 @@ const createBrowserCompassBridge = (): CompassApi => ({
     }
 
     const store = readStore();
-    if (!upsertPresetFile(store, 'rack', parsed.relativePath, request.payload)) {
+    if (!upsertPresetFile(store, 'rack', parsed.relativePath, request.payload, true)) {
       return {
         status: 'error',
         message: 'A folder with that name already exists.',
@@ -671,6 +714,10 @@ const createBrowserCompassBridge = (): CompassApi => ({
       };
     }
     const store = readStore();
+    if (request.relativePath.length && !store.folders[request.presetType].some((path) =>
+      relativePathEquals(path, request.relativePath))) {
+      return { status: 'error', message: 'The parent folder no longer exists.' };
+    }
     if (
       store.folders[request.presetType].some((path) =>
         relativePathCollides(path, relativePath))
@@ -1014,5 +1061,12 @@ const createBrowserCompassBridge = (): CompassApi => ({
   },
 });
 
-export const resolveCompassBridge = (): CompassApi =>
-  window.compass ?? createBrowserCompassBridge();
+export const resolveCompassBridge = (): RendererCompassApi => {
+  const nativeBridge = window.compass;
+  return nativeBridge ? {
+    ...nativeBridge,
+    savePresetFile: (request) => nativeBridge.savePresetFile(
+      typeof request === 'function' ? request() : request,
+    ),
+  } : createBrowserCompassBridge();
+};

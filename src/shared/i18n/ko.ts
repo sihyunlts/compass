@@ -1,6 +1,20 @@
 import type { MessageKey } from './en';
 
+
 export const ko = {
+  'webSave.renameFailed': '항목 이름을 바꾸지 못했습니다. 사용할 수 있는 중복되지 않는 이름을 입력하세요.',
+  'webSave.newFolder': "새 폴더",
+  'webSave.folderContents': "폴더 내용",
+  'webSave.createFolderFailed': "폴더를 만들지 못했습니다. 사용할 수 있는 중복되지 않는 이름을 입력하세요.",
+  'webSave.title': "프리셋 저장",
+  'webSave.folder': "저장 폴더",
+  'webSave.overwriteTitle': "‘{label}’ 프리셋을 대치할까요?",
+  'webSave.overwrite': "대치",
+  'webSave.conflict': "현재 저장된 내용은 복구할 수 없습니다.",
+  'webSave.invalid-name': "이름에는 / \\ : * ? \" < > | 문자를 사용할 수 없습니다. 올바른 이름을 입력하세요.",
+  'webSave.missing-folder': "폴더가 더 이상 존재하지 않습니다. 취소한 뒤 저장 창을 다시 열어주세요.",
+  'webSave.folder-conflict': "같은 이름의 폴더가 있습니다. 다른 이름을 입력하세요.",
+  'webSave.failed': "저장하지 못했습니다. 브라우저 저장 공간을 확인하고 다시 시도하세요.",
   'delivery.saveMidi': 'MIDI 저장',
   'app.cancel': '취소',
   'app.close': '닫기',

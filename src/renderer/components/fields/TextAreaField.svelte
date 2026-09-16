@@ -68,7 +68,7 @@
       border: 0;
       border-radius: var(--radius-4);
       padding: var(--gap-6) var(--gap-8);
-      background: var(--color-surface-interactive);
+      background: var(--input-background, var(--color-surface-interactive));
       color: var(--color-text-primary);
       font: inherit;
       font-size: var(--text-13);

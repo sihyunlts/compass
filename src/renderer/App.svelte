@@ -22,6 +22,7 @@
     isPresetBrowserContextTarget,
     isPresetDeleteContextTarget,
     type ContextMenuTarget,
+    type PresetEntryContextTarget,
   } from './features/context-menu/types';
   import Button from './components/primitives/Button.svelte';
   import ResultDeliveryButton from './components/controls/ResultDeliveryButton.svelte';
@@ -35,6 +36,7 @@
   import RackHeaderScrollbar from './components/rack/RackHeaderScrollbar.svelte';
   import PreviewPanel from './components/preview/PreviewPanel.svelte';
   import ContextMenu from './components/overlays/ContextMenu.svelte';
+  import BrowserPresetSaveDialog from './components/overlays/BrowserPresetSaveDialog.svelte';
   import ModalDialog from './components/overlays/ModalDialog.svelte';
   import AuthoredInfoDialog from './components/overlays/AuthoredInfoDialog.svelte';
   import WorkspaceRackTitle from './components/rack/WorkspaceRackTitle.svelte';
@@ -445,6 +447,15 @@
     editorSession.commands.beginRenameFromContextTarget(target);
   };
 
+  const sharedContextMenuActions = {
+    onCopy: handleContextMenuCopy,
+    onPaste: handleContextMenuPaste,
+    onDuplicate: handleContextMenuDuplicate,
+    onDelete: handleContextMenuDelete,
+    onInfo: authoredInfoController.openFromContextTarget,
+    onShowInFolder: (target: PresetEntryContextTarget) => presetController.handleShowPresetEntryInFolder(target),
+  };
+
   const syncMainWindowAlwaysOnTop = async (): Promise<void> => {
     if (isWebFallback) {
       return;
@@ -850,18 +861,21 @@
       </section>
     </section>
   </section>
+  <BrowserPresetSaveDialog
+    menuActions={sharedContextMenuActions}
+    platform={bridgeClient.platform}
+    browserClipboardPresetType={presetState.browserClipboardEntries[0]?.presetType ?? null}
+    presetTree={presetState.presetTree}
+    onCommitEntryDraft={(draft) => presetController.commitPresetEntryDraft(draft)}
+  />
+
   <ContextMenu
     bind:this={contextMenuComponent}
+    {...sharedContextMenuActions}
     platform={bridgeClient.platform}
-    onCopy={handleContextMenuCopy}
     onCut={editorSession.commands.cutFromContextTarget}
-    onPaste={handleContextMenuPaste}
-    onDuplicate={handleContextMenuDuplicate}
     onRename={handleContextMenuRename}
-    onInfo={authoredInfoController.openFromContextTarget}
-    onDelete={handleContextMenuDelete}
     onCreatePresetFolder={handleContextMenuCreatePresetFolder}
-    onShowInFolder={(target) => presetController.handleShowPresetEntryInFolder(target)}
     onGroup={editorSession.commands.groupDeviceIds}
     onUngroupGroup={editorSession.commands.ungroupGroup}
     onDisconnectModulation={editorSession.commands.disconnectModulation}

@@ -30,6 +30,7 @@
   const FOCUSABLE_SELECTOR = [
     MODAL_DIALOG_INPUT_SELECTOR,
     'button:not([disabled])',
+    '[tabindex]:not([tabindex="-1"]):not([disabled])',
   ].join(', ');
   const MODAL_DIALOG_ENTER_SCALE = 1.06;
   const MODAL_DIALOG_EXIT_SCALE = 1.10;
@@ -80,8 +81,10 @@
   let {
     open = false,
     title,
+    visuallyHiddenTitle = false,
     description = null,
     footerNote = null,
+    footerLeading,
     confirmLabel = 'OK',
     showConfirm = true,
     secondaryLabel = null,
@@ -96,8 +99,10 @@
   } = $props<{
     open?: boolean;
     title: string;
+    visuallyHiddenTitle?: boolean;
     description?: string | null;
     footerNote?: string | null;
+    footerLeading?: Snippet;
     confirmLabel?: string;
     showConfirm?: boolean;
     secondaryLabel?: string | null;
@@ -412,7 +417,13 @@
       onkeydown={handleKeyDown}
     >
       <form onsubmit={handleSubmit}>
-        <h2 id={titleId} class="modal-dialog-title">{displayedText.title}</h2>
+        <h2
+          id={titleId}
+          class="modal-dialog-title"
+          class:is-visually-hidden={visuallyHiddenTitle}
+        >
+          {displayedText.title}
+        </h2>
 
         {#if displayedText.description}
           <p id={descriptionId} class="modal-dialog-description">{displayedText.description}</p>
@@ -425,6 +436,11 @@
         {/if}
 
         <footer class="modal-dialog-actions">
+          {#if footerLeading}
+            <span class="modal-dialog-footer-leading">
+              {@render footerLeading()}
+            </span>
+          {/if}
           {#if displayedText.footerNote}
             <span class="modal-dialog-footer-note">{displayedText.footerNote}</span>
           {/if}
@@ -476,6 +492,7 @@
   }
 
   .modal-dialog {
+    --input-background: var(--color-surface-floating-interactive);
     width: min(22rem, calc(100vw - 2rem));
     padding: var(--gap-16);
     border-radius: var(--radius-12);
@@ -488,8 +505,6 @@
       width: min(28rem, calc(100vw - 2rem));
     }
 
-    :global(input[type='text']),
-    :global(textarea),
     :global(.button.modal-dialog-action-button:not(.button-primary)) {
       background: var(--color-surface-floating-interactive);
     }
@@ -497,6 +512,18 @@
     &-title {
       margin: 0 0 var(--gap-12);
       font-size: var(--text-16);
+
+      &.is-visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
     }
 
     &-description {
@@ -516,8 +543,12 @@
       gap: var(--gap-8);
     }
 
+    &-footer-leading,
     &-footer-note {
       margin-right: auto;
+    }
+
+    &-footer-note {
       color: var(--color-text-secondary);
       font-size: var(--text-12);
     }

@@ -1,6 +1,7 @@
 import {
   applyOrderedRangeSelection,
   getOrderedSelectedIds,
+  hasAdditiveSelectionModifier,
   haveSameSelectedIds,
   reconcileOrderedSelection,
   selectSingleOrderedItem,
@@ -24,6 +25,17 @@ class BrowserSelection {
       selectedIds: [],
       anchorId: null,
     });
+  }
+
+  public mountClearOnOutsidePointer(rowSelector: string): () => void {
+    const handlePointerDown = (event: PointerEvent): void => {
+      const target = event.target;
+      if (target instanceof Element && target.closest(rowSelector)) return;
+      this.clear();
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown, true);
+    return () => window.removeEventListener('pointerdown', handlePointerDown, true);
   }
 
   public includes(rowId: string): boolean {
@@ -53,6 +65,44 @@ class BrowserSelection {
       additiveSelection,
       orderedRowIds,
     ));
+  }
+
+  public selectFromPointer(
+    rowId: string,
+    event: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean },
+    orderedRowIds: readonly string[],
+  ): void {
+    if (event.shiftKey) {
+      this.selectRange(rowId, hasAdditiveSelectionModifier(event), orderedRowIds);
+    } else if (hasAdditiveSelectionModifier(event)) {
+      this.toggle(rowId, orderedRowIds);
+    } else {
+      this.selectSingle(rowId, orderedRowIds);
+    }
+  }
+
+  public selectFromToggleKey(
+    rowId: string,
+    event: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean },
+    orderedRowIds: readonly string[],
+  ): void {
+    if (event.shiftKey) {
+      this.selectRange(rowId, hasAdditiveSelectionModifier(event), orderedRowIds);
+    } else {
+      this.toggle(rowId, orderedRowIds);
+    }
+  }
+
+  public selectFromFocusMove(
+    rowId: string,
+    event: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean },
+    orderedRowIds: readonly string[],
+  ): void {
+    if (event.shiftKey) {
+      this.selectRange(rowId, hasAdditiveSelectionModifier(event), orderedRowIds);
+    } else if (!hasAdditiveSelectionModifier(event)) {
+      this.selectSingle(rowId, orderedRowIds);
+    }
   }
 
   public replace(

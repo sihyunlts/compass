@@ -36,7 +36,7 @@ input[type='number'][data-control-action][data-device-id],
 /* Input: Base */
 input {
   border: 0;
-  background: var(--color-surface-interactive);
+  background: var(--input-background, var(--color-surface-interactive));
   color: var(--color-text-primary);
   border-radius: var(--radius-4);
   padding: var(--gap-4) var(--gap-6);
@@ -499,6 +499,12 @@ html.reduce-blur {
   font-size: var(--text-14);
   line-height: 1;
   color: var(--browser-icon-accent, var(--color-text-secondary));
+  font-variation-settings: 'FILL' 1, 'wght' 400;
+}
+
+.browser-chevron-icon {
+  font-size: var(--text-16);
+  line-height: 1;
   font-variation-settings: 'FILL' 1, 'wght' 400;
 }
 

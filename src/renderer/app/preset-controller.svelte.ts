@@ -1,4 +1,5 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
+import type { RendererCompassApi } from './browser-bridge';
 import type { MessageKey } from '../../shared/i18n';
 import {
   cloneDeviceNode,
@@ -147,7 +148,7 @@ interface PresetControllerState {
 }
 
 interface PresetControllerOptions {
-  bridgeClient: CompassApi;
+  bridgeClient: RendererCompassApi;
   editorSession: EditorSession;
   showMessage: (message: string) => void;
 }
@@ -578,13 +579,6 @@ export class PresetController {
     );
   }
 
-  private buildRackSaveAsRequest(): SavePresetFileRequest {
-    return {
-      suggestedName: this.state.currentRackDisplayName,
-      payload: this.buildCurrentRackFile(),
-    };
-  }
-
   private async saveCurrentRack(
     options: { showSuccessMessage: boolean },
   ): Promise<boolean> {
@@ -620,13 +614,17 @@ export class PresetController {
   private async saveRackAs(
     options: { showSuccessMessage: boolean },
   ): Promise<boolean> {
-    const request = this.buildRackSaveAsRequest();
-    const response = await this.options.bridgeClient.savePresetFile(request);
+    let savedAtIso: string | null = null;
+    const response = await this.options.bridgeClient.savePresetFile(() => {
+      const payload = this.buildCurrentRackFile();
+      savedAtIso = payload.savedAtIso;
+      return { suggestedName: this.state.currentRackDisplayName, payload };
+    });
     if (response.status === 'saved') {
       this.setCurrentRackFile(
         response.filePath,
         resolveRackDisplayName(response.filePath),
-        request.payload.savedAtIso,
+        savedAtIso,
       );
       this.markCurrentRackClean({ captureRevertTarget: true });
       if (options.showSuccessMessage) {
@@ -897,6 +895,24 @@ export class PresetController {
     }
 
     this.state.pendingPresetFolderDraft = null;
+    const response = await this.commitPresetEntryDraft(draft);
+    if (response.status === 'error') {
+      this.showError(
+        resolvePresetDraftErrorMessageKey(draft),
+        response.message,
+      );
+      return;
+    }
+
+    this.setPresetEntrySelectionTarget([{
+      presetType: draft.presetType,
+      relativePath: response.relativePath,
+      entryKind: draft.entryKind,
+    }]);
+  }
+
+  public async commitPresetEntryDraft(draft: PendingPresetFolderDraft) {
+    const entryName = draft.draftName.trim();
     const response = draft.mode === 'create'
       ? await this.options.bridgeClient.createPresetFolder({
           presetType: draft.presetType,
@@ -917,29 +933,19 @@ export class PresetController {
           relativePath: [...draft.relativePath],
           folderName: entryName,
         } satisfies RenamePresetFolderRequest);
-    if (response.status === 'error') {
-      this.showError(
-        resolvePresetDraftErrorMessageKey(draft),
-        response.message,
-      );
-      return;
+    if (response.status !== 'error') {
+      await this.loadTree();
+      if (draft.presetType === 'rack' && 'sourcePath' in response) {
+        this.syncCurrentRackAfterPresetEntriesMove([{
+          presetType: 'rack',
+          entryKind: draft.entryKind,
+          relativePath: response.relativePath,
+          sourcePath: response.sourcePath,
+          filePath: response.filePath,
+        }]);
+      }
     }
-
-    await this.loadTree();
-    if (draft.presetType === 'rack' && 'sourcePath' in response) {
-      this.syncCurrentRackAfterPresetEntriesMove([{
-        presetType: 'rack',
-        entryKind: draft.entryKind,
-        relativePath: response.relativePath,
-        sourcePath: response.sourcePath,
-        filePath: response.filePath,
-      }]);
-    }
-    this.setPresetEntrySelectionTarget([{
-      presetType: draft.presetType,
-      relativePath: response.relativePath,
-      entryKind: draft.entryKind,
-    }]);
+    return response;
   }
 
   public clearPresetEntrySelectionTarget(token: number): void {
