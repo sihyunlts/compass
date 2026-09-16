@@ -111,12 +111,14 @@ const config: ForgeConfig = {
     }, ['darwin']),
     new MakerRpm({
       options: {
+        bin: 'Compass',
         icon: 'assets/compass.png',
         categories: ['AudioVideo'],
       },
     }),
     new MakerDeb({
       options: {
+        bin: 'Compass',
         icon: 'assets/compass.png',
         categories: ['AudioVideo'],
       },
