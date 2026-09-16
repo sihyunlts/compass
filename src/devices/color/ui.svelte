@@ -13,6 +13,7 @@
   import { i18n } from '../../renderer/i18n.svelte';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
   import DeviceControlColumn from '../../renderer/components/rack/DeviceControlColumn.svelte';
+  import { hint } from '../../renderer/components/overlays/hint';
 
   const BLACK_RGB = '0 0 0';
 
@@ -143,6 +144,7 @@
             disabled={isPaletteSlotDisabled(paletteRgb)}
             style={`background-color: rgb(${paletteRgb});`}
             aria-label={`Palette ${paletteIndex}`}
+            use:hint={String(paletteIndex)}
             onclick={() => selectPaletteSlot(paletteIndex)}
           ></button>
         {/each}
@@ -158,6 +160,7 @@
             disabled={isPaletteSlotDisabled(paletteRgb)}
             style={`background-color: rgb(${paletteRgb});`}
             aria-label={`Palette ${paletteIndex}`}
+            use:hint={String(paletteIndex)}
             onclick={() => selectPaletteSlot(paletteIndex)}
           ></button>
         {/each}
@@ -171,6 +174,7 @@
           class="color-slot"
           class:is-selected={selectedColorSlotIndex === slotIndex}
           style={`background-color: rgb(${resolvePaletteSwatchRgb(slotVelocity, paletteRevision)});`}
+          use:hint={String(slotVelocity)}
           onclick={() => {
             selectedColorSlotIndex = slotIndex;
           }}
