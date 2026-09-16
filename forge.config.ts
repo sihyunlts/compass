@@ -89,7 +89,7 @@ const config: ForgeConfig = {
       owners: 'sihyunlights',
       iconUrl: 'https://raw.githubusercontent.com/sihyunlts/compass/master/assets/compass.ico',
     }),
-    new MakerZIP({}, ['darwin']),
+    new MakerZIP({}, ['darwin', 'linux']),
     new MakerDMG({
       name: ARTIFACT_NAME,
       icon: 'assets/compass.icns',
@@ -109,8 +109,18 @@ const config: ForgeConfig = {
         },
       ],
     }, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({}),
+    new MakerRpm({
+      options: {
+        icon: 'assets/compass.png',
+        categories: ['AudioVideo'],
+      },
+    }),
+    new MakerDeb({
+      options: {
+        icon: 'assets/compass.png',
+        categories: ['AudioVideo'],
+      },
+    }),
   ],
   hooks: {
     preStart: async () => {
@@ -137,13 +147,15 @@ const config: ForgeConfig = {
     postMake: async (_forgeConfig, makeResults) => Promise.all(makeResults.map(async (result) => {
       result.artifacts = await Promise.all(result.artifacts.map(async (artifact) => {
         const extension = path.extname(artifact);
-        if (extension !== '.dmg' && extension !== '.zip' && extension !== '.exe') {
+        if (!['.dmg', '.zip', '.exe', '.deb', '.rpm'].includes(extension)) {
           return artifact;
         }
 
-        const suffix = extension === '.exe'
-          ? `-${result.arch}-Setup.exe`
-          : `-${result.arch}${extension}`;
+        const suffix = result.platform === 'linux'
+          ? `-linux-${result.arch}${extension}`
+          : extension === '.exe'
+            ? `-${result.arch}-Setup.exe`
+            : `-${result.arch}${extension}`;
         const nextArtifact = path.join(
           path.dirname(artifact),
           `${ARTIFACT_NAME}${suffix}`,

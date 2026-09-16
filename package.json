@@ -14,6 +14,7 @@
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
+    "make:linux:docker": "bash scripts/build-linux-docker.sh",
     "publish": "electron-forge publish",
     "web:dev": "vite --config vite.renderer.config.mts --host 127.0.0.1 --port 4173",
     "web:build": "vite build --config vite.renderer.config.mts",
