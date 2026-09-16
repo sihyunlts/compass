@@ -11,6 +11,7 @@ interface ColorCoverageInterval {
 }
 
 export interface CompiledColorAgeKernel {
+  noteLengthRatio: number;
   sequenceEndUnit: number;
   coverageIntervals: ReadonlyArray<ColorCoverageInterval>;
 }

@@ -1,5 +1,6 @@
 import type { GeometryStateEvent } from '../geometry/event-track';
 import { extractGeometryEventTracks } from '../geometry/event-track';
+import { requireColorIntervalResolution } from '../plan/sampling';
 import {
   addStrokeToFrameRange,
   beginTimelineStage,
@@ -11,6 +12,7 @@ import type {
   GeometryTimeline,
 } from '../types';
 import type { CompiledColorAgeKernel } from './types';
+import { applyMotionWidth } from './motion-width';
 
 interface ColorTimelineMaterializationInput {
   sourceTimeline: GeometryTimeline;
@@ -104,6 +106,7 @@ const createMotionSampleClock = (
 ): ((position: number) => number) => {
   const lastEventIndex = events.length - 1;
   const sourceEndFrame = events[lastEventIndex].endFrameExclusive;
+  const meanPoseFrameSpan = (sourceEndFrame - events[0].frameIndex) / events.length;
   return (position) => {
     // The clock advances only on a new pose. A shared fractional boundary is
     // sampled once, so sub-sample slots may be empty rather than overlap.
@@ -111,17 +114,28 @@ const createMotionSampleClock = (
     if (sampleIndex <= lastEventIndex) {
       return events[sampleIndex].frameIndex;
     }
-    // After the final held pose, consume history at one unit per output sample.
-    return sourceEndFrame + sampleIndex - lastEventIndex - 1;
+    // Continue the run's pose cadence after its last pose. Temporal remapping
+    // can hold each pose for multiple frames; resetting to one frame here
+    // would accelerate Color history as soon as the source ends.
+    return toFirstSampleIndex(sourceEndFrame
+      + (sampleIndex - lastEventIndex - 1) * meanPoseFrameSpan);
   };
 };
 
 function* iterateEventWrites(
   events: ReadonlyArray<GeometryStateEvent>,
   kernel: CompiledColorAgeKernel,
+  sampleStepBeats: number,
 ): Generator<ColorAgeWrite> {
   for (const runEvents of groupEventsByRunIndex(events).values()) {
     const referenceSpan = resolveReferenceSpan(runEvents, kernel);
+    requireColorIntervalResolution(
+      sampleStepBeats,
+      kernel.noteLengthRatio * referenceSpan,
+    );
+    const footprintRatio = Math.min(kernel.noteLengthRatio, 1);
+    const colorEvents = applyMotionWidth(runEvents, footprintRatio);
+    const footprintSpan = referenceSpan * footprintRatio;
     const toOutputFrame = runEvents.length > 1
       ? createMotionSampleClock(runEvents)
       : (position: number) => toFirstSampleIndex(runEvents[0].frameIndex + position);
@@ -130,15 +144,19 @@ function* iterateEventWrites(
       const intervalUnits = interval.endUnitExclusive - interval.startUnit;
       const requestedSpan = intervalUnits * referenceSpan;
       // The source stroke supplies its own footprint. Add only the sweep beyond
-      // one motion unit, once per connected interval rather than once per color.
+      // its actual width, once per connected interval rather than once per color.
       // Static sources use time alone; they have no motion footprint to subtract.
       const coverageSpan = runEvents.length > 1
-        ? Math.min(requestedSpan, referenceSpan, 1)
-          + Math.max(requestedSpan - referenceSpan, 0)
+        ? Math.min(requestedSpan, footprintSpan, 1)
+          + Math.max(requestedSpan - footprintSpan, 0)
         : requestedSpan;
       const coverageStart = interval.startUnit * referenceSpan;
+      const outerHalfSpan = (requestedSpan - coverageSpan) / 2;
+      // Keep internal color boundaries equally spaced. The source footprint
+      // supplies the two outer half-widths of the connected interval.
       const toCoveragePosition = (unit: number) => coverageStart
-        + ((unit - interval.startUnit) / intervalUnits * coverageSpan);
+        + Math.max(0, Math.min(coverageSpan,
+          (unit - interval.startUnit) * referenceSpan - outerHalfSpan));
       return interval.slots.map((slot) => ({
         slot,
         startPosition: toCoveragePosition(slot.startUnit),
@@ -149,7 +167,7 @@ function* iterateEventWrites(
     for (let eventIndex = 0; eventIndex < runEvents.length; eventIndex += 1) {
       for (const { slot, startPosition, endPosition } of slotCoverage) {
         const write: ColorAgeWrite = {
-          event: runEvents[eventIndex],
+          event: colorEvents[eventIndex],
           startFrame: toOutputFrame(eventIndex + startPosition),
           endFrameExclusive: toOutputFrame(eventIndex + endPosition),
           velocity: slot.velocity,
@@ -192,7 +210,7 @@ export const materializeColorTimeline = (
     const sourcePoseLayer: ColorLayer = { order: [...layer.order, 1] };
     let originStart = Infinity;
     let originEnd = -Infinity;
-    for (const write of iterateEventWrites(events, input.kernel)) {
+    for (const write of iterateEventWrites(events, input.kernel, input.sourceTimeline.sampleStepBeats)) {
       writes.push({ ...write, layer: write.prioritizesSourcePose ? sourcePoseLayer : layer });
       originStart = Math.min(originStart, write.startFrame * input.sourceTimeline.sampleStepBeats);
       originEnd = Math.max(originEnd, write.endFrameExclusive * input.sourceTimeline.sampleStepBeats);

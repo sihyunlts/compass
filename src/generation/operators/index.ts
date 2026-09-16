@@ -1,7 +1,7 @@
 import type { GeneratorChain } from '../../shared/model';
 import type { SpatialBounds } from '../analysis/types';
 import type { CompiledRackPlan, CompiledRackStage, RackStageDeviceKind } from '../plan/types';
-import { resolveCompiledRackSampleStepBeats } from '../plan/sampling';
+import { resolveCompiledRackSampleStepBeats, withAdaptiveTimelineSampling } from '../plan/sampling';
 import { createEmptyGenerationState, type GenerationState } from '../timeline/state';
 import type { CanonicalOutputAdapter, GeometryTimeline } from '../types';
 import { colorOperator } from './color';
@@ -139,8 +139,7 @@ export const executeCompiledRackPlan = (
   generatorOutputBounds: SpatialBounds,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
-): GeometryTimeline => {
-  const sampleStepBeats = resolveCompiledRackSampleStepBeats(compiledPlan);
+): GeometryTimeline => withAdaptiveTimelineSampling(resolveCompiledRackSampleStepBeats(compiledPlan), (sampleStepBeats) => {
   const modulationContext = createModulationContext(modulationChain, loopLengthBeats);
   const referenceContext: MaskSourceReferenceContext = {
     compiledPlan,
@@ -169,4 +168,4 @@ export const executeCompiledRackPlan = (
   }
 
   return materializeAndNormalizeRackTimeline(currentState, stageExecutionContext);
-};
+});

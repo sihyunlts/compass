@@ -4,6 +4,9 @@ import path from 'node:path';
 import test from 'node:test';
 
 import { buildGeneratedFieldResult } from '../domain/field-result';
+import { createLaunchpadMap } from '../core/launchpad-map';
+import { colorDeviceSchema } from '../devices/color/schema';
+import { rippleDeviceSchema } from '../devices/ripple/schema';
 import type { GeneratorPreview } from '../shared/contracts/preview/generator-preview';
 import type { ClipNote, GeneratorChain, PathGeneratorNode } from '../shared/model';
 import {
@@ -297,6 +300,28 @@ test('rack regression fixtures match their compact generation baselines', async 
     }
 
     assert.deepEqual(signature, await readBaseline(baselinePath), `${rackFileName}: baseline changed`);
+  }
+});
+
+test('short ripple color intervals retain every color across the complete output', () => {
+  for (const noteLengthPercent of [1, 2, 4, 5, 7, 8, 10]) {
+    const color = colorDeviceSchema.createDefaultNode('short-color', true);
+    color.params.noteLengthPercent = noteLengthPercent;
+    const result = buildGeneratedFieldResult({
+      chain: {
+        devices: [rippleDeviceSchema.createDefaultNode('ripple', true), color],
+        groupStateById: {},
+      },
+      loopLengthBeats: 1,
+      launchpadModel: 'mk3',
+    });
+    const expected = new Set(createLaunchpadMap('mk3').flatMap((button) => (
+      button.output.kind === 'note'
+        ? color.params.velocities.map((velocity) => `${button.output.number}:${velocity}`)
+        : []
+    )));
+    const actual = new Set(result.notes.map((note) => `${note.pitch}:${note.velocity}`));
+    assert.deepEqual(actual, expected, `${noteLengthPercent}% must not drop a pitch or color`);
   }
 });
 

@@ -13,6 +13,7 @@ export const compileColorAgeKernel = (
   }));
 
   return {
+    noteLengthRatio,
     sequenceEndUnit: (config.velocities.length * noteLengthRatio)
       + ((config.velocities.length - 1) * gapRatio),
     coverageIntervals: gapRatio === 0
