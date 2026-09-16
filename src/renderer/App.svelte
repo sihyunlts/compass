@@ -453,7 +453,9 @@
     onDuplicate: handleContextMenuDuplicate,
     onDelete: handleContextMenuDelete,
     onInfo: authoredInfoController.openFromContextTarget,
-    onShowInFolder: (target: PresetEntryContextTarget) => presetController.handleShowPresetEntryInFolder(target),
+    onShowInFolder: isWebFallback
+      ? undefined
+      : (target: PresetEntryContextTarget) => presetController.handleShowPresetEntryInFolder(target),
   };
 
   const syncMainWindowAlwaysOnTop = async (): Promise<void> => {
