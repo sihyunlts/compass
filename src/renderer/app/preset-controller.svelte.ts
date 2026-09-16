@@ -81,6 +81,27 @@ const PRESET_APPLY_MESSAGE_KEY_BY_STATUS = {
   'rack-loaded': 'status.rackLoaded',
 } as const satisfies Readonly<Record<PresetApplyStatus, MessageKey>>;
 
+const PRESET_DELETE_MESSAGE_KEYS = {
+  desktop: {
+    folderPrompt: 'preset.moveFolderPrompt',
+    itemPrompt: 'preset.moveItemPrompt',
+    itemsPrompt: 'preset.moveItemsPrompt',
+    folderDescription: 'preset.moveFolderDescription',
+    itemDescription: 'preset.moveItemDescription',
+    itemsDescription: 'preset.moveItemsDescription',
+    failed: 'status.moveToTrashFailed',
+  },
+  web: {
+    folderPrompt: 'preset.deleteFolderPrompt',
+    itemPrompt: 'preset.deleteItemPrompt',
+    itemsPrompt: 'preset.deleteItemsPrompt',
+    folderDescription: 'preset.deleteFolderDescription',
+    itemDescription: 'preset.deleteItemDescription',
+    itemsDescription: 'preset.deleteItemsDescription',
+    failed: 'status.presetDeleteFailed',
+  },
+} as const;
+
 const resolvePresetApplyMessage = (status: PresetApplyStatus): string =>
   i18n.t(PRESET_APPLY_MESSAGE_KEY_BY_STATUS[status]);
 
@@ -151,6 +172,7 @@ interface PresetControllerOptions {
   bridgeClient: RendererCompassApi;
   editorSession: EditorSession;
   showMessage: (message: string) => void;
+  isWebFallback: boolean;
 }
 
 const clonePresetBrowserPreview = (
@@ -1106,7 +1128,7 @@ export class PresetController {
       if (response.status === 'error') {
         await this.loadTree();
         this.state.pendingPresetDeleteTarget = null;
-        this.showError('status.moveToTrashFailed', response.message);
+        this.showError(this.presetDeleteMessageKeys.failed, response.message);
         return;
       }
 
@@ -1115,7 +1137,7 @@ export class PresetController {
       this.state.pendingPresetDeleteTarget = null;
     } catch (error) {
       this.showError(
-        'status.moveToTrashFailed',
+        this.presetDeleteMessageKeys.failed,
         error instanceof Error ? error.message : null,
       );
     } finally {
@@ -1124,8 +1146,9 @@ export class PresetController {
   }
 
   public getPresetDeleteTitle(target: PresetDeleteTarget): string {
+    const keys = this.presetDeleteMessageKeys;
     if (target.kind === 'preset-entries') {
-      return i18n.t('preset.moveItemsPrompt', {
+      return i18n.t(keys.itemsPrompt, {
         count: target.entries.length,
       });
     }
@@ -1135,18 +1158,23 @@ export class PresetController {
       ? resolvePresetNameFromFileName(entryName, target.presetType) ?? entryName
       : entryName;
     return target.entryKind === 'directory'
-      ? i18n.t('preset.moveFolderPrompt', { label })
-      : i18n.t('preset.moveItemPrompt', { label });
+      ? i18n.t(keys.folderPrompt, { label })
+      : i18n.t(keys.itemPrompt, { label });
   }
 
   public getPresetDeleteDescription(target: PresetDeleteTarget): string {
+    const keys = this.presetDeleteMessageKeys;
     if (target.kind === 'preset-entries') {
-      return i18n.t('preset.moveItemsDescription');
+      return i18n.t(keys.itemsDescription);
     }
 
     return target.entryKind === 'directory'
-      ? i18n.t('preset.moveFolderDescription')
-      : i18n.t('preset.moveItemDescription');
+      ? i18n.t(keys.folderDescription)
+      : i18n.t(keys.itemDescription);
+  }
+
+  private get presetDeleteMessageKeys() {
+    return PRESET_DELETE_MESSAGE_KEYS[this.options.isWebFallback ? 'web' : 'desktop'];
   }
 
   public async handleShowPresetEntryInFolder(target: PresetEntryTarget): Promise<void> {

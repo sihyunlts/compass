@@ -141,6 +141,7 @@
   const presetController = createPresetController({
     bridgeClient,
     editorSession,
+    isWebFallback,
     showMessage: (message) => {
       headerIndicator.show(message);
     },
@@ -926,7 +927,7 @@
     description={presetState.pendingPresetDeleteTarget
       ? presetController.getPresetDeleteDescription(presetState.pendingPresetDeleteTarget)
       : null}
-    confirmLabel={i18n.t('rack.trash')}
+    confirmLabel={i18n.t(isWebFallback ? 'context.delete' : 'rack.trash')}
     cancelLabel={i18n.t('app.cancel')}
     busy={presetState.isPresetDeletePending}
     defaultAction="confirm"
