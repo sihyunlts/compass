@@ -1,6 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { touchGestures } from '../../features/touch-gestures';
   import type { RendererControlChange } from '../../../devices/control-types';
   import {
     createModulationParameterKey,
@@ -174,6 +175,7 @@
   >
     <input
       class:has-display-overlay={hasDisplayOverlay}
+      use:touchGestures={{ contextMenu: false, enabled: !disabled && !readonly }}
       type="number"
       step={resolvedStep}
       data-drag-step={dragStep}

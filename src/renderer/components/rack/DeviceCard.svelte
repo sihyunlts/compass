@@ -1,6 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { touchGestures } from '../../features/touch-gestures';
   /** Renders the shared device card shell and mounts the kind-specific editor body. */
   import { tick } from 'svelte';
   import {
@@ -268,6 +269,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <header
     class="device-head"
+    use:touchGestures={{ enabled: !isRenaming }}
     data-rack-device-header="true"
     tabindex="-1"
     onpointerdown={isRenaming ? undefined : onHeaderPointerDown}
@@ -393,6 +395,8 @@
       align-items: center;
       gap: var(--gap-10);
       min-width: 0;
+      touch-action: none;
+      -webkit-touch-callout: none;
       cursor: grab;
       -webkit-user-drag: none;
       outline: none;

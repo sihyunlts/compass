@@ -195,22 +195,6 @@
     });
   };
 
-  const requestCenteredScrollAtClientX = (clientX: number): void => {
-    if (!trackEl || !hasOverflow) {
-      return;
-    }
-
-    const rect = trackEl.getBoundingClientRect();
-    if (rect.width <= 0) {
-      return;
-    }
-
-    const localX = clamp(clientX - rect.left, 0, rect.width);
-    const targetRatio = localX / rect.width;
-    const centered = (targetRatio * metrics.scrollWidth) - (metrics.clientWidth / 2);
-    onScrollRequest(clamp(centered, 0, maxScrollLeft));
-  };
-
   const requestDragScrollAtClientX = (clientX: number): void => {
     if (!trackEl || !hasOverflow) {
       return;
@@ -229,6 +213,7 @@
   };
 
   const handleTrackPointerDown = (event: PointerEvent): void => {
+    if (!event.isPrimary || event.button !== 0 || activePointerId !== null) return;
     const target = event.target;
     if (target instanceof HTMLElement && target.closest('.rack-header-scrollbar-thumb')) {
       return;
@@ -249,10 +234,11 @@
     dragOffsetPx = layout.widthPx / 2;
     activePointerId = event.pointerId;
     trackEl.setPointerCapture(event.pointerId);
-    requestCenteredScrollAtClientX(event.clientX);
+    requestDragScrollAtClientX(event.clientX);
   };
 
   const handleThumbPointerDown = (event: PointerEvent): void => {
+    if (!event.isPrimary || event.button !== 0 || activePointerId !== null) return;
     if (!hasOverflow) {
       return;
     }
@@ -286,13 +272,6 @@
   };
 
   const handleActivePointerUp = (event: PointerEvent): void => {
-    if (event.pointerId !== activePointerId) {
-      return;
-    }
-    clearActivePointer();
-  };
-
-  const handleActivePointerCancel = (event: PointerEvent): void => {
     if (event.pointerId !== activePointerId) {
       return;
     }
@@ -378,7 +357,7 @@
     onpointerdown={handleTrackPointerDown}
     onpointermove={handleActivePointerMove}
     onpointerup={handleActivePointerUp}
-    onpointercancel={handleActivePointerCancel}
+    onpointercancel={handleActivePointerUp}
     onlostpointercapture={handleActiveLostPointerCapture}
     onkeydown={handleKeyDown}
   >
@@ -408,6 +387,7 @@
   .rack-header-scrollbar {
     --scrollbar-track-border-color: var(--color-border-tertiary);
     -webkit-app-region: no-drag;
+    touch-action: none;
 
     position: relative;
     height: 1.5rem;

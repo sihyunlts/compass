@@ -1,6 +1,9 @@
 * {
   box-sizing: border-box;
 
+  /* Keep scrolling and pinch zoom, without consuming double taps as zoom gestures. */
+  touch-action: manipulation;
+
   /* Form elements do not inherit font-family by default */
   font-family: inherit;
 
@@ -10,6 +13,7 @@
   /* Disable selection and tap highlight */
   user-select: none;
   -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 
   /* Electron-only continuous corner smoothing for every rounded surface. */
   -electron-corner-smoothing: 80%;

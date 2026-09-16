@@ -1,3 +1,4 @@
+import { hasDragMovement } from '../drag-gesture';
 import {
   getDeviceBrowserCategory,
   getDeviceBrowserIcon,
@@ -60,9 +61,6 @@ type RackDragControllerOptions = {
   onDragUpdate?: (info: ActiveDragInfo | null) => void;
 };
 
-// Minimum pointer travel before a drag is considered intentional.
-const DRAG_START_THRESHOLD_PX = 4;
-
 // Auto-scroll settings while dragging near rack edges.
 const DRAG_AUTO_SCROLL_EDGE_PX = 56;
 const DRAG_AUTO_SCROLL_MAX_STEP_PX = 8;
@@ -70,6 +68,7 @@ const DRAG_AUTO_SCROLL_MAX_STEP_PX = 8;
 type ChainDragState = {
   kind: 'chain';
   pointerId: number;
+  pointerType: string;
   sourceIds: string[];
   sourceKind: ChainDragSourceKind;
   startX: number;
@@ -81,6 +80,7 @@ type ChainDragState = {
 type BrowserDragState = {
   kind: 'browser';
   pointerId: number;
+  pointerType: string;
   source: BrowserInsertSource;
   itemEl: HTMLElement;
   badge: BrowserDragBadgeContent;
@@ -227,6 +227,7 @@ export class RackDragController {
     this.activeDrag = {
       kind: 'chain',
       pointerId: event.pointerId,
+      pointerType: event.pointerType,
       sourceIds: [...sourceIds],
       sourceKind,
       startX: event.clientX,
@@ -251,6 +252,7 @@ export class RackDragController {
     this.activeDrag = {
       kind: 'browser',
       pointerId: event.pointerId,
+      pointerType: event.pointerType,
       source,
       itemEl,
       badge: resolveBrowserDragBadgeContent(source, badgeLabel),
@@ -272,7 +274,7 @@ export class RackDragController {
     if (!drag.didMove) {
       const dx = Math.abs(event.clientX - drag.startX);
       const dy = Math.abs(event.clientY - drag.startY);
-      if (dx + dy < DRAG_START_THRESHOLD_PX) {
+      if (!hasDragMovement(drag.pointerType, dx, dy, drag.kind === 'browser')) {
         return false;
       }
       this.markDragStarted(drag);
@@ -324,6 +326,7 @@ export class RackDragController {
   }
 
   private markDragStarted(drag: ActiveDrag): void {
+    this.closeContextMenu();
     drag.didMove = true;
     if (drag.kind === 'browser') {
       drag.itemEl.classList.add('is-dragging');
@@ -364,7 +367,6 @@ export class RackDragController {
     }
 
     this.activeDrag = null;
-    this.closeContextMenu();
     this.notifyDragUpdate();
   }
 

@@ -142,9 +142,12 @@ class RackSurfaceController {
     this.emitScrollMetrics();
     this.emitMiniMapContentRevision();
 
+    const cancelDragForContextMenu = (): void => { this.dragController?.cancel(); };
+    window.addEventListener('contextmenu', cancelDragForContextMenu, true);
     document.addEventListener('pointerlockchange', this.handlePointerLockChange);
 
     return () => {
+      window.removeEventListener('contextmenu', cancelDragForContextMenu, true);
       document.removeEventListener('pointerlockchange', this.handlePointerLockChange);
       this.dragController?.cancel();
       this.clearDropIndicator();
@@ -241,6 +244,7 @@ class RackSurfaceController {
     const started = this.dragController.startChainDrag(event, sourceIds, sourceKind);
     if (started) {
       this.clearDropIndicator();
+      event.preventDefault();
     }
     return started;
   }

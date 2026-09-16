@@ -1,5 +1,11 @@
 @use './preview-cell';
 
+/* Numeric dragging owns the gesture from touch-down, before pointer capture. */
+input[type='number'][data-control-action][data-device-id],
+[data-numeric-input-proxy][data-control-action][data-device-id] {
+  touch-action: none;
+}
+
 .control-field-label {
   color: var(--color-text-secondary);
   font-size: var(--text-12);

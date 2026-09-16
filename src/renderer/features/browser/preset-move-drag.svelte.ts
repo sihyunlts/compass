@@ -1,3 +1,4 @@
+import { hasDragMovement } from '../drag-gesture';
 import {
   type PresetEntryMoveDestination,
 } from '../../../shared/preset-entry-move';
@@ -21,6 +22,7 @@ export interface BrowserPresetMoveDestination
 
 interface ActiveBrowserPresetMove {
   pointerId: number;
+  pointerType: string;
   startX: number;
   startY: number;
   didMove: boolean;
@@ -44,7 +46,6 @@ interface BrowserPresetMoveDragOptions {
   ) => void | Promise<void>;
 }
 
-const START_THRESHOLD_PX = 4;
 const EXPAND_DELAY_MS = 600;
 const SCROLL_EDGE_PX = 36;
 const SCROLL_MAX_STEP_PX = 8;
@@ -88,12 +89,14 @@ export class BrowserPresetMoveDrag {
     window.addEventListener('pointerup', this.handlePointerUp);
     window.addEventListener('pointercancel', this.handlePointerCancel);
     window.addEventListener('blur', this.clear);
+    window.addEventListener('contextmenu', this.clear, true);
 
     return () => {
       window.removeEventListener('pointermove', this.handlePointerMove);
       window.removeEventListener('pointerup', this.handlePointerUp);
       window.removeEventListener('pointercancel', this.handlePointerCancel);
       window.removeEventListener('blur', this.clear);
+      window.removeEventListener('contextmenu', this.clear, true);
       this.clear();
     };
   }
@@ -111,6 +114,7 @@ export class BrowserPresetMoveDrag {
     this.activeAbortController = new AbortController();
     this.active = {
       pointerId: event.pointerId,
+      pointerType: event.pointerType,
       startX: event.clientX,
       startY: event.clientY,
       didMove: false,
@@ -134,10 +138,12 @@ export class BrowserPresetMoveDrag {
     }
 
     if (!drag.didMove) {
-      const distance =
-        Math.abs(event.clientX - drag.startX)
-        + Math.abs(event.clientY - drag.startY);
-      if (distance < START_THRESHOLD_PX) {
+      if (!hasDragMovement(
+        drag.pointerType,
+        event.clientX - drag.startX,
+        event.clientY - drag.startY,
+        true,
+      )) {
         return;
       }
       drag.didMove = true;

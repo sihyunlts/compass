@@ -1,6 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { touchGestures } from '../../features/touch-gestures';
   import type { RendererControlChange } from '../../../devices/control-types';
   import {
     createModulationParameterKey,
@@ -130,6 +131,7 @@
     <div class="angle-picker-controls" data-numeric-input-scope>
       <div
         class="angle-picker-dial"
+      use:touchGestures={{ contextMenu: false }}
         data-modulation-floating-anchor
         role="slider"
         tabindex="0"
@@ -203,7 +205,6 @@
     place-items: center;
     flex: 0 0 auto;
     cursor: n-resize;
-    touch-action: none;
     background-color: var(--color-surface-interactive);
 
     &-knob {

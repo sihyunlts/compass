@@ -5,6 +5,7 @@
    * Interactive curve editor shared by modulation and time-warp device cards.
    * Owns node editing and segment control editing for shared curve controls.
    */
+  import { PointerCaptureSession } from '../../features/rack/pointer-capture-session';
   import type { RendererControlChange } from '../../../devices/control-types';
   import {
     buildCurveSegments,
@@ -87,11 +88,11 @@
     onControlChange: (change: RendererControlChange) => void;
   }>();
 
+  const pointerSession = new PointerCaptureSession<HTMLDivElement>({ onChanged: () => {} });
   let editorEl = $state<HTMLDivElement | null>(null);
   let selectedNodeId = $state<string | null>(null);
   let dragTarget = $state<DragTarget>(null);
   let activePointerNodeId = $state<string | null>(null);
-  let isDragging = $state(false);
   let pointerDownClientX = $state(0);
   let pointerDownClientY = $state(0);
   let pointerDidMove = $state(false);
@@ -352,8 +353,9 @@
     selectedNodeId = next[0]?.id ?? null;
   };
 
-  const beginDrag = (event: MouseEvent, nextTarget: DragTarget): void => {
-    isDragging = true;
+  const beginDrag = (event: PointerEvent, nextTarget: DragTarget): void => {
+    if (!editorEl) return;
+    pointerSession.begin(editorEl, event.pointerId);
     dragTarget = nextTarget;
     pointerDownClientX = event.clientX;
     pointerDownClientY = event.clientY;
@@ -363,8 +365,8 @@
     event.preventDefault();
   };
 
-  const handleNodeMouseDown = (event: MouseEvent, nodeId: string): void => {
-    if (event.button !== 0) {
+  const handleNodePointerDown = (event: PointerEvent, nodeId: string): void => {
+    if (event.button !== 0 || !event.isPrimary || pointerSession.isActive()) {
       return;
     }
 
@@ -374,8 +376,8 @@
     beginDrag(event, { kind: 'node', nodeId });
   };
 
-  const handleSegmentControlMouseDown = (event: MouseEvent, startNodeId: string): void => {
-    if (event.button !== 0) {
+  const handleSegmentControlPointerDown = (event: PointerEvent, startNodeId: string): void => {
+    if (event.button !== 0 || !event.isPrimary || pointerSession.isActive()) {
       return;
     }
 
@@ -481,7 +483,7 @@
   };
 
   const clearPointerState = (): void => {
-    isDragging = false;
+    pointerSession.finish();
     dragTarget = null;
     activePointerNodeId = null;
     pointerDidMove = false;
@@ -540,7 +542,7 @@
   };
 
   $effect(() => {
-    if (isDragging) {
+    if (dragTarget) {
       return;
     }
 
@@ -552,8 +554,8 @@
   });
 
   $effect(() => {
-    const handlePointerMove = (event: MouseEvent): void => {
-      if (!isDragging || !dragTarget) {
+    const handlePointerMove = (event: PointerEvent): void => {
+      if (!pointerSession.matches(event.pointerId) || !dragTarget) {
         return;
       }
 
@@ -569,8 +571,8 @@
       );
     };
 
-    const handlePointerUp = (event: MouseEvent): void => {
-      if (!isDragging) {
+    const handlePointerUp = (event: PointerEvent): void => {
+      if (!pointerSession.matches(event.pointerId)) {
         return;
       }
 
@@ -594,20 +596,19 @@
       clearPointerState();
     };
 
-    const handlePointerCancel = (): void => {
-      if (!isDragging) {
-        return;
-      }
-      clearPointerState();
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    const cancelPointer = (event: PointerEvent): void => {
+      if (pointerSession.matches(event.pointerId)) clearPointerState();
     };
-
-    window.addEventListener('mousemove', handlePointerMove);
-    window.addEventListener('mouseup', handlePointerUp);
-    window.addEventListener('mouseleave', handlePointerCancel);
+    window.addEventListener('pointercancel', cancelPointer);
+    window.addEventListener('blur', clearPointerState);
     return () => {
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('mouseup', handlePointerUp);
-      window.removeEventListener('mouseleave', handlePointerCancel);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', cancelPointer);
+      window.removeEventListener('blur', clearPointerState);
+      pointerSession.finish();
     };
   });
 
@@ -673,7 +674,7 @@
             class="curve-editor-segment-control"
             data-curve-segment-control-id={control.key}
             style={`left:${control.x}%;top:${control.y}%;`}
-            onmousedown={(event) => handleSegmentControlMouseDown(event, control.startNodeId)}
+            onpointerdown={(event) => handleSegmentControlPointerDown(event, control.startNodeId)}
             aria-label={segmentControlLabel}
           ></button>
         {/each}
@@ -687,7 +688,7 @@
             class:selected={node.id === selectedNodeId}
             data-curve-node-id={node.id}
             style={`left:${node.x}%;top:${node.y}%;`}
-            onmousedown={(event) => handleNodeMouseDown(event, node.id)}
+            onpointerdown={(event) => handleNodePointerDown(event, node.id)}
             aria-label={nodeLabel}
           ></button>
         {/each}
@@ -724,6 +725,7 @@
 
 <style lang="scss">
   .curve-editor {
+    touch-action: none;
     &-wrap {
       display: flex;
       flex-direction: column;

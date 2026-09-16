@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { touchGestures } from '../../features/touch-gestures';
   import { onDestroy, onMount, tick } from 'svelte';
 
   import type { RendererDeviceKind } from '../../../devices';
@@ -1616,6 +1617,7 @@
                 )}
                 data-browser-row-id={row.node.id}
                 class="browser-tree-item"
+                use:touchGestures
                 class:is-preset-move-source={
                   presetMoveDrag.active?.didMove === true
                   && presetMoveDrag.active.sourceRowIds.includes(row.node.id)
@@ -1961,6 +1963,8 @@
   }
 
   .browser-tree-item {
+    touch-action: pan-y pinch-zoom;
+    -webkit-touch-callout: none;
     min-width: 0;
     padding: {
       block: 0;

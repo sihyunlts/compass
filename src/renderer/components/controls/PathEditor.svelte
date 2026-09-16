@@ -1,6 +1,9 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { PointerCaptureSession } from '../../features/rack/pointer-capture-session';
+  import { touchGestures } from '../../features/touch-gestures';
+  import { isConsecutiveTap, TAP_WINDOW_MS } from '../../features/drag-gesture';
   import type { RendererControlChange } from '../../../devices/control-types';
   import {
     PATH_COORDINATE_MAX,
@@ -122,6 +125,16 @@
     onControlChange: (change: RendererControlChange) => void;
   }>();
 
+  const pointerSession = new PointerCaptureSession<Element>({ onChanged: () => {} });
+  let pointerDownEvent: PointerEvent | null = null;
+  let previousTap: PointerEvent | null = null;
+  const resolvePressTarget = (event: PointerEvent): Element | null => event.target instanceof Element
+    ? event.target.closest('.path-editor-interactive') ?? editorEl
+    : null;
+  const isRepeatedPress = (event: PointerEvent): boolean => isConsecutiveTap(previousTap, event)
+    && previousTap !== null && resolvePressTarget(previousTap) === resolvePressTarget(event);
+  const canBeginPointer = (event: PointerEvent): boolean => !readonly && event.isPrimary
+    && event.button === 0 && !pointerSession.isActive();
   let editorEl = $state<HTMLDivElement | null>(null);
   let localAnchors = $state<PathAnchor[]>(sanitizePathAnchors([]));
   let localClosed = $state(false);
@@ -1298,11 +1311,11 @@
     drawingEndpoint = null;
   };
 
-  const beginDrag = (event: MouseEvent, target: DragTarget): void => {
-    if (readonly || event.button !== 0) {
-      return;
-    }
-    editorEl?.focus({ preventScroll: true });
+  const beginDrag = (event: PointerEvent, target: DragTarget): void => {
+    if (!canBeginPointer(event) || !editorEl) return;
+    pointerDownEvent = event;
+    pointerSession.begin(event.currentTarget instanceof Element ? event.currentTarget : editorEl, event.pointerId);
+    editorEl.focus({ preventScroll: true });
     dragTarget = target;
     pointerDownClientX = event.clientX;
     pointerDownClientY = event.clientY;
@@ -1313,7 +1326,8 @@
     event.stopPropagation();
   };
 
-  const beginPathMove = (event: MouseEvent): void => {
+  const beginPathMove = (event: PointerEvent): void => {
+    if (!canBeginPointer(event)) return;
     const startPoint = resolveUnboundedEditorPoint(event.clientX, event.clientY);
     const startBounds = resolveWorldPathBounds(localAnchors, localClosed, localTransform);
     if (!startPoint || !startBounds) {
@@ -1331,9 +1345,10 @@
   };
 
   const beginSelectedAnchorsMove = (
-    event: MouseEvent,
+    event: PointerEvent,
     anchorIds: string[],
   ): void => {
+    if (!canBeginPointer(event)) return;
     const startPoint = resolveUnsnappedEditorPoint(event.clientX, event.clientY);
     if (!startPoint) {
       return;
@@ -1346,7 +1361,8 @@
     });
   };
 
-  const beginPathRotation = (event: MouseEvent): void => {
+  const beginPathRotation = (event: PointerEvent): void => {
+    if (!canBeginPointer(event)) return;
     if (!pathSelection) {
       return;
     }
@@ -1367,9 +1383,10 @@
   };
 
   const beginPathScale = (
-    event: MouseEvent,
+    event: PointerEvent,
     handle: { point: EditorPoint; fixedPoint: EditorPoint },
   ): void => {
+    if (!canBeginPointer(event)) return;
     const pointerPoint = resolveUnboundedEditorPoint(event.clientX, event.clientY);
     if (!pointerPoint) {
       return;
@@ -1401,10 +1418,8 @@
     }
   };
 
-  const handleSurfaceMouseDown = (event: MouseEvent): void => {
-    if (readonly || event.button !== 0) {
-      return;
-    }
+  const handleSurfacePointerDown = (event: PointerEvent): void => {
+    if (!canBeginPointer(event)) return;
     const target = event.target;
     if (target instanceof Element && target.closest('.path-editor-interactive')) {
       return;
@@ -1413,7 +1428,7 @@
     if (!startPoint) {
       return;
     }
-    if (event.detail === 1) {
+    if (!isRepeatedPress(event)) {
       pendingAppendEndpoint = drawingEndpoint;
     }
     const additiveAnchorIds = event.shiftKey && selection?.kind === 'anchors'
@@ -1459,11 +1474,9 @@
     }
   };
 
-  const handleAnchorMouseDown = (event: MouseEvent, anchorId: string): void => {
-    if (readonly) {
-      return;
-    }
-    if (event.detail <= 1) {
+  const handleAnchorPointerDown = (event: PointerEvent, anchorId: string): void => {
+    if (!canBeginPointer(event)) return;
+    if (!isRepeatedPress(event)) {
       connectionOriginAnchorId = drawingEndpoint === 'start'
         ? localAnchors[0]?.id ?? null
         : drawingEndpoint === 'end'
@@ -1657,6 +1670,9 @@
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
+      pointerSession.finish();
+      pointerDownEvent = null;
+      previousTap = null;
       clearEditorFocus();
       dragTarget = null;
       pointerDidMove = false;
@@ -1697,8 +1713,8 @@
   });
 
   $effect(() => {
-    const handleMouseMove = (event: MouseEvent): void => {
-      if (!dragTarget) {
+    const handlePointerMove = (event: PointerEvent): void => {
+      if (!pointerSession.matches(event.pointerId) || !dragTarget) {
         return;
       }
       if (!pointerDidMove && hasExceededControlPointDragThreshold(
@@ -1860,17 +1876,20 @@
       }
     };
 
-    const handleMouseUp = (): void => {
+    const finishDrag = (cancelled: boolean): void => {
+      pointerSession.finish();
+      if (cancelled) previousTap = null;
+      pointerDownEvent = null;
       if (!dragTarget) {
         return;
       }
       const completedDrag = dragTarget;
-      const mergeTargetId = pendingMergeTargetId;
+      const mergeTargetId = cancelled ? null : pendingMergeTargetId;
       dragTarget = null;
       pendingMergeTargetId = null;
       alignmentGuides = { x: null, y: null };
       if (completedDrag.kind === 'marquee') {
-        if (!pointerDidMove) {
+        if (!pointerDidMove && !cancelled) {
           clearEditorFocus(true);
           editorEl?.blur();
         }
@@ -1897,6 +1916,18 @@
       lastPathSnapSignature = null;
     };
 
+    const handlePointerUp = (event: PointerEvent): void => {
+      if (!pointerSession.matches(event.pointerId)) return;
+      previousTap = pointerDownEvent && !pointerDidMove
+        && event.timeStamp - pointerDownEvent.timeStamp <= TAP_WINDOW_MS
+        && !isRepeatedPress(pointerDownEvent) ? pointerDownEvent : null;
+      finishDrag(false);
+    };
+    const handlePointerCancel = (event: PointerEvent): void => {
+      if (pointerSession.matches(event.pointerId)) finishDrag(true);
+    };
+    const handleWindowBlur = (): void => { finishDrag(true); };
+
     const handleWindowPointerDown = (event: PointerEvent): void => {
       if (readonly || !editorEl) {
         return;
@@ -1905,18 +1936,22 @@
       if (target instanceof Node && editorEl.contains(target)) {
         return;
       }
+      finishDrag(true);
       clearEditorFocus();
       editorEl.blur();
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('mouseleave', handleMouseUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerCancel);
+    window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('pointerdown', handleWindowPointerDown, { capture: true });
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('mouseleave', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerCancel);
+      window.removeEventListener('blur', handleWindowBlur);
+      pointerSession.finish();
       window.removeEventListener('pointerdown', handleWindowPointerDown, true);
     };
   });
@@ -1926,10 +1961,11 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="path-editor-surface"
+      use:touchGestures={{ contextMenu: false, enabled: !readonly }}
       class:is-drawing={!readonly}
       bind:this={editorEl}
       tabindex="-1"
-      onmousedown={handleSurfaceMouseDown}
+      onpointerdown={handleSurfacePointerDown}
       ondblclick={handleSurfaceDoubleClick}
       onkeydown={handleEditorKeyDown}
     >
@@ -1968,8 +2004,9 @@
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <path
               class="path-editor-hit-path path-editor-interactive"
+              use:touchGestures={{ contextMenu: false }}
               d={segment.d}
-              onmousedown={beginPathMove}
+              onpointerdown={beginPathMove}
               ondblclick={(event) => handleSegmentDoubleClick(event, segment.index)}
             ></path>
           {/if}
@@ -2006,7 +2043,7 @@
           class="path-editor-handle path-editor-interactive"
           style={`left:${handle.x}%;top:${handle.y}%;`}
           aria-label={i18n.t('control.pathHandle')}
-          onmousedown={(event) => beginDrag(event, {
+          onpointerdown={(event) => beginDrag(event, {
             kind: 'handle',
             anchorId: selectedAnchor?.anchor.id ?? '',
             handleKind: handle.kind,
@@ -2022,14 +2059,14 @@
             class:is-inside={handle.rotationZoneInside}
             style={`left:${handle.x}%;top:${handle.y}%;cursor:${handle.rotationCursor};`}
             aria-label={i18n.t('control.rotation')}
-            onmousedown={beginPathRotation}
+            onpointerdown={beginPathRotation}
           ></button>
           <button
             type="button"
             class="path-editor-scale-handle path-editor-interactive"
             style={`left:${handle.x}%;top:${handle.y}%;cursor:${handle.cursor};`}
             aria-label={i18n.t('device.scale')}
-            onmousedown={(event) => beginPathScale(event, handle)}
+            onpointerdown={(event) => beginPathScale(event, handle)}
           ></button>
         {/each}
       {/if}
@@ -2038,6 +2075,7 @@
           <button
             type="button"
             class="path-editor-anchor path-editor-interactive"
+            use:touchGestures={{ contextMenu: false, enabled: !readonly }}
             class:is-selected={anchor.selected}
             class:is-animation-start={readonly && selectedAnchorId === anchor.id}
             class:is-merge-target={anchor.mergeTarget}
@@ -2049,9 +2087,9 @@
             aria-pressed={readonly && onAnchorSelect
               ? selectedAnchorId === anchor.id
               : undefined}
-            onmousedown={(event) => {
+            onpointerdown={(event) => {
               if (!readonly) {
-                handleAnchorMouseDown(event, anchor.id);
+                handleAnchorPointerDown(event, anchor.id);
               }
             }}
             onclick={(event) => {
@@ -2077,6 +2115,7 @@
 
 <style lang="scss">
   .path-editor-surface {
+    touch-action: none;
     position: relative;
     aspect-ratio: 1 / 1;
     overflow: hidden;

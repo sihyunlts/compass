@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { touchGestures } from '../../features/touch-gestures';
   /**
    * Renders the rack surface and translates pointer/drag interactions into commit events.
    * Integrates rack selection, drop indicators, and group rendering state.
@@ -484,6 +485,7 @@
                       || (lastGroupDeviceId !== undefined
                         && selectedDeviceIds.includes(lastGroupDeviceId))}
                 class:is-renaming={col.kind === 'left-rail' && controller.rename.isRenamingGroup(col.groupId)}
+                use:touchGestures={{ enabled: col.kind !== 'device' && !controller.rename.isRenamingGroup(col.groupId) }}
                 data-rack-group-header={col.kind === 'left-rail' ? 'true' : undefined}
                 tabindex={col.kind === 'left-rail' ? -1 : undefined}
                 onpointerdown={col.kind === 'device'
@@ -767,6 +769,8 @@
   }
 
   .group-rail {
+    touch-action: none;
+    -webkit-touch-callout: none;
     position: relative;
     display: flex;
     flex-direction: column;

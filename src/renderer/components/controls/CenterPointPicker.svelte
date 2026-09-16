@@ -1,6 +1,7 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { touchGestures } from '../../features/touch-gestures';
   import type { Snippet } from 'svelte';
   import type { RendererControlChange } from '../../../devices/control-types';
   import type { ModulationStateByParameter } from '../../../shared/contracts/preview/modulation';
@@ -75,6 +76,7 @@
   <ControlSurfaceFrame bind:measuredSize={surfaceSize}>
     <div
       class="center-picker-surface"
+      use:touchGestures={{ contextMenu: false }}
       data-center-picker-surface="true"
       data-device-id={deviceId}
       data-min={resolvedMin}
@@ -130,6 +132,7 @@
 
 <style lang="scss">
   .center-picker-surface {
+    touch-action: none;
     position: relative;
     flex: 1;
     border: 1px solid var(--color-border-secondary);

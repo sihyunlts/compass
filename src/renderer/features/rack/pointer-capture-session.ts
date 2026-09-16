@@ -1,5 +1,5 @@
 export const releasePointerCaptureIfHeld = (
-  element: HTMLElement | null,
+  element: Element | null,
   pointerId: number | null,
 ): void => {
   if (element && pointerId !== null && element.hasPointerCapture(pointerId)) {
@@ -7,7 +7,7 @@ export const releasePointerCaptureIfHeld = (
   }
 };
 
-export class PointerCaptureSession<T extends HTMLElement> {
+export class PointerCaptureSession<T extends Element> {
   private pointerId: number | null = null;
 
   private element: T | null = null;

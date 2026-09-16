@@ -161,9 +161,7 @@ class DeviceRackController {
     const orderedSelectedIds = this.getOrderedSelectedDeviceIdsInRack();
     const shouldDragSelection = orderedSelectedIds.includes(deviceId) && orderedSelectedIds.length > 1;
     const sourceIds = shouldDragSelection ? orderedSelectedIds : [deviceId];
-    if (this.surface.startChainDrag(event, sourceIds, 'devices')) {
-      event.preventDefault();
-    }
+    this.surface.startChainDrag(event, sourceIds, 'devices');
   }
 
   public handleDeviceHeaderClick(event: MouseEvent, deviceId: string): void {
@@ -293,9 +291,7 @@ class DeviceRackController {
       return;
     }
 
-    if (this.surface.startChainDrag(event, sourceIds, 'group')) {
-      event.preventDefault();
-    }
+    this.surface.startChainDrag(event, sourceIds, 'group');
   }
 
   public handleGroupRailClick(event: MouseEvent, groupId: string): void {
