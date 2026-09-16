@@ -78,7 +78,7 @@
   const isWebFallback = !window.compass;
   const resultDeliveryMode = isWebFallback ? 'midi-download' : 'ableton';
   const hasWindowsTitlebarControls = bridgeClient.platform === 'windows';
-  const reserveBrowserTitlebarSpace = !isWebFallback && !hasWindowsTitlebarControls;
+  const reserveBrowserTitlebarSpace = !isWebFallback && bridgeClient.platform === 'mac';
   const undoShortcut = resolveShortcutPresentation('undo', bridgeClient.platform);
   const redoShortcut = resolveShortcutPresentation('redo', bridgeClient.platform);
   let rackViewApi: RackViewApi | null = $state(null);
