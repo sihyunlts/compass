@@ -82,11 +82,6 @@ const buildRackSelectionIndex = (
   return index;
 };
 
-/** Rack items where each group occupies one top-level position. */
-export const buildRackSelectionItems = (
-  devices: readonly GeneratorDeviceNode[],
-): RackSelectionItem[] => buildRackSelectionIndex(devices).topLevelItems;
-
 /** Keyboard order where a group is followed by its member devices. */
 export const buildRackNavigationItems = (
   devices: readonly GeneratorDeviceNode[],
