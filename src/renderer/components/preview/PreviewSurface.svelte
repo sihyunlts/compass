@@ -29,19 +29,38 @@
   );
   const surfaceScale = $derived(
     mode === "popout" && surfaceSize > 0
-      ? Math.min(Math.max(surfaceSize / 280, 1), 3)
+      ? Math.max(surfaceSize / 280, 1)
       : 1,
+  );
+  const resolvedSurfaceSize = $derived(
+    mode === "popout" && surfaceSize > 0
+      ? Math.round(surfaceSize)
+      : surfaceSize,
+  );
+  const popoutLayoutStyle = $derived(
+    mode === "popout"
+      ? [
+        `--preview-gap:${Math.round(3 * surfaceScale)}px`,
+        `--preview-padding:${Math.round(12 * surfaceScale)}px`,
+        `--preview-edge-inset:${Math.round(2 * surfaceScale)}px`,
+        `--preview-radius:${Math.round(4 * surfaceScale)}px`,
+      ].join(";")
+      : "",
   );
   const surfaceStyle = $derived.by(() => {
     if (surfaceSize <= 0) {
-      return `--preview-surface-scale:${surfaceScale.toFixed(3)};`;
+      return [
+        `--preview-surface-scale:${surfaceScale.toFixed(3)}`,
+        popoutLayoutStyle,
+      ].filter(Boolean).join(";");
     }
 
     if (mode === "popout") {
       return [
-        `width: ${surfaceSize}px`,
-        `height: ${surfaceSize}px`,
+        `width: ${resolvedSurfaceSize}px`,
+        `height: ${resolvedSurfaceSize}px`,
         `--preview-surface-scale:${surfaceScale.toFixed(3)}`,
+        popoutLayoutStyle,
       ].join(";");
     }
 

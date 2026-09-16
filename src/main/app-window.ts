@@ -163,10 +163,10 @@ const createPreviewWindow = (): BrowserWindow => {
   const isMac = process.platform === 'darwin';
   const isWindows = process.platform === 'win32';
   const previewWindow = new BrowserWindow({
-    width: 320,
-    height: 420,
-    minWidth: 320,
-    minHeight: 360,
+    width: 300,
+    height: 400,
+    minWidth: 300,
+    minHeight: 400,
     title: 'Compass Preview',
     show: false,
     backgroundColor: WINDOW_BACKGROUND_COLOR,
