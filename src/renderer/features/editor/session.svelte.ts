@@ -134,6 +134,7 @@ export interface EditorSessionState {
   isPreviewPopoutOpen: boolean;
   previewScrubValue: number;
   autoCreateLengthLabel: string;
+  isDelivering: boolean;
   deliveryButtonState: 'idle' | 'working' | 'done';
   sidebarWidthPx: number;
   isSidebarResizing: boolean;

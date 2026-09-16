@@ -29,6 +29,7 @@ export const createInitialEditorState = (): EditorSessionState => {
     isPreviewPopoutOpen: false,
     previewScrubValue: 0,
     autoCreateLengthLabel: resolveBridgeLengthLabel(bridge),
+    isDelivering: false,
     deliveryButtonState: 'idle',
     sidebarWidthPx: loadSidebarWidth(),
     isSidebarResizing: false,

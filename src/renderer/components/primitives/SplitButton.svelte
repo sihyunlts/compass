@@ -10,41 +10,43 @@
 
   let {
     id,
-    menuId,
+    secondaryId,
     variant = 'secondary',
     text,
     label,
     title,
     shortcut,
     disabled = false,
-    menuDisabled = false,
-    menuLabel,
-    menuTitle,
-    menuExpanded = false,
-    menuPopupType = 'menu',
+    secondaryDisabled = false,
+    secondaryLabel,
+    secondaryTitle,
+    secondaryExpanded = false,
+    secondaryPopupType,
+    secondaryIcon = 'expand_more',
     type = 'button',
     class: className = '',
     onClick,
-    onMenuClick,
+    onSecondaryClick,
     ...rest
   } = $props<{
     id?: string;
-    menuId?: string;
+    secondaryId?: string;
     variant?: SplitButtonVariant;
     text: string;
     label?: string;
     title?: string;
     shortcut?: ShortcutPresentation;
     disabled?: boolean;
-    menuDisabled?: boolean;
-    menuLabel: string;
-    menuTitle?: string;
-    menuExpanded?: boolean;
-    menuPopupType?: 'menu' | 'dialog' | 'listbox' | 'tree' | 'grid';
+    secondaryDisabled?: boolean;
+    secondaryLabel: string;
+    secondaryTitle?: string;
+    secondaryExpanded?: boolean;
+    secondaryPopupType?: 'menu' | 'dialog' | 'listbox' | 'tree' | 'grid';
+    secondaryIcon?: string;
     type?: ButtonType;
     class?: string;
     onClick?: (event: MouseEvent) => void;
-    onMenuClick?: (event: MouseEvent | KeyboardEvent) => void;
+    onSecondaryClick?: (event: MouseEvent | KeyboardEvent) => void;
   } & Record<string, unknown>>();
 
   const rootClass = $derived(`split-button split-button-${variant} ${className}`.trim());
@@ -53,13 +55,13 @@
     ? { text: title, shortcut: shortcut.display }
     : title);
 
-  const handleMenuKeyDown = (event: KeyboardEvent): void => {
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
+  const handleSecondaryKeyDown = (event: KeyboardEvent): void => {
+    if (!secondaryPopupType || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) {
       return;
     }
 
     event.preventDefault();
-    onMenuClick?.(event);
+    onSecondaryClick?.(event);
   };
 </script>
 
@@ -93,18 +95,18 @@
     </span>
   {/if}
   <button
-    id={menuId}
+    id={secondaryId}
     type="button"
     class="split-button-segment split-button-trigger"
-    aria-label={menuLabel}
-    aria-haspopup={menuPopupType}
-    aria-expanded={menuExpanded}
-    disabled={menuDisabled}
-    use:hint={menuExpanded ? undefined : menuTitle}
-    onclick={onMenuClick}
-    onkeydown={handleMenuKeyDown}
+    aria-label={secondaryLabel}
+    aria-haspopup={secondaryPopupType}
+    aria-expanded={secondaryPopupType ? secondaryExpanded : undefined}
+    disabled={secondaryDisabled}
+    use:hint={secondaryExpanded ? undefined : secondaryTitle}
+    onclick={onSecondaryClick}
+    onkeydown={handleSecondaryKeyDown}
   >
-    <span class="material-symbols-rounded" aria-hidden="true">expand_more</span>
+    <span class="material-symbols-rounded" aria-hidden="true">{secondaryIcon}</span>
   </button>
 </div>
 
@@ -119,8 +121,10 @@
     }
 
     &-primary {
-      --split-button-hover-background: transparent;
-      --split-button-hover-color: inherit;
+      .split-button-segment:disabled {
+        opacity: 1;
+        color: color-mix(in oklch, var(--color-text-inverse) 60%, transparent);
+      }
 
       background: var(--color-surface-inverse);
       color: var(--color-text-inverse);
@@ -150,11 +154,11 @@
       &:disabled {
         opacity: 0.6;
       }
+    }
 
-      &:not(:disabled):hover {
-        background: var(--split-button-hover-background, var(--color-surface-active));
-        color: var(--split-button-hover-color, var(--color-text-primary));
-      }
+    &:not(.split-button-primary) .split-button-segment:not(:disabled):hover {
+      background: var(--split-button-hover-background, var(--color-surface-active));
+      color: var(--color-text-primary);
     }
 
     &-main {

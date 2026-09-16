@@ -356,6 +356,8 @@
     mainWindowAlwaysOnTop = false,
     reduceAnimation = false,
     reduceBlur = false,
+    canConfigureMidiSaveButton = false,
+    showMidiSaveButton = false,
     themePreset = 'default',
     themeHue = 265,
     themeSaturation = 100,
@@ -374,6 +376,7 @@
     onMainWindowAlwaysOnTopToggle = () => {},
     onReduceAnimationToggle = () => {},
     onReduceBlurToggle = () => {},
+    onShowMidiSaveButtonToggle = () => {},
     onThemePresetChange = () => {},
     onThemeHueChange = () => {},
     onThemeSaturationChange = () => {},
@@ -415,6 +418,8 @@
     mainWindowAlwaysOnTop?: boolean;
     reduceAnimation?: boolean;
     reduceBlur?: boolean;
+    canConfigureMidiSaveButton?: boolean;
+    showMidiSaveButton?: boolean;
     themePreset?: ThemeSelectionId;
     themeHue?: number;
     themeSaturation?: number;
@@ -433,6 +438,7 @@
     onMainWindowAlwaysOnTopToggle?: () => void;
     onReduceAnimationToggle?: (enabled: boolean) => void;
     onReduceBlurToggle?: (enabled: boolean) => void;
+    onShowMidiSaveButtonToggle?: (enabled: boolean) => void;
     onThemePresetChange?: (presetId: ThemePresetId) => void;
     onThemeHueChange?: (hue: number) => void;
     onThemeSaturationChange?: (saturation: number) => void;
@@ -1550,6 +1556,8 @@
           {locale}
           {reduceAnimation}
           {reduceBlur}
+          {canConfigureMidiSaveButton}
+          {showMidiSaveButton}
           {themePreset}
           {themeHue}
           {themeSaturation}
@@ -1564,6 +1572,7 @@
           onLocaleChange={onLocaleChange}
           onReduceAnimationToggle={onReduceAnimationToggle}
           onReduceBlurToggle={onReduceBlurToggle}
+          onShowMidiSaveButtonToggle={onShowMidiSaveButtonToggle}
           onThemePresetChange={onThemePresetChange}
           onThemeHueChange={onThemeHueChange}
           onThemeSaturationChange={onThemeSaturationChange}

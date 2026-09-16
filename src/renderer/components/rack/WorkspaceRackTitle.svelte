@@ -110,13 +110,13 @@
     title={titleHint}
     label={titleLabel}
     onClick={onEditRackInfo}
-    menuId="rack-file-actions-trigger"
-    menuDisabled={disabled}
-    menuLabel={i18n.t('rack.actions')}
-    menuTitle={i18n.t('rack.actions')}
-    menuExpanded={isOpen}
-    menuPopupType="menu"
-    onMenuClick={toggleMenu}
+    secondaryId="rack-file-actions-trigger"
+    secondaryDisabled={disabled}
+    secondaryLabel={i18n.t('rack.actions')}
+    secondaryTitle={i18n.t('rack.actions')}
+    secondaryExpanded={isOpen}
+    secondaryPopupType="menu"
+    onSecondaryClick={toggleMenu}
   />
 
   <FloatingDropdown

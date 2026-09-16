@@ -18,6 +18,7 @@ export interface PersistedRendererState {
     mainWindowAlwaysOnTop?: boolean;
     reduceAnimation?: boolean;
     reduceBlur?: boolean;
+    showMidiSaveButton?: boolean;
     themeHue?: number;
     themeSaturation?: number;
   };
@@ -85,6 +86,9 @@ const pickPersistedUi = (
       ? { reduceAnimation: ui.reduceAnimation }
       : {}),
     ...(ui.reduceBlur !== undefined ? { reduceBlur: ui.reduceBlur } : {}),
+    ...(ui.showMidiSaveButton !== undefined
+      ? { showMidiSaveButton: ui.showMidiSaveButton }
+      : {}),
     ...(ui.themeHue !== undefined ? { themeHue: ui.themeHue } : {}),
     ...(ui.themeSaturation !== undefined
       ? { themeSaturation: ui.themeSaturation }

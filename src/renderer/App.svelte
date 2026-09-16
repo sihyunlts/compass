@@ -24,6 +24,7 @@
     type ContextMenuTarget,
   } from './features/context-menu/types';
   import Button from './components/primitives/Button.svelte';
+  import ResultDeliveryButton from './components/controls/ResultDeliveryButton.svelte';
   import DropdownSelect from './components/primitives/DropdownSelect.svelte';
   import SidebarResizer from './components/layout/SidebarResizer.svelte';
   import DeviceRack from './components/rack/DeviceRack.svelte';
@@ -220,7 +221,7 @@
     editorSession,
     headerIndicator,
     playbackSession,
-    mode: resultDeliveryMode,
+    primaryMode: resultDeliveryMode,
   });
 
   let rackScrollMetrics: RackScrollMetrics = $state({
@@ -623,6 +624,8 @@
       locale={i18n.locale}
       reduceAnimation={settingsState.reduceAnimation}
       reduceBlur={settingsState.reduceBlur}
+      canConfigureMidiSaveButton={!isWebFallback}
+      showMidiSaveButton={settingsState.showMidiSaveButton}
       themePreset={settingsState.themePreset}
       themeHue={settingsState.themeHue}
       themeSaturation={settingsState.themeSaturation}
@@ -658,6 +661,8 @@
         settingsController.handleReduceAnimationToggle(enabled)}
       onReduceBlurToggle={(enabled) =>
         settingsController.handleReduceBlurToggle(enabled)}
+      onShowMidiSaveButtonToggle={(enabled) =>
+        settingsController.handleShowMidiSaveButtonToggle(enabled)}
       onThemePresetChange={(presetId) =>
         settingsController.handleThemePresetChange(presetId)}
       onThemeHueChange={(hue) => settingsController.handleThemeHueChange(hue)}
@@ -776,13 +781,13 @@
               onValueChange={handlePreviewLengthChange}
             />
           </div>
-          <Button
-            id="delivery-button"
-            variant="primary"
+          <ResultDeliveryButton
             text={deliveryButtonText}
-            disabled={uiState.deliveryButtonState === 'working'}
-            onClick={() =>
+            disabled={uiState.isDelivering}
+            showMidiSave={!isWebFallback && settingsState.showMidiSaveButton}
+            onDeliver={() =>
               resultDeliveryFlow.deliver(presetState.currentRackDisplayName)}
+            onSaveMidi={() => resultDeliveryFlow.saveMidi(presetState.currentRackDisplayName)}
           />
         </div>
       </header>

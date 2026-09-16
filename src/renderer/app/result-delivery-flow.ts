@@ -16,12 +16,12 @@ interface ResultDeliveryFlowOptions {
   editorSession: EditorSession;
   headerIndicator: HeaderIndicatorController;
   playbackSession: PlaybackSessionController;
-  mode: ResultDeliveryMode;
+  primaryMode: ResultDeliveryMode;
   doneDisplayMs?: number;
 }
 
 const DEFAULT_DONE_DISPLAY_MS = 900;
-const MESSAGE_KEYS_BY_MODE = {
+const DELIVERY_MESSAGE_KEYS_BY_MODE = {
   ableton: {
     working: 'status.sending',
     complete: 'status.sendComplete',
@@ -35,14 +35,30 @@ const MESSAGE_KEYS_BY_MODE = {
     unknownError: 'status.unknownDownloadError',
   },
 } as const;
+const MIDI_SAVE_ERROR_MESSAGE_KEYS = {
+  failed: 'status.midiSaveFailed',
+  unknownError: 'status.unknownMidiSaveError',
+} as const;
 
 class ResultDeliveryFlowController {
   private doneTimer: number | null = null;
 
   public constructor(private readonly options: ResultDeliveryFlowOptions) {}
 
-  public async deliver(clipName: string): Promise<void> {
-    if (this.options.editorSession.state.deliveryButtonState === 'working') {
+  public deliver(clipName: string): Promise<void> {
+    return this.runDelivery(clipName, this.options.primaryMode, true);
+  }
+
+  public saveMidi(clipName: string): Promise<void> {
+    return this.runDelivery(clipName, 'midi-download', false);
+  }
+
+  private async runDelivery(
+    clipName: string,
+    mode: ResultDeliveryMode,
+    showDeliveryFeedback: boolean,
+  ): Promise<void> {
+    if (this.options.editorSession.state.isDelivering) {
       return;
     }
 
@@ -50,20 +66,20 @@ class ResultDeliveryFlowController {
       bridgeClient,
       editorSession,
       headerIndicator,
-      mode,
       playbackSession,
     } = this.options;
     const uiState = editorSession.state;
-    const isMidiDownload = mode === 'midi-download';
-    const messageKeys = MESSAGE_KEYS_BY_MODE[mode];
-
-    editorSession.cancelAutoPreview();
+    const messageKeys = DELIVERY_MESSAGE_KEYS_BY_MODE[mode];
+    uiState.isDelivering = true;
     this.clearDoneTimer();
-    uiState.deliveryButtonState = 'working';
-    headerIndicator.show(i18n.t(messageKeys.working), { autoClear: false });
-    playbackSession.prepareForDelivery();
+    uiState.deliveryButtonState = showDeliveryFeedback ? 'working' : 'idle';
 
     try {
+      editorSession.cancelAutoPreview();
+      if (showDeliveryFeedback) {
+        headerIndicator.show(i18n.t(messageKeys.working), { autoClear: false });
+      }
+      playbackSession.prepareForDelivery();
       const bridge = editorSession.readBridgeSettings();
       editorSession.applyBridgeSettings(bridge, { persist: true });
       const launchpadModel = uiState.launchpadModel;
@@ -86,7 +102,7 @@ class ResultDeliveryFlowController {
         announce: false,
       });
 
-      if (isMidiDownload) {
+      if (mode === 'midi-download') {
         downloadGeneratedPreviewMidi({
           preview,
           clipName,
@@ -99,26 +115,30 @@ class ResultDeliveryFlowController {
         });
       }
 
-      if (preview.noteCount > 0) {
-        headerIndicator.show(i18n.t(messageKeys.complete));
-      } else {
-        headerIndicator.clear();
+      if (showDeliveryFeedback) {
+        if (preview.noteCount > 0) {
+          headerIndicator.show(i18n.t(messageKeys.complete));
+        } else {
+          headerIndicator.clear();
+        }
+        uiState.deliveryButtonState = 'done';
+        this.doneTimer = window.setTimeout(() => {
+          this.doneTimer = null;
+          uiState.deliveryButtonState = 'idle';
+        }, this.options.doneDisplayMs ?? DEFAULT_DONE_DISPLAY_MS);
       }
-
-      uiState.deliveryButtonState = 'done';
-      this.doneTimer = window.setTimeout(() => {
-        this.doneTimer = null;
-        uiState.deliveryButtonState = 'idle';
-      }, this.options.doneDisplayMs ?? DEFAULT_DONE_DISPLAY_MS);
     } catch (error) {
       playbackSession.stopPlayback();
+      const errorMessageKeys = showDeliveryFeedback ? messageKeys : MIDI_SAVE_ERROR_MESSAGE_KEYS;
       const errorText = error instanceof Error
         ? error.message
-        : i18n.t(messageKeys.unknownError);
+        : i18n.t(errorMessageKeys.unknownError);
       headerIndicator.show(
-        i18n.t(messageKeys.failed, { error: errorText }),
+        i18n.t(errorMessageKeys.failed, { error: errorText }),
       );
       uiState.deliveryButtonState = 'idle';
+    } finally {
+      uiState.isDelivering = false;
     }
   }
 

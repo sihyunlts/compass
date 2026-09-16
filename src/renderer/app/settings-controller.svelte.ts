@@ -4,9 +4,11 @@ import type { EditorSession } from '../features/editor/session.svelte';
 import {
   loadReduceAnimation,
   loadReduceBlur,
+  loadShowMidiSaveButton,
   loadThemeSettings,
   saveReduceAnimation,
   saveReduceBlur,
+  saveShowMidiSaveButton,
 } from '../features/editor/persistence-storage';
 import {
   findThemePreset,
@@ -28,6 +30,7 @@ interface SettingsControllerState {
   updateAvailable: boolean;
   reduceAnimation: boolean;
   reduceBlur: boolean;
+  showMidiSaveButton: boolean;
   themePreset: ThemeSelectionId;
   themeHue: number;
   themeSaturation: number;
@@ -52,6 +55,7 @@ class SettingsController {
     updateAvailable: false,
     reduceAnimation: loadReduceAnimation(),
     reduceBlur: loadReduceBlur(),
+    showMidiSaveButton: loadShowMidiSaveButton(),
     themePreset: resolveThemeSelection(
       this.initialTheme.hue,
       this.initialTheme.saturation,
@@ -160,6 +164,11 @@ class SettingsController {
   public handleReduceBlurToggle(enabled: boolean): void {
     this.state.reduceBlur = enabled;
     saveReduceBlur(enabled);
+  }
+
+  public handleShowMidiSaveButtonToggle(enabled: boolean): void {
+    this.state.showMidiSaveButton = enabled;
+    saveShowMidiSaveButton(enabled);
   }
 
   public handleThemeHueChange(hue: number): void {

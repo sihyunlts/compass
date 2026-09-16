@@ -1,6 +1,7 @@
 import type { MessageKey } from './en';
 
 export const ko = {
+  'delivery.saveMidi': 'MIDI 저장',
   'app.cancel': '취소',
   'app.close': '닫기',
   'app.loading': '불러오는 중…',
@@ -324,6 +325,8 @@ export const ko = {
   'settings.reduceAnimationDescription': '인터페이스 전환 효과 단순화',
   'settings.reduceBlur': '블러 줄이기',
   'settings.reduceBlurDescription': '투명도와 블러 효과 완화',
+  'settings.showMidiSaveButton': 'MIDI 저장 버튼',
+  'settings.showMidiSaveButtonDescription': '전송 버튼에 저장 아이콘 표시',
   'settings.reset': '초기화',
   'settings.saturation': '채도',
   'settings.theme': '테마',
@@ -373,12 +376,14 @@ export const ko = {
   'status.downloadComplete': 'MIDI 클립을 다운로드했습니다.',
   'status.downloadFailed': '다운로드 실패: {error}',
   'status.downloading': '다운로드 중…',
+  'status.midiSaveFailed': 'MIDI 저장 실패: {error}',
   'status.send': '전송',
   'status.sendComplete': '전송을 완료했습니다.',
   'status.sendFailed': '전송 실패: {error}',
   'status.sending': '전송 중…',
   'status.showInFolderFailed': '폴더에서 표시하지 못했습니다.',
   'status.unknownDownloadError': '알 수 없는 다운로드 오류입니다.',
+  'status.unknownMidiSaveError': '알 수 없는 MIDI 저장 오류입니다.',
   'status.unknownPreviewError': '알 수 없는 미리보기 오류입니다.',
   'status.unknownSendError': '알 수 없는 전송 오류입니다.',
   'tab.curve': '곡선',

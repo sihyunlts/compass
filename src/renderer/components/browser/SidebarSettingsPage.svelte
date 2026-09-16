@@ -21,6 +21,8 @@
     locale,
     reduceAnimation,
     reduceBlur,
+    canConfigureMidiSaveButton,
+    showMidiSaveButton,
     themePreset,
     themeHue,
     themeSaturation,
@@ -35,6 +37,7 @@
     onLocaleChange,
     onReduceAnimationToggle,
     onReduceBlurToggle,
+    onShowMidiSaveButtonToggle,
     onThemePresetChange,
     onThemeHueChange,
     onThemeSaturationChange,
@@ -48,6 +51,8 @@
     locale: AppLocale;
     reduceAnimation: boolean;
     reduceBlur: boolean;
+    canConfigureMidiSaveButton: boolean;
+    showMidiSaveButton: boolean;
     themePreset: ThemeSelectionId;
     themeHue: number;
     themeSaturation: number;
@@ -62,6 +67,7 @@
     onLocaleChange: (locale: AppLocale) => void;
     onReduceAnimationToggle: (enabled: boolean) => void;
     onReduceBlurToggle: (enabled: boolean) => void;
+    onShowMidiSaveButtonToggle: (enabled: boolean) => void;
     onThemePresetChange: (presetId: ThemePresetId) => void;
     onThemeHueChange: (hue: number) => void;
     onThemeSaturationChange: (saturation: number) => void;
@@ -270,6 +276,21 @@
         />
       </div>
     </div>
+
+    {#if canConfigureMidiSaveButton}
+      <div class="sidebar-settings-card sidebar-settings-row">
+        <div class="sidebar-settings-info">
+          <span class="sidebar-settings-label">{i18n.t('settings.showMidiSaveButton')}</span>
+          <span class="sidebar-settings-description">{i18n.t('settings.showMidiSaveButtonDescription')}</span>
+        </div>
+        <Switch
+          id="show-midi-save-button"
+          checked={showMidiSaveButton}
+          label={i18n.t('settings.showMidiSaveButton')}
+          onCheckedChange={onShowMidiSaveButtonToggle}
+        />
+      </div>
+    {/if}
 
     <div class="sidebar-settings-card sidebar-settings-row">
       <div class="sidebar-settings-info">

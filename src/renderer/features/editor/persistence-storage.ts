@@ -204,6 +204,19 @@ export const saveReduceBlur = (enabled: boolean): void => {
   });
 };
 
+/** Loads the MIDI save button visibility with `false` fallback for missing or invalid values. */
+export const loadShowMidiSaveButton = (): boolean =>
+  toBoolean(readPersistedRendererState().ui?.showMidiSaveButton, false);
+
+/** Persists whether the direct MIDI save button is shown next to Send. */
+export const saveShowMidiSaveButton = (enabled: boolean): void => {
+  writePersistedRendererState({
+    ui: {
+      showMidiSaveButton: enabled === true,
+    },
+  });
+};
+
 export interface ThemeSettings {
   hue: number;
   saturation: number;

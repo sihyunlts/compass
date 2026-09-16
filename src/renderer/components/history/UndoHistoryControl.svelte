@@ -60,14 +60,14 @@
       ? i18n.t('history.undoAction', { action: localizedUndoActionLabel })
       : i18n.t('history.undoUnavailable')}
     {shortcut}
-    menuId="undo-history-trigger"
-    menuDisabled={!canCheckoutHistory}
-    menuLabel={i18n.t('history.showUndoHistory')}
-    menuTitle={i18n.t('history.showUndoHistory')}
-    menuExpanded={isOpen}
-    menuPopupType="dialog"
+    secondaryId="undo-history-trigger"
+    secondaryDisabled={!canCheckoutHistory}
+    secondaryLabel={i18n.t('history.showUndoHistory')}
+    secondaryTitle={i18n.t('history.showUndoHistory')}
+    secondaryExpanded={isOpen}
+    secondaryPopupType="dialog"
     onClick={handleUndoClick}
-    onMenuClick={(event) => {
+    onSecondaryClick={(event) => {
       triggerEl = event.currentTarget as HTMLButtonElement;
       handleTriggerClick();
     }}
