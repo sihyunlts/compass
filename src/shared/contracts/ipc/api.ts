@@ -1,6 +1,6 @@
 import type { LiveTempoUpdate } from '../../bridge/types';
 import type { AppLocale } from '../../i18n';
-import type { PresetFileKind } from '../../presets';
+import type { PresetFileKind } from '../../preset/file';
 import type {
   CopyPresetEntriesRequest,
   CopyPresetEntriesResponse,

@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 import { IPC_CHANNELS } from './shared/contracts/ipc/channels';
-import type { PresetFileKind } from './shared/presets';
+import type { PresetFileKind } from './shared/preset/file';
 import type {
   CopyPresetEntriesRequest,
   CopyPresetEntriesResponse,

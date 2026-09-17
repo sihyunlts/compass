@@ -8,15 +8,15 @@
     isPresetFileKind,
     type PresetFileKind,
     type RackPresetFile,
-  } from '../../../shared/presets';
+  } from '../../../shared/preset/file';
   import {
     canMovePresetEntriesTo,
-  } from '../../../shared/preset-entry-move';
+  } from '../../../shared/preset/entry-move';
   import {
     arePresetPathsEqual as areEqualRelativePaths,
     normalizePresetEntrySelection,
     type PresetEntryPath,
-  } from '../../../shared/preset-entry-selection';
+  } from '../../../shared/preset/entry-selection';
   import {
     getDeviceBrowserCategory,
     getDeviceBrowserCategoryAccentColorVar,

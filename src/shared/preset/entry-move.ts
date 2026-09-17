@@ -6,12 +6,12 @@ import {
   normalizePresetEntrySelection,
   type PresetEntryPath,
   type PresetEntrySelectionItem,
-} from './preset-entry-selection';
+} from './entry-selection';
 import {
   isDeviceBrowserSystemDirectoryPath,
   resolveDeviceBrowserSystemDirectoryPath,
-} from '../devices/browser-categories';
-import type { PresetFileKind } from './presets';
+} from '../../devices/browser-categories';
+import type { PresetFileKind } from './file';
 
 export type PresetEntryMoveDestination = PresetEntryPath;
 

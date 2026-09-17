@@ -8,7 +8,7 @@ import {
   type GeneratorNode,
   type LaunchpadModel,
 } from '../../../shared/model';
-import type { RackPresetFile } from '../../../shared/presets';
+import type { RackPresetFile } from '../../../shared/preset/file';
 import { resolveLedSurfaceRgb } from '../../../shared/led-surface-color';
 import type { HintInput } from '../../components/overlays/hint';
 import { getDeviceMessageKey } from '../../device-i18n';

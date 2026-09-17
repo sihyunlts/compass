@@ -1,16 +1,13 @@
-import type { PresetFileKind } from '../../shared/presets';
+import type { PresetFileKind } from '../../shared/preset/file';
 import type { SavePresetFileResponse } from '../../shared/contracts/ipc/presets';
 
-export type BrowserPresetSaveResult =
-  | { status: 'saved'; filePath: string }
-  | { status: 'conflict'; conflict: string }
-  | { status: 'invalid-name' | 'missing-folder' | 'folder-conflict' };
+import type { PresetSaveResult } from '../../shared/preset/repository';
 
 interface BrowserPresetSaveRequest {
   name: string;
   presetType: PresetFileKind;
   folder: string[];
-  save: (name: string, folder: string[], approvedConflict: string | null) => BrowserPresetSaveResult;
+  save: (name: string, folder: string[], approvedConflict: string | null) => Promise<PresetSaveResult>;
 }
 
 class BrowserPresetSaveDialog {

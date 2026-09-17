@@ -1,4 +1,4 @@
-import type { PresetFileKind } from './presets';
+import type { PresetFileKind } from './file';
 
 export interface PresetEntryPath {
   presetType: PresetFileKind;

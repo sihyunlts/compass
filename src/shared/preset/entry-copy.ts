@@ -1,15 +1,15 @@
 import {
   isDeviceBrowserSystemDirectoryPath,
   resolveDeviceBrowserSystemDirectoryPath,
-} from '../devices/browser-categories';
-import { PRESET_FILE_EXTENSIONS } from './presets';
+} from '../../devices/browser-categories';
+import { PRESET_FILE_EXTENSIONS } from './file';
 import {
   getPresetPathCollisionKey,
   isPresetPathInsideIgnoringCase,
   normalizePresetEntrySelection,
   type PresetEntryPath,
   type PresetEntrySelectionItem,
-} from './preset-entry-selection';
+} from './entry-selection';
 
 export interface PresetEntryCopyPlan {
   entry: PresetEntrySelectionItem;

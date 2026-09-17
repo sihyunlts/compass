@@ -20,13 +20,10 @@ import type { RendererDeviceKind } from '../../../devices/types';
 import type {
   SavePresetFileRequest,
 } from '../../../shared/contracts/ipc/presets';
-import type { PresetFileKind } from '../../../shared/presets';
+import type { PresetFileKind } from '../../../shared/preset/file';
 import { PRESET_FILE_SPECS } from './preset-config';
-import {
-  ensurePresetExtension,
-  resolvePresetSaveDirectory,
-  sanitizeFileStem,
-} from './preset-paths';
+import { ensurePresetExtension, sanitizeFileStem } from '../../../shared/preset/paths';
+import { resolvePresetSaveDirectory } from './preset-paths';
 
 const PRESET_DIALOG_STATE_SCHEMA_VERSION = 1 as const;
 const PRESET_DIALOG_STATE_FILE_NAME = 'preset-dialog-state.json';

@@ -11,18 +11,18 @@ import type {
   ShowPresetEntryInFolderRequest,
   UpdatePresetFileInfoRequest,
   UpdateRackFileInfoRequest,
-} from '../../../shared/contracts/ipc/presets';
+} from '../contracts/ipc/presets';
 import {
   isPresetEntrySource,
   isPresetFileKind,
   parsePresetFile,
   type PresetFileKind,
-} from '../../../shared/presets';
+} from './file';
 import {
   normalizeAuthoredMetadata,
   type AuthoredMetadata,
-} from '../../../shared/model';
-import { isSafePresetRelativePathSegment } from './preset-paths';
+} from '../model';
+import { isSafePresetRelativePathSegment } from './paths';
 
 const parseOptionalAuthoredMetadata = (
   value: unknown,

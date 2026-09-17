@@ -1,5 +1,5 @@
-import type { PresetEntrySelectionItem } from '../../../shared/preset-entry-selection';
-import type { PresetEntrySource } from '../../../shared/presets';
+import type { PresetEntrySelectionItem } from '../../../shared/preset/entry-selection';
+import type { PresetEntrySource } from '../../../shared/preset/file';
 
 export interface PresetEntryContextTarget extends PresetEntrySelectionItem {
   kind: 'preset-entry';

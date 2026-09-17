@@ -1,4 +1,4 @@
-import type { PresetFileErrorCode } from '../../../shared/presets';
+import type { PresetFileErrorCode } from '../../../shared/preset/file';
 import type { MessageKey } from '../../../shared/i18n';
 import { i18n } from '../../i18n.svelte';
 

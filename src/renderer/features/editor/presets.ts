@@ -2,7 +2,7 @@ import type {
   DevicePresetFile,
   GroupPresetFile,
   RackPresetFile,
-} from '../../../shared/presets';
+} from '../../../shared/preset/file';
 import {
   getRendererDeviceLabel,
   type RendererDeviceKind,
@@ -12,7 +12,7 @@ import {
   sanitizeCollapsedDeviceIdsForChain,
   sanitizeCollapsedDeviceIdsForDevices,
   toStandaloneDevicePresetDevice,
-} from '../../../shared/presets';
+} from '../../../shared/preset/file';
 import {
   cloneChainForIpc,
   cloneDeviceNode,

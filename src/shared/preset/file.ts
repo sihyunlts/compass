@@ -9,13 +9,13 @@ import {
   type GroupMode,
   type TimeWarpCurve,
   isGeneratorNode,
-} from './model';
+} from '../model';
 import {
   hydrateImportedGeneratorChain,
   hydrateImportedGeneratorDevice,
   hydrateImportedGeneratorDevices,
-} from './model/chain-normalization';
-import { migratePresetValue } from './preset-migrations';
+} from '../model/chain-normalization';
+import { migratePresetValue } from './migrations';
 
 export const PRESET_FILE_SCHEMA_VERSION = 2 as const;
 

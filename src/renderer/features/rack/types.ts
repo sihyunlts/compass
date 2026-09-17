@@ -3,7 +3,7 @@ import type {
   DevicePresetFile,
   GroupPresetFile,
   RackPresetFile,
-} from '../../../shared/presets';
+} from '../../../shared/preset/file';
 import type {
   ChainDragSourceKind,
   RackDropZone,

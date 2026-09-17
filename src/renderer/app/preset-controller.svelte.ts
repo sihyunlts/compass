@@ -12,7 +12,7 @@ import {
   normalizePresetEntrySelection,
   type PresetEntryPath,
   type PresetEntrySelectionItem,
-} from '../../shared/preset-entry-selection';
+} from '../../shared/preset/entry-selection';
 import {
   getDeviceMessageKey,
 } from '../device-i18n';
@@ -33,7 +33,7 @@ import {
   resolvePresetNameFromFileName,
   type PresetBrowserPreview,
   type RackPresetFile,
-} from '../../shared/presets';
+} from '../../shared/preset/file';
 import type {
   BrowserTreePresetFolderNode,
   BrowserTreePresetLeafNode,

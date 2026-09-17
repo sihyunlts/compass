@@ -6,7 +6,7 @@ import { toGeneratorPreview } from '../domain/generator-preview';
 import type { GeneratorPreview } from '../shared/contracts/preview/generator-preview';
 import type { LaunchpadModel } from '../shared/model';
 import { resolveEvenlySpacedSampleIndices } from '../shared/even-sampling';
-import { parsePresetFileText } from '../shared/presets';
+import { parsePresetFileText } from '../shared/preset/file';
 
 export const RACK_PREVIEW_LOOP_LENGTH_BEATS = 1;
 export const RACK_REGRESSION_FIXTURE_DIR = path.join(

@@ -1,10 +1,10 @@
 import { hasDragMovement } from '../drag-gesture';
 import {
   type PresetEntryMoveDestination,
-} from '../../../shared/preset-entry-move';
-import { arePresetPathsEqual } from '../../../shared/preset-entry-selection';
+} from '../../../shared/preset/entry-move';
+import { arePresetPathsEqual } from '../../../shared/preset/entry-selection';
 import type { PresetEntryContextTarget } from '../context-menu/types';
-import type { PresetEntrySource } from '../../../shared/presets';
+import type { PresetEntrySource } from '../../../shared/preset/file';
 import { DragAutoScroller } from '../drag-auto-scroll';
 import { performHapticFeedback } from '../../haptics';
 import {

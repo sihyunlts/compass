@@ -1,9 +1,9 @@
 import type { CompassApi } from '../../shared/contracts/ipc/api';
-import type { PresetFile } from '../../shared/presets';
+import type { PresetFile } from '../../shared/preset/file';
 import {
   normalizeAuthoredMetadata,
 } from '../../shared/model';
-import { resolvePresetNameFromFileName } from '../../shared/presets';
+import { resolvePresetNameFromFileName } from '../../shared/preset/file';
 import { getDeviceMessageKey } from '../device-i18n';
 import { i18n } from '../i18n.svelte';
 import type {

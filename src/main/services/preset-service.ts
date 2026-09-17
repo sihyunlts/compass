@@ -1,12 +1,11 @@
+import { PresetRepository } from '../../shared/preset/repository';
+import { NativePresetBackend } from './presets/native-preset-backend';
 import { shell, type BaseWindow } from 'electron';
 import { watch, type FSWatcher } from 'node:fs';
 
-import { isDeviceBrowserSystemDirectoryPath } from '../../devices/browser-categories';
-import { readBundledRackPreset } from '../../shared/bundled-rack-presets';
 import type {
   CopyPresetEntriesResponse,
   CreatePresetFolderResponse,
-  DeletedPresetEntry,
   DeletePresetEntriesResponse,
   ListPresetBrowserTreeResponse,
   MovePresetEntriesResponse,
@@ -20,34 +19,19 @@ import type {
   UpdateRackFileInfoResponse,
 } from '../../shared/contracts/ipc/presets';
 import type { AuthoredMetadata } from '../../shared/model';
-import {
-  withPresetAuthoredMetadata,
-  type PresetFileKind,
-} from '../../shared/presets';
-import { preparePresetEntryMove } from '../../shared/preset-entry-move';
-import { preparePresetEntryCopy } from '../../shared/preset-entry-copy';
-import { normalizePresetEntrySelection } from '../../shared/preset-entry-selection';
+import { withPresetAuthoredMetadata, type PresetFile, type PresetFileKind } from '../../shared/preset/file';
+
 import { PRESET_FILE_SPECS } from './presets/preset-config';
-import { PresetBrowserTreeBuilder } from './presets/preset-browser-tree';
+
 import { PresetDialogs } from './presets/preset-dialogs';
+import { hasPresetExtension } from '../../shared/preset/paths';
+import { resolvePresetPath } from './presets/preset-paths';
 import {
-  hasPresetExtension,
-  resolvePresetPath,
-} from './presets/preset-paths';
-import {
-  parseCopyPresetEntriesRequest,
-  parseCreatePresetFolderRequest,
-  parseDeletePresetEntriesRequest,
-  parseMovePresetEntriesRequest,
   parsePresetEntryRequest,
-  parseReadPresetEntryRequest,
   parseSaveRackFileRequest,
-  parseRenamePresetFileRequest,
-  parseRenamePresetFolderRequest,
   parseSavePresetFileRequest,
-  parseUpdatePresetFileInfoRequest,
   parseUpdateRackFileInfoRequest,
-} from './presets/preset-requests';
+} from '../../shared/preset/requests';
 import { PresetStorage } from './presets/preset-storage';
 
 const toErrorMessage = (error: unknown, fallback: string): string => {
@@ -64,7 +48,9 @@ export class PresetService {
 
   private readonly dialogs = new PresetDialogs();
 
-  private readonly browserTreeBuilder = new PresetBrowserTreeBuilder(this.storage);
+  private readonly backend = new NativePresetBackend(this.storage);
+
+  private readonly repository = new PresetRepository(this.backend);
 
   private browserTreeWatcher: FSWatcher | null = null;
 
@@ -132,14 +118,14 @@ export class PresetService {
         return { status: 'canceled' };
       }
 
-      await this.storage.writePresetFile(dialogResult.filePath, parsedRequest.payload);
+      const savedPath = await this.saveAtPath(dialogResult.filePath, parsedRequest.payload);
       await this.dialogs.rememberSaveDirectory(
         parsedRequest,
         dialogResult.filePath,
       );
       return {
         status: 'saved',
-        filePath: dialogResult.filePath,
+        filePath: savedPath,
       };
     } catch (error) {
       return {
@@ -169,10 +155,10 @@ export class PresetService {
     }
 
     try {
-      await this.storage.writePresetFile(parsedRequest.filePath, parsedRequest.payload);
+      const savedPath = await this.saveAtPath(parsedRequest.filePath, parsedRequest.payload);
       return {
         status: 'saved',
-        filePath: parsedRequest.filePath,
+        filePath: savedPath,
       };
     } catch (error) {
       return {
@@ -223,126 +209,32 @@ export class PresetService {
   }
 
   public async listPresetBrowserTree(): Promise<ListPresetBrowserTreeResponse> {
-    try {
-      const result = await this.browserTreeBuilder.listTree();
-      return {
-        status: 'ok',
-        ...result,
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: toErrorMessage(error, 'Failed to list presets.'),
-      };
-    }
+    return this.repository.listPresetBrowserTree();
   }
 
   public async renamePresetFile(
     request: unknown,
   ): Promise<RenamePresetFileResponse> {
-    const parsedRequest = parseRenamePresetFileRequest(request);
-    if (!parsedRequest) {
-      return {
-        status: 'error',
-        message: 'Invalid preset file rename request.',
-      };
-    }
-
-    const spec = PRESET_FILE_SPECS[parsedRequest.presetType];
-    const currentFileName = parsedRequest.relativePath[parsedRequest.relativePath.length - 1] ?? '';
-    if (!hasPresetExtension(currentFileName, spec.extension)) {
-      return {
-        status: 'error',
-        message: 'Unsupported preset file extension.',
-      };
-    }
-
-    try {
-      const rootDirectory = await this.storage.resolvePresetDirectory(parsedRequest.presetType);
-      const filePath = resolvePresetPath(rootDirectory, parsedRequest.relativePath);
-      if (!filePath) {
-        return {
-          status: 'error',
-          message: 'Invalid preset file path.',
-        };
-      }
-
-      const renamedPath = await this.storage.renamePresetFile(
-        filePath,
-        parsedRequest.fileName,
-        spec.extension,
-      );
-      return {
-        status: 'renamed',
-        sourcePath: filePath,
-        filePath: renamedPath,
-        relativePath: [
-          ...parsedRequest.relativePath.slice(0, -1),
-          renamedPath.split(/[\\/]/).pop() ?? currentFileName,
-        ],
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: toErrorMessage(error, 'Failed to rename preset file.'),
-      };
-    }
+    return this.repository.renamePresetFile(request);
   }
 
   public async updatePresetFileInfo(
     request: unknown,
   ): Promise<UpdatePresetFileInfoResponse> {
-    const parsedRequest = parseUpdatePresetFileInfoRequest(request);
-    if (!parsedRequest) {
-      return {
-        status: 'error',
-        message: 'Invalid preset info update request.',
-      };
-    }
+    return this.repository.updatePresetFileInfo(request);
+  }
 
-    const spec = PRESET_FILE_SPECS[parsedRequest.presetType];
-    const currentFileName = parsedRequest.relativePath.at(-1) ?? '';
-    if (!hasPresetExtension(currentFileName, spec.extension)) {
-      return {
-        status: 'error',
-        message: 'Unsupported preset file extension.',
-      };
+  private async saveAtPath(filePath: string, payload: PresetFile): Promise<string> {
+    const entry = await this.backend.entryAtPath(payload.presetType, filePath);
+    if (!entry) {
+      await this.storage.writePresetFile(filePath, payload);
+      return filePath;
     }
-
-    try {
-      const rootDirectory = await this.storage.resolvePresetDirectory(
-        parsedRequest.presetType,
-      );
-      const filePath = resolvePresetPath(rootDirectory, parsedRequest.relativePath);
-      if (!filePath) {
-        return {
-          status: 'error',
-          message: 'Invalid preset file path.',
-        };
-      }
-
-      const updated = await this.updatePresetInfoAtPath(
-        parsedRequest.presetType,
-        filePath,
-        parsedRequest.fileName,
-        parsedRequest.metadata,
-      );
-      return {
-        status: 'updated',
-        sourcePath: filePath,
-        filePath: updated.filePath,
-        relativePath: [
-          ...parsedRequest.relativePath.slice(0, -1),
-          updated.filePath.split(/[\\/]/).pop() ?? currentFileName,
-        ],
-        savedAtIso: updated.savedAtIso,
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: toErrorMessage(error, 'Failed to update preset info.'),
-      };
+    const result = await this.repository.savePresetAt(entry, payload, 'overwrite');
+    if (result.status !== 'saved') {
+      throw new Error(result.status === 'error' ? result.message : 'Preset could not be saved at that location.');
     }
+    return result.filePath;
   }
 
   private async updatePresetInfoAtPath(
@@ -351,6 +243,12 @@ export class PresetService {
     fileName: string,
     metadata: AuthoredMetadata | undefined,
   ): Promise<{ filePath: string; savedAtIso: string }> {
+    const entry = await this.backend.entryAtPath(presetType, filePath);
+    if (entry) {
+      const result = await this.repository.updatePresetFileInfo({ ...entry, source: 'user', fileName, metadata });
+      if (result.status === 'error') throw new Error(result.message);
+      return { filePath: result.filePath, savedAtIso: result.savedAtIso };
+    }
     const savedAtIso = new Date().toISOString();
     const updatedPath = await this.storage.updatePresetFile(
       presetType,
@@ -372,132 +270,19 @@ export class PresetService {
   public async createPresetFolder(
     request: unknown,
   ): Promise<CreatePresetFolderResponse> {
-    const parsedRequest = parseCreatePresetFolderRequest(request);
-    if (!parsedRequest) {
-      return {
-        status: 'error',
-        message: 'Invalid folder request.',
-      };
-    }
-    if (
-      parsedRequest.presetType === 'device'
-      && isDeviceBrowserSystemDirectoryPath([
-        ...parsedRequest.relativePath,
-        parsedRequest.folderName.trim(),
-      ])
-    ) {
-      return {
-        status: 'error',
-        message: 'Built-in device folder names are reserved.',
-      };
-    }
-
-    try {
-      return {
-        status: 'ok',
-        relativePath: await this.storage.createPresetFolder(
-          parsedRequest.presetType,
-          parsedRequest.relativePath,
-          parsedRequest.folderName,
-        ),
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: toErrorMessage(error, 'Failed to create folder.'),
-      };
-    }
+    return this.repository.createPresetFolder(request);
   }
 
   public async renamePresetFolder(
     request: unknown,
   ): Promise<RenamePresetFolderResponse> {
-    const parsedRequest = parseRenamePresetFolderRequest(request);
-    if (!parsedRequest) {
-      return {
-        status: 'error',
-        message: 'Invalid folder request.',
-      };
-    }
-    if (
-      parsedRequest.presetType === 'device'
-      && isDeviceBrowserSystemDirectoryPath(parsedRequest.relativePath)
-    ) {
-      return {
-        status: 'error',
-        message: 'Built-in device folders cannot be renamed.',
-      };
-    }
-    if (
-      parsedRequest.presetType === 'device'
-      && isDeviceBrowserSystemDirectoryPath([
-        ...parsedRequest.relativePath.slice(0, -1),
-        parsedRequest.folderName.trim(),
-      ])
-    ) {
-      return {
-        status: 'error',
-        message: 'Built-in device folder names are reserved.',
-      };
-    }
-
-    try {
-      const renamedFolder = await this.storage.renamePresetFolder(
-        parsedRequest.presetType,
-        parsedRequest.relativePath,
-        parsedRequest.folderName,
-      );
-      return {
-        status: 'ok',
-        ...renamedFolder,
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: toErrorMessage(error, 'Failed to rename folder.'),
-      };
-    }
+    return this.repository.renamePresetFolder(request);
   }
 
   public async readPresetEntry(
     request: unknown,
   ): Promise<ReadPresetEntryResponse> {
-    const parsedRequest = parseReadPresetEntryRequest(request);
-    if (!parsedRequest) {
-      return {
-        status: 'error',
-        errorCode: 'invalid-read-request',
-        message: 'Invalid file read request.',
-      };
-    }
-
-    if (parsedRequest.source === 'bundled') {
-      return readBundledRackPreset(
-        parsedRequest.presetType,
-        parsedRequest.relativePath,
-      );
-    }
-
-    const rootDirectory = await this.storage.resolvePresetDirectory(parsedRequest.presetType);
-    const filePath = resolvePresetPath(rootDirectory, parsedRequest.relativePath);
-    if (!filePath) {
-      return {
-        status: 'error',
-        errorCode: 'invalid-file-path',
-        message: 'Invalid file path.',
-      };
-    }
-
-    if (!hasPresetExtension(filePath, PRESET_FILE_SPECS[parsedRequest.presetType].extension)) {
-      return {
-        status: 'error',
-        errorCode: 'unsupported-file-extension',
-        message: 'Unsupported file extension.',
-        filePath,
-      };
-    }
-
-    return this.storage.readPresetFileByType(parsedRequest.presetType, filePath);
+    return this.repository.readPresetEntry(request);
   }
 
   public async showPresetEntryInFolder(
@@ -556,162 +341,19 @@ export class PresetService {
   public async deletePresetEntries(
     request: unknown,
   ): Promise<DeletePresetEntriesResponse> {
-    const parsedRequest = parseDeletePresetEntriesRequest(request);
-    if (!parsedRequest) {
-      return {
-        status: 'error',
-        message: 'Invalid preset items request.',
-      };
-    }
-    if (parsedRequest.entries.some((entry) => entry.relativePath.length === 0)) {
-      return {
-        status: 'error',
-        message: 'Preset root folders cannot be deleted.',
-      };
-    }
-
-    try {
-      const normalizedEntries = normalizePresetEntrySelection(parsedRequest.entries);
-      if (
-        normalizedEntries.some(
-          (entry) =>
-            entry.entryKind === 'directory'
-            && entry.presetType === 'device'
-            && isDeviceBrowserSystemDirectoryPath(entry.relativePath),
-        )
-      ) {
-        return {
-          status: 'error',
-          message: 'Built-in device folders cannot be deleted.',
-        };
-      }
-
-      const entriesToDelete: DeletedPresetEntry[] = [];
-      for (const entry of normalizedEntries) {
-        const rootDirectory = await this.storage.resolvePresetDirectory(entry.presetType);
-        const filePath = resolvePresetPath(rootDirectory, entry.relativePath);
-        if (!filePath) {
-          return {
-            status: 'error',
-            message: 'Invalid file path.',
-          };
-        }
-
-        if (
-          entry.entryKind === 'file'
-          && !hasPresetExtension(filePath, PRESET_FILE_SPECS[entry.presetType].extension)
-        ) {
-          return {
-            status: 'error',
-            message: 'Invalid file type.',
-          };
-        }
-
-        entriesToDelete.push({
-          entryKind: entry.entryKind,
-          filePath,
-          presetType: entry.presetType,
-          relativePath: [...entry.relativePath],
-        });
-      }
-
-      await this.storage.trashPresetEntries(entriesToDelete);
-      return { status: 'ok', entries: entriesToDelete };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: toErrorMessage(error, 'Failed to delete preset item.'),
-      };
-    }
+    return this.repository.deletePresetEntries(request);
   }
 
   public async movePresetEntries(
     request: unknown,
   ): Promise<MovePresetEntriesResponse> {
-    const parsedRequest = parseMovePresetEntriesRequest(request);
-    if (!parsedRequest) {
-      return {
-        status: 'error',
-        message: 'Invalid preset move request.',
-      };
-    }
-
-    try {
-      const occupiedPaths = await this.browserTreeBuilder.listOccupiedPaths(
-        parsedRequest.destination.presetType,
-      );
-      const movePlan = preparePresetEntryMove(
-        parsedRequest.entries,
-        parsedRequest.destination,
-        occupiedPaths,
-      );
-      if (movePlan.status === 'error') {
-        return movePlan;
-      }
-
-      for (const { entry } of movePlan.plans) {
-        if (
-          entry.entryKind === 'file'
-          && !hasPresetExtension(
-            entry.relativePath[entry.relativePath.length - 1] ?? '',
-            PRESET_FILE_SPECS[movePlan.presetType].extension,
-          )
-        ) {
-          return {
-            status: 'error',
-            message: 'Invalid file type.',
-          };
-        }
-      }
-
-      return {
-        status: 'ok',
-        entries: await this.storage.movePresetEntries(
-          movePlan.presetType,
-          movePlan.plans,
-          movePlan.destinationRelativePath,
-          movePlan.createDestination,
-        ),
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: toErrorMessage(error, 'Failed to move preset items.'),
-      };
-    }
+    return this.repository.movePresetEntries(request);
   }
 
   public async copyPresetEntries(
     request: unknown,
   ): Promise<CopyPresetEntriesResponse> {
-    const parsedRequest = parseCopyPresetEntriesRequest(request);
-    if (!parsedRequest) {
-      return { status: 'error', message: 'Invalid preset copy request.' };
-    }
-
-    try {
-      const presetType = parsedRequest.entries[0].presetType;
-      const occupiedPaths = await this.browserTreeBuilder.listOccupiedPaths(presetType);
-      const copyPlan = preparePresetEntryCopy(
-        parsedRequest.entries,
-        parsedRequest.destination,
-        occupiedPaths,
-      );
-      if (copyPlan.status === 'error') {
-        return copyPlan;
-      }
-      return {
-        status: 'ok',
-        entries: await this.storage.copyPresetEntries(
-          presetType,
-          copyPlan.plans,
-        ),
-      };
-    } catch (error) {
-      return {
-        status: 'error',
-        message: toErrorMessage(error, 'Failed to copy preset items.'),
-      };
-    }
+    return this.repository.copyPresetEntries(request);
   }
+
 }

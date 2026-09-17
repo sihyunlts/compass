@@ -1,4 +1,4 @@
-import type { PresetFileKind } from '../../../shared/presets';
+import type { PresetFileKind } from '../../../shared/preset/file';
 
 export const PRESET_ROOT_DIR_NAME = 'Presets';
 

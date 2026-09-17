@@ -1,11 +1,11 @@
-import scratchPresetText from '../assets/presets/racks/Scratch.compassrack?raw';
-import snakePresetText from '../assets/presets/racks/Snake.compassrack?raw';
-import spinPresetText from '../assets/presets/racks/Spin.compassrack?raw';
-import sunrisePresetText from '../assets/presets/racks/Sunrise.compassrack?raw';
+import scratchPresetText from '../../assets/presets/racks/Scratch.compassrack?raw';
+import snakePresetText from '../../assets/presets/racks/Snake.compassrack?raw';
+import spinPresetText from '../../assets/presets/racks/Spin.compassrack?raw';
+import sunrisePresetText from '../../assets/presets/racks/Sunrise.compassrack?raw';
 import type {
   PresetBrowserTreeFolderNode,
   ReadPresetEntryResponse,
-} from './contracts/ipc/presets';
+} from '../contracts/ipc/presets';
 import {
   parsePresetFileText,
   resolvePresetBrowserPreview,
@@ -14,7 +14,7 @@ import {
   type PresetFile,
   type PresetFileKind,
   type RackPresetFile,
-} from './presets';
+} from './file';
 
 const BUNDLED_RACK_PRESET_COLLECTION = {
   id: 'sihyunlights',

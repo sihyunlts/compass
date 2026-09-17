@@ -14,7 +14,7 @@ import type {
   DevicePresetFile,
   GroupPresetFile,
   RackPresetFile,
-} from '../../../shared/presets';
+} from '../../../shared/preset/file';
 import type { RendererDeviceKind } from '../../../devices';
 import type { BrowserPage } from '../browser/types';
 import { isRendererDeviceKind } from '../../../devices';

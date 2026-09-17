@@ -2,7 +2,7 @@ import type { AuthoredMetadata, GeneratorDeviceNode } from '../../model';
 import type {
   PresetEntryPath,
   PresetEntrySelectionItem,
-} from '../../preset-entry-selection';
+} from '../../preset/entry-selection';
 import type {
   PresetBrowserPreview,
   PresetEntrySource,
@@ -10,7 +10,7 @@ import type {
   PresetFileErrorCode,
   PresetFileKind,
   RackPresetFile,
-} from '../../presets';
+} from '../../preset/file';
 
 type RendererDeviceKind = GeneratorDeviceNode['kind'];
 

@@ -1,5 +1,5 @@
 import type { RendererDeviceKind } from '../../../devices';
-import type { PresetFileKind } from '../../../shared/presets';
+import type { PresetFileKind } from '../../../shared/preset/file';
 import { getDeviceBrowserIcon } from '../editor/device-browser-categories';
 
 type PresetEntryPresentationNode =

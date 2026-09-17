@@ -24,29 +24,23 @@ import {
 } from '../../../devices/browser-categories';
 import { getRendererDeviceLabel } from '../../../devices/schema-registry';
 import type {
-  MovedPresetEntry,
   ReadPresetEntryResponse,
 } from '../../../shared/contracts/ipc/presets';
-import type { PresetEntryMovePlan } from '../../../shared/preset-entry-move';
-import type { PresetEntryCopyPlan } from '../../../shared/preset-entry-copy';
-import type { PresetEntrySelectionItem } from '../../../shared/preset-entry-selection';
+import type { PresetEntryMovePlan } from '../../../shared/preset/entry-move';
+import type { PresetEntryCopyPlan } from '../../../shared/preset/entry-copy';
 import {
   parsePresetFileText,
   type PresetFile,
   type PresetFileKind,
-} from '../../../shared/presets';
+} from '../../../shared/preset/file';
 import { PRESET_FILE_SPECS, PRESET_ROOT_DIR_NAME } from './preset-config';
 import {
   migratePresetDirectory,
   type PresetDirectoryMigration,
 } from './preset-directory-migration';
-import {
-  isValidPresetPathSegment,
-  normalizePresetPathSegment,
-  resolvePresetPath,
-  ensurePresetExtension,
-  sanitizeFileStem,
-} from './preset-paths';
+import { isValidPresetPathSegment, normalizePresetPathSegment } from '../../../shared/preset/paths';
+import { ensurePresetExtension, sanitizeFileStem } from '../../../shared/preset/paths';
+import { resolvePresetPath } from './preset-paths';
 
 const DEVICE_PRESET_DIRECTORY_MIGRATIONS = [
   {
@@ -353,7 +347,7 @@ export class PresetStorage {
     plans: readonly PresetEntryMovePlan[],
     destinationRelativePath: readonly string[],
     createDestination: boolean,
-  ): Promise<MovedPresetEntry[]> {
+  ): Promise<void> {
     return this.enqueuePresetEntryMutation(() =>
       this.performPresetEntriesMove(
         presetType,
@@ -367,7 +361,7 @@ export class PresetStorage {
   public async copyPresetEntries(
     presetType: PresetFileKind,
     plans: readonly PresetEntryCopyPlan[],
-  ): Promise<PresetEntrySelectionItem[]> {
+  ): Promise<void> {
     return this.enqueuePresetEntryMutation(async () => {
       const rootDirectory = await this.resolvePresetDirectory(presetType);
       const resolvedPlans = plans.map(({ entry, relativePath }) => {
@@ -380,7 +374,6 @@ export class PresetStorage {
         }
         return {
           entry,
-          relativePath,
           parentRelativePath,
           sourcePath,
           destinationDirectory,
@@ -442,11 +435,6 @@ export class PresetStorage {
         throw error;
       }
 
-      return resolvedPlans.map((plan) => ({
-        presetType,
-        entryKind: plan.entry.entryKind,
-        relativePath: plan.relativePath,
-      }));
     });
   }
 
@@ -468,7 +456,7 @@ export class PresetStorage {
     plans: readonly PresetEntryMovePlan[],
     destinationRelativePath: readonly string[],
     createDestination: boolean,
-  ): Promise<MovedPresetEntry[]> {
+  ): Promise<void> {
     const rootDirectory = await this.resolvePresetDirectory(presetType);
     const destinationDirectory = resolvePresetPath(
       rootDirectory,
@@ -494,7 +482,6 @@ export class PresetStorage {
 
       return {
         entryKind: plan.entry.entryKind,
-        relativePath: [...plan.relativePath],
         sourcePath,
         filePath,
         isNoop: plan.isNoop,
@@ -541,14 +528,6 @@ export class PresetStorage {
       }
       throw error;
     }
-
-    return resolvedPlans.map((plan) => ({
-      presetType,
-      entryKind: plan.entryKind,
-      relativePath: plan.relativePath,
-      sourcePath: plan.sourcePath,
-      filePath: plan.filePath,
-    }));
   }
 
   private async moveExistingPresetEntry(

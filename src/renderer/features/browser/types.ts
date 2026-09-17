@@ -1,11 +1,11 @@
 import type { RendererDeviceKind } from '../../../devices';
 import type { DeviceBrowserCategoryId } from '../../../devices/browser-categories';
 import type { PresetBrowserTreeLeafNode } from '../../../shared/contracts/ipc/presets';
-import type { PresetEntrySelectionItem } from '../../../shared/preset-entry-selection';
+import type { PresetEntrySelectionItem } from '../../../shared/preset/entry-selection';
 import type {
   PresetEntrySource,
   PresetFileKind,
-} from '../../../shared/presets';
+} from '../../../shared/preset/file';
 
 interface BrowserTreeBaseFolderNode {
   kind: 'folder';

@@ -4,30 +4,7 @@ import { getDeviceBrowserCategoryDirectoryName } from '../../../devices/browser-
 import { getRendererDeviceLabel } from '../../../devices/schema-registry';
 import type { SavePresetFileRequest } from '../../../shared/contracts/ipc/presets';
 
-export const sanitizeFileStem = (value: string, fallback: string): string => {
-  const trimmed = value.trim();
-  const sanitized = trimmed
-    .replace(/[\\/:*?"<>|]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return sanitized || fallback;
-};
-
-export const normalizePresetPathSegment = (value: string): string => value.trim();
-
-export const isValidPresetPathSegment = (value: string): boolean => {
-  const normalized = normalizePresetPathSegment(value);
-  return normalized.length > 0
-    && normalized !== '.'
-    && normalized !== '..'
-    && !/[\\/:*?"<>|]/.test(normalized);
-};
-
-export const isSafePresetRelativePathSegment = (value: string): boolean =>
-  value.length > 0
-  && value !== '.'
-  && value !== '..'
-  && !/[\\/\0]/.test(value);
+import { sanitizeFileStem } from '../../../shared/preset/paths';
 
 export const resolvePresetSaveDirectory = (
   baseDirectory: string,
@@ -46,23 +23,6 @@ export const resolvePresetSaveDirectory = (
     getDeviceBrowserCategoryDirectoryName(request.payload.device.kind),
     deviceDirectoryName,
   );
-};
-
-export const hasPresetExtension = (
-  filePath: string,
-  extension: string,
-): boolean => filePath.toLowerCase().endsWith(extension);
-
-export const ensurePresetExtension = (
-  filePath: string,
-  extension: string,
-): string => {
-  if (hasPresetExtension(filePath, extension)) {
-    return filePath;
-  }
-
-  const parsed = path.parse(filePath);
-  return path.join(parsed.dir, `${parsed.name}${extension}`);
 };
 
 export const resolvePresetPath = (

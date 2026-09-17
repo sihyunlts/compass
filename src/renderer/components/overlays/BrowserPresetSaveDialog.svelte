@@ -5,8 +5,8 @@
   import type { PresetBrowserTreeFolderNode, PresetBrowserTreeNode } from '../../../shared/contracts/ipc/presets';
   import type { PendingPresetFolderDraft } from '../../features/browser/types';
   import type { PresetController } from '../../app/preset-controller.svelte';
-  import { resolvePresetNameFromFileName } from '../../../shared/presets';
-  import { arePresetPathsEqual } from '../../../shared/preset-entry-selection';
+  import { resolvePresetNameFromFileName } from '../../../shared/preset/file';
+  import { arePresetPathsEqual } from '../../../shared/preset/entry-selection';
   import { browserPresetSaveDialog as dialog } from '../../app/browser-preset-save-dialog.svelte';
   import { i18n } from '../../i18n.svelte';
   import type { ShortcutPlatform } from '../../../shared/keyboard-shortcuts';
@@ -169,10 +169,13 @@
       fileList?.querySelectorAll<HTMLElement>('[data-save-entry]')[next]?.focus();
     }
   };
-  const save = (overwrite = false): void => {
+  const save = async (overwrite = false): Promise<void> => {
     if (!dialog.request || busy || entryDraft) return;
+    const request = dialog.request;
+    busy = true;
     try {
-      const result = dialog.request.save(name, folder, overwrite ? conflict : null);
+      const result = await request.save(name, folder, overwrite ? conflict : null);
+      if (dialog.request !== request) return;
       if (result.status === 'saved') {
         conflict = null;
         dialog.close(result);
@@ -181,11 +184,13 @@
         error = '';
       } else {
         conflict = null;
-        error = i18n.t(`webSave.${result.status}`);
+        error = result.status === 'error' ? result.message : i18n.t(`webSave.${result.status}`);
       }
     } catch {
       error = i18n.t('webSave.failed');
       conflict = null;
+    } finally {
+      busy = false;
     }
   };
   const canRename = (entry: PresetBrowserTreeNode): boolean =>

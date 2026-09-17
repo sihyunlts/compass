@@ -3,18 +3,19 @@ import path from 'node:path';
 import { compareDeviceBrowserCategoryDirectoryNames } from '../../../devices/browser-categories';
 import {
   buildBundledRackPresetCollectionNode,
-} from '../../../shared/bundled-rack-presets';
+} from '../../../shared/preset/bundled-racks';
 import type {
   PresetBrowserTreeFolderNode,
   PresetBrowserTreeNode,
 } from '../../../shared/contracts/ipc/presets';
-import type { PresetEntryPath } from '../../../shared/preset-entry-selection';
+import type { PresetEntryPath } from '../../../shared/preset/entry-selection';
 import {
   resolvePresetBrowserPreview,
   type PresetFileKind,
-} from '../../../shared/presets';
+} from '../../../shared/preset/file';
 import { PRESET_FILE_SPECS, PRESET_ROOT_SECTION_LABELS } from './preset-config';
-import { hasPresetExtension, resolvePresetPath } from './preset-paths';
+import { hasPresetExtension } from '../../../shared/preset/paths';
+import { resolvePresetPath } from './preset-paths';
 import { PresetStorage } from './preset-storage';
 
 const compareEntryNames = (left: string, right: string): number =>
