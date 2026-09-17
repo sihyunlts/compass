@@ -12,12 +12,11 @@
     type RackPresetFile,
   } from '../../../shared/preset/file';
   import {
-    canMovePresetEntriesTo,
+    canHoverPresetMoveDestination,
   } from '../../../shared/preset/entry-move';
   import {
     arePresetPathsEqual as areEqualRelativePaths,
     normalizePresetEntrySelection,
-    type PresetEntryPath,
   } from '../../../shared/preset/entry-selection';
   import {
     getDeviceBrowserCategory,
@@ -359,7 +358,6 @@
     platform,
     deviceTree = [] as BrowserTreeDeviceFolderNode[],
     presetTree = [] as BrowserTreePresetFolderNode[],
-    presetOccupiedPaths = [] as PresetEntryPath[],
     presetErrorText = null,
     pendingPresetFolderDraft = null,
     presetEntrySelectionTarget = null,
@@ -421,7 +419,6 @@
     platform: ShortcutPlatform;
     deviceTree: BrowserTreeDeviceFolderNode[];
     presetTree: BrowserTreePresetFolderNode[];
-    presetOccupiedPaths?: PresetEntryPath[];
     presetErrorText?: string | null;
     pendingPresetFolderDraft?: PendingPresetFolderDraft | null;
     presetEntrySelectionTarget?: PresetEntrySelectionTarget | null;
@@ -962,10 +959,9 @@
     entries: readonly PresetEntryContextTarget[],
   ): boolean =>
     entries.every((entry) => entry.source === 'user')
-    && canMovePresetEntriesTo(
+    && canHoverPresetMoveDestination(
       entries,
       destination,
-      presetOccupiedPaths,
     );
 
   const resolvePresetMoveRootDestination = (

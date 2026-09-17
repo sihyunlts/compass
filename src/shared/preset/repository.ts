@@ -1,3 +1,4 @@
+import { PresetNameConflictError } from './operation-error';
 import { isDeviceBrowserSystemDirectoryPath } from '../../devices/browser-categories';
 import { readBundledRackPreset } from './bundled-racks';
 import type {
@@ -53,6 +54,7 @@ export type PresetSaveResult =
 
 const errorResult = (error: unknown) => ({
   status: 'error' as const,
+  ...(error instanceof PresetNameConflictError ? { errorCode: error.code } : {}),
   message: error instanceof Error ? error.message : 'Preset operation failed.',
 });
 
@@ -90,7 +92,7 @@ export class PresetRepository {
     const occupied = await storage.listOccupiedPaths(entry.presetType);
     if (occupied.some((path) => doPresetPathsCollide(path.relativePath, relativePath)
       && !(excludeSource && arePresetPathsEqual(path.relativePath, entry.relativePath)))) {
-      throw new Error('An item or folder with that name already exists.');
+      throw new PresetNameConflictError();
     }
   }
 
@@ -191,7 +193,10 @@ export class PresetRepository {
     return this.mutate(async (storage) => {
       const parsed = requireRequest(parseMovePresetEntriesRequest(request));
       const prepared = preparePresetEntryMove(parsed.entries, parsed.destination, await storage.listOccupiedPaths(parsed.destination.presetType));
-      if (prepared.status === 'error') throw new Error(prepared.message);
+      if (prepared.status === 'error') {
+        if (prepared.errorCode === 'name-conflict') throw new PresetNameConflictError();
+        throw new Error(prepared.message);
+      }
       for (const { entry } of prepared.plans) {
         if (entry.entryKind === 'file') ensureFileType(entry);
       }

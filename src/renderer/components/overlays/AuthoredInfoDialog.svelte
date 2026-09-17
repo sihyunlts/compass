@@ -15,6 +15,7 @@
     author,
     description,
     savedAtIso = null,
+    errorMessage = '',
     busy = false,
     readOnly = false,
     onNameChange,
@@ -29,6 +30,7 @@
     author: string;
     description: string;
     savedAtIso?: string | null;
+    errorMessage?: string;
     busy?: boolean;
     readOnly?: boolean;
     onNameChange: (value: string) => void;
@@ -56,9 +58,6 @@
 <ModalDialog
   {open}
   {title}
-  footerNote={savedAtText
-    ? i18n.t('info.lastSavedValue', { time: savedAtText })
-    : null}
   confirmLabel={i18n.t('info.save')}
   showConfirm={!readOnly}
   cancelLabel={readOnly ? i18n.t('app.close') : i18n.t('app.cancel')}
@@ -68,6 +67,15 @@
   {onConfirm}
   {onCancel}
 >
+  {#snippet footerLeading()}
+    <span class="authored-info-footer" aria-live="polite" aria-atomic="true">
+      {#if errorMessage}
+        {errorMessage}
+      {:else if savedAtText}
+        {i18n.t('info.lastSavedValue', { time: savedAtText })}
+      {/if}
+    </span>
+  {/snippet}
   <div class="authored-info-fields">
     <div class="authored-info-primary-fields">
       <TextField
@@ -104,6 +112,12 @@
 </ModalDialog>
 
 <style lang="scss">
+  .authored-info-footer {
+    color: var(--color-text-secondary);
+    font-size: var(--text-12);
+    overflow-wrap: anywhere;
+  }
+
   .authored-info-fields {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

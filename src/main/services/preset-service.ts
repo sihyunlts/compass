@@ -1,3 +1,4 @@
+import { PresetNameConflictError } from '../../shared/preset/operation-error';
 import { PresetRepository } from '../../shared/preset/repository';
 import { NativePresetBackend } from './presets/native-preset-backend';
 import { shell, type BaseWindow } from 'electron';
@@ -203,6 +204,7 @@ export class PresetService {
       return {
         status: 'error',
         message: toErrorMessage(error, 'Failed to update rack info.'),
+        ...(error instanceof PresetNameConflictError ? { errorCode: error.code } : {}),
         filePath: parsedRequest.filePath,
       };
     }
@@ -246,7 +248,10 @@ export class PresetService {
     const entry = await this.backend.entryAtPath(presetType, filePath);
     if (entry) {
       const result = await this.repository.updatePresetFileInfo({ ...entry, source: 'user', fileName, metadata });
-      if (result.status === 'error') throw new Error(result.message);
+      if (result.status === 'error') {
+        if (result.errorCode === 'name-conflict') throw new PresetNameConflictError();
+        throw new Error(result.message);
+      }
       return { filePath: result.filePath, savedAtIso: result.savedAtIso };
     }
     const savedAtIso = new Date().toISOString();

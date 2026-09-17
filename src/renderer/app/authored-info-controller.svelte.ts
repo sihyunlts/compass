@@ -1,3 +1,4 @@
+import { TransientFeedback } from './transient-feedback';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { PresetFile } from '../../shared/preset/file';
 import {
@@ -16,7 +17,7 @@ import {
   resolveEditableDeviceName,
   resolveEditableGroupName,
 } from '../features/rack/rename';
-import type { PresetController } from './preset-controller.svelte';
+import type { PresetController, PresetInfoUpdateResult } from './preset-controller.svelte';
 
 type AuthoredInfoTarget =
   | { kind: 'rack' }
@@ -31,6 +32,7 @@ interface AuthoredInfoControllerState {
   description: string;
   savedAtIso: string | null;
   isPending: boolean;
+  errorMessage: string;
 }
 
 interface AuthoredInfoControllerOptions {
@@ -60,7 +62,19 @@ class AuthoredInfoController {
     description: '',
     savedAtIso: null,
     isPending: false,
+    errorMessage: '',
   });
+
+  private readonly feedback = new TransientFeedback((message) => {
+    this.state.errorMessage = message;
+  });
+
+  public clearFeedback = (): void => { this.feedback.clear(); };
+
+  public dispose(): void {
+    this.loadToken += 1;
+    this.feedback.clear();
+  }
 
   private loadToken = 0;
 
@@ -114,6 +128,7 @@ class AuthoredInfoController {
       return;
     }
     this.loadToken += 1;
+    this.feedback.clear();
     this.state.target = null;
   };
 
@@ -127,6 +142,7 @@ class AuthoredInfoController {
       return;
     }
 
+    this.feedback.clear();
     this.state.isPending = true;
     try {
       if (target.kind === 'rack') {
@@ -137,20 +153,25 @@ class AuthoredInfoController {
             description: this.state.description,
           }),
         );
-        if (!updated) {
+        if (updated.status === 'error') {
+          this.feedback.show(updated.message);
           return;
         }
       } else if (target.kind === 'device') {
         this.updateDevice(target.deviceId);
       } else if (target.kind === 'group') {
         this.updateGroup(target.groupId);
-      } else if (!await this.updatePreset(target.entry)) {
-        return;
+      } else {
+        const result = await this.updatePreset(target.entry);
+        if (result.status === 'error') {
+          this.feedback.show(result.message);
+          return;
+        }
       }
 
       this.state.target = null;
     } catch {
-      this.showSaveError();
+      this.feedback.show(i18n.t('status.presetInfoSaveFailed'));
     } finally {
       this.state.isPending = false;
     }
@@ -270,7 +291,7 @@ class AuthoredInfoController {
     });
   }
 
-  private async updatePreset(entry: PresetEntryContextTarget): Promise<boolean> {
+  private async updatePreset(entry: PresetEntryContextTarget): Promise<PresetInfoUpdateResult> {
     const metadata = normalizeAuthoredMetadata({
       author: this.state.author,
       description: this.state.description,
@@ -287,6 +308,7 @@ class AuthoredInfoController {
     metadata: { author?: string; description?: string } | undefined,
     savedAtIso: string | null,
   ): void {
+    this.feedback.clear();
     this.state.name = name;
     this.state.author = metadata?.author ?? '';
     this.state.description = metadata?.description ?? '';
@@ -295,10 +317,6 @@ class AuthoredInfoController {
 
   private showLoadError(): void {
     this.options.showMessage(i18n.t('status.presetInfoLoadFailed'));
-  }
-
-  private showSaveError(): void {
-    this.options.showMessage(i18n.t('status.presetInfoSaveFailed'));
   }
 }
 

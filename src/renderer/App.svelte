@@ -2,7 +2,7 @@
   /**
    * Main renderer composition root.
    * Delegates non-visual orchestration to renderer/app modules and keeps UI wiring here.
-   */
+  */
   import { onMount, tick, untrack } from 'svelte';
   import { Spring, prefersReducedMotion } from 'svelte/motion';
 
@@ -616,6 +616,7 @@
       playbackSession.dispose();
       headerIndicator.dispose();
       settingsController.dispose();
+      authoredInfoController.dispose();
       editorSession.dispose();
     };
   });
@@ -664,7 +665,6 @@
       activePage={uiState.sidebarPage}
       deviceTree={DEVICE_BROWSER_TREE}
       presetTree={presetState.presetTree}
-      presetOccupiedPaths={presetState.presetOccupiedPaths}
       presetErrorText={presetState.presetErrorText}
       pendingPresetFolderDraft={presetState.pendingPresetFolderDraft}
       presetEntrySelectionTarget={presetState.presetEntrySelectionTarget}
@@ -911,10 +911,12 @@
     author={authoredInfoState.author}
     description={authoredInfoState.description}
     savedAtIso={authoredInfoState.savedAtIso}
+    errorMessage={authoredInfoState.errorMessage}
     busy={authoredInfoState.isPending}
     readOnly={authoredInfoController.readOnly}
     onNameChange={(value) => {
       authoredInfoState.name = value;
+      authoredInfoController.clearFeedback();
     }}
     onAuthorChange={(value) => {
       authoredInfoState.author = value;

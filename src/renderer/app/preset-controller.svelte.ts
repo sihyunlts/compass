@@ -1,3 +1,4 @@
+import { resolvePresetOperationErrorMessage } from '../features/browser/preset-operation-error';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { RendererCompassApi } from './browser-bridge';
 import type { MessageKey } from '../../shared/i18n';
@@ -10,7 +11,6 @@ import {
 } from '../../shared/model';
 import {
   normalizePresetEntrySelection,
-  type PresetEntryPath,
   type PresetEntrySelectionItem,
 } from '../../shared/preset/entry-selection';
 import {
@@ -105,6 +105,10 @@ const PRESET_DELETE_MESSAGE_KEYS = {
 const resolvePresetApplyMessage = (status: PresetApplyStatus): string =>
   i18n.t(PRESET_APPLY_MESSAGE_KEY_BY_STATUS[status]);
 
+export type PresetInfoUpdateResult =
+  | { status: 'updated' }
+  | { status: 'error'; message: string };
+
 const formatErrorMessage = (
   summaryKey: MessageKey,
   detail?: string | null,
@@ -153,7 +157,6 @@ type RackOpenTarget = {
 interface PresetControllerState {
   browserClipboardEntries: PresetEntryContextTarget[];
   presetTree: BrowserTreePresetFolderNode[];
-  presetOccupiedPaths: PresetEntryPath[];
   presetErrorText: string | null;
   pendingPresetFolderDraft: PendingPresetFolderDraft | null;
   presetEntrySelectionTarget: PresetEntrySelectionTarget | null;
@@ -296,7 +299,6 @@ export class PresetController {
   public readonly state: PresetControllerState = $state({
     browserClipboardEntries: [],
     presetTree: [],
-    presetOccupiedPaths: [],
     presetErrorText: null,
     pendingPresetFolderDraft: null,
     presetEntrySelectionTarget: null,
@@ -415,7 +417,7 @@ export class PresetController {
   public async updateCurrentRackInfo(
     rawName: string,
     metadata: AuthoredMetadata | undefined,
-  ): Promise<boolean> {
+  ): Promise<PresetInfoUpdateResult> {
     const nextName = resolveRackDisplayName(rawName);
     const normalizedMetadata = normalizeAuthoredMetadata(metadata);
 
@@ -427,7 +429,7 @@ export class PresetController {
         description: normalizedMetadata?.description ?? '',
       });
       this.syncRackDirtyState();
-      return true;
+      return { status: 'updated' };
     }
 
     const response = await this.options.bridgeClient.updateRackFileInfo({
@@ -436,8 +438,7 @@ export class PresetController {
       ...(normalizedMetadata ? { metadata: normalizedMetadata } : {}),
     });
     if (response.status === 'error') {
-      this.showError('status.presetInfoSaveFailed', response.message);
-      return false;
+      return { status: 'error', message: resolvePresetOperationErrorMessage(response.errorCode, 'status.presetInfoSaveFailed', 'name-edit') };
     }
 
     this.options.editorSession.synchronizePersistedRackMetadata(
@@ -461,16 +462,16 @@ export class PresetController {
     }
     this.syncRackDirtyState();
     await this.loadTree();
-    return true;
+    return { status: 'updated' };
   }
 
   public async updatePresetInfo(
     entry: PresetEntryContextTarget,
     rawName: string,
     metadata: AuthoredMetadata | undefined,
-  ): Promise<boolean> {
+  ): Promise<PresetInfoUpdateResult> {
     if (entry.source !== 'user') {
-      return false;
+      return { status: 'error', message: i18n.t('status.presetInfoSaveFailed') };
     }
 
     const normalizedMetadata = normalizeAuthoredMetadata(metadata);
@@ -482,8 +483,7 @@ export class PresetController {
       ...(normalizedMetadata ? { metadata: normalizedMetadata } : {}),
     });
     if (response.status === 'error') {
-      this.showError('status.presetInfoSaveFailed', response.message);
-      return false;
+      return { status: 'error', message: resolvePresetOperationErrorMessage(response.errorCode, 'status.presetInfoSaveFailed', 'name-edit') };
     }
 
     await this.loadTree();
@@ -501,7 +501,7 @@ export class PresetController {
       relativePath: response.relativePath,
       entryKind: 'file',
     }]);
-    return true;
+    return { status: 'updated' };
   }
 
   private markCurrentRackClean(
@@ -678,10 +678,6 @@ export class PresetController {
       this.state.presetTree = response.tree.map(
         (node) => mapPresetTreeNode(node) as BrowserTreePresetFolderNode,
       );
-      this.state.presetOccupiedPaths = response.occupiedPaths.map((path) => ({
-        ...path,
-        relativePath: [...path.relativePath],
-      }));
       this.state.presetErrorText = null;
     } catch (error) {
       if (requestToken !== this.presetListRequestToken) {
@@ -689,7 +685,6 @@ export class PresetController {
       }
 
       this.state.presetTree = [];
-      this.state.presetOccupiedPaths = [];
       this.state.presetErrorText = formatErrorMessage(
         'status.presetsLoadFailed',
         error instanceof Error ? error.message : null,
@@ -919,10 +914,11 @@ export class PresetController {
     this.state.pendingPresetFolderDraft = null;
     const response = await this.commitPresetEntryDraft(draft);
     if (response.status === 'error') {
-      this.showError(
+      this.showMessage(resolvePresetOperationErrorMessage(
+        response.errorCode,
         resolvePresetDraftErrorMessageKey(draft),
-        response.message,
-      );
+        'name-edit',
+      ));
       return;
     }
 
@@ -1022,7 +1018,7 @@ export class PresetController {
       });
       if (response.status === 'error') {
         await this.loadTree();
-        this.showError('status.presetMoveFailed', response.message);
+        this.showMessage(resolvePresetOperationErrorMessage(response.errorCode, 'status.presetMoveFailed', 'move'));
         return;
       }
 
@@ -1089,7 +1085,7 @@ export class PresetController {
       });
       if (response.status === 'error') {
         await this.loadTree();
-        this.showError('status.presetCopyFailed', response.message);
+        this.showMessage(resolvePresetOperationErrorMessage(response.errorCode, 'status.presetCopyFailed', 'copy'));
         return;
       }
 
@@ -1128,7 +1124,7 @@ export class PresetController {
       if (response.status === 'error') {
         await this.loadTree();
         this.state.pendingPresetDeleteTarget = null;
-        this.showError(this.presetDeleteMessageKeys.failed, response.message);
+        this.showMessage(resolvePresetOperationErrorMessage(response.errorCode, this.presetDeleteMessageKeys.failed));
         return;
       }
 

@@ -1,3 +1,4 @@
+import type { PresetOperationErrorCode } from '../../preset/operation-error';
 import type { AuthoredMetadata, GeneratorDeviceNode } from '../../model';
 import type {
   PresetEntryPath,
@@ -68,6 +69,7 @@ export type UpdateRackFileInfoResponse =
     }
   | {
       status: 'error';
+      errorCode?: PresetOperationErrorCode;
       message: string;
       filePath?: string;
     };
@@ -92,6 +94,7 @@ export type RenamePresetFileResponse =
     }
   | {
       status: 'error';
+      errorCode?: PresetOperationErrorCode;
       message: string;
     };
 
@@ -111,6 +114,7 @@ export type UpdatePresetFileInfoResponse =
     }
   | {
       status: 'error';
+      errorCode?: PresetOperationErrorCode;
       message: string;
     };
 
@@ -126,6 +130,7 @@ export type CreatePresetFolderResponse =
     }
   | {
       status: 'error';
+      errorCode?: PresetOperationErrorCode;
       message: string;
     };
 
@@ -143,6 +148,7 @@ export type RenamePresetFolderResponse =
     }
   | {
       status: 'error';
+      errorCode?: PresetOperationErrorCode;
       message: string;
     };
 
@@ -252,6 +258,7 @@ export type DeletePresetEntriesResponse =
     }
   | {
       status: 'error';
+      errorCode?: PresetOperationErrorCode;
       message: string;
     };
 
@@ -262,6 +269,7 @@ export type MovePresetEntriesResponse =
     }
   | {
       status: 'error';
+      errorCode?: PresetOperationErrorCode;
       message: string;
     };
 
@@ -272,6 +280,7 @@ export type CopyPresetEntriesResponse =
     }
   | {
       status: 'error';
+      errorCode?: PresetOperationErrorCode;
       message: string;
     };
 

@@ -1,3 +1,4 @@
+import type { PresetOperationErrorCode } from './operation-error';
 import {
   arePresetPathsEqual,
   doPresetPathsCollide,
@@ -23,6 +24,7 @@ export interface PresetEntryMovePlan {
 
 type PresetEntryMoveError = {
   status: 'error';
+  errorCode?: PresetOperationErrorCode;
   message: string;
 };
 
@@ -41,9 +43,10 @@ interface PreparedPresetEntryMove {
   plans: PresetEntryMovePlan[];
 }
 
-const moveError = (message: string): PresetEntryMoveError => ({
+const moveError = (message: string, errorCode?: PresetOperationErrorCode): PresetEntryMoveError => ({
   status: 'error',
   message,
+  ...(errorCode ? { errorCode } : {}),
 });
 
 const planPresetEntryMove = (
@@ -156,7 +159,7 @@ export const preparePresetEntryMove = (
         ),
     )
   ) {
-    return moveError('An item or folder with that name already exists.');
+    return moveError('An item or folder with that name already exists.', 'name-conflict');
   }
 
   return {
@@ -168,12 +171,13 @@ export const preparePresetEntryMove = (
   };
 };
 
-export const canMovePresetEntriesTo = (
+// Hover also opens folders so users can reach a non-conflicting subfolder.
+// Name occupancy is checked when the move is actually submitted.
+export const canHoverPresetMoveDestination = (
   entries: readonly PresetEntrySelectionItem[],
   destination: PresetEntryMoveDestination,
-  occupiedPaths: readonly PresetEntryPath[] = [],
 ): boolean => {
-  const result = preparePresetEntryMove(entries, destination, occupiedPaths);
+  const result = preparePresetEntryMove(entries, destination);
   return result.status === 'ok'
     && result.plans.some((plan) => !plan.isNoop);
 };

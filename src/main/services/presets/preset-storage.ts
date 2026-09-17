@@ -1,3 +1,4 @@
+import { PresetNameConflictError } from '../../../shared/preset/operation-error';
 import { app, shell } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { constants, type Dirent } from 'node:fs';
@@ -272,7 +273,7 @@ export class PresetStorage {
       } catch (error) {
         const code = (error as NodeJS.ErrnoException).code;
         if (code === 'EEXIST') {
-          throw new Error('An item or folder with that name already exists.', { cause: error });
+          throw new PresetNameConflictError({ cause: error });
         }
         if (code === 'ENOENT' || code === 'ENOTDIR') {
           throw new Error('Parent folder does not exist.', { cause: error });
@@ -594,10 +595,7 @@ export class PresetStorage {
           await mkdir(entry.filePath);
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-            throw new Error(
-              'An item or folder with that name already exists.',
-              { cause: error },
-            );
+            throw new PresetNameConflictError({ cause: error });
           }
           throw error;
         }
@@ -619,10 +617,7 @@ export class PresetStorage {
           }
         }
         if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-          throw new Error(
-            'An item or folder with that name already exists.',
-            { cause: error },
-          );
+          throw new PresetNameConflictError({ cause: error });
         }
         throw error;
       }
@@ -633,10 +628,7 @@ export class PresetStorage {
       await link(entry.sourcePath, entry.filePath);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-        throw new Error(
-          'An item or folder with that name already exists.',
-          { cause: error },
-        );
+        throw new PresetNameConflictError({ cause: error });
       }
       try {
         await copyFile(
@@ -646,10 +638,7 @@ export class PresetStorage {
         );
       } catch (copyError) {
         if ((copyError as NodeJS.ErrnoException).code === 'EEXIST') {
-          throw new Error(
-            'An item or folder with that name already exists.',
-            { cause: copyError },
-          );
+          throw new PresetNameConflictError({ cause: copyError });
         }
         throw copyError;
       }
@@ -703,7 +692,7 @@ export class PresetStorage {
         ),
     );
     if (hasCollision) {
-      throw new Error('An item or folder with that name already exists.');
+      throw new PresetNameConflictError();
     }
   }
 
@@ -717,7 +706,7 @@ export class PresetStorage {
       throw error;
     }
 
-    throw new Error('An item or folder with that name already exists.');
+    throw new PresetNameConflictError();
   }
 
   private async ensureEntryTargetAvailable(
@@ -749,7 +738,7 @@ export class PresetStorage {
         && name.toLocaleLowerCase('en-US') === targetKey,
     );
     if (hasCollision) {
-      throw new Error('An item or folder with that name already exists.');
+      throw new PresetNameConflictError();
     }
   }
 

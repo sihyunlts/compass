@@ -1,3 +1,4 @@
+import { TransientFeedback } from './transient-feedback';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { UpdateCheckResponse } from '../../shared/contracts/ipc/releases';
 import type { EditorSession } from '../features/editor/session.svelte';
@@ -72,9 +73,14 @@ class SettingsController {
 
   private playbackSession: PlaybackSessionController | null = null;
 
-  private paletteFeedbackTimer: number | null = null;
+  private readonly paletteFeedback = new TransientFeedback((message) => {
+    this.state.paletteDescriptionOverride = message;
+  });
 
-  private aboutFeedbackTimer: number | null = null;
+  private readonly aboutFeedback = new TransientFeedback((message) => {
+    this.state.aboutDescriptionOverride = message;
+    this.state.aboutDescriptionTone = message ? 'error' : 'neutral';
+  });
 
   public constructor(private readonly options: SettingsControllerOptions) {
     this.paletteController = createPaletteController({
@@ -129,8 +135,7 @@ class SettingsController {
       }
 
       this.playbackSession?.renderPreviewFrame();
-      this.clearPaletteFeedbackTimer();
-      this.state.paletteDescriptionOverride = '';
+      this.paletteFeedback.clear();
     } catch {
       this.showPaletteError(i18n.t('settings.paletteLoadFailed'));
     } finally {
@@ -240,26 +245,18 @@ class SettingsController {
   }
 
   public dispose(): void {
-    this.clearPaletteFeedbackTimer();
-    this.clearAboutFeedbackTimer();
+    this.paletteFeedback.clear();
+    this.aboutFeedback.clear();
   }
 
   private showPaletteDescription(
     message: string,
   ): void {
-    this.state.paletteDescriptionOverride = message;
-    this.clearPaletteFeedbackTimer();
-    this.paletteFeedbackTimer = window.setTimeout(() => {
-      this.paletteFeedbackTimer = null;
-      if (this.state.paletteDescriptionOverride === message) {
-        this.state.paletteDescriptionOverride = '';
-      }
-    }, 2500);
+    this.paletteFeedback.show(message);
   }
 
   private showPaletteError(summary: string): void {
-    this.state.paletteDescriptionOverride = summary;
-    this.clearPaletteFeedbackTimer();
+    this.paletteFeedback.show(summary, false);
   }
 
   private resolvePaletteUploadErrorSummary(error: unknown): string {
@@ -280,34 +277,7 @@ class SettingsController {
       ? error.message.trim()
       : i18n.t('settings.unknownError');
     const message = `${summary} | ${detail}`;
-    this.state.aboutDescriptionOverride = message;
-    this.state.aboutDescriptionTone = 'error';
-    this.clearAboutFeedbackTimer();
-    this.aboutFeedbackTimer = window.setTimeout(() => {
-      this.aboutFeedbackTimer = null;
-      if (this.state.aboutDescriptionOverride === message) {
-        this.state.aboutDescriptionOverride = '';
-        this.state.aboutDescriptionTone = 'neutral';
-      }
-    }, 2500);
-  }
-
-  private clearPaletteFeedbackTimer(): void {
-    if (this.paletteFeedbackTimer === null) {
-      return;
-    }
-
-    window.clearTimeout(this.paletteFeedbackTimer);
-    this.paletteFeedbackTimer = null;
-  }
-
-  private clearAboutFeedbackTimer(): void {
-    if (this.aboutFeedbackTimer === null) {
-      return;
-    }
-
-    window.clearTimeout(this.aboutFeedbackTimer);
-    this.aboutFeedbackTimer = null;
+    this.aboutFeedback.show(message);
   }
 }
 
