@@ -3,10 +3,8 @@ import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { EditorSession } from '../features/editor/session.svelte';
 import type { HeaderIndicatorController } from './header-indicator.svelte';
 import { downloadGeneratedPreviewMidi } from './midi-download';
-import {
-  createPreviewSourceKey,
-  type PlaybackSessionController,
-} from './playback-session.svelte';
+import type { PlaybackSessionController } from './playback-session.svelte';
+import { createPreviewSourceKey } from '../features/preview/generation-session.svelte';
 import { i18n } from '../i18n.svelte';
 
 type ResultDeliveryMode = 'ableton' | 'midi-download';
@@ -85,7 +83,7 @@ class ResultDeliveryFlowController {
       const launchpadModel = uiState.launchpadModel;
       const sourceChain = cloneChainForIpc(uiState.chainState);
       const sourceKey = createPreviewSourceKey(uiState.previewSourceRevision, sourceChain);
-      const preview = await playbackSession.generatePreviewForDelivery({
+      const preview = await playbackSession.resolvePreviewForDelivery({
         sourceChain,
         sourceKey,
         loopLengthBeats: bridge.autoCreateLengthBeats,

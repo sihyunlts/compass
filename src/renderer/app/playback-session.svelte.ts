@@ -1,5 +1,3 @@
-import { scaleGeneratorPreviewToLoopLength } from '../../domain/generator-preview';
-import { NORMALIZED_SOURCE_TIMELINE_END_BEAT } from '../../domain/note-generation-types';
 import type { BridgeSettings } from '../../shared/bridge/types';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { GeneratorPreview } from '../../shared/contracts/preview/generator-preview';
@@ -23,12 +21,17 @@ import {
   createPreviewWindowStatePusher,
 } from './playback-runtime';
 import { sanitizePreviewBpm } from '../features/editor/persistence-storage';
-import { createPreviewGenerationWorkerClient } from '../features/preview/generation-worker-client';
 import {
-  PREVIEW_GENERATION_POLICY,
-  type PreviewGenerationReason,
-  type ScheduledPreviewGenerationReason,
-} from '../features/preview/generation-reason';
+  createPreviewGenerationSession,
+  createPreviewSourceKey,
+  isPreviewGenerationCancelled,
+  type PreviewPlaybackRequest,
+} from '../features/preview/generation-session.svelte';
+import {
+  PREVIEW_UPDATE_POLICY,
+  type PreviewUpdateReason,
+  type ScheduledPreviewUpdateReason,
+} from '../features/preview/update-reason';
 import type { HeaderIndicatorController } from './header-indicator.svelte';
 import { i18n } from '../i18n.svelte';
 import { buildTouchBarTimelineFrameStrip } from './touchbar-timeline';
@@ -36,13 +39,12 @@ import { buildTouchBarTimelineFrameStrip } from './touchbar-timeline';
 interface PlaybackSessionState {
   currentBeat: number;
   isPlaying: boolean;
-  isPreviewGenerating: boolean;
 }
 
 interface ApplyPreviewResultInput {
   preview: GeneratorPreview;
   bridge: BridgeSettings | null;
-  reason: PreviewGenerationReason;
+  reason: PreviewUpdateReason;
   sourceChain: GeneratorChain;
   sourceKey: string;
   launchpadModel: LaunchpadModel;
@@ -70,19 +72,6 @@ interface PlaybackSessionOptions {
   scrubMax?: number;
 }
 
-interface PreviewGenerationSource {
-  sourceChain: GeneratorChain;
-  sourceKey: string;
-  loopLengthBeats: number;
-  launchpadModel: LaunchpadModel;
-}
-
-interface CachedNormalizedPreview {
-  sourceKey: string;
-  launchpadModel: LaunchpadModel;
-  preview: GeneratorPreview;
-}
-
 type PreviewVisualPhase =
   | 'disabled'
   | 'armed'
@@ -92,46 +81,23 @@ type PreviewVisualPhase =
 
 const DEFAULT_PREVIEW_WINDOW_STATE_MAX_FPS = 120;
 
-const hashPreviewSource = (chain: GeneratorChain): string => {
-  const source = JSON.stringify(chain);
-  let hash = 2166136261;
-  for (let index = 0; index < source.length; index += 1) {
-    hash ^= source.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `${(hash >>> 0).toString(16)}-${source.length}`;
-};
-
-export const createPreviewSourceKey = (
-  sourceRevision: number,
-  chain: GeneratorChain,
-): string =>
-  `chain:${sourceRevision}:${hashPreviewSource(chain)}`;
-
 export class PlaybackSessionController {
   public readonly state: PlaybackSessionState = $state({
     currentBeat: 0,
     isPlaying: false,
-    isPreviewGenerating: false,
   });
 
   private readonly previewWindowStatePusher: ReturnType<typeof createPreviewWindowStatePusher>;
 
   private playbackScheduler: ReturnType<typeof createPlaybackScheduler> | null = null;
 
-  private readonly previewGenerator = createPreviewGenerationWorkerClient();
+  private readonly previewGeneration = createPreviewGenerationSession();
 
-  private previewGenerationRequestId = 0;
+  private previewUpdateId = 0;
 
-  private previewGenerationPurpose: 'preview' | 'delivery' | null = null;
-
-  private latestNormalizedPreview: CachedNormalizedPreview | null = null;
-
-  private pendingNormalizedPreview: {
-    sourceKey: string;
-    launchpadModel: LaunchpadModel;
-    promise: Promise<GeneratorPreview>;
-  } | null = null;
+  public get isPreviewGenerating(): boolean {
+    return this.previewGeneration.isGenerating;
+  }
 
   private previewVisualStartedAtMs: number | null = null;
 
@@ -187,12 +153,10 @@ export class PlaybackSessionController {
   }
 
   public dispose(): void {
+    this.previewUpdateId += 1;
     this.playbackScheduler?.teardown();
     this.playbackScheduler = null;
-    this.previewGenerationRequestId += 1;
-    this.previewGenerator.dispose();
-    this.pendingNormalizedPreview = null;
-    this.latestNormalizedPreview = null;
+    this.previewGeneration.dispose();
     this.previewWindowStatePusher.reset();
     this.options.previewSession.commands.resetCaches();
   }
@@ -269,11 +233,12 @@ export class PlaybackSessionController {
     this.previewWindowStatePusher.push(nextPreviewWindowState);
   }
 
-  public async runPreview(reason: ScheduledPreviewGenerationReason): Promise<void> {
-    if (this.previewGenerationPurpose === 'delivery') {
+  public async updatePreview(reason: ScheduledPreviewUpdateReason): Promise<void> {
+    if (this.previewGeneration.isDeliveryPending) {
       return;
     }
 
+    const updateId = ++this.previewUpdateId;
     if (reason !== 'initial') {
       this.resetPlaybackForPreviewReplacement(reason);
     }
@@ -286,15 +251,16 @@ export class PlaybackSessionController {
       const loopLengthBeats = uiState.previewLoopLengthBeats;
       const sourceChain = cloneChainForIpc(uiState.chainState);
       const sourceKey = createPreviewSourceKey(sourceRevision, sourceChain);
-      const preview = await this.resolveGeneratedPreview({
+      const preview = await this.previewGeneration.resolve({
         sourceChain,
         sourceKey,
         loopLengthBeats,
         launchpadModel,
-      }, reason);
+      }, 'preview');
 
       if (
-        uiState.previewSourceRevision !== sourceRevision
+        updateId !== this.previewUpdateId
+        || uiState.previewSourceRevision !== sourceRevision
         || uiState.previewLoopLengthBeats !== loopLengthBeats
         || uiState.launchpadModel !== launchpadModel
       ) {
@@ -308,9 +274,10 @@ export class PlaybackSessionController {
         sourceChain,
         sourceKey,
         launchpadModel,
+        announce: reason !== 'playback-length-change',
       });
     } catch (error) {
-      if (isPreviewGenerationCancelled(error)) {
+      if (updateId !== this.previewUpdateId || isPreviewGenerationCancelled(error)) {
         return;
       }
       this.stopPlayback();
@@ -323,10 +290,10 @@ export class PlaybackSessionController {
     }
   }
 
-  public async generatePreviewForDelivery(
-    input: PreviewGenerationSource,
+  public async resolvePreviewForDelivery(
+    input: PreviewPlaybackRequest,
   ): Promise<GeneratorPreview> {
-    return this.resolveGeneratedPreview(input, 'delivery');
+    return this.previewGeneration.resolve(input, 'delivery');
   }
 
   public setHardwareFrameSink(
@@ -339,7 +306,7 @@ export class PlaybackSessionController {
   public applyPreviewResult(input: ApplyPreviewResultInput): void {
     const { editorSession, previewSession } = this.options;
     const shouldAnnounce = input.announce ?? true;
-    const shouldRestartPlayback = PREVIEW_GENERATION_POLICY[input.reason].restartPlayback;
+    const shouldRestartPlayback = PREVIEW_UPDATE_POLICY[input.reason].restartPlayback;
     if (shouldRestartPlayback && this.state.isPlaying) {
       this.stopPlayback();
     }
@@ -421,6 +388,7 @@ export class PlaybackSessionController {
   }
 
   public prepareForDelivery(): void {
+    this.previewUpdateId += 1;
     this.consumePreviewVisual();
     this.stopPlayback();
   }
@@ -524,83 +492,10 @@ export class PlaybackSessionController {
       || this.previewVisualPhase === 'active';
   }
 
-  private async resolveGeneratedPreview(
-    input: PreviewGenerationSource,
-    reason: PreviewGenerationReason,
-  ): Promise<GeneratorPreview> {
-    let preview = this.resolveCachedNormalizedPreview(input);
-    if (!preview) {
-      let pending = this.pendingNormalizedPreview;
-      if (
-        !pending
-        || pending.sourceKey !== input.sourceKey
-        || pending.launchpadModel !== input.launchpadModel
-      ) {
-        pending = {
-          sourceKey: input.sourceKey,
-          launchpadModel: input.launchpadModel,
-          promise: this.generateNormalizedPreview(input, reason),
-        };
-        this.pendingNormalizedPreview = pending;
-      } else if (reason === 'delivery') {
-        this.previewGenerationPurpose = 'delivery';
-      }
-      preview = await pending.promise;
-    }
-    return scaleGeneratorPreviewToLoopLength(preview, input.loopLengthBeats);
-  }
-
-  private async generateNormalizedPreview(
-    input: PreviewGenerationSource,
-    reason: PreviewGenerationReason,
-  ): Promise<GeneratorPreview> {
-    const requestId = this.beginPreviewGeneration(reason);
-    try {
-      await waitForNextAnimationFrame();
-      if (requestId !== this.previewGenerationRequestId) {
-        throw new Error('Preview generation cancelled');
-      }
-      const preview = await this.previewGenerator.generate({
-        sourceChain: input.sourceChain,
-        loopLengthBeats: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
-        launchpadModel: input.launchpadModel,
-      });
-
-      if (requestId !== this.previewGenerationRequestId) {
-        throw new Error('Preview generation cancelled');
-      }
-
-      this.latestNormalizedPreview = {
-        sourceKey: input.sourceKey,
-        launchpadModel: input.launchpadModel,
-        preview,
-      };
-      return preview;
-    } finally {
-      if (requestId === this.previewGenerationRequestId) {
-        this.state.isPreviewGenerating = false;
-        this.previewGenerationPurpose = null;
-        this.pendingNormalizedPreview = null;
-      }
-    }
-  }
-
-  private beginPreviewGeneration(reason: PreviewGenerationReason): number {
-    const purpose = reason === 'delivery' ? 'delivery' : 'preview';
-    this.previewGenerationRequestId += 1;
-    this.previewGenerationPurpose = purpose;
-    this.state.isPreviewGenerating = true;
-    if (purpose === 'delivery') {
-      this.consumePreviewVisual();
-      this.stopPlayback();
-    }
-    return this.previewGenerationRequestId;
-  }
-
   private resetPlaybackForPreviewReplacement(
-    reason: Exclude<ScheduledPreviewGenerationReason, 'initial'>,
+    reason: Exclude<ScheduledPreviewUpdateReason, 'initial'>,
   ): void {
-    const previewVisualPolicy = PREVIEW_GENERATION_POLICY[reason].previewVisual;
+    const previewVisualPolicy = PREVIEW_UPDATE_POLICY[reason].previewVisual;
     if (previewVisualPolicy === 'rearm') {
       if (this.previewVisualPhase !== 'disabled') {
         this.previewVisualPhase = 'armed';
@@ -626,29 +521,8 @@ export class PlaybackSessionController {
     }
     this.previewVisualStartedAtMs = null;
   }
-
-  private resolveCachedNormalizedPreview(input: PreviewGenerationSource): GeneratorPreview | null {
-    const cached = this.latestNormalizedPreview;
-    if (
-      cached
-      && cached.sourceKey === input.sourceKey
-      && cached.launchpadModel === input.launchpadModel
-    ) {
-      return cached.preview;
-    }
-
-    return null;
-  }
 }
 
 export const createPlaybackSession = (
   options: PlaybackSessionOptions,
 ): PlaybackSessionController => new PlaybackSessionController(options);
-
-const waitForNextAnimationFrame = (): Promise<void> =>
-  new Promise((resolve) => {
-    window.requestAnimationFrame(() => resolve());
-  });
-
-const isPreviewGenerationCancelled = (error: unknown): boolean =>
-  error instanceof Error && error.message === 'Preview generation cancelled';

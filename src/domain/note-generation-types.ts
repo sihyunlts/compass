@@ -1,10 +1,13 @@
 import type { GeneratorChain, LaunchpadButton, LaunchpadModel } from '../shared/model';
 import type { ButtonIndex } from '../core/pipeline/types';
 
-export interface GenerateNotesInput {
+export interface GeneratePatternInput {
   chain: GeneratorChain;
-  loopLengthBeats: number;
   launchpadModel?: LaunchpadModel;
+}
+
+export interface GenerateNotesInput extends GeneratePatternInput {
+  loopLengthBeats: number;
 }
 
 export interface RuntimeMapData {

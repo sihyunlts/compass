@@ -10,7 +10,6 @@ import type {
 
 interface PreviewGenerationInput {
   sourceChain: GeneratorChain;
-  loopLengthBeats: number;
   launchpadModel: LaunchpadModel;
 }
 

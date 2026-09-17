@@ -1,5 +1,5 @@
 import { toGeneratorPreview } from '../../../domain/generator-preview';
-import { buildGeneratedFieldResult } from '../../../domain/field-result';
+import { buildNormalizedFieldResult } from '../../../domain/field-result';
 import { resolveEvenlySpacedSampleIndices } from '../../../shared/even-sampling';
 import type {
   PreviewGenerationRequest,
@@ -20,9 +20,8 @@ workerScope.addEventListener('message', (event: MessageEvent<PreviewGenerationRe
   const request = event.data;
 
   try {
-    const generated = buildGeneratedFieldResult({
+    const generated = buildNormalizedFieldResult({
       chain: request.sourceChain,
-      loopLengthBeats: request.loopLengthBeats,
       launchpadModel: request.launchpadModel,
     });
     if (request.kind === 'led-frames') {

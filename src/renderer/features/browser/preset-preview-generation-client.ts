@@ -37,7 +37,6 @@ class PresetPreviewGenerationClient {
 
     return this.workerClient.generateLedFrames({
       sourceChain: input.sourceChain,
-      loopLengthBeats: 1,
       frameCount: input.frameCount,
       launchpadModel: input.launchpadModel,
     }).then((ledFrames) => {

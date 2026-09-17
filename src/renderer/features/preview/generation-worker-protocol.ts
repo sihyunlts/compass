@@ -7,7 +7,6 @@ import type { GeneratorChain, LaunchpadModel } from '../../../shared/model';
 interface PreviewGenerationRequestBase {
   requestId: number;
   sourceChain: GeneratorChain;
-  loopLengthBeats: number;
   launchpadModel: LaunchpadModel;
 }
 

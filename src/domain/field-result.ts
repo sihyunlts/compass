@@ -1,9 +1,9 @@
-import { scaleClipNoteTimes } from './note-utils';
+import { scalePlaybackTiming } from './playback-timing';
 import { NOTE_SAMPLES_PER_BEAT } from '../core/pipeline/constants';
 import {
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
   type GenerateNotesInput,
-  type RuntimeMapData,
+  type GeneratePatternInput,
 } from './note-generation-types';
 import { buildRuntimeMapData } from './runtime-map';
 import { buildCanonicalFieldResult } from '../generation/engine';
@@ -39,20 +39,11 @@ const createEmptyFieldResult = (): GeneratedRuntimeFieldResult => ({
   ledFramesBySampleIndex: [[]],
 });
 
-const buildGeneratedFieldResultWithRuntimeMap = ({
+export const buildNormalizedFieldResult = ({
   chain,
-  loopLengthBeats,
-  runtimeMap,
-}: {
-  chain: GenerateNotesInput['chain'];
-  loopLengthBeats: number;
-  runtimeMap: RuntimeMapData;
-}): GeneratedRuntimeFieldResult => {
-  if (!Number.isFinite(loopLengthBeats) || loopLengthBeats <= 0) {
-    return createEmptyFieldResult();
-  }
-
-  const projectionContext = createLaunchpadProjectionContext(runtimeMap);
+  launchpadModel,
+}: GeneratePatternInput): GeneratedRuntimeFieldResult => {
+  const projectionContext = createLaunchpadProjectionContext(buildRuntimeMapData(launchpadModel));
   const generated = buildCanonicalFieldResult(
     chain,
     projectionContext.outputAdapter,
@@ -69,23 +60,23 @@ const buildGeneratedFieldResultWithRuntimeMap = ({
     activeByPitchFrames,
     generated.timeline,
   );
-  const scaledNotes = scaleClipNoteTimes(notes, loopLengthBeats);
-  const sampleStepBeats = loopLengthBeats / Math.max(generated.timeline.frameCount, 1);
+  const sampleStepBeats = NORMALIZED_SOURCE_TIMELINE_END_BEAT
+    / Math.max(generated.timeline.frameCount, 1);
   const ledFramesBySampleIndex = toLedFramesFromActivePitches(activeByPitchFrames);
   return {
-    notes: scaledNotes,
-    sourceTimelineEndBeat: loopLengthBeats,
+    notes,
+    sourceTimelineEndBeat: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
     sampleStepBeats,
     ledFramesBySampleIndex,
   };
 };
 
 export const buildGeneratedFieldResult = ({
-  chain,
   loopLengthBeats,
-  launchpadModel,
-}: GenerateNotesInput): GeneratedRuntimeFieldResult => buildGeneratedFieldResultWithRuntimeMap({
-  chain,
-  loopLengthBeats,
-  runtimeMap: buildRuntimeMapData(launchpadModel),
-});
+  ...patternInput
+}: GenerateNotesInput): GeneratedRuntimeFieldResult => {
+  if (!Number.isFinite(loopLengthBeats) || loopLengthBeats <= 0) {
+    return createEmptyFieldResult();
+  }
+  return scalePlaybackTiming(buildNormalizedFieldResult(patternInput), loopLengthBeats);
+};

@@ -100,7 +100,7 @@
   const editorSession = createEditorSession({
     autoPreviewDebounceMs: AUTO_PREVIEW_DEBOUNCE_MS,
     historyMaxEntries: HISTORY_MAX_ENTRIES,
-    onAutoPreview: ({ reason }) => playbackSession.runPreview(reason),
+    onAutoPreview: ({ reason }) => playbackSession.updatePreview(reason),
     onSyncAfterRender: () => syncRackAfterRender(),
   });
   const previewSession = createPreviewSession();
@@ -847,7 +847,7 @@
             onPopout={() => playbackSession.openPreviewPopout()}
             canPopout={!isWebFallback}
             isPlaying={playbackSession.state.isPlaying}
-            isGenerating={playbackSession.state.isPreviewGenerating}
+            isGenerating={playbackSession.isPreviewGenerating}
             loopEnabled={uiState.isPreviewLoopEnabled}
             onPlayClick={() => playbackSession.togglePlayback()}
             onLoopToggle={() => playbackSession.togglePreviewLoop()}

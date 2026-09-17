@@ -114,7 +114,7 @@ import {
   type RackSelectionSnapshot,
 } from './selectors';
 import type { ChainHistoryKind } from './history-core';
-import type { ScheduledPreviewGenerationReason } from '../preview/generation-reason';
+import type { ScheduledPreviewUpdateReason } from '../preview/update-reason';
 
 const DEFAULT_AUTO_PREVIEW_DEBOUNCE_MS = 120;
 const DEFAULT_HISTORY_MAX_ENTRIES = 100;
@@ -171,7 +171,7 @@ export interface EditorRackBinding {
 }
 
 interface AutoPreviewRequest {
-  reason: ScheduledPreviewGenerationReason;
+  reason: ScheduledPreviewUpdateReason;
 }
 
 interface EditorSessionOptions {
@@ -195,7 +195,7 @@ export class EditorSession {
 
   private autoPreviewTimer: number | null = null;
 
-  private pendingAutoPreviewReason: ScheduledPreviewGenerationReason | null = null;
+  private pendingAutoPreviewReason: ScheduledPreviewUpdateReason | null = null;
 
   private rackBinding: EditorRackBinding | null = null;
 
@@ -338,7 +338,7 @@ export class EditorSession {
     },
     handleAutoCreateLengthChange: (): void => {
       handleAutoCreateLengthChange(this.state, (delayMs = 0) =>
-        this.scheduleAutoPreview(delayMs, this.pendingAutoPreviewReason ?? 'output-change'));
+        this.scheduleAutoPreview(delayMs, this.pendingAutoPreviewReason ?? 'playback-length-change'));
     },
     undo: (): boolean => this.undo(),
     redo: (): boolean => this.redo(),
@@ -450,7 +450,7 @@ export class EditorSession {
   }
 
   private requestRegeneratedPreview(
-    reason: Exclude<ScheduledPreviewGenerationReason, 'initial'>,
+    reason: Exclude<ScheduledPreviewUpdateReason, 'initial' | 'playback-length-change'>,
     delayMs: number,
   ): void {
     this.state.previewSourceRevision += 1;
@@ -459,7 +459,7 @@ export class EditorSession {
 
   private scheduleAutoPreview(
     delayMs: number,
-    reason: ScheduledPreviewGenerationReason,
+    reason: ScheduledPreviewUpdateReason,
   ): void {
     this.cancelAutoPreview();
     this.pendingAutoPreviewReason = reason;

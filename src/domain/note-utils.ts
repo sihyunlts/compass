@@ -15,12 +15,3 @@ export const toClipNote = (note: ClipNoteWithOrigin): ClipNote => ({
   durationBeats: note.durationBeats,
   velocity: note.velocity,
 });
-
-export const scaleClipNoteTimes = <T extends ClipNote>(
-  notes: ReadonlyArray<T>,
-  ratio: number,
-): T[] => notes.map((note) => ({
-  ...note,
-  startBeat: note.startBeat * ratio,
-  durationBeats: note.durationBeats * ratio,
-}));
