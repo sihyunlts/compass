@@ -356,6 +356,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--gap-16);
+    min-width: 0;
   }
 
   .sidebar-settings-section {

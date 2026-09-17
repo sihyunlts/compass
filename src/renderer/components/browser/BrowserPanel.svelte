@@ -1,6 +1,8 @@
 <script lang="ts">
   import { touchGestures } from '../../features/touch-gestures';
   import { onDestroy, onMount, tick } from 'svelte';
+  import { fade, fly } from 'svelte/transition';
+  import { prefersReducedMotion } from 'svelte/motion';
 
   import type { RendererDeviceKind } from '../../../devices';
   import type { AppLocale } from '../../../shared/i18n';
@@ -74,6 +76,11 @@
   import { resolvePresetFileErrorMessage } from '../../features/browser/preset-file-error';
   import { resolvePresetBrowserEntryIcon } from '../../features/browser/preset-entry-presentation';
   import { hint, type HintInput } from '../overlays/hint';
+  import {
+    BROWSER_SETTINGS_FADE_DURATION_MS,
+    BROWSER_SETTINGS_SPRING_TRANSITION,
+    browserSettingsFadeEasing,
+  } from './browser-panel-motion';
 
   interface VisibleTreeRow {
     node: VisibleBrowserTreeNode;
@@ -100,6 +107,7 @@
   type VisibleBrowserTreeNode = BrowserTreeNode | PendingPresetFolderNode;
 
   const presetPreviewHintController = createPresetPreviewHintController();
+  const BROWSER_SETTINGS_TRANSITION_DISTANCE_PX = 40;
 
   onDestroy(() => presetPreviewHintController.dispose());
 
@@ -492,6 +500,36 @@
   let focusedRowId = $state<string | null>(null);
   let detachedKeyboardFocusRowId = $state<string | null>(null);
   let browserPagePanelEl = $state<HTMLDivElement | null>(null);
+  let browserPageTransitionsEnabled = $state(false);
+
+  const shouldAnimateBrowserPageTransition = (): boolean =>
+    browserPageTransitionsEnabled
+    && !reduceAnimation
+    && !prefersReducedMotion.current;
+
+  const browserPageFade = (node: Element) => {
+    if (!shouldAnimateBrowserPageTransition()) {
+      return { duration: 0 };
+    }
+
+    return fade(node, {
+      duration: BROWSER_SETTINGS_FADE_DURATION_MS,
+      easing: browserSettingsFadeEasing,
+    });
+  };
+
+  const browserLibraryFly = (node: Element) => {
+    if (!shouldAnimateBrowserPageTransition()) {
+      return { duration: 0 };
+    }
+
+    return fly(node, {
+      x: BROWSER_SETTINGS_TRANSITION_DISTANCE_PX,
+      opacity: 1,
+      duration: BROWSER_SETTINGS_SPRING_TRANSITION.durationMs,
+      easing: BROWSER_SETTINGS_SPRING_TRANSITION.easing,
+    });
+  };
 
   const BROWSER_PAGE_EDGE_TRANSITION_DISTANCE_PX = 32;
   const BROWSER_PAGE_EDGE_MASK_DEPTH = 0.8;
@@ -1377,6 +1415,7 @@
   });
 
   onMount(() => {
+    browserPageTransitionsEnabled = true;
     const unmountPresetMoveDrag = presetMoveDrag.mount();
     const unmountOutsideSelectionClear = browserSelection.mountClearOnOutsidePointer(
       '[data-browser-row-id]',
@@ -1470,40 +1509,55 @@
           && presetMoveDrag.destination.relativePath.length === 0
         }
       >
-        <div>
+        <div class="browser-page-content" class:is-settings={activePage === 'settings'}>
       {#if activePage === 'settings'}
-        <SidebarSettingsPage
-          {launchpadMk2Enabled}
-          {locale}
-          {reduceAnimation}
-          {reduceBlur}
-          {canConfigureMidiSaveButton}
-          {showMidiSaveButton}
-          {themePreset}
-          {themeHue}
-          {themeSaturation}
-          {paletteDescription}
-          {appVersionText}
-          {updateCheckText}
-          {updateAvailable}
-          {aboutDescription}
-          {aboutDescriptionTone}
-          {githubDescription}
-          onLaunchpadModelToggle={onLaunchpadModelToggle}
-          onLocaleChange={onLocaleChange}
-          onReduceAnimationToggle={onReduceAnimationToggle}
-          onReduceBlurToggle={onReduceBlurToggle}
-          onShowMidiSaveButtonToggle={onShowMidiSaveButtonToggle}
-          onThemePresetChange={onThemePresetChange}
-          onThemeHueChange={onThemeHueChange}
-          onThemeSaturationChange={onThemeSaturationChange}
-          onPaletteReset={onPaletteReset}
-          onPaletteFileChange={onPaletteFileChange}
-          onOpenAboutSite={onOpenAboutSite}
-          onOpenGitHub={onOpenGitHub}
-          onOpenLatestReleasePage={onOpenLatestReleasePage}
-        />
+        <div
+          class="browser-settings-page"
+          in:browserPageFade
+          out:browserPageFade
+        >
+          <SidebarSettingsPage
+            {launchpadMk2Enabled}
+            {locale}
+            {reduceAnimation}
+            {reduceBlur}
+            {canConfigureMidiSaveButton}
+            {showMidiSaveButton}
+            {themePreset}
+            {themeHue}
+            {themeSaturation}
+            {paletteDescription}
+            {appVersionText}
+            {updateCheckText}
+            {updateAvailable}
+            {aboutDescription}
+            {aboutDescriptionTone}
+            {githubDescription}
+            onLaunchpadModelToggle={onLaunchpadModelToggle}
+            onLocaleChange={onLocaleChange}
+            onReduceAnimationToggle={onReduceAnimationToggle}
+            onReduceBlurToggle={onReduceBlurToggle}
+            onShowMidiSaveButtonToggle={onShowMidiSaveButtonToggle}
+            onThemePresetChange={onThemePresetChange}
+            onThemeHueChange={onThemeHueChange}
+            onThemeSaturationChange={onThemeSaturationChange}
+            onPaletteReset={onPaletteReset}
+            onPaletteFileChange={onPaletteFileChange}
+            onOpenAboutSite={onOpenAboutSite}
+            onOpenGitHub={onOpenGitHub}
+            onOpenLatestReleasePage={onOpenLatestReleasePage}
+          />
+        </div>
       {:else}
+        <div
+          class="browser-library-page"
+          in:browserLibraryFly
+          out:browserLibraryFly
+        >
+        <div
+          in:browserPageFade
+          out:browserPageFade
+        >
         {#if presetErrorText}
           <p class="browser-status browser-status-error">{presetErrorText}</p>
         {/if}
@@ -1625,6 +1679,8 @@
             </li>
           {/each}
         </ul>
+        </div>
+        </div>
       {/if}
         </div>
       </div>
@@ -1794,6 +1850,35 @@
       background: var(--color-surface-interactive);
       border-radius: var(--radius-4);
     }
+  }
+
+  .browser-page-content {
+    position: relative;
+    width: 100%;
+
+    &.is-settings {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+  }
+
+  .browser-settings-page {
+    // Keep the final content width while the panel expands from its current width.
+    // At the target panel width this resolves to the actual available space.
+    width: calc(100% + var(--settings-sidebar-width) - var(--browser-panel-width));
+  }
+
+  .browser-page-content.is-settings > .browser-library-page {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+  }
+
+  .browser-page-content:not(.is-settings) > .browser-settings-page {
+    position: absolute;
+    top: 0;
+    right: 0;
   }
 
   .browser-tree-list {

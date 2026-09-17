@@ -4,6 +4,7 @@
    * Delegates non-visual orchestration to renderer/app modules and keeps UI wiring here.
    */
   import { onMount, tick, untrack } from 'svelte';
+  import { Spring, prefersReducedMotion } from 'svelte/motion';
 
   import { clamp } from '../shared/math';
   import { AUTO_CREATE_LENGTH_OPTIONS } from '../shared/beat-length';
@@ -38,6 +39,7 @@
   import ContextMenu from './components/overlays/ContextMenu.svelte';
   import BrowserPresetSaveDialog from './components/overlays/BrowserPresetSaveDialog.svelte';
   import ModalDialog from './components/overlays/ModalDialog.svelte';
+  import { BROWSER_SETTINGS_SPRING_OPTIONS } from './components/browser/browser-panel-motion';
   import AuthoredInfoDialog from './components/overlays/AuthoredInfoDialog.svelte';
   import WorkspaceRackTitle from './components/rack/WorkspaceRackTitle.svelte';
   import { createPresetController } from './app/preset-controller.svelte';
@@ -106,6 +108,18 @@
   const previewSession = createPreviewSession();
   let badAppleAnimation: BadAppleAnimation | null = $state(null);
   const uiState = editorSession.state;
+  const browserSettingsProgress = new Spring(
+    uiState.sidebarPage === 'settings' ? 1 : 0,
+    BROWSER_SETTINGS_SPRING_OPTIONS,
+  );
+  const browserPanelWidthPx = $derived.by(() => {
+    const widthProgress = browserWidthIsImmediate
+      ? browserSettingsTarget
+      : browserSettingsProgress.current;
+
+    return uiState.sidebarWidthPx
+      + (SETTINGS_SIDEBAR_WIDTH_PX - uiState.sidebarWidthPx) * widthProgress;
+  });
   const previewState = previewSession.state;
   const deliveryButtonMessageKeys = {
     idle: isWebFallback ? 'status.download' : 'status.send',
@@ -161,6 +175,10 @@
   });
   const presetState = presetController.state;
   const settingsState = settingsController.state;
+  const browserSettingsTarget = $derived(uiState.sidebarPage === 'settings' ? 1 : 0);
+  const browserWidthIsImmediate = $derived(
+    uiState.isSidebarResizing || settingsState.reduceAnimation || prefersReducedMotion.current,
+  );
   const paletteDescription = $derived.by(() => {
     if (settingsState.paletteDescriptionOverride) {
       return settingsState.paletteDescriptionOverride;
@@ -602,6 +620,10 @@
     };
   });
 
+  $effect(() => {
+    void browserSettingsProgress.set(browserSettingsTarget, { instant: browserWidthIsImmediate });
+  });
+
   // Reflect state classes directly on the #app mount element.
   $effect(() => {
     const appEl = document.getElementById('app');
@@ -617,18 +639,14 @@
       settingsState.reduceBlur,
     );
     appEl.style.setProperty('--sidebar-width', `${uiState.sidebarWidthPx}px`);
-    appEl.style.setProperty(
-      '--browser-panel-width',
-      `${uiState.sidebarPage === 'settings'
-        ? SETTINGS_SIDEBAR_WIDTH_PX
-        : uiState.sidebarWidthPx}px`,
-    );
   });
 </script>
 
 <section
   class="live-main"
   class:has-windows-titlebar-controls={hasWindowsTitlebarControls}
+  style:--browser-panel-width={`${browserPanelWidthPx}px`}
+  style:--settings-sidebar-width={`${SETTINGS_SIDEBAR_WIDTH_PX}px`}
 >
     <BrowserPanel
       platform={bridgeClient.platform}
