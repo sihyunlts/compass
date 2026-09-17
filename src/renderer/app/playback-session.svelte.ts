@@ -1,3 +1,5 @@
+import { scaleGeneratorPreviewToLoopLength } from '../../domain/generator-preview';
+import { NORMALIZED_SOURCE_TIMELINE_END_BEAT } from '../../domain/note-generation-types';
 import type { BridgeSettings } from '../../shared/bridge/types';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { GeneratorPreview } from '../../shared/contracts/preview/generator-preview';
@@ -75,9 +77,8 @@ interface PreviewGenerationSource {
   launchpadModel: LaunchpadModel;
 }
 
-interface CachedGeneratedPreview {
+interface CachedNormalizedPreview {
   sourceKey: string;
-  loopLengthBeats: number;
   launchpadModel: LaunchpadModel;
   preview: GeneratorPreview;
 }
@@ -124,7 +125,13 @@ export class PlaybackSessionController {
 
   private previewGenerationPurpose: 'preview' | 'delivery' | null = null;
 
-  private latestGeneratedPreview: CachedGeneratedPreview | null = null;
+  private latestNormalizedPreview: CachedNormalizedPreview | null = null;
+
+  private pendingNormalizedPreview: {
+    sourceKey: string;
+    launchpadModel: LaunchpadModel;
+    promise: Promise<GeneratorPreview>;
+  } | null = null;
 
   private previewVisualStartedAtMs: number | null = null;
 
@@ -182,7 +189,10 @@ export class PlaybackSessionController {
   public dispose(): void {
     this.playbackScheduler?.teardown();
     this.playbackScheduler = null;
+    this.previewGenerationRequestId += 1;
     this.previewGenerator.dispose();
+    this.pendingNormalizedPreview = null;
+    this.latestNormalizedPreview = null;
     this.previewWindowStatePusher.reset();
     this.options.previewSession.commands.resetCaches();
   }
@@ -348,12 +358,6 @@ export class PlaybackSessionController {
       launchpadModel: input.launchpadModel,
     });
     editorSession.state.previewLoopLengthBeats = nextLoopLengthBeats;
-    this.latestGeneratedPreview = {
-      sourceKey: input.sourceKey,
-      loopLengthBeats: nextLoopLengthBeats,
-      launchpadModel: input.launchpadModel,
-      preview: input.preview,
-    };
 
     if (this.options.bridgeClient.platform === 'mac') {
       this.pendingTimelineFrameStrip = buildTouchBarTimelineFrameStrip(
@@ -524,17 +528,41 @@ export class PlaybackSessionController {
     input: PreviewGenerationSource,
     reason: PreviewGenerationReason,
   ): Promise<GeneratorPreview> {
-    const cachedPreview = this.resolveCachedGeneratedPreview(input);
-    if (cachedPreview) {
-      return cachedPreview;
+    let preview = this.resolveCachedNormalizedPreview(input);
+    if (!preview) {
+      let pending = this.pendingNormalizedPreview;
+      if (
+        !pending
+        || pending.sourceKey !== input.sourceKey
+        || pending.launchpadModel !== input.launchpadModel
+      ) {
+        pending = {
+          sourceKey: input.sourceKey,
+          launchpadModel: input.launchpadModel,
+          promise: this.generateNormalizedPreview(input, reason),
+        };
+        this.pendingNormalizedPreview = pending;
+      } else if (reason === 'delivery') {
+        this.previewGenerationPurpose = 'delivery';
+      }
+      preview = await pending.promise;
     }
+    return scaleGeneratorPreviewToLoopLength(preview, input.loopLengthBeats);
+  }
 
+  private async generateNormalizedPreview(
+    input: PreviewGenerationSource,
+    reason: PreviewGenerationReason,
+  ): Promise<GeneratorPreview> {
     const requestId = this.beginPreviewGeneration(reason);
     try {
       await waitForNextAnimationFrame();
+      if (requestId !== this.previewGenerationRequestId) {
+        throw new Error('Preview generation cancelled');
+      }
       const preview = await this.previewGenerator.generate({
         sourceChain: input.sourceChain,
-        loopLengthBeats: input.loopLengthBeats,
+        loopLengthBeats: NORMALIZED_SOURCE_TIMELINE_END_BEAT,
         launchpadModel: input.launchpadModel,
       });
 
@@ -542,9 +570,8 @@ export class PlaybackSessionController {
         throw new Error('Preview generation cancelled');
       }
 
-      this.latestGeneratedPreview = {
+      this.latestNormalizedPreview = {
         sourceKey: input.sourceKey,
-        loopLengthBeats: input.loopLengthBeats,
         launchpadModel: input.launchpadModel,
         preview,
       };
@@ -553,6 +580,7 @@ export class PlaybackSessionController {
       if (requestId === this.previewGenerationRequestId) {
         this.state.isPreviewGenerating = false;
         this.previewGenerationPurpose = null;
+        this.pendingNormalizedPreview = null;
       }
     }
   }
@@ -599,12 +627,11 @@ export class PlaybackSessionController {
     this.previewVisualStartedAtMs = null;
   }
 
-  private resolveCachedGeneratedPreview(input: PreviewGenerationSource): GeneratorPreview | null {
-    const cached = this.latestGeneratedPreview;
+  private resolveCachedNormalizedPreview(input: PreviewGenerationSource): GeneratorPreview | null {
+    const cached = this.latestNormalizedPreview;
     if (
       cached
       && cached.sourceKey === input.sourceKey
-      && cached.loopLengthBeats === input.loopLengthBeats
       && cached.launchpadModel === input.launchpadModel
     ) {
       return cached.preview;

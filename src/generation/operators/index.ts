@@ -134,13 +134,12 @@ const resolveMaskSourceReference = (
 export const executeCompiledRackPlan = (
   compiledPlan: CompiledRackPlan,
   modulationChain: GeneratorChain,
-  loopLengthBeats: number,
   outputAdapter: CanonicalOutputAdapter,
   generatorOutputBounds: SpatialBounds,
   mutedGroupIds: ReadonlySet<string>,
   mutedGeneratorIds: ReadonlySet<string>,
 ): GeometryTimeline => withAdaptiveTimelineSampling(resolveCompiledRackSampleStepBeats(compiledPlan), (sampleStepBeats) => {
-  const modulationContext = createModulationContext(modulationChain, loopLengthBeats);
+  const modulationContext = createModulationContext(modulationChain);
   const referenceContext: MaskSourceReferenceContext = {
     compiledPlan,
     sampleStepBeats,

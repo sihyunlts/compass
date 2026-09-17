@@ -1,3 +1,4 @@
+import { DEFAULT_TIMELINE_WINDOW } from '../../timeline/temporal-window';
 import {
   applyModulationRoutesToDevice,
   compileModulationProgram,
@@ -11,9 +12,7 @@ import type { ModulationContext } from './types';
 
 export const createModulationContext = (
   modulationChain: GeneratorChain,
-  loopLengthBeats: number,
 ): ModulationContext => ({
-  loopLengthBeats,
   program: compileModulationProgram(modulationChain),
   deviceByFrameKey: new Map<string, GeneratorDeviceNode>(),
 });
@@ -29,7 +28,6 @@ export interface ModulationEvaluationWindow {
 }
 
 const resolveEvaluationWindow = (
-  context: ModulationContext,
   window: ModulationEvaluationWindow | undefined,
 ): ModulationEvaluationWindow => {
   if (
@@ -41,10 +39,7 @@ const resolveEvaluationWindow = (
     return window;
   }
 
-  return {
-    start: 0,
-    end: context.loopLengthBeats,
-  };
+  return DEFAULT_TIMELINE_WINDOW;
 };
 
 export const resolveModulatedDeviceAtFrame = <T extends GeneratorDeviceNode>(
@@ -59,7 +54,7 @@ export const resolveModulatedDeviceAtFrame = <T extends GeneratorDeviceNode>(
     return device;
   }
 
-  const resolvedWindow = resolveEvaluationWindow(context, evaluationWindow);
+  const resolvedWindow = resolveEvaluationWindow(evaluationWindow);
   const evaluationLoopLengthBeats = resolvedWindow.end - resolvedWindow.start;
   const cacheKey = `${device.id}:${frameIndex}:${resolvedWindow.start}:${resolvedWindow.end}`;
   const cached = context.deviceByFrameKey.get(cacheKey);

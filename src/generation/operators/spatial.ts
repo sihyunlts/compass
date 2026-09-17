@@ -1,3 +1,4 @@
+import { DEFAULT_TIMELINE_WINDOW } from '../timeline/temporal-window';
 import {
   buildTargetOriginIds,
   createRackOperator,
@@ -113,10 +114,7 @@ export const spatialTransformOperator = createRackOperator<SpatialTransformStage
         sampleStepBeats,
         evaluationWindow,
       ),
-      {
-        start: 0,
-        end: context.modulationContext.loopLengthBeats,
-      },
+      DEFAULT_TIMELINE_WINDOW,
     );
   },
 );

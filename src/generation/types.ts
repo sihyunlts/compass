@@ -62,10 +62,7 @@ export interface GenerationOriginTimelineState {
 export type LedFrameVelocityEntry = readonly [pitch: number, velocity: number];
 
 export interface CanonicalFieldResult {
-  loopLengthBeats: number;
   timeline: GeometryTimeline;
-  sourceTimelineEndBeat: number;
-  sampleStepBeats: number;
   mutedGroupIds: ReadonlySet<string>;
   mutedGeneratorIds: ReadonlySet<string>;
 }

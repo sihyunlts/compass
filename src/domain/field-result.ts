@@ -1,3 +1,4 @@
+import { scaleClipNoteTimes } from './note-utils';
 import { NOTE_SAMPLES_PER_BEAT } from '../core/pipeline/constants';
 import {
   NORMALIZED_SOURCE_TIMELINE_END_BEAT,
@@ -24,17 +25,6 @@ export interface GeneratedRuntimeFieldResult {
 }
 
 const DEFAULT_SAMPLE_STEP_BEATS = 1 / NOTE_SAMPLES_PER_BEAT;
-
-const scaleNotesToLoopLength = (
-  notes: ReadonlyArray<ClipNoteWithOrigin>,
-  loopLengthBeats: number,
-): ClipNoteWithOrigin[] => {
-  return notes.map((note) => ({
-    ...note,
-    startBeat: note.startBeat * loopLengthBeats,
-    durationBeats: note.durationBeats * loopLengthBeats,
-  }));
-};
 
 const toLedFramesFromActivePitches = (
   activeByPitchFrames: ReadonlyArray<ReadonlyMap<number, { velocity: number }>>,
@@ -65,7 +55,6 @@ const buildGeneratedFieldResultWithRuntimeMap = ({
   const projectionContext = createLaunchpadProjectionContext(runtimeMap);
   const generated = buildCanonicalFieldResult(
     chain,
-    loopLengthBeats,
     projectionContext.outputAdapter,
     {
       generatorOutputBounds: createLaunchpadGeneratorOutputBounds(),
@@ -80,7 +69,7 @@ const buildGeneratedFieldResultWithRuntimeMap = ({
     activeByPitchFrames,
     generated.timeline,
   );
-  const scaledNotes = scaleNotesToLoopLength(notes, loopLengthBeats);
+  const scaledNotes = scaleClipNoteTimes(notes, loopLengthBeats);
   const sampleStepBeats = loopLengthBeats / Math.max(generated.timeline.frameCount, 1);
   const ledFramesBySampleIndex = toLedFramesFromActivePitches(activeByPitchFrames);
   return {

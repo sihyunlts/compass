@@ -24,6 +24,11 @@ interface PreviewResultInput {
 class PreviewResultCache {
   private readonly resultsByKey = new SvelteMap<string, PreviewResultCacheEntry>();
 
+  private velocityFramesByLedFrames = new WeakMap<
+    GeneratorPreview['ledFramesBySampleIndex'],
+    PreviewResultCacheEntry['ledFramesBySampleIndex']
+  >();
+
   private readonly latestSourceKeyByFamily = new LatestSourceKeyFamilyCache();
 
   public resolve(input: PreviewResultInput): PreviewResultCacheEntry {
@@ -37,14 +42,19 @@ class PreviewResultCache {
       return cached;
     }
 
+    let velocityFrames = this.velocityFramesByLedFrames.get(input.preview.ledFramesBySampleIndex);
+    if (!velocityFrames) {
+      velocityFrames = input.preview.ledFramesBySampleIndex.map(
+        (frame) => new Map<number, number>(frame),
+      );
+      this.velocityFramesByLedFrames.set(input.preview.ledFramesBySampleIndex, velocityFrames);
+    }
     const entry: PreviewResultCacheEntry = {
       key,
       preview: input.preview,
       sourceTimelineEndBeat: input.preview.sourceTimelineEndBeat,
       sampleStepBeats: input.preview.sampleStepBeats,
-      ledFramesBySampleIndex: input.preview.ledFramesBySampleIndex.map(
-        (frame) => new Map<number, number>(frame),
-      ),
+      ledFramesBySampleIndex: velocityFrames,
     };
     this.resultsByKey.set(key, entry);
     this.evictStaleSourceFamilyEntries(input.sourceKey);
@@ -61,6 +71,7 @@ class PreviewResultCache {
 
   public reset(): void {
     this.resultsByKey.clear();
+    this.velocityFramesByLedFrames = new WeakMap();
     this.latestSourceKeyByFamily.reset();
   }
 

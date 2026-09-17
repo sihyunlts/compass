@@ -19,7 +19,6 @@ import type {
 import type { CanonicalOutputAdapter, GeometryTimeline } from '../../types';
 
 export interface ModulationContext {
-  loopLengthBeats: number;
   program: CompiledModulationProgram;
   deviceByFrameKey: Map<string, GeneratorDeviceNode>;
 }

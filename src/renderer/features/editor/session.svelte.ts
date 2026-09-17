@@ -337,7 +337,8 @@ export class EditorSession {
       toggleEditorGroupIsolated(this.buildGroupingContext(), groupId, nextIsolated);
     },
     handleAutoCreateLengthChange: (): void => {
-      handleAutoCreateLengthChange(this.state, (delayMs) => this.requestOutputPreview(delayMs));
+      handleAutoCreateLengthChange(this.state, (delayMs = 0) =>
+        this.scheduleAutoPreview(delayMs, this.pendingAutoPreviewReason ?? 'output-change'));
     },
     undo: (): boolean => this.undo(),
     redo: (): boolean => this.redo(),

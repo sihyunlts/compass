@@ -2,7 +2,7 @@ import type { GeneratorPreview } from '../shared/contracts/preview/generator-pre
 import {
   type GeneratedRuntimeFieldResult,
 } from './field-result';
-import { toClipNote } from './note-utils';
+import { scaleClipNoteTimes, toClipNote } from './note-utils';
 
 export const toGeneratorPreview = (
   generated: GeneratedRuntimeFieldResult,
@@ -21,5 +21,21 @@ export const toGeneratorPreview = (
     sourceTimelineEndBeat: generated.sourceTimelineEndBeat,
     sampleStepBeats: generated.sampleStepBeats,
     ledFramesBySampleIndex: generated.ledFramesBySampleIndex,
+  };
+};
+
+export const scaleGeneratorPreviewToLoopLength = (
+  preview: GeneratorPreview,
+  loopLengthBeats: number,
+): GeneratorPreview => {
+  if (preview.sourceTimelineEndBeat === loopLengthBeats) {
+    return preview;
+  }
+  const ratio = loopLengthBeats / preview.sourceTimelineEndBeat;
+  return {
+    ...preview,
+    notes: scaleClipNoteTimes(preview.notes, ratio),
+    sourceTimelineEndBeat: loopLengthBeats,
+    sampleStepBeats: preview.sampleStepBeats * ratio,
   };
 };

@@ -10,7 +10,6 @@ import type { GeneratorChain } from '../shared/model';
 
 export const buildCanonicalFieldResult = (
   chain: GeneratorChain,
-  loopLengthBeats: number,
   outputAdapter: CanonicalOutputAdapter,
   executionContext: GenerationExecutionContext,
 ): CanonicalFieldResult => {
@@ -19,7 +18,6 @@ export const buildCanonicalFieldResult = (
   const timeline = executeCompiledRackPlan(
     compiledPlan,
     chain,
-    loopLengthBeats,
     outputAdapter,
     executionContext.generatorOutputBounds,
     mutedGroupIds,
@@ -27,10 +25,7 @@ export const buildCanonicalFieldResult = (
   );
 
   return {
-    loopLengthBeats,
     timeline,
-    sourceTimelineEndBeat: loopLengthBeats,
-    sampleStepBeats: timeline.sampleStepBeats,
     mutedGroupIds,
     mutedGeneratorIds,
   };
