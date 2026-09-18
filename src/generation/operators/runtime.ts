@@ -16,7 +16,6 @@ export {
 export {
   appendPendingGeometryRewriteApplication,
   appendPendingStrokeRewriteApplication,
-  buildPendingStrokeRewriteFrameWrites,
 } from './runtime/pending-frame-applications';
 export {
   createRackStageExecutionContext,

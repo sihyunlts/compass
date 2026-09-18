@@ -11,15 +11,17 @@ import {
 import {
   createEmptyTimeline,
   createIdentityMask,
-  iterateTimelineFrames,
+  iterateTimelineSpans,
+  groupPlacementsByOrigin,
+  type FrameWindow,
 } from '../timeline';
 import type { CanonicalOutputAdapter, GeometryMask, GeometryTimeline } from '../types';
 import {
   type GenerationState,
+  type PendingStrokeRewriteWrite,
 } from '../timeline/state';
 import {
   buildTargetOriginIds,
-  buildPendingStrokeRewriteFrameWrites,
   transformStroke,
   createRackOperator,
   materializeRackState,
@@ -79,6 +81,10 @@ const resolveMaskSourceTimeline = (
   }
 };
 
+interface MaskSpan extends FrameWindow {
+  mask: GeometryMask;
+}
+
 const createMaskFrameResolver = (
   sourceTimeline: GeometryTimeline,
   chain: GeneratorChain,
@@ -86,40 +92,37 @@ const createMaskFrameResolver = (
   consumingDeviceId: string,
   outputAdapter: CanonicalOutputAdapter,
   targetGroupId: string | null,
-): (frameIndex: number) => GeometryMask => {
-  if (effect.params.sourceKind === 'tiles') {
-    const mask = outputAdapter.createMaskFromViewportTiles(effect.params.tiles);
-    const geometryMask = createIdentityMask(mask.contains);
-    return () => geometryMask;
-  }
-
+): ((frameIndex: number) => MaskSpan) => {
+  const createMask = (contains: GeometryMask['contains']): GeometryMask => createIdentityMask(
+    effect.params.mode === 'include' ? contains : (x, y) => !contains(x, y),
+  );
   const sourceId = normalizeOptionalId(effect.params.sourceId);
-  if (!sourceId) {
-    const emptyMask = createIdentityMask(() => false);
-    return () => emptyMask;
+  if (effect.params.sourceKind === 'tiles' || !sourceId) {
+    const contains = effect.params.sourceKind === 'tiles'
+      ? outputAdapter.createMaskFromViewportTiles(effect.params.tiles).contains
+      : () => false;
+    const span = { startFrame: 0, endFrameExclusive: sourceTimeline.frameCount, mask: createMask(contains) };
+    return () => span;
   }
 
   const isTimeReversed = resolveMaskSourceTimeReversed(
-    chain,
-    targetGroupId,
-    consumingDeviceId,
+    chain, targetGroupId, consumingDeviceId,
   );
-  const sourceFrames = Array.from(iterateTimelineFrames(sourceTimeline));
-  return (frameIndex) => {
-    const resolvedFrameIndex = isTimeReversed
-      ? Math.max(sourceTimeline.frameCount - 1 - frameIndex, 0)
-      : frameIndex;
-    if (resolvedFrameIndex < 0 || resolvedFrameIndex >= sourceTimeline.frameCount) {
-      return createIdentityMask(() => false);
-    }
-
-    const sourceStrokes = sourceFrames[resolvedFrameIndex].strokes.filter((stroke) => (
-      effect.params.sourceKind === 'group'
-        ? stroke.originGroupId === sourceId
-        : stroke.polyline.originId === sourceId
-    ));
-    return createIdentityMask(createGeometryCoordinateMask(sourceStrokes));
-  };
+  const sourceOriginIds = new Set(Array.from(sourceTimeline.originGroupIdByOriginId)
+    .filter(([originId, groupId]) => effect.params.sourceKind === 'group'
+      ? groupId === sourceId : originId === sourceId)
+    .map(([originId]) => originId));
+  const spansByFrame = new Array<MaskSpan>(sourceTimeline.frameCount);
+  for (const span of iterateTimelineSpans(sourceTimeline, undefined, sourceOriginIds)) {
+    const startFrame = isTimeReversed ? sourceTimeline.frameCount - span.endFrameExclusive : span.startFrame;
+    const endFrameExclusive = isTimeReversed ? sourceTimeline.frameCount - span.startFrame : span.endFrameExclusive;
+    spansByFrame.fill({
+      startFrame,
+      endFrameExclusive,
+      mask: createMask(createGeometryCoordinateMask(span.strokes)),
+    }, startFrame, endFrameExclusive);
+  }
+  return (frameIndex) => spansByFrame[frameIndex];
 };
 
 const applyMaskEffect = (
@@ -138,10 +141,6 @@ const applyMaskEffect = (
     effect,
     referenceContext,
   );
-  const targetFrameWindow = {
-    startFrame: 0,
-    endFrameExclusive: sourceTimeline.frameCount,
-  };
   const targetOriginIds = buildTargetOriginIds(inputTimeline, targetGroupId);
   const resolveMaskAtFrame = createMaskFrameResolver(
     sourceTimeline,
@@ -151,24 +150,27 @@ const applyMaskEffect = (
     outputAdapter,
     targetGroupId,
   );
-  const writes = buildPendingStrokeRewriteFrameWrites(
-    inputTimeline,
-    targetOriginIds,
-    targetFrameWindow,
-    (frameIndex, strokes) => {
-      const mask = resolveMaskAtFrame(frameIndex);
-
-      return strokes.map((stroke) => ({
-        ...transformStroke(stroke, null, writeOrder),
-        masks: [
-          ...stroke.masks,
-          effect.params.mode === 'include'
-            ? mask
-            : createIdentityMask((x, y) => !mask.contains(x, y)),
-        ],
-      }));
-    },
-  );
+  const writes: PendingStrokeRewriteWrite[] = [];
+  // Keep each placement's duration; split only where the source mask changes.
+  // One mask instance per span also shares projection results across color ages.
+  for (const placements of groupPlacementsByOrigin(inputTimeline, targetOriginIds).values()) {
+    for (const { stroke, startFrame, endFrameExclusive } of placements) {
+      const end = Math.min(endFrameExclusive, sourceTimeline.frameCount);
+      for (let frame = startFrame; frame < end;) {
+        const span = resolveMaskAtFrame(frame);
+        const nextFrame = Math.min(end, span.endFrameExclusive);
+        writes.push({
+          startFrame: frame,
+          endFrameExclusive: nextFrame,
+          strokes: [{
+            ...transformStroke(stroke, null, writeOrder),
+            masks: [...stroke.masks, span.mask],
+          }],
+        });
+        frame = nextFrame;
+      }
+    }
+  }
 
   return appendPendingStrokeRewriteApplication(
     state,

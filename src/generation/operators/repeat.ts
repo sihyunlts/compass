@@ -13,7 +13,7 @@ import type {
   GenerationState,
   MaterializedGenerationState,
   OriginTimelineState,
-  PendingStrokeRewriteFrameWrite,
+  PendingStrokeRewriteWrite,
 } from '../timeline/state';
 import type { ColorLayer, GeometryStroke, GeometryTimeline } from '../types';
 import {
@@ -28,14 +28,14 @@ const buildRepeatedFrameWrites = (
   repeatCount: number,
   intervalPercent: number,
   writeOrder: number,
-): PendingStrokeRewriteFrameWrite[] => {
+): PendingStrokeRewriteWrite[] => {
   const sourceStrokesByOriginAndFrame = buildSourceStrokesByOriginAndFrame(
     timeline,
     targetOriginIds,
   );
   const strokesByDestinationFrame = new Map<
     number,
-    PendingStrokeRewriteFrameWrite['strokes'][number][]
+    PendingStrokeRewriteWrite['strokes'][number][]
   >();
   const intervalRatio = intervalPercent / 100;
   const repeatedLayers = new Map<ColorLayer, Map<number, ColorLayer>>();
@@ -140,7 +140,8 @@ const buildRepeatedFrameWrites = (
   return Array.from(strokesByDestinationFrame.entries())
     .sort(([leftFrameIndex], [rightFrameIndex]) => leftFrameIndex - rightFrameIndex)
     .map(([destinationFrameIndex, strokes]) => ({
-      destinationFrameIndex,
+      startFrame: destinationFrameIndex,
+      endFrameExclusive: destinationFrameIndex + 1,
       strokes,
     }));
 };

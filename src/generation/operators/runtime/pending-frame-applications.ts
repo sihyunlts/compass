@@ -2,15 +2,14 @@ import {
   type PendingFrameApplication,
   type PendingGeometryRewriteApplication,
   type GenerationState,
-  type PendingStrokeRewriteFrameWrite,
+  type PendingStrokeRewriteWrite,
 } from '../../timeline/state';
 import {
-  addStrokeToFrame,
+  addStrokeToFrameRange,
   addExistingStrokeToFrameRange,
   iterateTimelineFrames,
   beginTimelineStage,
   removeOriginStrokes,
-  type FrameWindow,
 } from '../../timeline';
 import type { CanonicalOutputAdapter } from '../../types';
 import {
@@ -40,7 +39,7 @@ export const appendPendingStrokeRewriteApplication = (
   state: GenerationState,
   sourceTimeline: GeometryTimeline,
   targetOriginIds: ReadonlySet<string>,
-  writes: ReadonlyArray<PendingStrokeRewriteFrameWrite>,
+  writes: ReadonlyArray<PendingStrokeRewriteWrite>,
   timelineStateOverrides?: ReadonlyMap<string, OriginTimelineStateOverride>,
 ): GenerationState => {
   return appendPendingFrameApplication(
@@ -73,44 +72,6 @@ export const appendPendingGeometryRewriteApplication = (
   );
 };
 
-export const buildPendingStrokeRewriteFrameWrites = (
-  timeline: GeometryTimeline,
-  targetOriginIds: ReadonlySet<string>,
-  frameWindow: FrameWindow,
-  rewriteFrameStrokes: (
-    frameIndex: number,
-    strokes: ReadonlyArray<GeometryStroke>,
-  ) => ReadonlyArray<Omit<GeometryStroke, 'writeId'>>,
-): PendingStrokeRewriteFrameWrite[] => {
-  const writes: PendingStrokeRewriteFrameWrite[] = [];
-  const originIds = Array.from(targetOriginIds);
-  for (const { frameIndex, strokes: frameStrokes } of iterateTimelineFrames(timeline, frameWindow, targetOriginIds)) {
-    const byOrigin = new Map<string, GeometryStroke[]>();
-    for (const stroke of frameStrokes) {
-      const originId = stroke.polyline.originId;
-      const strokes = byOrigin.get(originId);
-      if (strokes) strokes.push(stroke);
-      else byOrigin.set(originId, [stroke]);
-    }
-    const sourceStrokes = originIds.flatMap((originId) => byOrigin.get(originId) ?? []);
-    if (sourceStrokes.length === 0) {
-      continue;
-    }
-
-    const strokes = rewriteFrameStrokes(frameIndex, sourceStrokes);
-    if (strokes.length === 0) {
-      continue;
-    }
-
-    writes.push({
-      destinationFrameIndex: frameIndex,
-      strokes,
-    });
-  }
-
-  return writes;
-};
-
 const materializePendingStrokeRewriteApplication = (
   timeline: GeometryTimeline,
   application: Extract<PendingFrameApplication, { kind: 'stroke-rewrite' }>,
@@ -122,11 +83,8 @@ const materializePendingStrokeRewriteApplication = (
     Math.min(application.sourceFrameCount, nextTimeline.frameCount),
   );
   for (const write of application.writes) {
-    if (write.destinationFrameIndex < 0 || write.destinationFrameIndex >= nextTimeline.frameCount) {
-      continue;
-    }
     for (const stroke of write.strokes) {
-      addStrokeToFrame(nextTimeline, write.destinationFrameIndex, stroke);
+      addStrokeToFrameRange(nextTimeline, write.startFrame, write.endFrameExclusive, stroke);
     }
   }
   return nextTimeline;

@@ -3,12 +3,11 @@ import type {
   GeometryStroke,
   GeometryTimeline,
 } from '../types';
-import { createEmptyTimeline, DEFAULT_SAMPLE_STEP_BEATS } from './index';
+import { createEmptyTimeline, DEFAULT_SAMPLE_STEP_BEATS, type FrameWindow } from './index';
 
 export type OriginTimelineState = GenerationOriginTimelineState;
 
-export interface PendingStrokeRewriteFrameWrite {
-  readonly destinationFrameIndex: number;
+export interface PendingStrokeRewriteWrite extends FrameWindow {
   readonly strokes: ReadonlyArray<Omit<GeometryStroke, 'writeId'>>;
 }
 
@@ -17,7 +16,7 @@ export interface PendingStrokeRewriteApplication {
   readonly targetOriginIds: ReadonlySet<string>;
   readonly sourceFrameCount: number;
   readonly endBeat: number;
-  readonly writes: ReadonlyArray<PendingStrokeRewriteFrameWrite>;
+  readonly writes: ReadonlyArray<PendingStrokeRewriteWrite>;
 }
 
 interface FrameGeometryRewriteInput {
