@@ -14,13 +14,6 @@ import type {
   GeometryStroke,
 } from '../types';
 
-export interface OccupiedCoordinate {
-  stroke: GeometryStroke;
-  x: number;
-  y: number;
-  distanceSquared: number;
-}
-
 interface StrokeOccupiedCoordinateCandidate {
   x: number;
   y: number;
@@ -36,7 +29,6 @@ export interface OccupiedCoordinateCandidateBounds {
 
 type OccupiedCoordinateCandidateCache = Map<string, StrokeOccupiedCoordinateCandidate[]>;
 
-const occupiedCoordinateCandidatesByStroke = new WeakMap<GeometryStroke, OccupiedCoordinateCandidateCache>();
 const occupiedCoordinateCandidatesByPoints = new WeakMap<GeometryStroke['polyline']['points'], OccupiedCoordinateCandidateCache>();
 const RASTER_TIE_EPSILON = 1e-9;
 
@@ -130,19 +122,23 @@ const compareLayerOrder = (left: ReadonlyArray<number>, right: ReadonlyArray<num
   return left.length - right.length;
 };
 
-interface RankedCoordinate extends OccupiedCoordinate {
+interface RankedCoordinate {
+  stroke: GeometryStroke;
   distanceRank: number;
 }
+
+const colorSamplesByStroke = new WeakMap<GeometryStroke, Map<number, RankedCoordinate>>();
 
 interface CoordinatePath {
   latest: RankedCoordinate;
   samplesByEnd: Map<number, RankedCoordinate>;
 }
 
-interface CoordinateLayers {
+interface CoordinateTopLayer {
   writeOrder: number;
   plainWinner?: RankedCoordinate;
-  pathsByLayer: Map<ColorLayer, Map<string, CoordinatePath>>;
+  layer?: ColorLayer;
+  samples: RankedCoordinate[];
 }
 
 const compareSampleOrder = (left: GeometryStroke, right: GeometryStroke): number => {
@@ -170,21 +166,36 @@ const resolveLatestPassage = (path: CoordinatePath): RankedCoordinate => {
   return winner;
 };
 
-/** Resolve a path's color boundary, then crossing paths, then authored layers. */
+/** Select the visible layer before resolving its paths and color history. */
 export class CoordinateColorResolver<TKey> {
-  private readonly coordinates = new Map<TKey, CoordinateLayers>();
+  private readonly coordinates = new Map<TKey, CoordinateTopLayer>();
 
-  add(key: TKey, stroke: GeometryStroke, x: number, y: number, distanceSquared: number): void {
+  add(key: TKey, stroke: GeometryStroke, distanceSquared: number): void {
     let coordinate = this.coordinates.get(key);
     if (coordinate && coordinate.writeOrder > stroke.writeOrder) return;
     if (!coordinate || coordinate.writeOrder < stroke.writeOrder) {
-      coordinate = { writeOrder: stroke.writeOrder, pathsByLayer: new Map() };
+      coordinate = { writeOrder: stroke.writeOrder, samples: [] };
       this.coordinates.set(key, coordinate);
     }
 
-    // Quantize once so distance ties cannot depend on candidate traversal order.
-    const candidate = { stroke, x, y, distanceSquared, distanceRank: Math.round(distanceSquared / 1e-9) };
     const binding = stroke.colorBinding;
+    if (binding && binding.layer !== coordinate.layer) {
+      const layerOrder = coordinate.layer ? compareLayerOrder(binding.layer.order, coordinate.layer.order) : 1;
+      if (layerOrder <= 0) return;
+      coordinate.layer = binding.layer;
+      coordinate.samples.length = 0;
+    }
+    // A held stroke has the same rank at this LED in every frame.
+    let samples = colorSamplesByStroke.get(stroke);
+    if (!samples) {
+      samples = new Map();
+      colorSamplesByStroke.set(stroke, samples);
+    }
+    let candidate = samples.get(distanceSquared);
+    if (!candidate) {
+      candidate = { stroke, distanceRank: Math.round(distanceSquared / 1e-9) };
+      samples.set(distanceSquared, candidate);
+    }
     if (!binding) {
       if (!coordinate.plainWinner || stroke.writeId > coordinate.plainWinner.stroke.writeId) {
         coordinate.plainWinner = candidate;
@@ -192,43 +203,34 @@ export class CoordinateColorResolver<TKey> {
       return;
     }
 
-    let paths = coordinate.pathsByLayer.get(binding.layer);
-    if (!paths) {
-      paths = new Map();
-      coordinate.pathsByLayer.set(binding.layer, paths);
-    }
-    let path = paths.get(stroke.pathId);
-    if (!path) {
-      path = { latest: candidate, samplesByEnd: new Map() };
-      paths.set(stroke.pathId, path);
-    }
-    const previous = path.samplesByEnd.get(binding.sourceEndFrameExclusive);
-    if (previous && !isNearerSample(candidate, previous)) return;
-    path.samplesByEnd.set(binding.sourceEndFrameExclusive, candidate);
-    if (binding.sourceFrame >= path.latest.stroke.colorBinding!.sourceFrame) {
-      path.latest = candidate;
-    }
+    coordinate.samples.push(candidate);
   }
 
-  get(key: TKey): OccupiedCoordinate | undefined {
+  get(key: TKey): RankedCoordinate | undefined {
     const coordinate = this.coordinates.get(key);
     if (!coordinate) return undefined;
-    // Only the top authored layer can contribute. Resolve passages once, after
-    // choosing that layer, rather than scanning histories of covered layers.
-    let topPaths: Map<string, CoordinatePath> | undefined;
-    let layerOrder: ReadonlyArray<number> | undefined = coordinate.plainWinner
-      ? [coordinate.plainWinner.stroke.writeId]
-      : undefined;
-    for (const [layer, paths] of coordinate.pathsByLayer) {
-      if (!layerOrder || compareLayerOrder(layer.order, layerOrder) > 0) {
-        topPaths = paths;
-        layerOrder = layer.order;
-      }
+    if (!coordinate.layer || (coordinate.plainWinner
+      && compareLayerOrder(coordinate.layer.order, [coordinate.plainWinner.stroke.writeId]) <= 0)) {
+      return coordinate.plainWinner;
     }
-    if (!topPaths) return coordinate.plainWinner;
 
+    // Build passage histories only for the layer that survives every overlap.
+    const paths = new Map<string, CoordinatePath>();
+    for (const candidate of coordinate.samples) {
+      const { stroke } = candidate;
+      const binding = stroke.colorBinding!;
+      let path = paths.get(stroke.pathId);
+      if (!path) {
+        path = { latest: candidate, samplesByEnd: new Map() };
+        paths.set(stroke.pathId, path);
+      }
+      const previous = path.samplesByEnd.get(binding.sourceEndFrameExclusive);
+      if (previous && !isNearerSample(candidate, previous)) continue;
+      path.samplesByEnd.set(binding.sourceEndFrameExclusive, candidate);
+      if (binding.sourceFrame >= path.latest.stroke.colorBinding!.sourceFrame) path.latest = candidate;
+    }
     let winner: RankedCoordinate | undefined;
-    for (const path of topPaths.values()) {
+    for (const path of paths.values()) {
       const candidate = resolveLatestPassage(path);
       if (!winner || compareSampleOrder(candidate.stroke, winner.stroke) > 0) {
         winner = candidate;
@@ -237,7 +239,7 @@ export class CoordinateColorResolver<TKey> {
     return winner;
   }
 
-  *entries(): Generator<[TKey, OccupiedCoordinate]> {
+  *entries(): Generator<[TKey, RankedCoordinate]> {
     for (const key of this.coordinates.keys()) yield [key, this.get(key)!];
   }
 }
@@ -358,22 +360,9 @@ const resolveStrokeOccupiedCoordinateCandidates = (
     stroke.polyline.rasterTieBreakDirection?.x ?? 'no-tie-x',
     stroke.polyline.rasterTieBreakDirection?.y ?? 'no-tie-y',
   ].join(':');
-  const cached = occupiedCoordinateCandidatesByStroke.get(stroke)?.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  if (stroke.masks.length === 0) {
-    const pointsCached = occupiedCoordinateCandidatesByPoints
-      .get(stroke.polyline.points)
-      ?.get(cacheKey);
-    if (pointsCached) {
-      const strokeCache = occupiedCoordinateCandidatesByStroke.get(stroke) ?? new Map();
-      strokeCache.set(cacheKey, pointsCached);
-      occupiedCoordinateCandidatesByStroke.set(stroke, strokeCache);
-      return pointsCached;
-    }
-  }
+  // These candidates precede mask filtering, so masked strokes share geometry too.
+  const cached = occupiedCoordinateCandidatesByPoints.get(stroke.polyline.points)?.get(cacheKey);
+  if (cached) return cached;
 
   let coordinates: StrokeOccupiedCoordinateCandidate[];
   if (stroke.polyline.rasterMode === 'centerline') {
@@ -403,14 +392,9 @@ const resolveStrokeOccupiedCoordinateCandidates = (
     }
   }
 
-  const strokeCache = occupiedCoordinateCandidatesByStroke.get(stroke) ?? new Map();
-  strokeCache.set(cacheKey, coordinates);
-  occupiedCoordinateCandidatesByStroke.set(stroke, strokeCache);
-  if (stroke.masks.length === 0) {
-    const pointsCache = occupiedCoordinateCandidatesByPoints.get(stroke.polyline.points) ?? new Map();
-    pointsCache.set(cacheKey, coordinates);
-    occupiedCoordinateCandidatesByPoints.set(stroke.polyline.points, pointsCache);
-  }
+  const pointsCache = occupiedCoordinateCandidatesByPoints.get(stroke.polyline.points) ?? new Map();
+  pointsCache.set(cacheKey, coordinates);
+  occupiedCoordinateCandidatesByPoints.set(stroke.polyline.points, pointsCache);
   return coordinates;
 };
 

@@ -477,8 +477,6 @@ const resolveActiveByPitchFromFrameStrokes = (
       integerWinnerByCoordinateGroup.add(
         coordinateGroup,
         stroke,
-        coordinateGroup.x,
-        coordinateGroup.y,
         hit.distanceSquared,
       );
     }
@@ -492,8 +490,6 @@ const resolveActiveByPitchFromFrameStrokes = (
       fractionalWinnerByCoordinateGroup.add(
         coordinateGroup,
         stroke,
-        coordinateGroup.x,
-        coordinateGroup.y,
         hit.distanceSquared,
       );
     }
