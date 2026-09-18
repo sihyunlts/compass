@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 2,
+  "presetType": "rack",
+  "savedAtIso": "2026-09-17T23:39:36.394Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-7",
+        "kind": "path",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "anchors": [
+            {
+              "id": "path-anchor-start",
+              "x": 2,
+              "y": 4.5
+            },
+            {
+              "id": "path-anchor-end",
+              "x": 7,
+              "y": 4.5
+            }
+          ],
+          "closed": false,
+          "fill": false,
+          "transform": {
+            "a": 1,
+            "b": 0,
+            "c": 0,
+            "d": 1,
+            "tx": 0,
+            "ty": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "animation": {
+            "enabled": false,
+            "direction": "forward",
+            "startAnchorId": "path-anchor-start"
+          }
+        }
+      },
+      {
+        "id": "effect-9",
+        "kind": "rotate",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "angleDeg": 0
+        }
+      },
+      {
+        "id": "effect-10",
+        "kind": "modulator",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "targets": [
+            {
+              "id": "mod-target-wzt0rx-mu668qvd",
+              "slotIndex": 0,
+              "deviceId": "effect-9",
+              "paramKey": "angleDeg",
+              "amount": 360
+            }
+          ],
+          "curve": {
+            "domain": "loop01",
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "curve-node-start",
+                "t": 0,
+                "v": 0
+              },
+              {
+                "id": "curve-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "effect-12",
+        "kind": "reverse",
+        "enabled": true,
+        "groupId": null,
+        "name": null
+      }
+    ],
+    "groupStateById": {}
+  }
+}

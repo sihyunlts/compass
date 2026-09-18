@@ -1,16 +1,9 @@
-import { doesDeviceToggleTimelineParity } from '../../devices/timeline-parity';
 import { readNumericDeviceParam, writeNumericDeviceParam } from '../../devices/modulation';
 import {
-  isGeneratorNode,
   type GeneratorChain,
   type GeneratorDeviceNode,
   type ModulationCurve,
 } from '../../shared/model';
-import {
-  isDeviceEffectivelyEnabled,
-  resolveEffectTargetGroupId,
-} from '../../shared/group-state';
-import { normalizeOptionalId } from '../../shared/normalize-id';
 import {
   buildCurveSegments,
   evaluateCurveSegments,
@@ -29,7 +22,6 @@ interface CompiledModulationRoute {
   amount: number;
   baseValue: number;
   curve: CompiledModulationCurve;
-  isTimelineReversed: boolean;
 }
 
 export interface CompiledModulationProgram {
@@ -47,65 +39,8 @@ interface ModulationRuntimeReadout {
   modulatedValue: number;
 }
 
-const resolveReversedTimelineByDeviceId = (
-  chain: GeneratorChain,
-): Map<string, boolean> => {
-  const deviceIndexById = new Map<string, number>();
-  const reverseStages: Array<{
-    index: number;
-    targetGroupId: string | null;
-  }> = [];
-
-  for (let index = 0; index < chain.devices.length; index += 1) {
-    const device = chain.devices[index];
-    if (!deviceIndexById.has(device.id)) {
-      deviceIndexById.set(device.id, index);
-    }
-    if (doesDeviceToggleTimelineParity(device) && isDeviceEffectivelyEnabled(chain, device)) {
-      reverseStages.push({
-        index,
-        targetGroupId: resolveEffectTargetGroupId(chain, device.groupId),
-      });
-    }
-  }
-
-  if (reverseStages.length === 0) {
-    return new Map<string, boolean>();
-  }
-
-  const reversedById = new Map<string, boolean>();
-  for (const [deviceId, index] of deviceIndexById.entries()) {
-    const device = chain.devices[index];
-    const targetGroupId = isGeneratorNode(device)
-      ? normalizeOptionalId(device.groupId)
-      : resolveEffectTargetGroupId(chain, device.groupId);
-    let reverseCount = 0;
-    for (const reverseStage of reverseStages) {
-      const affectsEntireTarget = reverseStage.targetGroupId === null
-        || (
-          targetGroupId !== null
-          && reverseStage.targetGroupId === targetGroupId
-        );
-      if (reverseStage.index > index && affectsEntireTarget) {
-        reverseCount += 1;
-      }
-    }
-    reversedById.set(deviceId, reverseCount % 2 === 1);
-  }
-
-  return reversedById;
-};
-
-const reverseLoopProgress01 = (t01: number): number => {
-  if (!Number.isFinite(t01)) {
-    return 0;
-  }
-  if (t01 <= 0) {
-    return 1;
-  }
-  return 1 - t01;
-};
-
+// Modulation is evaluated in its target device's local timeline. Later temporal
+// stages remap the generated result, including the modulation, exactly once.
 const toCompiledCurve = (curve: ModulationCurve): CompiledModulationCurve => ({
   segments: buildCurveSegments(curve.nodes),
 });
@@ -114,7 +49,6 @@ export const compileModulationProgram = (
   chain: GeneratorChain,
 ): CompiledModulationProgram => {
   const routes = collectValidatedModulationRoutes(chain);
-  const reversedTimelineByDeviceId = resolveReversedTimelineByDeviceId(chain);
   const compiled: CompiledModulationRoute[] = [];
   const routesByTargetDeviceId = new Map<string, CompiledModulationRoute[]>();
 
@@ -132,7 +66,6 @@ export const compileModulationProgram = (
       amount: route.target.amount,
       baseValue,
       curve: toCompiledCurve(route.modulator.params.curve),
-      isTimelineReversed: reversedTimelineByDeviceId.get(route.targetDevice.id) === true,
     };
     compiled.push(compiledRoute);
 
@@ -158,7 +91,7 @@ export const evaluateModulationProgramReadouts = (
     wrap?: boolean;
   },
 ): ModulationRuntimeReadout[] => {
-  const baseTimelineT = toLoopProgress01(
+  const timelineT = toLoopProgress01(
     beat,
     loopLengthBeats,
     options?.wrap !== false,
@@ -166,9 +99,6 @@ export const evaluateModulationProgramReadouts = (
   const readouts: ModulationRuntimeReadout[] = [];
 
   for (const route of program.routes) {
-    const timelineT = route.isTimelineReversed
-      ? reverseLoopProgress01(baseTimelineT)
-      : baseTimelineT;
     const curveValue = evaluateCurveSegments(route.curve.segments, timelineT);
     const modulatedValue = route.baseValue + curveValue * route.amount;
 
@@ -195,7 +125,7 @@ export const applyModulationRoutesToDevice = (
     wrap?: boolean;
   },
 ): void => {
-  const baseTimelineT = toLoopProgress01(
+  const timelineT = toLoopProgress01(
     beat,
     loopLengthBeats,
     options?.wrap !== false,
@@ -206,9 +136,6 @@ export const applyModulationRoutesToDevice = (
   }>();
 
   for (const route of routes) {
-    const timelineT = route.isTimelineReversed
-      ? reverseLoopProgress01(baseTimelineT)
-      : baseTimelineT;
     const curveValue = evaluateCurveSegments(route.curve.segments, timelineT);
     const accumulated = modulationByParamKey.get(route.targetParamKey) ?? {
       baseValue: route.baseValue,
