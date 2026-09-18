@@ -201,29 +201,21 @@ const isPointInsideMasks = (
   return mask.contains(localPoint.x, localPoint.y);
 });
 
-const isStrokeActiveAtCoordinate = (
+const resolveStrokeCoordinateDistanceSquared = (
   stroke: GeometryStroke,
   x: number,
   y: number,
-): boolean => {
-  if (!isPointInsideMasks(stroke, x, y)) {
-    return false;
+): number | null => {
+  if (!isPointInsideMasks(stroke, x, y)) return null;
+
+  if (stroke.polyline.rasterMode === 'centerline'
+    && (stroke.polyline.points.length === 1 || (Number.isInteger(x) && Number.isInteger(y)))) {
+    return collectStrokeOccupiedCoordinateCandidates(stroke, { minX: x, maxX: x, minY: y, maxY: y })
+      .find((coordinate) => coordinate.x === x && coordinate.y === y)?.distanceSquared ?? null;
   }
 
-  if (
-    stroke.polyline.rasterMode === 'centerline'
-    && (
-      stroke.polyline.points.length === 1
-      || (Number.isInteger(x) && Number.isInteger(y))
-    )
-  ) {
-    return collectStrokeOccupiedCoordinateCandidates(stroke, { minX: x, maxX: x, minY: y, maxY: y }).some(
-      (coordinate) => coordinate.x === x && coordinate.y === y,
-    );
-  }
-
-  return distanceToRasterizedPolylineSquared({ x, y }, stroke.polyline)
-    <= THICKNESS * THICKNESS;
+  const distanceSquared = distanceToRasterizedPolylineSquared({ x, y }, stroke.polyline);
+  return distanceSquared <= THICKNESS * THICKNESS ? distanceSquared : null;
 };
 
 const createStrokeNoteOutputPredicate = (
@@ -250,10 +242,10 @@ const createStrokeNoteOutputPredicate = (
       if (coordinates.some(({ x, y }) => integerNoteOutputKeys.has(`${x},${y}`))) {
         return true;
       }
-      return fractionalNoteOutputGroups.some(({ x, y }) => isStrokeActiveAtCoordinate(stroke, x, y));
+      return fractionalNoteOutputGroups.some(({ x, y }) => resolveStrokeCoordinateDistanceSquared(stroke, x, y) !== null);
     }
 
-    return noteOutputCoordinateGroups.some(({ x, y }) => isStrokeActiveAtCoordinate(stroke, x, y));
+    return noteOutputCoordinateGroups.some(({ x, y }) => resolveStrokeCoordinateDistanceSquared(stroke, x, y) !== null);
   };
 };
 
@@ -388,18 +380,12 @@ const resolveFractionalCoordinateHits = (
     return projection.fractionalCoordinateHits;
   }
 
-  const coordinateHits = fractionalCoordinateGroups.flatMap((coordinateGroup) => (
-    hasNoteOutput(coordinateGroup)
-    && isStrokeActiveAtCoordinate(stroke, coordinateGroup.x, coordinateGroup.y)
-      ? [{
-          coordinateGroup,
-          distanceSquared: distanceToRasterizedPolylineSquared(
-            { x: coordinateGroup.x, y: coordinateGroup.y },
-            stroke.polyline,
-          ),
-        }]
-      : []
-  ));
+  const coordinateHits: CoordinateGroupHit[] = [];
+  for (const coordinateGroup of fractionalCoordinateGroups) {
+    if (!hasNoteOutput(coordinateGroup)) continue;
+    const distanceSquared = resolveStrokeCoordinateDistanceSquared(stroke, coordinateGroup.x, coordinateGroup.y);
+    if (distanceSquared !== null) coordinateHits.push({ coordinateGroup, distanceSquared });
+  }
   projection.fractionalCoordinateHits = coordinateHits;
   return coordinateHits;
 };

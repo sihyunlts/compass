@@ -1,5 +1,5 @@
 import type { Vec2 } from '../../core/core-types';
-import { iterateTimelineFrames, type FrameWindow } from '../timeline';
+import { iterateTimelineSpans, type FrameWindow } from '../timeline';
 import type { GeometryStroke, GeometryTimeline } from '../types';
 
 export interface GeometryStateEvent {
@@ -452,7 +452,7 @@ export const extractGeometryEventTracks = (
     });
   }
 
-  for (const { frameIndex, strokes: frameStrokes } of iterateTimelineFrames(
+  for (const { startFrame: frameIndex, strokes: frameStrokes } of iterateTimelineSpans(
     input.timeline, frameWindow, input.targetOriginIds,
   )) {
     const strokesByOriginId = new Map<string, GeometryStroke[]>();
