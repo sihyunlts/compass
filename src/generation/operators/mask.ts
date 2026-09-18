@@ -1,9 +1,4 @@
-import { doesDeviceToggleTimelineParity } from '../../devices/timeline-parity';
-import {
-  isDeviceEffectivelyEnabled,
-  resolveEffectTargetGroupId,
-} from '../../shared/group-state';
-import type { GeneratorChain, MaskEffectNode } from '../../shared/model';
+import type { MaskEffectNode } from '../../shared/model';
 import { normalizeOptionalId } from '../../shared/normalize-id';
 import {
   createGeometryCoordinateMask,
@@ -28,35 +23,6 @@ import {
   appendPendingStrokeRewriteApplication,
   type MaskSourceReferenceContext,
 } from './runtime';
-
-const resolveMaskSourceTimeReversed = (
-  chain: GeneratorChain,
-  targetGroupId: string | null,
-  consumingDeviceId: string,
-): boolean => {
-  const consumingDeviceIndex = chain.devices.findIndex((device) => device.id === consumingDeviceId);
-  if (consumingDeviceIndex < 0) {
-    return false;
-  }
-
-  let reverseParity = false;
-
-  for (let index = chain.devices.length - 1; index > consumingDeviceIndex; index -= 1) {
-    const device = chain.devices[index];
-    const deviceTargetGroupId = resolveEffectTargetGroupId(chain, device.groupId);
-    const affectsTarget = deviceTargetGroupId === null
-      || (targetGroupId !== null && deviceTargetGroupId === targetGroupId);
-    if (
-      affectsTarget
-      && isDeviceEffectivelyEnabled(chain, device)
-      && doesDeviceToggleTimelineParity(device)
-    ) {
-      reverseParity = !reverseParity;
-    }
-  }
-
-  return reverseParity;
-};
 
 const resolveMaskSourceTimeline = (
   currentTimeline: GeometryTimeline,
@@ -87,11 +53,8 @@ interface MaskSpan extends FrameWindow {
 
 const createMaskFrameResolver = (
   sourceTimeline: GeometryTimeline,
-  chain: GeneratorChain,
   effect: MaskEffectNode,
-  consumingDeviceId: string,
   outputAdapter: CanonicalOutputAdapter,
-  targetGroupId: string | null,
 ): ((frameIndex: number) => MaskSpan) => {
   const createMask = (contains: GeometryMask['contains']): GeometryMask => createIdentityMask(
     effect.params.mode === 'include' ? contains : (x, y) => !contains(x, y),
@@ -105,21 +68,16 @@ const createMaskFrameResolver = (
     return () => span;
   }
 
-  const isTimeReversed = resolveMaskSourceTimeReversed(
-    chain, targetGroupId, consumingDeviceId,
-  );
   const sourceOriginIds = new Set(Array.from(sourceTimeline.originGroupIdByOriginId)
     .filter(([originId, groupId]) => effect.params.sourceKind === 'group'
       ? groupId === sourceId : originId === sourceId)
     .map(([originId]) => originId));
   const spansByFrame = new Array<MaskSpan>(sourceTimeline.frameCount);
-  for (const span of iterateTimelineSpans(sourceTimeline, undefined, sourceOriginIds)) {
-    const startFrame = isTimeReversed ? sourceTimeline.frameCount - span.endFrameExclusive : span.startFrame;
-    const endFrameExclusive = isTimeReversed ? sourceTimeline.frameCount - span.startFrame : span.endFrameExclusive;
+  for (const { startFrame, endFrameExclusive, strokes } of iterateTimelineSpans(sourceTimeline, undefined, sourceOriginIds)) {
     spansByFrame.fill({
       startFrame,
       endFrameExclusive,
-      mask: createMask(createGeometryCoordinateMask(span.strokes)),
+      mask: createMask(createGeometryCoordinateMask(strokes)),
     }, startFrame, endFrameExclusive);
   }
   return (frameIndex) => spansByFrame[frameIndex];
@@ -128,11 +86,9 @@ const createMaskFrameResolver = (
 const applyMaskEffect = (
   state: GenerationState,
   inputTimeline: GeometryTimeline,
-  chain: GeneratorChain,
   effect: MaskEffectNode,
   targetGroupId: string | null,
   writeOrder: number,
-  consumingDeviceId: string,
   outputAdapter: CanonicalOutputAdapter,
   referenceContext: MaskSourceReferenceContext,
 ): GenerationState => {
@@ -144,11 +100,8 @@ const applyMaskEffect = (
   const targetOriginIds = buildTargetOriginIds(inputTimeline, targetGroupId);
   const resolveMaskAtFrame = createMaskFrameResolver(
     sourceTimeline,
-    chain,
     effect,
-    consumingDeviceId,
     outputAdapter,
-    targetGroupId,
   );
   const writes: PendingStrokeRewriteWrite[] = [];
   // Keep each placement's duration; split only where the source mask changes.
@@ -192,11 +145,9 @@ export const maskOperator = createRackOperator<'mask', 'preserve-pending'>(
     return applyMaskEffect(
       state,
       inputTimeline,
-      context.compiledPlan.baseChain,
       device,
       stage.targetGroupId,
       stage.stageIndex,
-      stage.deviceId,
       context.outputAdapter,
       context.referenceContext,
     );
