@@ -100,6 +100,7 @@ export const ko = {
   'control.pathAnimationStartAnchor': '앵커 {index}을 애니메이션 시작점으로 설정',
   'control.position': '위치',
   'control.rotation': '회전',
+  'control.rotationShort': '회전',
   'control.interval': '간격',
   'control.repeatTimeline': '반복 타이밍 미리보기',
   'control.repeats': '반복 횟수',

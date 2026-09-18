@@ -167,7 +167,7 @@
       </div>
       <div class="path-paired-fields">
         <NumberField
-          label={i18n.t('control.rotation')}
+          label={i18n.t('control.rotationShort')}
           size="compact"
           fill={true}
           class="path-paired-field"

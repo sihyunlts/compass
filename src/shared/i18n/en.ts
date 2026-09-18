@@ -97,6 +97,7 @@ export const en = {
   'control.pathAnimationStartAnchor': 'Set anchor {index} as animation start',
   'control.position': 'Position',
   'control.rotation': 'Rotation',
+  'control.rotationShort': 'Rot.',
   'control.interval': 'Interval',
   'control.repeatTimeline': 'Repeat timing preview',
   'control.repeats': 'Repeats',
