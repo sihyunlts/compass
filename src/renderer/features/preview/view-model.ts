@@ -100,12 +100,19 @@ export const buildPreviewSurfaceViewModel = (
 ): PreviewSurfaceViewModel => {
   const resolvedModel = resolveLaunchpadModel(previewState?.launchpadModel);
 
+  // Many pads share a palette color. Convert each distinct color once per frame;
+  // keeping this local also makes palette changes immediate and memory bounded.
+  const surfaceRgbByRgb = new Map<string, string>();
   return {
     launchpadModel: resolvedModel,
     cells: resolvePreviewCellModels(resolvedModel),
-    activeCells: (previewState?.activeCells ?? []).map((cell) => ({
-      pitch: cell.pitch,
-      rgb: resolveLedSurfaceRgb(cell.rgb),
-    })),
+    activeCells: (previewState?.activeCells ?? []).map((cell) => {
+      let rgb = surfaceRgbByRgb.get(cell.rgb);
+      if (rgb === undefined) {
+        rgb = resolveLedSurfaceRgb(cell.rgb);
+        surfaceRgbByRgb.set(cell.rgb, rgb);
+      }
+      return { pitch: cell.pitch, rgb };
+    }),
   };
 };

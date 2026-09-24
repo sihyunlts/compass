@@ -1,6 +1,6 @@
 <script lang="ts">
   import { i18n } from '../../i18n.svelte';
-  import { onMount } from 'svelte';
+  import { onDestroy } from 'svelte';
   import { clamp } from '../../../shared/math';
   import type { RackScrollMetrics } from '../../features/rack/types';
 
@@ -38,20 +38,12 @@
   let sourceHeightPx = $state(1);
   let mirrorMarkup = $state('');
   let mirrorSyncFrameId: number | null = null;
-  let pendingMirrorSignature: string | null = null;
-  let lastAppliedMirrorSignature: string | null = null;
   let hasRackContent = $state(false);
-  let occupiedEndRatio = $state(0);
+  let occupiedSourceWidthPx = $state(1);
 
   const maxScrollLeft = $derived.by(() => Math.max(metrics.scrollWidth - metrics.clientWidth, 0));
   const hasOverflow = $derived.by(() => maxScrollLeft > 0.1);
   const valueNow = $derived.by(() => clamp(metrics.scrollLeft, 0, maxScrollLeft));
-  const occupiedSourceWidthPx = $derived.by(() => {
-    if (occupiedEndRatio <= 0 || metrics.scrollWidth <= 0) {
-      return 1;
-    }
-    return Math.max(metrics.scrollWidth * occupiedEndRatio, 1);
-  });
   const viewportHeightPx = $derived.by(() =>
     Math.max(trackHeightPx - (MINIMAP_INSET_PX * 2), 0));
   const baseScale = $derived.by(() => {
@@ -113,31 +105,32 @@
 
   const sanitizeMirrorTree = (root: HTMLElement): void => {
     root.removeAttribute('id');
-    root.querySelectorAll<HTMLElement>('[id]').forEach((node) => node.removeAttribute('id'));
-    root.querySelectorAll<HTMLElement>('.drop-indicator').forEach((node) => node.remove());
-    root.querySelectorAll<HTMLElement>('input, textarea, button').forEach((node) => {
-      node.setAttribute('tabindex', '-1');
+    root.querySelectorAll<HTMLElement>('[id], .drop-indicator, input, textarea, button').forEach((node) => {
+      node.removeAttribute('id');
+      if (node.classList.contains('drop-indicator')) {
+        node.remove();
+      } else if (node.matches('input, textarea, button')) {
+        node.setAttribute('tabindex', '-1');
+      }
     });
   };
 
-  const applySourceMirror = (signature: string): void => {
+  const applySourceMirror = (): void => {
     const sourceEl = document.getElementById(controlsId);
     if (!(sourceEl instanceof HTMLElement)) {
       hasRackContent = false;
-      occupiedEndRatio = 0;
+      occupiedSourceWidthPx = 1;
       mirrorMarkup = '';
       sourceHeightPx = 1;
-      lastAppliedMirrorSignature = signature;
       return;
     }
 
     const sourceNodes = sourceEl.querySelectorAll<HTMLElement>(RACK_MINIMAP_SOURCE_SELECTOR);
     if (sourceNodes.length === 0) {
       hasRackContent = false;
-      occupiedEndRatio = 0;
+      occupiedSourceWidthPx = 1;
       mirrorMarkup = '';
       sourceHeightPx = Math.max(sourceEl.clientHeight, 1);
-      lastAppliedMirrorSignature = signature;
       return;
     }
 
@@ -153,7 +146,7 @@
       const rightInScrollSpace = rect.right - sourceRect.left + sourceScrollLeft;
       maxRightInScrollSpace = Math.max(maxRightInScrollSpace, rightInScrollSpace);
     });
-    occupiedEndRatio = clamp(maxRightInScrollSpace / Math.max(sourceEl.scrollWidth, 1), 0, 1);
+    occupiedSourceWidthPx = Math.max(maxRightInScrollSpace, 1);
 
     const mirrorRoot = sourceEl.cloneNode(true);
     if (!(mirrorRoot instanceof HTMLElement)) {
@@ -175,23 +168,13 @@
 
     sourceHeightPx = Math.max(sourceEl.clientHeight, 1);
     mirrorMarkup = mirrorRoot.outerHTML;
-    lastAppliedMirrorSignature = signature;
   };
 
-  const scheduleMirrorSync = (signature: string): void => {
-    pendingMirrorSignature = signature;
-    if (mirrorSyncFrameId !== null) {
-      return;
-    }
-
+  const scheduleMirrorSync = (): void => {
+    if (mirrorSyncFrameId !== null) return;
     mirrorSyncFrameId = window.requestAnimationFrame(() => {
       mirrorSyncFrameId = null;
-      const nextSignature = pendingMirrorSignature;
-      pendingMirrorSignature = null;
-      if (!nextSignature || nextSignature === lastAppliedMirrorSignature) {
-        return;
-      }
-      applySourceMirror(nextSignature);
+      applySourceMirror();
     });
   };
 
@@ -317,24 +300,37 @@
     onScrollRequest(clamp(nextScrollLeft, 0, maxScrollLeft));
   };
 
-  onMount(() => () => {
+  onDestroy(() => {
     if (mirrorSyncFrameId !== null) {
       window.cancelAnimationFrame(mirrorSyncFrameId);
-      mirrorSyncFrameId = null;
     }
   });
 
   $effect(() => {
-    const signature = [
-      controlsId,
-      contentRevision.toString(),
-      metrics.scrollWidth.toFixed(2),
-      metrics.clientWidth.toFixed(2),
-      occupiedSourceWidthPx.toFixed(2),
-      naturalScaledWidthPx.toFixed(2),
-      scrollbarWidthPx.toFixed(2),
-    ].join('|');
-    scheduleMirrorSync(signature);
+    void contentRevision;
+    const sourceEl = document.getElementById(controlsId);
+    scheduleMirrorSync();
+    if (!sourceEl) return;
+
+    // Viewport width/scroll changes only move the thumb. Rebuild the mirror for
+    // actual card geometry or content changes, not every sidebar spring frame.
+    let sourceHeight: number | undefined;
+    const observer = new ResizeObserver((entries) => {
+      let layoutChanged = false;
+      for (const entry of entries) {
+        if (entry.target === sourceEl) {
+          const height = entry.contentRect.height;
+          layoutChanged ||= sourceHeight !== height;
+          sourceHeight = height;
+        } else {
+          layoutChanged = true;
+        }
+      }
+      if (layoutChanged) scheduleMirrorSync();
+    });
+    observer.observe(sourceEl);
+    sourceEl.querySelectorAll(RACK_MINIMAP_SOURCE_SELECTOR).forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
   });
 </script>
 

@@ -1,7 +1,6 @@
 <script lang="ts">
   import { i18n } from '../../i18n.svelte';
   /** Renders Launchpad preview cells for rack and popout modes. */
-  import { SvelteMap } from "svelte/reactivity";
 
   import {
     createEmptyPreviewSurfaceViewModel,
@@ -69,13 +68,16 @@
 
   const resolveLedRgbByCellKey = (
     nextSurfaceModel: PreviewSurfaceViewModel,
-  ): SvelteMap<string, string> => {
-    const rgbByPitch = new SvelteMap<number, string>();
+  ): Map<string, string> => {
+    // Frame-local lookup tables are rebuilt by the enclosing derived value.
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const rgbByPitch = new Map<number, string>();
     for (const cell of nextSurfaceModel.activeCells) {
       rgbByPitch.set(cell.pitch, cell.rgb);
     }
 
-    const rgbByCellKey = new SvelteMap<string, string>();
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
+    const rgbByCellKey = new Map<string, string>();
     for (const cell of nextSurfaceModel.cells) {
       for (const pitch of cell.pitches) {
         const rgb = rgbByPitch.get(pitch);

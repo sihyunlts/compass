@@ -28,6 +28,11 @@ const liftLedSurfaceChannel = (channel: number): number => {
   ));
 };
 
+// Parsed channels are rounded bytes. Reuse the exact transfer function for all
+// frames instead of repeating gamma calculations for every illuminated pad.
+const LED_SURFACE_CHANNELS = Array.from({ length: 256 }, (_, channel) =>
+  liftLedSurfaceChannel(channel));
+
 /**
  * Approximates the lit pad surface color instead of the bare LED color.
  * Keeps fully-off LEDs black so velocity 0 still reads as unlit.
@@ -40,7 +45,7 @@ export const resolveLedSurfaceRgbChannels = (
     return channels;
   }
 
-  return channels.map(liftLedSurfaceChannel) as RgbChannels;
+  return channels.map((channel) => LED_SURFACE_CHANNELS[channel]) as RgbChannels;
 };
 
 export const resolveLedSurfaceRgb = (rgb: string): string => {
