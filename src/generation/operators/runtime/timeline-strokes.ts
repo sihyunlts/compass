@@ -1,5 +1,5 @@
 import { iterateTimelineFrames } from '../../timeline';
-import type { AffineTransform } from '../../../core/core-types';
+import type { AffineTransform, Polyline } from '../../../core/core-types';
 import {
   applyTransformToPolyline,
   composeAffine,
@@ -93,9 +93,10 @@ export const transformStroke = (
   transform: AffineTransform | null,
   writeOrder: number,
   resolveMask: typeof transformMask = transformMask,
+  resolvePolyline: typeof applyTransformToPolyline = applyTransformToPolyline,
 ): Omit<GeometryStroke, 'writeId'> => {
   const polyline = transform
-    ? applyTransformToPolyline(stroke.polyline, transform)
+    ? resolvePolyline(stroke.polyline, transform)
     // Temporal remaps and identity spatial rewrites change placement metadata,
     // not geometry. Canonical strokes are immutable snapshots, so preserving
     // the polyline identity lets downstream projection reuse its occupancy.
@@ -112,24 +113,54 @@ export const transformStroke = (
   };
 };
 
-/** Reuse identical mask transforms within one geometry rewrite. */
+/** Transforms and source geometry are immutable snapshots scoped to one stage. */
 export const createStrokeTransformer = (): typeof transformStroke => {
-  const masksBySource = new Map<GeometryMask, Map<string, GeometryMask>>();
-  const resolveMask: typeof transformMask = (mask, transform) => {
-    const key = [transform.a, transform.b, transform.c, transform.d, transform.tx, transform.ty].join(',');
-    let transformed = masksBySource.get(mask);
-    if (!transformed) {
-      transformed = new Map();
-      masksBySource.set(mask, transformed);
+  interface TransformedGeometry {
+    sourceTieDirection: Polyline['rasterTieBreakDirection'];
+    geometry: Pick<Polyline, 'points' | 'rasterTieBreakDirection'>;
+  }
+  const geometryByTransform = new WeakMap<
+    AffineTransform,
+    WeakMap<Polyline['points'], TransformedGeometry>
+  >();
+  const resolvePolyline: typeof applyTransformToPolyline = (polyline, transform) => {
+    let geometryByPoints = geometryByTransform.get(transform);
+    if (!geometryByPoints) {
+      geometryByPoints = new WeakMap();
+      geometryByTransform.set(transform, geometryByPoints);
     }
-    let result = transformed.get(key);
+    const cached = geometryByPoints.get(polyline.points);
+    const tieDirection = polyline.rasterTieBreakDirection;
+    if (cached
+      && cached.sourceTieDirection?.x === tieDirection?.x
+      && cached.sourceTieDirection?.y === tieDirection?.y) {
+      return { ...polyline, ...cached.geometry };
+    }
+    const result = applyTransformToPolyline(polyline, transform);
+    geometryByPoints.set(polyline.points, {
+      sourceTieDirection: tieDirection,
+      geometry: {
+        points: result.points,
+        ...(result.rasterTieBreakDirection ? { rasterTieBreakDirection: result.rasterTieBreakDirection } : {}),
+      },
+    });
+    return result;
+  };
+  const masksByTransform = new WeakMap<AffineTransform, WeakMap<GeometryMask, GeometryMask>>();
+  const resolveMask: typeof transformMask = (mask, transform) => {
+    let masksBySource = masksByTransform.get(transform);
+    if (!masksBySource) {
+      masksBySource = new WeakMap();
+      masksByTransform.set(transform, masksBySource);
+    }
+    let result = masksBySource.get(mask);
     if (!result) {
       result = transformMask(mask, transform);
-      transformed.set(key, result);
+      masksBySource.set(mask, result);
     }
     return result;
   };
-  return (stroke, transform, writeOrder) => transformStroke(stroke, transform, writeOrder, resolveMask);
+  return (stroke, transform, writeOrder) => transformStroke(stroke, transform, writeOrder, resolveMask, resolvePolyline);
 };
 
 export const buildSourceStrokesByOriginAndFrame = (
