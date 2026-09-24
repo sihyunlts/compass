@@ -66,12 +66,17 @@ const resolvePlaybackExtent = (
   observedWindow: TimelineWindow,
   previousState: OriginTimelineState | undefined,
   override: TimelineWindow | undefined,
+  overrideDomain: GenerationTimelineDomain | undefined,
 ): TimelineWindow => {
   if (!override) {
     return previousState?.playbackExtent ?? observedWindow;
   }
 
   const authoredExtent = mergeTimelineSpans(observedWindow, override);
+  if (overrideDomain === 'fixed') {
+    // A temporal transform replaces the source clock with its own output window.
+    return authoredExtent;
+  }
   return previousState?.timelineDomain === 'fixed'
     && hasTimelineSpan(previousState.playbackExtent)
     ? mergeTimelineSpans(previousState.playbackExtent, authoredExtent)
@@ -107,6 +112,7 @@ export const buildTimelineStateByOriginId = (
       observedWindow,
       previousState,
       playbackExtentOverride,
+      override?.timelineDomain,
     );
     timelineStateByOriginId.set(originId, {
       observedWindow: {

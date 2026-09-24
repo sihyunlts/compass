@@ -1,0 +1,193 @@
+{
+  "schemaVersion": 2,
+  "presetType": "rack",
+  "savedAtIso": "2026-09-24T22:07:37.100Z",
+  "chain": {
+    "devices": [
+      {
+        "id": "generator-40",
+        "kind": "path",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "anchors": [
+            {
+              "id": "path-anchor-669ru1-mu58sv46",
+              "x": 5.5,
+              "y": 5.5
+            },
+            {
+              "id": "path-anchor-t3l8lg-mu58ss56",
+              "x": 8,
+              "y": 4.5
+            },
+            {
+              "id": "path-anchor-lok6z1-mu58sl92",
+              "x": 5.5,
+              "y": 3.5
+            },
+            {
+              "id": "path-anchor-c7jssr-mu58sjrx",
+              "x": 4.5,
+              "y": 1
+            },
+            {
+              "id": "path-anchor-nalmse-mu58shu4",
+              "x": 3.5,
+              "y": 3.5
+            },
+            {
+              "id": "path-anchor-3esu32-mu58sdys",
+              "x": 1,
+              "y": 4.5
+            },
+            {
+              "id": "path-anchor-start",
+              "x": 3.5,
+              "y": 5.5
+            },
+            {
+              "id": "path-anchor-end",
+              "x": 4.5,
+              "y": 8
+            }
+          ],
+          "closed": true,
+          "fill": false,
+          "transform": {
+            "a": 1,
+            "b": 0,
+            "c": 0,
+            "d": 1,
+            "tx": 0,
+            "ty": 0,
+            "scaleX": 1,
+            "scaleY": 1
+          },
+          "animation": {
+            "enabled": false,
+            "direction": "forward",
+            "startAnchorId": "path-anchor-start"
+          }
+        }
+      },
+      {
+        "id": "effect-82",
+        "kind": "scale",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "centerX": 4.5,
+          "centerY": 4.5,
+          "scaleX": 0,
+          "scaleY": 0
+        }
+      },
+      {
+        "id": "effect-83",
+        "kind": "modulator",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "targets": [
+            {
+              "id": "mod-target-iyx9ub-mu58tyvg",
+              "slotIndex": 0,
+              "deviceId": "effect-82",
+              "paramKey": "scaleX",
+              "amount": 8
+            },
+            {
+              "id": "mod-target-pz0c1h-mu58uem0",
+              "slotIndex": 1,
+              "deviceId": "effect-82",
+              "paramKey": "scaleY",
+              "amount": 8
+            }
+          ],
+          "curve": {
+            "domain": "loop01",
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "curve-node-start",
+                "t": 0,
+                "v": 0
+              },
+              {
+                "id": "curve-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "effect-90",
+        "kind": "repeat",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "count": 2,
+          "intervalPercent": 100
+        }
+      },
+      {
+        "id": "effect-79",
+        "kind": "color",
+        "enabled": true,
+        "groupId": null,
+        "name": "YellowBluePurple4",
+        "params": {
+          "velocities": [
+            3,
+            12,
+            13,
+            32,
+            33,
+            41,
+            45,
+            46,
+            47
+          ],
+          "noteLengthPercent": 80,
+          "gapPercent": 0
+        },
+        "metadata": {
+          "author": "sihyunlights"
+        }
+      },
+      {
+        "id": "effect-91",
+        "kind": "timewarp",
+        "enabled": true,
+        "groupId": null,
+        "name": null,
+        "params": {
+          "curve": {
+            "divisions": 16,
+            "nodes": [
+              {
+                "id": "timewarp-node-start",
+                "t": 0,
+                "v": 0,
+                "nextCurveBend": 0.011058
+              },
+              {
+                "id": "timewarp-node-end",
+                "t": 1,
+                "v": 1
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "groupStateById": {}
+  }
+}

@@ -130,6 +130,7 @@ const applyMaskEffect = (
     inputTimeline,
     targetOriginIds,
     writes,
+    { rescalePlaybackExtentOnVisibilityLoss: true },
   );
 };
 

@@ -1,9 +1,5 @@
 import type { GenerationState, OriginTimelineState } from '../../timeline/state';
-import {
-  DEFAULT_TIMELINE_WINDOW,
-  FIXED_TIMELINE_END_BEAT,
-  type TimelineWindow,
-} from '../../timeline/temporal-window';
+import { FIXED_TIMELINE_END_BEAT, type TimelineWindow } from '../../timeline/temporal-window';
 import type { GeometryTimeline } from '../../types';
 import { remapTimeline } from './frame-remap';
 import { buildSourceWindowOriginFrameRemap } from './origin-frame-remap';
@@ -13,8 +9,8 @@ const resolveFinalSourceWindow = (
   timelineState: OriginTimelineState,
 ): TimelineWindow => timelineState.timelineDomain === 'fixed'
   ? {
-      start: Math.min(DEFAULT_TIMELINE_WINDOW.start, timelineState.observedWindow.start),
-      end: Math.max(DEFAULT_TIMELINE_WINDOW.end, timelineState.observedWindow.end),
+      start: Math.min(timelineState.playbackExtent.start, timelineState.observedWindow.start),
+      end: Math.max(timelineState.playbackExtent.end, timelineState.observedWindow.end),
     }
   : timelineState.observedWindow;
 

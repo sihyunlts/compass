@@ -170,7 +170,7 @@ const applyRepeatEffect = (
       intervalPercent,
       writeOrder,
     ),
-    buildFixedTimelineStateOverrides(targetOriginIds),
+    { timelineStateOverrides: buildFixedTimelineStateOverrides(targetOriginIds) },
   );
 };
 

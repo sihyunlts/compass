@@ -17,6 +17,7 @@ export interface PendingStrokeRewriteApplication {
   readonly sourceFrameCount: number;
   readonly endBeat: number;
   readonly writes: ReadonlyArray<PendingStrokeRewriteWrite>;
+  readonly rescalePlaybackExtentOnVisibilityLoss: boolean;
 }
 
 interface FrameGeometryRewriteInput {

@@ -12,6 +12,7 @@ import {
   removeOriginStrokes,
 } from '../../timeline';
 import type { CanonicalOutputAdapter } from '../../types';
+import type { TimelineWindow } from '../../timeline/temporal-window';
 import {
   applyTimelineStateOverrides,
   buildTimelineStateByOriginId,
@@ -40,7 +41,10 @@ export const appendPendingStrokeRewriteApplication = (
   sourceTimeline: GeometryTimeline,
   targetOriginIds: ReadonlySet<string>,
   writes: ReadonlyArray<PendingStrokeRewriteWrite>,
-  timelineStateOverrides?: ReadonlyMap<string, OriginTimelineStateOverride>,
+  options: {
+    timelineStateOverrides?: ReadonlyMap<string, OriginTimelineStateOverride>;
+    rescalePlaybackExtentOnVisibilityLoss?: boolean;
+  } = {},
 ): GenerationState => {
   return appendPendingFrameApplication(
     state,
@@ -50,8 +54,10 @@ export const appendPendingStrokeRewriteApplication = (
       sourceFrameCount: sourceTimeline.frameCount,
       endBeat: sourceTimeline.timeDomainEndBeat,
       writes,
+      rescalePlaybackExtentOnVisibilityLoss:
+        options.rescalePlaybackExtentOnVisibilityLoss ?? false,
     },
-    timelineStateOverrides,
+    options.timelineStateOverrides,
   );
 };
 
@@ -177,11 +183,44 @@ export const materializePendingFrameApplications = (
   }
 
   let timeline = state.timeline;
+  const adjustedPlaybackExtentByOriginId = new Map<string, TimelineWindow>();
   let applicationIndex = 0;
   while (applicationIndex < state.pendingFrameApplications.length) {
     const application = state.pendingFrameApplications[applicationIndex];
     if (application.kind === 'stroke-rewrite') {
+      const fixedTargetOriginIds = application.rescalePlaybackExtentOnVisibilityLoss
+        ? Array.from(application.targetOriginIds).filter(
+          (originId) => state.timelineStateByOriginId.get(originId)?.timelineDomain === 'fixed',
+        )
+        : [];
+      const beforeVisibility = fixedTargetOriginIds.length > 0
+        ? outputAdapter.buildVisibleWindowByOriginId(timeline, mutedGroupIds, mutedGeneratorIds)
+        : null;
       timeline = materializePendingStrokeRewriteApplication(timeline, application);
+      if (beforeVisibility) {
+        const afterVisibility = outputAdapter.buildVisibleWindowByOriginId(
+          timeline,
+          mutedGroupIds,
+          mutedGeneratorIds,
+        );
+        for (const originId of fixedTargetOriginIds) {
+          const before = beforeVisibility.get(originId);
+          const after = afterVisibility.get(originId);
+          if (!before) continue;
+          const playbackExtent = adjustedPlaybackExtentByOriginId.get(originId)
+            ?? state.timelineStateByOriginId.get(originId)!.playbackExtent;
+          if (!after) {
+            adjustedPlaybackExtentByOriginId.set(originId, { start: 0, end: 0 });
+          } else if (after.start > before.start || after.end < before.end) {
+            // Preserve the proportion of empty time authored before this mask.
+            const visibleScale = (after.end - after.start) / (before.end - before.start);
+            adjustedPlaybackExtentByOriginId.set(originId, {
+              start: after.start + (playbackExtent.start - before.start) * visibleScale,
+              end: after.end + (playbackExtent.end - before.end) * visibleScale,
+            });
+          }
+        }
+      }
       applicationIndex += 1;
       continue;
     }
@@ -195,15 +234,26 @@ export const materializePendingFrameApplications = (
     timeline = materializeGeometryRewriteBatch(timeline, batch);
   }
 
+  const timelineStateByOriginId = buildTimelineStateByOriginId(
+    timeline,
+    state.timelineStateByOriginId,
+    outputAdapter,
+    mutedGroupIds,
+    mutedGeneratorIds,
+  );
+  for (const [originId, playbackExtent] of adjustedPlaybackExtentByOriginId) {
+    const timelineState = timelineStateByOriginId.get(originId);
+    if (timelineState) {
+      timelineStateByOriginId.set(originId, {
+        ...timelineState,
+        playbackExtent,
+      });
+    }
+  }
+
   return transitionGenerationState(state, {
     timeline,
-    timelineStateByOriginId: buildTimelineStateByOriginId(
-      timeline,
-      state.timelineStateByOriginId,
-      outputAdapter,
-      mutedGroupIds,
-      mutedGeneratorIds,
-    ),
+    timelineStateByOriginId,
     pendingFrameApplications: [],
   });
 };
