@@ -71,23 +71,30 @@ const applyPendingSpatialTransform = (
     targetOriginIds,
     fallbackEvaluationWindow,
   );
+  const transformStroke = createStrokeTransformer();
+  const staticTransform = isModulated ? null : resolveEffectTransform(effect);
 
   return appendPendingGeometryRewriteApplication(
     state,
     targetOriginIds,
     ({ sampleStepBeats, frameIndex, strokes }) => {
-      const transformStroke = createStrokeTransformer();
+      const transformByOriginId = new Map<string, ReturnType<typeof resolveEffectTransform>>();
       return strokes.map((stroke) => {
-        const deviceAtFrame = isModulated
-          ? resolveDeviceAtFrame(
+        const originId = stroke.polyline.originId;
+        let transform = staticTransform;
+        if (isModulated) {
+          if (!transformByOriginId.has(originId)) {
+            transformByOriginId.set(originId, resolveEffectTransform(resolveDeviceAtFrame(
               frameIndex,
               sampleStepBeats,
-              evaluationWindowByTargetOriginId.get(stroke.polyline.originId)!,
-            )
-          : effect;
+              evaluationWindowByTargetOriginId.get(originId)!,
+            )));
+          }
+          transform = transformByOriginId.get(originId)!;
+        }
         return transformStroke(
           stroke,
-          resolveEffectTransform(deviceAtFrame),
+          transform,
           writeOrder,
         );
       });

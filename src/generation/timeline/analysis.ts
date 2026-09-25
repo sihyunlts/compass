@@ -408,14 +408,27 @@ export const collectStrokeOccupiedCoordinateCandidates = (
 
 export const createGeometryCoordinateMask = (
   strokes: ReadonlyArray<GeometryStroke>,
-): ((x: number, y: number) => boolean) => (x, y) => coordinatePredicateContainsPoint(
-  (candidateX, candidateY) => strokes.some((stroke) => isPointInsideMasks(stroke.masks, candidateX, candidateY)
-    && (stroke.polyline.rasterMode === 'centerline'
-      ? collectCenterlineCandidateCoordinates(stroke, {
-          minX: candidateX, maxX: candidateX, minY: candidateY, maxY: candidateY,
-        }).length > 0
-      : distanceToRasterizedPolylineSquared({ x: candidateX, y: candidateY }, stroke.polyline)
-        <= THICKNESS * THICKNESS)),
-  x,
-  y,
-);
+): ((x: number, y: number) => boolean) => {
+  // The mask captures immutable strokes. Color history and transformed copies
+  // repeatedly query the same integer cells, so rasterize each cell only once.
+  const membershipByX = new Map<number, Map<number, boolean>>();
+  const containsCoordinate = (candidateX: number, candidateY: number): boolean => {
+    let membershipByY = membershipByX.get(candidateX);
+    const cached = membershipByY?.get(candidateY);
+    if (cached !== undefined) return cached;
+    const contains = strokes.some((stroke) => isPointInsideMasks(stroke.masks, candidateX, candidateY)
+      && (stroke.polyline.rasterMode === 'centerline'
+        ? collectCenterlineCandidateCoordinates(stroke, {
+            minX: candidateX, maxX: candidateX, minY: candidateY, maxY: candidateY,
+          }).length > 0
+        : distanceToRasterizedPolylineSquared({ x: candidateX, y: candidateY }, stroke.polyline)
+          <= THICKNESS * THICKNESS));
+    if (!membershipByY) {
+      membershipByY = new Map();
+      membershipByX.set(candidateX, membershipByY);
+    }
+    membershipByY.set(candidateY, contains);
+    return contains;
+  };
+  return (x, y) => coordinatePredicateContainsPoint(containsCoordinate, x, y);
+};

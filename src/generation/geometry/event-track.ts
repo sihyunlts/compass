@@ -330,6 +330,41 @@ const hasProbesOutsideDistance = (
   return false;
 };
 
+// Corresponding probes give an upper bound on nearest-neighbor distance.
+// If every pair is close, neither direction needs a spatial index. Different
+// probe counts or distant pairs still use the complete geometric comparison.
+const areCorrespondingProbesNearby = (
+  left: Float64Array,
+  right: Float64Array,
+  distanceLed: number,
+): boolean => {
+  if (left.length !== right.length) return false;
+  const threshold = Math.max(distanceLed - GEOMETRY_DISTANCE_EPSILON, 0);
+  const thresholdSquared = threshold * threshold;
+  for (let offset = 0; offset < left.length; offset += 2) {
+    const dx = left[offset] - right[offset];
+    const dy = left[offset + 1] - right[offset + 1];
+    if (!((dx * dx) + (dy * dy) < thresholdSquared)) return false;
+  }
+  return true;
+};
+
+const hasNearbyProbe = (
+  x: number,
+  y: number,
+  probes: Float64Array,
+  distanceLed: number,
+): boolean => {
+  const threshold = Math.max(distanceLed - GEOMETRY_DISTANCE_EPSILON, 0);
+  const thresholdSquared = threshold * threshold;
+  for (let offset = 0; offset < probes.length; offset += 2) {
+    const dx = probes[offset] - x;
+    const dy = probes[offset + 1] - y;
+    if ((dx * dx) + (dy * dy) < thresholdSquared) return true;
+  }
+  return false;
+};
+
 const hasGeometryChangedByAtLeast = (
   reference: GeometryProbeSnapshot,
   candidate: GeometryProbeSnapshot,
@@ -348,10 +383,14 @@ const hasGeometryChangedByAtLeast = (
   const safeDistance = Number.isFinite(distanceLed) && distanceLed > 0
     ? distanceLed
     : MOTION_UNIT_DISTANCE_LED;
-  const referenceHash = resolveSpatialHash(reference, safeDistance);
+  if (areCorrespondingProbesNearby(reference.probes, candidate.probes, safeDistance)) return false;
+  // One displaced probe proves a changed pose. Check it directly before
+  // allocating a spatial index for every probe in a moving shape.
+  if (!hasNearbyProbe(reference.probes[0], reference.probes[1], candidate.probes, safeDistance)
+    || !hasNearbyProbe(candidate.probes[0], candidate.probes[1], reference.probes, safeDistance)) return true;
   const candidateHash = resolveSpatialHash(candidate, safeDistance);
   return hasProbesOutsideDistance(reference.probes, candidateHash, safeDistance, 1)
-    || hasProbesOutsideDistance(candidate.probes, referenceHash, safeDistance, 1);
+    || hasProbesOutsideDistance(candidate.probes, resolveSpatialHash(reference, safeDistance), safeDistance, 1);
 };
 
 const hasRepresentativeMotionUnit = (
@@ -359,6 +398,7 @@ const hasRepresentativeMotionUnit = (
   candidate: GeometryProbeSnapshot,
   distanceLed: number,
 ): boolean => {
+  if (areCorrespondingProbesNearby(reference.probes, candidate.probes, distanceLed)) return false;
   // Pose retention detects ANY change; the Color unit measures the median
   // centerline displacement. A fast endpoint must not set every point's age.
   // Query the full centerline so reference-support endpoints do not introduce
