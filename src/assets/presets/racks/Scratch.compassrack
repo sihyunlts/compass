@@ -96,7 +96,10 @@
                 "id": "timewarp-node-start",
                 "t": 0,
                 "v": 0,
-                "nextCurveBend": 0.02077
+                "handleOut": {
+                  "t": 0.6511653590430597,
+                  "v": 0.9622335627115198
+                }
               },
               {
                 "id": "timewarp-node-end",

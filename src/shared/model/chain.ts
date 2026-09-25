@@ -250,7 +250,9 @@ export interface CurveNode {
   id: string;
   t: number;
   v: number;
-  nextCurveBend?: number | null;
+  /** Handle offsets relative to this node. */
+  handleIn?: { t: number; v: number };
+  handleOut?: { t: number; v: number };
 }
 
 export interface ModulationCurve {

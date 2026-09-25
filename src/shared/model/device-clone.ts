@@ -21,11 +21,8 @@ const cloneCurveNodes = (nodes: readonly CurveNode[]): CurveNode[] =>
     id: node.id,
     t: node.t,
     v: node.v,
-    ...(typeof node.nextCurveBend === 'number'
-      ? {
-        nextCurveBend: node.nextCurveBend,
-      }
-      : {}),
+    ...(node.handleIn ? { handleIn: { ...node.handleIn } } : {}),
+    ...(node.handleOut ? { handleOut: { ...node.handleOut } } : {}),
   }));
 
 const cloneModulationCurve = (curve: ModulationCurve): ModulationCurve => ({
