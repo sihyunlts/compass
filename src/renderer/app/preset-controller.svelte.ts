@@ -1509,11 +1509,10 @@ export class PresetController {
     if (target.needsSave) {
       this.captureCurrentRackRevertTarget();
       this.syncRackDirtyState();
-      this.showMessage(i18n.t('status.rackLoadedNeedsSave'));
-      return;
+    } else {
+      this.markCurrentRackClean({ captureRevertTarget: true });
     }
 
-    this.markCurrentRackClean({ captureRevertTarget: true });
     this.showMessage(i18n.t('status.rackLoaded'));
   }
 

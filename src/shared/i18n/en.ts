@@ -391,7 +391,6 @@ export const en = {
   'status.presetInfoSaveFailed': 'Failed to save preset info.',
   'status.rackLoadFailed': 'Rack load failed.',
   'status.rackLoaded': 'Rack loaded.',
-  'status.rackLoadedNeedsSave': 'Rack loaded. Save to update the file format.',
   'status.rackReverted': 'Rack reverted to saved state.',
   'status.rackSaveFailed': 'Rack save failed.',
   'status.rackSaved': 'Rack saved.',

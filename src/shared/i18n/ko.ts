@@ -394,7 +394,6 @@ export const ko = {
   'status.presetInfoSaveFailed': '프리셋 정보를 저장하지 못했습니다.',
   'status.rackLoadFailed': '랙을 불러오지 못했습니다.',
   'status.rackLoaded': '랙을 불러왔습니다.',
-  'status.rackLoadedNeedsSave': '랙을 불러왔습니다. 저장하면 파일 형식이 업데이트됩니다.',
   'status.rackReverted': '랙을 마지막 저장 상태로 되돌렸습니다.',
   'status.rackSaveFailed': '랙을 저장하지 못했습니다.',
   'status.rackSaved': '랙을 저장했습니다.',
