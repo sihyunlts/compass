@@ -1,3 +1,5 @@
+import { migratePresetCurves } from './curve-migration';
+
 const LEGACY_MODULATION_TARGET_ID = 'mod-target-legacy';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -288,8 +290,10 @@ export const migratePresetValue = (
     migrated = true;
   }
 
+  // Apply the curve conversion to both migrated v1 files and saved v2 drafts.
+  const withBezierCurves = migratePresetCurves(current);
   return {
-    value: current,
-    migrated,
+    value: withBezierCurves,
+    migrated: migrated || withBezierCurves !== current,
   };
 };

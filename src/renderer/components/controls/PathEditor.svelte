@@ -36,6 +36,8 @@
   import { i18n } from '../../i18n.svelte';
   import { performHapticFeedback } from '../../haptics';
   import ControlSurfaceFrame from './ControlSurfaceFrame.svelte';
+  import BezierHandles from './BezierHandles.svelte';
+  import { moveBezierHandle, type BezierHandleKind as HandleKind } from '../../../shared/bezier-handles';
   import {
     CONTROL_POINT_DRAG_THRESHOLD_PX,
     CONTROL_POINT_SOFT_SNAP_DISTANCE_PX,
@@ -54,7 +56,6 @@
   };
   type AlignmentGuides = { x: number | null; y: number | null };
   type AxisSnap = { value: number; target: number | null };
-  type HandleKind = 'handleIn' | 'handleOut';
   type Selection =
     | { kind: 'anchors'; anchorIds: string[] }
     | { kind: 'path' }
@@ -129,7 +130,7 @@
   let pointerDownEvent: PointerEvent | null = null;
   let previousTap: PointerEvent | null = null;
   const resolvePressTarget = (event: PointerEvent): Element | null => event.target instanceof Element
-    ? event.target.closest('.path-editor-interactive') ?? editorEl
+    ? event.target.closest('.path-editor-interactive, [data-bezier-handle]') ?? editorEl
     : null;
   const isRepeatedPress = (event: PointerEvent): boolean => isConsecutiveTap(previousTap, event)
     && previousTap !== null && resolvePressTarget(previousTap) === resolvePressTarget(event);
@@ -456,6 +457,7 @@
       const point = resolveAbsolutePathHandle(selectedAnchor.anchor, handle);
       const plotted = toPlotPoint(toWorldPoint(point));
       return [{
+        nodeId: selectedAnchor.anchor.id,
         kind,
         x: plotted.x,
         y: plotted.y,
@@ -682,32 +684,10 @@
     independent: boolean,
   ): void => {
     replaceAnchor(anchorId, (anchor) => {
-      if (isPointNearAnchor(point, anchor, CONTROL_POINT_DRAG_THRESHOLD_PX)) {
-        const next = { ...anchor };
-        delete next[kind];
-        if (!independent) {
-          const opposite: HandleKind = kind === 'handleIn' ? 'handleOut' : 'handleIn';
-          delete next[opposite];
-        }
-        return next;
-      }
-      const rawHandle = {
-        x: roundCoordinate(point.x - anchor.x),
-        y: roundCoordinate(point.y - anchor.y),
-      };
-      if (independent) {
-        return {
-          ...anchor,
-          [kind]: rawHandle,
-        };
-      }
-      const handle = rawHandle;
-      const opposite: HandleKind = kind === 'handleIn' ? 'handleOut' : 'handleIn';
-      return {
-        ...anchor,
-        [kind]: handle,
-        [opposite]: { x: -handle.x, y: -handle.y },
-      };
+      const offset = isPointNearAnchor(point, anchor, CONTROL_POINT_DRAG_THRESHOLD_PX)
+        ? null : { x: roundCoordinate(point.x - anchor.x), y: roundCoordinate(point.y - anchor.y) };
+      const handles = moveBezierHandle(anchor, kind, offset, independent);
+      return { id: anchor.id, x: anchor.x, y: anchor.y, ...handles };
     }, false);
   };
 
@@ -1421,7 +1401,7 @@
   const handleSurfacePointerDown = (event: PointerEvent): void => {
     if (!canBeginPointer(event)) return;
     const target = event.target;
-    if (target instanceof Element && target.closest('.path-editor-interactive')) {
+    if (target instanceof Element && target.closest('.path-editor-interactive, [data-bezier-handle]')) {
       return;
     }
     const startPoint = resolveUnsnappedEditorPoint(event.clientX, event.clientY);
@@ -1454,7 +1434,7 @@
       return;
     }
     const target = event.target;
-    if (target instanceof Element && target.closest('.path-editor-interactive')) {
+    if (target instanceof Element && target.closest('.path-editor-interactive, [data-bezier-handle]')) {
       return;
     }
     const point = resolveEditorPoint(event.clientX, event.clientY);
@@ -2026,30 +2006,14 @@
             height={marqueeBox.height}
           ></rect>
         {/if}
-        {#each selectedHandles as handle (handle.kind)}
-          <line
-            class="path-editor-handle-line"
-            x1={handle.anchorX}
-            y1={handle.anchorY}
-            x2={handle.x}
-            y2={handle.y}
-          ></line>
-        {/each}
       </svg>
 
-      {#each selectedHandles as handle (handle.kind)}
-        <button
-          type="button"
-          class="path-editor-handle path-editor-interactive"
-          style={`left:${handle.x}%;top:${handle.y}%;`}
-          aria-label={i18n.t('control.pathHandle')}
-          onpointerdown={(event) => beginDrag(event, {
-            kind: 'handle',
-            anchorId: selectedAnchor?.anchor.id ?? '',
-            handleKind: handle.kind,
-          })}
-        ></button>
-      {/each}
+      <BezierHandles
+        handles={selectedHandles}
+        onHandlePointerDown={(event, nodeId, kind) => beginDrag(event, {
+          kind: 'handle', anchorId: nodeId, handleKind: kind,
+        })}
+      />
 
       {#if pathSelection}
         {#each pathSelection.scaleHandles as handle (handle.id)}
@@ -2194,14 +2158,7 @@
     stroke-dasharray: 2 1;
   }
 
-  .path-editor-handle-line {
-    stroke: var(--color-text-secondary);
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-  }
-
   .path-editor-anchor,
-  .path-editor-handle,
   .path-editor-scale-handle {
     position: absolute;
     transform: translate(-50%, -50%);
@@ -2230,19 +2187,6 @@
 
     &.is-animation-start {
       box-shadow: 0 0 0 2px var(--color-text-primary);
-    }
-  }
-
-  .path-editor-handle {
-    width: 0.62rem;
-    height: 0.62rem;
-    padding: 0;
-    border: 1px solid var(--color-text-secondary);
-    background: var(--color-surface-interactive);
-    cursor: grab;
-
-    &:active {
-      cursor: grabbing;
     }
   }
 

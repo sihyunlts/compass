@@ -3,23 +3,25 @@
 <script lang="ts">
   /**
    * Interactive curve editor shared by modulation and time-warp device cards.
-   * Owns node editing and segment control editing for shared curve controls.
+   * Owns node editing and paired Bézier handles for shared curve controls.
    */
   import { PointerCaptureSession } from '../../features/rack/pointer-capture-session';
   import type { RendererControlChange } from '../../../devices/control-types';
   import {
     buildCurveSegments,
-    canSegmentCurveBendAffectShape,
-    evaluateNormalizedCurveAt,
-    toSegmentCurveBend,
-    toSegmentCurvePoint,
+    roundCurveNumber,
     type CurvePoint,
   } from '../../../core/curve-segments';
-  import { resolveSegmentCurvePoint } from '../../../core/modulation/curve';
   import { clamp } from '../../../shared/math';
   import type { CurveNode } from '../../../shared/model';
   import { CURVE_DIVISION_OPTIONS } from '../../../core/curve-divisions';
   import ControlSurfaceFrame from './ControlSurfaceFrame.svelte';
+  import BezierHandles from './BezierHandles.svelte';
+  import {
+    moveBezierHandle,
+    type BezierHandles as HandleState,
+    type BezierHandleKind as HandleKind,
+  } from '../../../shared/bezier-handles';
   import DropdownOptionList from '../primitives/DropdownOptionList.svelte';
   import FloatingDropdown from '../primitives/FloatingDropdown.svelte';
   import type { DropdownValue } from '../primitives/dropdown-types';
@@ -27,6 +29,7 @@
   import { i18n } from '../../i18n.svelte';
   import { performHapticFeedback } from '../../haptics';
   import {
+    CONTROL_POINT_DRAG_THRESHOLD_PX,
     hasExceededControlPointDragThreshold,
     resolveSoftSnap,
   } from './control-point-editor';
@@ -42,7 +45,8 @@
 
   type DragTarget =
     | { kind: 'node'; nodeId: string }
-    | { kind: 'segment-control'; startNodeId: string }
+    | { kind: 'node-handle'; nodeId: string }
+    | { kind: 'handle'; nodeId: string; handleKind: HandleKind }
     | null;
 
   type PlottedNode = {
@@ -53,13 +57,13 @@
     y: number;
   };
 
-  type PlottedSegmentControl = {
-    key: string;
-    startNodeId: string;
-    endNodeId: string;
+  type PlottedHandle = {
+    nodeId: string;
+    kind: HandleKind;
     x: number;
     y: number;
-    isStub: boolean;
+    anchorX: number;
+    anchorY: number;
   };
 
   let {
@@ -106,33 +110,6 @@
 
   const NODE_DOUBLE_CLICK_WINDOW_MS = 300;
 
-  const roundCurveNumber = (value: number): number =>
-    Number(value.toFixed(6));
-
-  const smoothstep = (value: number): number => {
-    const clamped = clamp(value, 0, 1);
-    return clamped * clamped * (3 - 2 * clamped);
-  };
-
-  const toResponsiveCurveValue = (
-    startNode: CurveNode,
-    endNode: CurveNode,
-    value: number,
-  ): number => {
-    const lowPoint = toSegmentCurvePoint(startNode, endNode, -1);
-    const highPoint = toSegmentCurvePoint(startNode, endNode, 1);
-    const minValue = Math.min(lowPoint.v, highPoint.v);
-    const maxValue = Math.max(lowPoint.v, highPoint.v);
-    const span = maxValue - minValue;
-    if (span <= 0.000001) {
-      return roundCurveNumber(clamp(value, minValue, maxValue));
-    }
-
-    const normalized = clamp((value - minValue) / span, 0, 1);
-    const eased = smoothstep(smoothstep(normalized));
-    return roundCurveNumber(minValue + span * eased);
-  };
-
   const divisions = $derived(Math.max(2, Math.round(curve.divisions)));
   const divisionDropdownOptions = $derived(
     CURVE_DIVISION_OPTIONS.map((value) => ({ value, label: String(value) })),
@@ -148,9 +125,7 @@
   const clampedProgress01 = $derived(
     clamp(Number.isFinite(currentProgress01) ? currentProgress01 : 0, 0, 1),
   );
-  const sortedNodes = $derived.by(() =>
-    [...localNodes].sort((a, b) => a.t - b.t || a.id.localeCompare(b.id)));
-  const curveSegments = $derived.by(() => buildCurveSegments(sortedNodes));
+  const curveSegments = $derived.by(() => buildCurveSegments(localNodes));
 
   const toPlotY = (value: number): number =>
     (1 - ((value - curveValueMin) / curveValueSpan)) * 100;
@@ -160,7 +135,7 @@
     y: toPlotY(point.v),
   });
 
-  const plottedNodes = $derived.by<PlottedNode[]>(() => sortedNodes.map((node) => ({
+  const plottedNodes = $derived.by<PlottedNode[]>(() => localNodes.map((node) => ({
     id: node.id,
     t: node.t,
     v: node.v,
@@ -168,48 +143,33 @@
     y: toPlotY(node.v),
   })));
 
-  const plottedSegmentControls = $derived.by<PlottedSegmentControl[]>(() =>
-    sortedNodes.slice(0, -1).flatMap((node, index) => {
-      const nextNode = sortedNodes[index + 1];
-      if (!nextNode || !canSegmentCurveBendAffectShape(node, nextNode)) {
-        return [];
+  const plottedHandles = $derived.by<PlottedHandle[]>(() =>
+    curveSegments.flatMap((segment, index) => {
+      const handles: PlottedHandle[] = [];
+      const start = localNodes[index];
+      const end = localNodes[index + 1];
+      if (start.id === selectedNodeId && start.handleOut) {
+        const anchor = toPlotPoint(start);
+        handles.push({ nodeId: start.id, kind: 'handleOut',
+          ...toPlotPoint(segment.controlOut), anchorX: anchor.x, anchorY: anchor.y });
       }
-
-      const resolved = resolveSegmentCurvePoint(sortedNodes, index);
-      const point = resolved.point ?? {
-        t: (node.t + nextNode.t) * 0.5,
-        v: (node.v + nextNode.v) * 0.5,
-      };
-      return [{
-        key: `${node.id}:${nextNode.id}`,
-        startNodeId: node.id,
-        endNodeId: nextNode.id,
-        ...toPlotPoint(point),
-        isStub: resolved.isStub,
-      }];
+      if (end.id === selectedNodeId && end.handleIn) {
+        const anchor = toPlotPoint(end);
+        handles.push({ nodeId: end.id, kind: 'handleIn',
+          ...toPlotPoint(segment.controlIn), anchorX: anchor.x, anchorY: anchor.y });
+      }
+      return handles;
     }));
-
-  const SAMPLE_STEPS_PER_SEGMENT = 24;
 
   const curveLinePath = $derived.by(() => {
     const firstNode = plottedNodes[0];
-    if (!firstNode) {
-      return '';
-    }
-
+    if (!firstNode) return '';
     let path = `M ${firstNode.x} ${firstNode.y}`;
-    for (let index = 0; index < curveSegments.length; index += 1) {
-      const segment = curveSegments[index];
-      const spanT = segment.end.t - segment.start.t;
-      for (let step = 1; step <= SAMPLE_STEPS_PER_SEGMENT; step += 1) {
-        const progress = step / SAMPLE_STEPS_PER_SEGMENT;
-        const curveProgress = evaluateNormalizedCurveAt(progress, segment.bend);
-        const point = toPlotPoint({
-          t: segment.start.t + spanT * progress,
-          v: segment.start.v + (segment.end.v - segment.start.v) * curveProgress,
-        });
-        path += ` L ${point.x} ${point.y}`;
-      }
+    for (const segment of curveSegments) {
+      const out = toPlotPoint(segment.controlOut);
+      const incoming = toPlotPoint(segment.controlIn);
+      const end = toPlotPoint(segment.end);
+      path += ` C ${out.x} ${out.y} ${incoming.x} ${incoming.y} ${end.x} ${end.y}`;
     }
     return path;
   });
@@ -228,18 +188,18 @@
     `curve-node-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
 
   const isEndpointNode = (nodeId: string | null): boolean => {
-    if (nodeId === null || sortedNodes.length < 2) {
+    if (nodeId === null || localNodes.length < 2) {
       return false;
     }
 
-    return nodeId === sortedNodes[0]?.id || nodeId === sortedNodes[sortedNodes.length - 1]?.id;
+    return nodeId === localNodes[0]?.id || nodeId === localNodes[localNodes.length - 1]?.id;
   };
 
   const canDeleteNode = (nodeId: string | null): boolean =>
     nodeId !== null
-    && sortedNodes.length > 2
+    && localNodes.length > 2
     && !isEndpointNode(nodeId)
-    && sortedNodes.some((node) => node.id === nodeId);
+    && localNodes.some((node) => node.id === nodeId);
 
   const emitNodes = (nodes: CurveNode[]): void => {
     localNodes = sanitizeNodes(nodes);
@@ -320,7 +280,7 @@
   const insertNodeAtPoint = (
     point: SnappedCurvePoint,
   ): void => {
-    const existingNode = sortedNodes.find((node) => node.t.toFixed(6) === point.t.toFixed(6));
+    const existingNode = localNodes.find((node) => node.t.toFixed(6) === point.t.toFixed(6));
     if (existingNode) {
       selectedNodeId = existingNode.id;
       return;
@@ -331,7 +291,7 @@
       t: point.t,
       v: point.v,
     };
-    emitNodes([...sortedNodes, nextNode]);
+    emitNodes([...localNodes, nextNode]);
     const insertedNode = localNodes.find((node) => node.id === nextNode.id);
     if (insertedNode && resolveAppliedSnapSignature(insertedNode, point.snapTargets)) {
       performHapticFeedback('alignment');
@@ -344,13 +304,13 @@
       return;
     }
 
-    const next = sortedNodes.filter((node) => node.id !== nodeId);
+    const next = localNodes.filter((node) => node.id !== nodeId);
     if (next.length < 2) {
       return;
     }
 
     emitNodes(next);
-    selectedNodeId = next[0]?.id ?? null;
+    selectedNodeId = null;
   };
 
   const beginDrag = (event: PointerEvent, nextTarget: DragTarget): void => {
@@ -371,19 +331,16 @@
     }
 
     isKeyboardDeleteEnabled = true;
-    activePointerNodeId = nodeId;
+    activePointerNodeId = event.altKey ? null : nodeId;
     selectedNodeId = nodeId;
-    beginDrag(event, { kind: 'node', nodeId });
+    beginDrag(event, { kind: event.altKey ? 'node-handle' : 'node', nodeId });
   };
 
-  const handleSegmentControlPointerDown = (event: PointerEvent, startNodeId: string): void => {
-    if (event.button !== 0 || !event.isPrimary || pointerSession.isActive()) {
-      return;
-    }
-
+  const handleHandlePointerDown = (event: PointerEvent, nodeId: string, handleKind: HandleKind): void => {
+    if (event.button !== 0 || !event.isPrimary || pointerSession.isActive()) return;
     isKeyboardDeleteEnabled = true;
     activePointerNodeId = null;
-    beginDrag(event, { kind: 'segment-control', startNodeId });
+    beginDrag(event, { kind: 'handle', nodeId, handleKind });
   };
 
   const markPointerMovedIfNeeded = (clientX: number, clientY: number): void => {
@@ -410,24 +367,24 @@
       return;
     }
 
-    const currentIndex = sortedNodes.findIndex((node) => node.id === nodeId);
+    const currentIndex = localNodes.findIndex((node) => node.id === nodeId);
     if (currentIndex === -1) {
       return;
     }
 
-    const current = sortedNodes[currentIndex];
-    const previousNode = sortedNodes[currentIndex - 1] ?? null;
-    const nextNode = sortedNodes[currentIndex + 1] ?? null;
+    const current = localNodes[currentIndex];
+    const previousNode = localNodes[currentIndex - 1] ?? null;
+    const nextNode = localNodes[currentIndex + 1] ?? null;
     const isEndpoint = previousNode === null || nextNode === null;
     const nextT = isEndpoint
       ? current.t
-      : roundCurveNumber(clamp(
+      : clamp(
         point.t,
-        previousNode.t + 0.000001,
-        nextNode.t - 0.000001,
-      ));
+        previousNode.t + Math.min(0.000001, (current.t - previousNode.t) / 2),
+        nextNode.t - Math.min(0.000001, (nextNode.t - current.t) / 2),
+      );
 
-    const next = sortedNodes.map((node) => node.id === nodeId
+    const next = localNodes.map((node) => node.id === nodeId
       ? { ...node, t: nextT, v: point.v }
       : node);
     emitNodes(next);
@@ -438,48 +395,41 @@
     }) : null);
   };
 
-  const updateDraggingSegmentControl = (
-    startNodeId: string,
-    clientX: number,
-    clientY: number,
+  const toHandleState = (node: CurveNode): HandleState => ({
+    ...(node.handleIn ? { handleIn: { x: node.handleIn.t, y: node.handleIn.v } } : {}),
+    ...(node.handleOut ? { handleOut: { x: node.handleOut.t, y: node.handleOut.v } } : {}),
+  });
+
+  const withHandleState = (node: CurveNode, handles: HandleState): CurveNode => ({
+    id: node.id, t: node.t, v: node.v,
+    ...(handles.handleIn ? { handleIn: { t: handles.handleIn.x, v: handles.handleIn.y } } : {}),
+    ...(handles.handleOut ? { handleOut: { t: handles.handleOut.x, v: handles.handleOut.y } } : {}),
+  });
+
+  const updateDraggingHandle = (
+    nodeId: string,
+    kind: HandleKind,
+    event: PointerEvent,
+    independent = event.altKey,
   ): void => {
-    markPointerMovedIfNeeded(clientX, clientY);
-
-    const point = resolvePoint(clientX, clientY, { snapToDivisions: false });
-    if (!point) {
-      return;
-    }
-
-    const startIndex = sortedNodes.findIndex((node) => node.id === startNodeId);
-    if (startIndex === -1 || startIndex >= sortedNodes.length - 1) {
-      return;
-    }
-
-    const startNode = sortedNodes[startIndex];
-    const endNode = sortedNodes[startIndex + 1];
-    const nextCurveBend = toSegmentCurveBend(startNode, endNode, {
-      t: (startNode.t + endNode.t) * 0.5,
-      v: toResponsiveCurveValue(startNode, endNode, point.v),
-    });
-
-    const next = sortedNodes.map((node, index) => {
-      if (index !== startIndex) {
-        return node;
-      }
-
-      return {
-        id: node.id,
-        t: node.t,
-        v: node.v,
-        ...(Math.abs(nextCurveBend) > 0.0001 ? { nextCurveBend } : {}),
-      };
-    });
-    emitNodes(next);
-    const appliedIndex = localNodes.findIndex((node) => node.id === startNodeId);
-    const appliedPoint = resolveSegmentCurvePoint(localNodes, appliedIndex).point;
-    performCurveSnapHaptic(appliedPoint
-      ? resolveAppliedSnapSignature(appliedPoint, point.snapTargets)
-      : null);
+    markPointerMovedIfNeeded(event.clientX, event.clientY);
+    const point = resolvePoint(event.clientX, event.clientY, { snapToDivisions: false, snapToCenterLine: false });
+    const index = localNodes.findIndex((node) => node.id === nodeId);
+    if (!point || index < 0) return;
+    const node = localNodes[index];
+    const neighbor = localNodes[index + (kind === 'handleIn' ? -1 : 1)];
+    if (!neighbor) return;
+    const rect = editorEl?.getBoundingClientRect();
+    const nearNode = rect && Math.hypot(
+      (point.t - node.t) * rect.width,
+      (point.v - node.v) / curveValueSpan * rect.height,
+    ) <= CONTROL_POINT_DRAG_THRESHOLD_PX;
+    const offset = nearNode ? null : {
+      x: roundCurveNumber(clamp(point.t, Math.min(node.t, neighbor.t), Math.max(node.t, neighbor.t)) - node.t),
+      y: roundCurveNumber(point.v - node.v),
+    };
+    const handles = moveBezierHandle(toHandleState(node), kind, offset, independent);
+    emitNodes(localNodes.map((candidate) => candidate.id === nodeId ? withHandleState(node, handles) : candidate));
   };
 
   const clearPointerState = (): void => {
@@ -499,7 +449,7 @@
     isKeyboardDeleteEnabled = true;
     const target = event.target;
     const interactiveHit = target instanceof Element
-      ? target.closest('[data-curve-node-id], [data-curve-segment-control-id]')
+      ? target.closest('[data-curve-node-id], [data-bezier-handle]')
       : null;
     if (interactiveHit) {
       return;
@@ -549,7 +499,7 @@
     const nextNodes: CurveNode[] = sanitizeNodes(curve.nodes);
     localNodes = nextNodes;
     if (!nextNodes.some((node) => node.id === selectedNodeId)) {
-      selectedNodeId = nextNodes[0]?.id ?? null;
+      selectedNodeId = null;
     }
   });
 
@@ -559,16 +509,23 @@
         return;
       }
 
-      if (dragTarget.kind === 'node') {
-        updateDraggingNode(dragTarget.nodeId, event.clientX, event.clientY);
+      const target = dragTarget;
+      if (target.kind === 'node') {
+        updateDraggingNode(target.nodeId, event.clientX, event.clientY);
         return;
       }
 
-      updateDraggingSegmentControl(
-        dragTarget.startNodeId,
-        event.clientX,
-        event.clientY,
-      );
+      if (target.kind === 'node-handle') {
+        const index = localNodes.findIndex((node) => node.id === target.nodeId);
+        const point = resolvePoint(event.clientX, event.clientY, { snapToDivisions: false, snapToCenterLine: false });
+        if (index < 0 || !point) return;
+        const kind: HandleKind = index === 0 ? 'handleOut'
+          : index === localNodes.length - 1 ? 'handleIn'
+            : point.t < localNodes[index].t ? 'handleIn' : 'handleOut';
+        updateDraggingHandle(target.nodeId, kind, event, false);
+        return;
+      }
+      updateDraggingHandle(target.nodeId, target.handleKind, event);
     };
 
     const handlePointerUp = (event: PointerEvent): void => {
@@ -596,6 +553,21 @@
       clearPointerState();
     };
 
+    const handleWindowPointerDown = (event: PointerEvent): void => {
+      if (!editorEl) return;
+      const target = event.target;
+      const isEditorControl = target instanceof Element
+        && editorEl.contains(target)
+        && target.closest('[data-curve-node-id], [data-bezier-handle]');
+      if (isEditorControl) return;
+      clearPointerState();
+      selectedNodeId = null;
+      isKeyboardDeleteEnabled = false;
+      lastClickedNodeId = null;
+      lastClickedAt = 0;
+    };
+
+    window.addEventListener('pointerdown', handleWindowPointerDown, { capture: true });
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
     const cancelPointer = (event: PointerEvent): void => {
@@ -604,6 +576,7 @@
     window.addEventListener('pointercancel', cancelPointer);
     window.addEventListener('blur', clearPointerState);
     return () => {
+      window.removeEventListener('pointerdown', handleWindowPointerDown, true);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', cancelPointer);
@@ -666,19 +639,7 @@
           <path class="curve-line" d={curveLinePath} />
         {/if}
       </svg>
-      <div class="curve-editor-segment-controls">
-        {#each plottedSegmentControls as control (control.key)}
-          {@const segmentControlLabel = `Curve point between ${control.startNodeId} and ${control.endNodeId}`}
-          <button
-            type="button"
-            class="curve-editor-segment-control"
-            data-curve-segment-control-id={control.key}
-            style={`left:${control.x}%;top:${control.y}%;`}
-            onpointerdown={(event) => handleSegmentControlPointerDown(event, control.startNodeId)}
-            aria-label={segmentControlLabel}
-          ></button>
-        {/each}
-      </div>
+      <BezierHandles handles={plottedHandles} onHandlePointerDown={handleHandlePointerDown} />
       <div class="curve-editor-nodes">
         {#each plottedNodes as node (node.id)}
           {@const nodeLabel = `Curve node at ${node.t.toFixed(3)}, ${node.v.toFixed(3)}`}
@@ -702,14 +663,16 @@
     anchorPoint={divisionsMenuPoint}
     onClose={() => divisionsMenuPoint = null}
   >
-    <DropdownOptionList
-      options={divisionDropdownOptions}
-      value={divisions}
-      ariaLabel={i18n.t('control.divisions')}
-      heading={i18n.t('control.divisions')}
-      onSelect={handleDivisionSelect}
-      onClose={() => divisionsMenuPoint = null}
-    />
+    {#if divisionsControlAction}
+      <DropdownOptionList
+        options={divisionDropdownOptions}
+        value={divisions}
+        ariaLabel={i18n.t('control.divisions')}
+        heading={i18n.t('control.divisions')}
+        onSelect={handleDivisionSelect}
+        onClose={() => divisionsMenuPoint = null}
+      />
+    {/if}
   </FloatingDropdown>
 
 </div>
@@ -775,44 +738,24 @@
       vector-effect: non-scaling-stroke;
     }
 
-    &-segment-controls,
     &-nodes {
       position: absolute;
       inset: 0;
       pointer-events: none;
     }
 
-    &-segment-control,
     &-node {
       position: absolute;
       transform: translate(-50%, -50%);
       padding: 0;
-      cursor: pointer;
       pointer-events: auto;
-    }
-
-    &-segment-control {
-      z-index: 1;
-      width: 0.5rem;
-      height: 0.5rem;
-      border: 2px solid var(--device-control-accent, var(--color-surface-inverse));
-      border-radius: var(--radius-round);
-      background: var(--color-surface);
-
-      &::before {
-        content: '';
-        position: absolute;
-        inset: -0.3rem;
-      }
-    }
-
-    &-node {
       z-index: 2;
-      width: 0.9rem;
-      height: 0.9rem;
+      width: 0.8rem;
+      height: 0.8rem;
       border: 2px solid var(--color-surface);
       border-radius: var(--radius-round);
       background: var(--color-surface-inverse);
+      cursor: pointer;
 
       &::before {
         content: '';

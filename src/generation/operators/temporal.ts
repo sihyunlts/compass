@@ -1,5 +1,5 @@
-import { invertNormalizedCurveAt } from '../../core/curve-segments';
-import { compileTimeWarpCurve, isIdentityTimeWarpCurve } from '../../core/timewarp/curve';
+import { invertCurveSegment } from '../../core/curve-segments';
+import { compileTimeWarpCurve } from '../../core/timewarp/curve';
 import type {
   GeneratorEffectNode,
   StretchEffectNode,
@@ -260,11 +260,10 @@ const applyTimeWarp = (
   writeOrder: number,
   context: RackStageExecutionContext,
 ): MaterializedGenerationState => {
-  if (isIdentityTimeWarpCurve(effect.params.curve)) {
+  const curve = compileTimeWarpCurve(effect.params.curve);
+  if (curve.isIdentity) {
     return state;
   }
-
-  const curve = compileTimeWarpCurve(effect.params.curve);
   const timeline = state.timeline;
   const targetOriginIds = buildTargetOriginIds(timeline, targetGroupId);
   const outputFrameCount = toFrameCount(1, timeline.sampleStepBeats);
@@ -291,7 +290,7 @@ const applyTimeWarp = (
         const high = (window.endFrameExclusive - sourceWindow.startFrame - 0.5) / (sourceCount - 1);
         const windows = [];
         for (const segment of curve.segments) {
-          const { start, end, bend } = segment;
+          const { start, end } = segment;
           const firstFrame = Math.ceil(start.t * outputSpan);
           const lastFrame = end.t === 1 ? outputFrameCount : Math.ceil(end.t * outputSpan);
           const valueSpan = end.v - start.v;
@@ -304,8 +303,7 @@ const applyTimeWarp = (
           const minValue = Math.min(start.v, end.v);
           const maxValue = Math.max(start.v, end.v);
           if (low > maxValue || high <= minValue) continue;
-          const inverseFrame = (value: number): number => (start.t + (end.t - start.t)
-            * invertNormalizedCurveAt((value - start.v) / valueSpan, bend)) * outputSpan;
+          const inverseFrame = (value: number): number => invertCurveSegment(segment, value) * outputSpan;
           const lower = valueSpan > 0
             ? (low <= minValue ? firstFrame : Math.ceil(inverseFrame(low)))
             : (high > maxValue ? firstFrame : Math.floor(inverseFrame(high)) + 1);
