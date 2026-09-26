@@ -127,8 +127,6 @@ interface RankedCoordinate {
   distanceRank: number;
 }
 
-const colorSamplesByStroke = new WeakMap<GeometryStroke, Map<number, RankedCoordinate>>();
-
 interface CoordinatePath {
   latest: RankedCoordinate;
   samplesByEnd: Map<number, RankedCoordinate>;
@@ -185,17 +183,9 @@ export class CoordinateColorResolver<TKey> {
       coordinate.layer = binding.layer;
       coordinate.samples.length = 0;
     }
-    // A held stroke has the same rank at this LED in every frame.
-    let samples = colorSamplesByStroke.get(stroke);
-    if (!samples) {
-      samples = new Map();
-      colorSamplesByStroke.set(stroke, samples);
-    }
-    let candidate = samples.get(distanceSquared);
-    if (!candidate) {
-      candidate = { stroke, distanceRank: Math.round(distanceSquared / 1e-9) };
-      samples.set(distanceSquared, candidate);
-    }
+    // Ranking is cheaper than a nested WeakMap/Map lookup for every LED hit.
+    // Keep candidates local to the frame instead of retaining a cache per stroke.
+    const candidate: RankedCoordinate = { stroke, distanceRank: Math.round(distanceSquared / 1e-9) };
     if (!binding) {
       if (!coordinate.plainWinner || stroke.writeId > coordinate.plainWinner.stroke.writeId) {
         coordinate.plainWinner = candidate;

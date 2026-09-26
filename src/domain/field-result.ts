@@ -28,9 +28,19 @@ const DEFAULT_SAMPLE_STEP_BEATS = 1 / NOTE_SAMPLES_PER_BEAT;
 
 const toLedFramesFromActivePitches = (
   activeByPitchFrames: ReadonlyArray<ReadonlyMap<number, { velocity: number }>>,
-): ReadonlyArray<ReadonlyArray<LedFrameVelocityEntry>> => activeByPitchFrames.map((frame) => (
-  Array.from(frame.entries()).map(([pitch, active]) => [pitch, active.velocity] as const)
-));
+): ReadonlyArray<ReadonlyArray<LedFrameVelocityEntry>> => {
+  let previousFrame: typeof activeByPitchFrames[number] | undefined;
+  let entries: ReadonlyArray<LedFrameVelocityEntry> = [];
+  // Projection shares an immutable map across each held span. Preserve that
+  // sharing instead of allocating and copying every LED again for each frame.
+  return activeByPitchFrames.map((frame) => {
+    if (frame !== previousFrame) {
+      entries = Array.from(frame, ([pitch, active]) => [pitch, active.velocity] as const);
+      previousFrame = frame;
+    }
+    return entries;
+  });
+};
 
 const createEmptyFieldResult = (): GeneratedRuntimeFieldResult => ({
   notes: [],
