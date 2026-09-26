@@ -43,7 +43,6 @@
     onThemeSaturationChange,
     onPaletteReset,
     onPaletteFileChange,
-    onOpenAboutSite,
     onOpenGitHub,
     onOpenLatestReleasePage,
   } = $props<{
@@ -73,7 +72,6 @@
     onThemeSaturationChange: (saturation: number) => void;
     onPaletteReset: () => void;
     onPaletteFileChange: (event: Event) => void | Promise<void>;
-    onOpenAboutSite: () => void | Promise<void>;
     onOpenGitHub: () => void | Promise<void>;
     onOpenLatestReleasePage: () => void | Promise<void>;
   }>();
@@ -322,29 +320,18 @@
       <div class="sidebar-settings-row">
         <div class="sidebar-settings-info">
           <span class="sidebar-settings-label">GitHub</span>
-          <span class="sidebar-settings-description">{githubDescription}</span>
-        </div>
-        <Button
-          text={i18n.t('app.open')}
-          onClick={() => onOpenGitHub()}
-        />
-      </div>
-
-      <div class="sidebar-settings-row">
-        <div class="sidebar-settings-info">
-          <span class="sidebar-settings-label">sihyunlights</span>
           <span
             class="sidebar-settings-description"
             class:is-error={aboutDescriptionTone === 'error'}
             role="status"
             aria-live="polite"
           >
-            {aboutDescription}
+            {aboutDescription || githubDescription}
           </span>
         </div>
         <Button
           text={i18n.t('app.open')}
-          onClick={() => onOpenAboutSite()}
+          onClick={() => onOpenGitHub()}
         />
       </div>
     </div>

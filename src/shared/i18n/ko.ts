@@ -345,7 +345,6 @@ export const ko = {
   'settings.paletteInvalid': '인식할 수 없는 팔레트 형식입니다.',
   'settings.openGithubFailed': 'GitHub 열기 실패',
   'settings.openReleaseFailed': '릴리스 페이지 열기 실패',
-  'settings.openWebsiteFailed': '웹사이트 열기 실패',
   'settings.unknownError': '알 수 없는 오류입니다.',
   'settings.reduceAnimation': '애니메이션 줄이기',
   'settings.reduceAnimationDescription': '인터페이스 전환 효과 단순화',

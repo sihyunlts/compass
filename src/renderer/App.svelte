@@ -655,7 +655,7 @@
       appVersionText={settingsState.appVersionText}
       updateCheckText={settingsState.updateCheckText}
       updateAvailable={settingsState.updateAvailable}
-      aboutDescription={settingsState.aboutDescriptionOverride || settingsController.getAboutSiteUrl()}
+      aboutDescription={settingsState.aboutDescriptionOverride}
       aboutDescriptionTone={settingsState.aboutDescriptionTone}
       githubDescription="sihyunlts/compass"
       onPageSelect={(nextPage) => {
@@ -685,7 +685,6 @@
       onLaunchpadModelToggle={(enabled) => settingsController.handleLaunchpadModelToggle(enabled)}
       onPaletteReset={() => settingsController.handlePaletteReset()}
       onPaletteFileChange={(event) => settingsController.handlePaletteFileChange(event)}
-      onOpenAboutSite={() => settingsController.openAboutSite()}
       onOpenGitHub={() => settingsController.openGitHub()}
       onOpenLatestReleasePage={() => settingsController.openLatestReleasePage()}
       onPresetEntryOpen={(entry) => presetController.handlePresetEntryOpen(entry)}

@@ -22,7 +22,6 @@ import { createPaletteController, PaletteParseError } from './palette-controller
 import { updateThemeSettings } from './theme';
 import { i18n } from '../i18n.svelte';
 
-const ABOUT_SITE_URL = 'https://sihyunlights.com';
 const GITHUB_URL = 'https://github.com/sihyunlts/compass';
 
 interface SettingsControllerState {
@@ -216,14 +215,6 @@ class SettingsController {
     this.state.updateAvailable = true;
   }
 
-  public async openAboutSite(): Promise<void> {
-    try {
-      await this.options.bridgeClient.openExternal(ABOUT_SITE_URL);
-    } catch (error) {
-      this.showAboutError(i18n.t('settings.openWebsiteFailed'), error);
-    }
-  }
-
   public async openGitHub(): Promise<void> {
     try {
       await this.options.bridgeClient.openExternal(GITHUB_URL);
@@ -238,10 +229,6 @@ class SettingsController {
     } catch (error) {
       this.showAboutError(i18n.t('settings.openReleaseFailed'), error);
     }
-  }
-
-  public getAboutSiteUrl(): string {
-    return ABOUT_SITE_URL;
   }
 
   public dispose(): void {

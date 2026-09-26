@@ -398,7 +398,6 @@
     onLocaleChange = () => {},
     onPaletteReset = () => {},
     onPaletteFileChange = () => {},
-    onOpenAboutSite = () => {},
     onOpenGitHub = () => {},
     onOpenLatestReleasePage = () => {},
     onPresetEntryOpen,
@@ -466,7 +465,6 @@
     onLocaleChange?: (locale: AppLocale) => void;
     onPaletteReset?: () => void;
     onPaletteFileChange?: (event: Event) => void | Promise<void>;
-    onOpenAboutSite?: () => void | Promise<void>;
     onOpenGitHub?: () => void | Promise<void>;
     onOpenLatestReleasePage?: () => void | Promise<void>;
     onPresetEntryOpen: (entry: BrowserTreePresetLeafNode) => void | Promise<void>;
@@ -1472,7 +1470,6 @@
           onThemeSaturationChange={onThemeSaturationChange}
           onPaletteReset={onPaletteReset}
           onPaletteFileChange={onPaletteFileChange}
-          onOpenAboutSite={onOpenAboutSite}
           onOpenGitHub={onOpenGitHub}
           onOpenLatestReleasePage={onOpenLatestReleasePage}
         />

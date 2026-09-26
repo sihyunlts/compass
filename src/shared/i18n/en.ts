@@ -342,7 +342,6 @@ export const en = {
   'settings.paletteInvalid': 'Palette format is not recognized.',
   'settings.openGithubFailed': 'Failed to open GitHub',
   'settings.openReleaseFailed': 'Failed to open release page',
-  'settings.openWebsiteFailed': 'Failed to open website',
   'settings.unknownError': 'Unknown error.',
   'settings.reduceAnimation': 'Reduce Animation',
   'settings.reduceAnimationDescription': 'Simplify interface transitions',
