@@ -36,6 +36,17 @@ https://github.com/user-attachments/assets/1d18c875-45b7-4ec0-a8bf-5234ce4bdcd8
 > [!NOTE]
 > 다만 Compass가 기존의 제작 방식을 대체할 수는 없습니다. 완전히 다른 방식을 사용한다는 것은 기존에 없던 효과를 만들 수 있다는 의미이기도 하지만, 특정 효과에서는 더 비효율적이거나 원하는 모양을 얻기 어려운 경우도 있기 때문입니다.
 
+## 또 어떤 기능들이 있나요?
+
+https://github.com/user-attachments/assets/10c6967d-2bd9-4706-af50-4c85a0259f3a
+* 디바이스와 그룹, 그리고 랙을 프리셋으로 저장할 수 있습니다. 저장된 프리셋은 브라우저에서 빠르게 탐색할 수 있고, 파일 형태로 저장되기 때문에 다른 사람과 공유할 수도 있습니다.
+
+https://github.com/user-attachments/assets/c83f1caa-c656-4cb6-8733-d7f05eab8220
+* 실제 런치패드를 연결해 실시간으로 효과를 확인할 수 있습니다. 지원되는 기기(1세대를 제외한 모든 Launchpad와 MIDI Fighter 64, 그리고 Mystrix)는 자동으로 연결되며, 지원되지 않더라도 직접 목록에서 선택할 수 있습니다.
+
+https://github.com/user-attachments/assets/c405233c-d91d-4689-9060-562adff5469d
+* 랙을 불러온 이후의 모든 편집 과정이 기록되어 언제든 원하는 시점으로 되돌릴 수 있습니다.
+
 ## 시작하기
 
 > [!NOTE]

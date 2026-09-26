@@ -36,6 +36,17 @@ https://github.com/user-attachments/assets/1d18c875-45b7-4ec0-a8bf-5234ce4bdcd8
 > [!NOTE]
 > However, Compass cannot entirely replace the traditional workflow. Using a completely different method means you can create previously impossible effects, but it also means it can be highly inefficient or difficult to achieve specific shapes for certain types of effects.
 
+## What other features are there?
+
+https://github.com/user-attachments/assets/10c6967d-2bd9-4706-af50-4c85a0259f3a
+* You can save devices, groups, and entire racks as presets. Saved presets can be quickly browsed, and since they are stored as files, you can easily share them with others.
+
+https://github.com/user-attachments/assets/c83f1caa-c656-4cb6-8733-d7f05eab8220
+* You can connect an actual Launchpad to preview your effects in real-time. Supported devices (all Launchpads except the 1st generation, MIDI Fighter 64, and Mystrix) connect automatically, and even if your device isn't officially supported, you can manually select it from the list.
+
+https://github.com/user-attachments/assets/c405233c-d91d-4689-9060-562adff5469d
+* Every edit you make after loading a rack is recorded, allowing you to undo and revert to any specific point in time.
+
 ## Getting Started
 
 > [!NOTE]
