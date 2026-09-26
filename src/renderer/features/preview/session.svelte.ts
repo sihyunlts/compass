@@ -52,28 +52,21 @@ interface ResolvedPreviewFrame {
   activeCells: PreviewWindowState['activeCells'];
 }
 
-interface PreviewSessionState {
-  previewWindowState: PreviewWindowState | null;
-  surfaceModel: PreviewSurfaceViewModel;
-  modulationReadoutById: Record<string, string>;
-  modulationStateByParameter: ModulationStateByParameter;
-  previewRevision: number;
-  sourceTimelineEndBeat: number;
-  noteCount: number;
-  uniquePitchCount: number;
+// These values are replaced as snapshots, never edited through the view.
+// Track each field without proxying every LED, chain node and readout entry.
+class PreviewSessionState {
+  previewWindowState = $state.raw<PreviewWindowState | null>(null);
+  surfaceModel = $state.raw<PreviewSurfaceViewModel>(createEmptyPreviewSurfaceViewModel());
+  modulationReadoutById = $state.raw<Record<string, string>>({});
+  modulationStateByParameter = $state.raw<ModulationStateByParameter>({});
+  previewRevision = $state(0);
+  sourceTimelineEndBeat = $state(1);
+  noteCount = $state(0);
+  uniquePitchCount = $state(0);
 }
 
 export class PreviewSession {
-  public readonly state: PreviewSessionState = $state({
-    previewWindowState: null,
-    surfaceModel: createEmptyPreviewSurfaceViewModel(),
-    modulationReadoutById: {},
-    modulationStateByParameter: {},
-    previewRevision: 0,
-    sourceTimelineEndBeat: 1,
-    noteCount: 0,
-    uniquePitchCount: 0,
-  });
+  public readonly state = new PreviewSessionState();
 
   private currentPreviewSource: AppliedPreviewSource | null = null;
 
@@ -226,8 +219,20 @@ export class PreviewSession {
   private syncPreviewSurface(
     previewState: PreviewWindowState | null,
   ): void {
+    const previous = this.state.previewWindowState;
+    const hasSameLeds = previous !== null && previewState !== null
+      && previous.launchpadModel === previewState.launchpadModel
+      && previous.activeCells.length === previewState.activeCells.length
+      && previous.activeCells.every((cell, index) => {
+        const next = previewState.activeCells[index];
+        return cell.pitch === next.pitch && cell.rgb === next.rgb;
+      });
     this.state.previewWindowState = previewState;
-    this.state.surfaceModel = buildPreviewSurfaceViewModel(previewState);
+    // Transport keeps advancing even when LEDs hold. This also works for IPC
+    // snapshots and palette changes, which cannot rely on object identity.
+    if (!hasSameLeds) {
+      this.state.surfaceModel = buildPreviewSurfaceViewModel(previewState);
+    }
   }
 }
 

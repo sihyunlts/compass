@@ -40,6 +40,11 @@ interface ModulationCacheEntry {
   key: string;
   program: CompiledModulationProgram;
   modulatorIds: readonly string[];
+  targetDeviceKindById: ReadonlyMap<string, GeneratorChain['devices'][number]['kind']>;
+  displayNames: {
+    locale: typeof i18n.locale;
+    byId: Record<string, string>;
+  };
 }
 
 class ModulationReadoutCache {
@@ -84,13 +89,13 @@ class ModulationReadoutCache {
     );
     const readoutSegmentsByModulatorId = new Map<string, string[]>();
     const stateByParameter = new Map<string, ModulationParameterState[]>();
-    const targetDeviceKindById = new Map(
-      chain.devices.map((device) => [device.id, device.kind] as const),
-    );
-    const modulatorLabelById = buildDeviceDisplayNameById(
-      chain.devices,
-      (kind) => i18n.t(getDeviceMessageKey(kind)),
-    );
+    const { targetDeviceKindById } = modulationCache;
+    // Names and kinds change with the source; translated names also depend on
+    // locale. Neither needs to be rebuilt at playback frame frequency.
+    if (modulationCache.displayNames.locale !== i18n.locale) {
+      modulationCache.displayNames = this.buildDisplayNames(chain);
+    }
+    const modulatorLabelById = modulationCache.displayNames.byId;
     for (const readout of readouts) {
       const segments = readoutSegmentsByModulatorId.get(readout.modulatorId) ?? [];
       const targetKind = targetDeviceKindById.get(readout.targetDeviceId);
@@ -158,9 +163,21 @@ class ModulationReadoutCache {
       key: sourceKey,
       program: compileModulationProgram(chain),
       modulatorIds,
+      targetDeviceKindById: new Map(chain.devices.map((device) => [device.id, device.kind])),
+      displayNames: this.buildDisplayNames(chain),
     };
     this.modulationCacheByKey.set(sourceKey, entry);
     return entry;
+  }
+
+  private buildDisplayNames(chain: GeneratorChain): ModulationCacheEntry['displayNames'] {
+    return {
+      locale: i18n.locale,
+      byId: buildDeviceDisplayNameById(
+        chain.devices,
+        (kind) => i18n.t(getDeviceMessageKey(kind)),
+      ),
+    };
   }
 
   public reset(): void {

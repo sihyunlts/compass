@@ -44,9 +44,20 @@ class PreviewResultCache {
 
     let velocityFrames = this.velocityFramesByLedFrames.get(input.preview.ledFramesBySampleIndex);
     if (!velocityFrames) {
-      velocityFrames = input.preview.ledFramesBySampleIndex.map(
-        (frame) => new Map<number, number>(frame),
-      );
+      // Worker structured cloning preserves shared held-frame references.
+      // Materialize each immutable frame once, including non-adjacent reuse.
+      const velocityByFrame = new Map<
+        GeneratorPreview['ledFramesBySampleIndex'][number],
+        ReadonlyMap<number, number>
+      >();
+      velocityFrames = input.preview.ledFramesBySampleIndex.map((frame) => {
+        let velocities = velocityByFrame.get(frame);
+        if (!velocities) {
+          velocities = new Map<number, number>(frame);
+          velocityByFrame.set(frame, velocities);
+        }
+        return velocities;
+      });
       this.velocityFramesByLedFrames.set(input.preview.ledFramesBySampleIndex, velocityFrames);
     }
     const entry: PreviewResultCacheEntry = {

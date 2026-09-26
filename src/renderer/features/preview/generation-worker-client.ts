@@ -70,6 +70,7 @@ class PreviewGenerationWorkerClient {
 
   public dispose(): void {
     this.cancelActive();
+    if (this.worker) this.clearWorker(this.worker);
   }
 
   private request<T>(
@@ -80,7 +81,9 @@ class PreviewGenerationWorkerClient {
 
     const requestId = this.nextRequestId;
     this.nextRequestId += 1;
-    const worker = new Worker(new URL('./generation-worker.ts', import.meta.url), {
+    // Retain the loaded engine after success. Only interrupted work, failures
+    // and disposal terminate the worker, so obsolete work never queues up.
+    const worker = this.worker ?? new Worker(new URL('./generation-worker.ts', import.meta.url), {
       type: 'module',
     });
     this.worker = worker;
@@ -94,7 +97,7 @@ class PreviewGenerationWorkerClient {
           return;
         }
 
-        this.clearWorker(worker);
+        this.releaseRequest(worker);
         try {
           resolve(resolveResponse(response));
         } catch (error) {
@@ -107,19 +110,36 @@ class PreviewGenerationWorkerClient {
         reject(new Error(event.message || 'Preview worker failed'));
       };
 
-      worker.postMessage(createRequest(requestId));
+      worker.onmessageerror = (): void => {
+        this.clearWorker(worker);
+        reject(new Error('Preview worker returned an unreadable response'));
+      };
+
+      try {
+        worker.postMessage(createRequest(requestId));
+      } catch (error) {
+        this.clearWorker(worker);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     });
   }
 
   private cancelActive(): void {
     const worker = this.worker;
-    if (!worker) {
+    if (!worker || !this.activeReject) {
       return;
     }
 
     const reject = this.activeReject;
     this.clearWorker(worker);
-    reject?.(new Error('Preview generation cancelled'));
+    reject(new Error('Preview generation cancelled'));
+  }
+
+  private releaseRequest(worker: Worker): void {
+    worker.onmessage = null;
+    worker.onerror = null;
+    worker.onmessageerror = null;
+    this.activeReject = null;
   }
 
   private clearWorker(worker: Worker): void {
@@ -127,9 +147,9 @@ class PreviewGenerationWorkerClient {
       return;
     }
 
+    this.releaseRequest(worker);
     worker.terminate();
     this.worker = null;
-    this.activeReject = null;
   }
 }
 

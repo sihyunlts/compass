@@ -90,6 +90,7 @@ class PreviewGenerationSession {
 
   public dispose(): void {
     this.cancelPending();
+    this.workerClient.dispose();
     this.latestNormalizedPreview = null;
   }
 
