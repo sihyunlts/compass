@@ -70,8 +70,6 @@
 
 <style lang="scss">
   .button {
-    --button-disabled-color: color-mix(in oklch, var(--color-text-primary) 60%, transparent);
-
     border: 0;
     border-radius: var(--radius-6);
     background: var(--color-surface-interactive);
@@ -84,14 +82,17 @@
       color 80ms linear;
 
     &:disabled {
-      color: var(--button-disabled-color);
+      opacity: 0.6;
     }
 
     &-primary {
-      --button-disabled-color: color-mix(in oklch, var(--color-text-inverse) 60%, transparent);
-
       background: var(--color-surface-inverse);
       color: var(--color-text-inverse);
+
+      &:disabled {
+        opacity: 1;
+        color: color-mix(in oklch, var(--color-text-inverse) 60%, transparent);
+      }
     }
 
     &-icon {

@@ -25,6 +25,9 @@ export const translateDeviceControls = {
         (input) => readControlParam(input, TRANSLATE_PARAM_KEYS),
       ),
     },
+    'reset-translate-offset': {
+      resolveMergeKey: createMergeKeyResolver('reset-translate-offset'),
+    },
   },
   createHandlers: () => ({
     'set-translate-param': createNumericParameterSetter({
@@ -32,5 +35,20 @@ export const translateDeviceControls = {
       rules: TRANSLATE_NUMERIC_PARAMETERS,
       readParam: (input) => readControlParam(input, TRANSLATE_PARAM_KEYS),
     }),
+    'reset-translate-offset': (device) => {
+      if (!isTranslateDevice(device)) {
+        return false;
+      }
+
+      const defaultX = TRANSLATE_NUMERIC_PARAMETERS.offsetX.defaultValue;
+      const defaultY = TRANSLATE_NUMERIC_PARAMETERS.offsetY.defaultValue;
+      if (device.params.offsetX === defaultX && device.params.offsetY === defaultY) {
+        return false;
+      }
+
+      device.params.offsetX = defaultX;
+      device.params.offsetY = defaultY;
+      return true;
+    },
   }),
 } satisfies RendererKindControlDefinition;
