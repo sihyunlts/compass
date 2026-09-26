@@ -53,8 +53,7 @@ window.addEventListener('storage', (event) => {
 interface BrowserPresetEntry {
   presetType: PresetFileKind;
   relativePath: string[];
-  payload: PresetFile;
-  needsSave: boolean;
+  payload: unknown;
 }
 
 interface BrowserPresetStore {
@@ -77,10 +76,8 @@ const createEmptyStore = (): BrowserPresetStore => ({
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-const clonePreset = <K extends PresetFileKind>(
-  preset: Extract<PresetFile, { presetType: K }>,
-): Extract<PresetFile, { presetType: K }> =>
-  JSON.parse(JSON.stringify(preset)) as Extract<PresetFile, { presetType: K }>;
+const clonePresetPayload = <T>(payload: T): T =>
+  JSON.parse(JSON.stringify(payload)) as T;
 
 export const parseVirtualPresetPath = (
   filePath: string,
@@ -139,23 +136,13 @@ const readStore = (): BrowserPresetStore => {
         || !isPresetFileKind(file.presetType)
         || !Array.isArray(file.relativePath)
         || !file.relativePath.every((segment) => typeof segment === 'string')
-        || !isRecord(file.payload)
-        || file.payload.presetType !== file.presetType
+        || !Object.hasOwn(file, 'payload')
       ) {
-        continue;
+        throw new Error('Invalid browser preset entry.');
       }
 
-      const parsedPayload = parseStoredPresetValue(file.payload);
-      if (!parsedPayload || parsedPayload.preset.presetType !== file.presetType) {
-        continue;
-      }
-
-      store.files.push({
-        presetType: parsedPayload.preset.presetType,
-        relativePath: file.relativePath,
-        payload: parsedPayload.preset,
-        needsSave: parsedPayload.needsSave,
-      });
+      // Keep stored payloads intact. Folder and path edits must not save migrations.
+      store.files.push(file as unknown as BrowserPresetEntry);
     }
 
     return store;
@@ -166,6 +153,26 @@ const readStore = (): BrowserPresetStore => {
 
 const writeStore = (store: BrowserPresetStore): void => {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+};
+
+const readPresetEntry = <K extends PresetFileKind>(
+  file: BrowserPresetEntry,
+  presetType: K,
+): ReadPresetEntryResponse<K> => {
+  const filePath = toVirtualPresetPath(file.presetType, file.relativePath);
+  const parsed = parseStoredPresetValue(file.payload);
+  if (!parsed) {
+    return { status: 'error', errorCode: 'invalid-file-format', message: 'Invalid file format.', filePath };
+  }
+  if (parsed.preset.presetType !== presetType) {
+    return { status: 'error', errorCode: 'preset-type-mismatch', message: `Expected a ${presetType} file.`, filePath };
+  }
+  return {
+    status: 'loaded',
+    filePath,
+    payload: parsed.preset as Extract<PresetFile, { presetType: K }>,
+    needsSave: parsed.needsSave,
+  };
 };
 
 const collectStorePaths = (
@@ -261,20 +268,31 @@ const buildChildren = (
       && file.relativePath.length === relativePath.length + 1
       && relativePathEquals(file.relativePath.slice(0, -1), relativePath))
     .map((file): PresetBrowserTreeNode => {
-      const preview = resolvePresetBrowserPreview(file.payload);
-      return {
-        kind: 'preset',
+      const readResult = readPresetEntry(file, presetType);
+      const leafNode = {
+        kind: 'preset' as const,
         id: `preset:${presetType}:${file.relativePath.join('/')}`,
         label: getFileStem(file.relativePath[file.relativePath.length - 1] ?? '', presetType),
         presetType,
-        source: 'user',
+        source: 'user' as const,
         relativePath: [...file.relativePath],
+      };
+      if (readResult.status === 'error') {
+        return {
+          ...leafNode,
+          loadStatus: 'error',
+          loadErrorCode: readResult.errorCode,
+        };
+      }
+      const preview = resolvePresetBrowserPreview(readResult.payload);
+      return {
+        ...leafNode,
         loadStatus: 'loaded',
-        savedAtIso: file.payload.savedAtIso,
+        savedAtIso: readResult.payload.savedAtIso,
         ...(preview ? { preview } : {}),
-        ...(file.payload.presetType === 'device'
+        ...(readResult.payload.presetType === 'device'
           ? {
-              deviceKind: file.payload.device.kind,
+              deviceKind: readResult.payload.device.kind,
             }
           : {}),
       };
@@ -310,8 +328,7 @@ const storageFor = (store: BrowserPresetStore): PresetRepositoryStorage => {
     read: async <K extends PresetFileKind>(entry: PresetEntryPath & { presetType: K }): Promise<ReadPresetEntryResponse<K>> => {
       const file = store.files.find((file) => file.presetType === entry.presetType && relativePathEquals(file.relativePath, entry.relativePath));
       if (!file) return { status: 'error', errorCode: 'preset-not-found', message: 'Preset does not exist.' };
-      return { status: 'loaded', filePath: toVirtualPresetPath(entry.presetType, entry.relativePath),
-        payload: clonePreset(file.payload as Extract<PresetFile, { presetType: K }>), needsSave: file.needsSave };
+      return readPresetEntry(file, entry.presetType);
     },
     createFolder: async (entry) => { store.folders[entry.presetType].push([...entry.relativePath]); },
     rename: async (entry, relativePath) => {
@@ -320,11 +337,13 @@ const storageFor = (store: BrowserPresetStore): PresetRepositoryStorage => {
     update: async (entry, relativePath, updatePayload) => {
       const index = store.files.findIndex((file) => file.presetType === entry.presetType && relativePathEquals(file.relativePath, entry.relativePath));
       if (index === -1) throw new Error('Preset does not exist.');
-      store.files[index] = { ...store.files[index], relativePath, payload: updatePayload(store.files[index].payload), needsSave: false };
+      const loaded = readPresetEntry(store.files[index], entry.presetType);
+      if (loaded.status === 'error') throw new Error(loaded.message);
+      store.files[index] = { presetType: entry.presetType, relativePath, payload: updatePayload(loaded.payload) };
     },
     write: async (entry, payload) => {
       const index = store.files.findIndex((file) => file.presetType === entry.presetType && relativePathEquals(file.relativePath, entry.relativePath));
-      const file = { presetType: entry.presetType, relativePath: [...entry.relativePath], payload: clonePreset(payload), needsSave: false };
+      const file = { presetType: entry.presetType, relativePath: [...entry.relativePath], payload: clonePresetPayload(payload) };
       if (index === -1) store.files.push(file);
       else store.files[index] = file;
     },
@@ -354,7 +373,7 @@ const storageFor = (store: BrowserPresetStore): PresetRepositoryStorage => {
         for (const file of sourceFiles) {
           if (file.presetType === presetType && (plan.entry.entryKind === 'directory'
             ? relativePathContains(plan.entry.relativePath, file.relativePath) : relativePathEquals(plan.entry.relativePath, file.relativePath))) {
-            store.files.push({ ...file, relativePath: [...plan.relativePath, ...file.relativePath.slice(plan.entry.relativePath.length)], payload: clonePreset(file.payload) });
+            store.files.push({ ...file, relativePath: [...plan.relativePath, ...file.relativePath.slice(plan.entry.relativePath.length)], payload: clonePresetPayload(file.payload) });
           }
         }
       }
