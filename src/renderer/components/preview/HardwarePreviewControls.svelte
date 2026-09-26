@@ -59,16 +59,12 @@
     if (error && outputs.length === 0) {
       return [noOutputOption, {
         value: STATUS_OPTION_VALUE,
-        label: errorLabel ?? i18n.t('preview.hardware.noOutputs'),
+        label: errorLabel ?? i18n.t('preview.hardware.outputLabel'),
         disabled: true,
       }];
     }
     if (outputs.length === 0) {
-      return [noOutputOption, {
-        value: STATUS_OPTION_VALUE,
-        label: i18n.t('preview.hardware.noOutputs'),
-        disabled: true,
-      }];
+      return [noOutputOption];
     }
     return [
       noOutputOption,

@@ -271,7 +271,6 @@ export const ko = {
   'preview.hardware.disconnected': '{name}의 연결을 해제했습니다.',
   'preview.hardware.loadingOutputs': 'MIDI 출력 찾는 중…',
   'preview.hardware.noOutput': '출력 없음',
-  'preview.hardware.noOutputs': 'MIDI 출력을 찾지 못했습니다',
   'preview.hardware.outputLabel': 'MIDI 출력',
   'preview.launchpadAria': 'Launchpad LED 미리보기',
   'preview.length': '라이트쇼 길이',

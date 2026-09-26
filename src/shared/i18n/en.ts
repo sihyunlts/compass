@@ -268,7 +268,6 @@ export const en = {
   'preview.hardware.disconnected': 'Disconnected from {name}.',
   'preview.hardware.loadingOutputs': 'Finding MIDI outputs…',
   'preview.hardware.noOutput': 'No Output',
-  'preview.hardware.noOutputs': 'No MIDI outputs found',
   'preview.hardware.outputLabel': 'MIDI Output',
   'preview.launchpadAria': 'Launchpad LED preview',
   'preview.length': 'Lightshow Length',
