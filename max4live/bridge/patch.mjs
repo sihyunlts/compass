@@ -1,5 +1,7 @@
 // Build-time patch definition. Keep runtime routing, object IDs and the device
 // face stable; editor-only artifacts are omitted. This module does not run in Max.
+import { createDeviceFace, DEVICE_HEIGHT, DEVICE_WIDTH } from '../shared/device-face.mjs';
+
 const box = (id, maxclass, patchingRect, properties) => ({
   box: { id, maxclass, patching_rect: patchingRect, numinlets: 1, numoutlets: 0, ...properties },
 });
@@ -7,7 +9,6 @@ const object = (id, text, rect, outletTypes = [], properties = {}) => box(id, 'n
   text, numoutlets: outletTypes.length,
   ...(outletTypes.length ? { outlettype: outletTypes } : {}), ...properties,
 });
-const comment = (id, text, rect, properties = {}) => box(id, 'comment', rect, { text, ...properties });
 const message = (id, text, rect) => box(id, 'message', rect, {
   text, numinlets: 2, numoutlets: 1, outlettype: [''],
 });
@@ -22,22 +23,7 @@ const connect = (source, destination, { outlet = 0, inlet = 0 } = {}) => ({
 // IDs are retained for compatibility; callers use the role names below.
 function createObjects(version) {
   return {
-    // Visible device face: version, logo and title.
-    versionLabel: comment('obj-23', `v${version}`, [156, 24, 43, 20], {
-      fontname: 'Ableton Sans', fontsize: 11, presentation: 1,
-      presentation_rect: [28, 133, 54, 20],
-      textcolor: [0.6941176470588235, 0.6941176470588235, 0.6941176470588235, 1],
-      textjustification: 1, varname: 'compass_bridge_version',
-    }),
-    logo: box('obj-22', 'fpic', [28.27777910232544, 50, 55, 55], {
-      numoutlets: 1, outlettype: ['jit_matrix'], autofit: 1, ignoreclick: 1,
-      pic: 'compass.png', presentation: 1, presentation_rect: [17, 14, 76, 76],
-    }),
-    title: comment('obj-1', 'Compass Bridge', [28, 22, 124, 23], {
-      fontface: 1, fontname: 'Ableton Sans Bold', fontsize: 14,
-      presentation: 1, presentation_linecount: 2,
-      presentation_rect: [15, 93, 80, 40], textcolor: [1, 1, 1, 1], textjustification: 1,
-    }),
+    ...createDeviceFace(version, 'Compass Bridge'),
 
     // Incoming OSC is deferred before it reaches the Live API bridge.
     udpReceiver: object('obj-2', 'udpreceive 8970', [30, 132, 97, 20], ['']),
@@ -100,14 +86,14 @@ const PATCH_LAYOUT = {
   },
   classnamespace: 'box',
   rect: [92, 380, 683, 317],
-  openrect: [0, 0, 109.6434633564204, 169],
+  openrect: [0, 0, DEVICE_WIDTH, DEVICE_HEIGHT],
   openrectmode: 0,
   openinpresentation: 1,
   default_fontsize: 10,
   default_fontname: 'Ableton Sans',
   gridsize: [8, 8],
   boxanimatetime: 500,
-  devicewidth: 109.6434633564204
+  devicewidth: DEVICE_WIDTH
 };
 
 // Device type and dependency handling are kept separate from routing and layout.

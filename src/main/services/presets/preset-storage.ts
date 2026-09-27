@@ -1,19 +1,20 @@
 import { PresetNameConflictError } from '../../../shared/preset/operation-error';
-import { app, shell } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { constants, type Dirent } from 'node:fs';
+import { constants, type Dirent, type Stats } from 'node:fs';
 import {
   access,
   copyFile,
-  cp,
   link,
   lstat,
   mkdir,
   readdir,
   readFile,
+  readlink,
   rename,
   rm,
   rmdir,
+  stat,
+  symlink,
   unlink,
   writeFile,
 } from 'node:fs/promises';
@@ -118,12 +119,17 @@ type PresetStorageEntry = Omit<PresetStorageEntryMove, 'sourcePath'>;
 
 /** Reads and writes preset files under the app's preset root. */
 export class PresetStorage {
+  public constructor(private readonly platform: {
+    userDataDirectory: () => string;
+    trashItem: (filePath: string) => Promise<void>;
+  }) {}
+
   private deviceDirectoryMigration: Promise<void> | null = null;
 
   private presetEntryMutationQueue: Promise<void> = Promise.resolve();
 
   public async resolvePresetsRootDirectory(): Promise<string> {
-    const directory = path.join(app.getPath('userData'), PRESET_ROOT_DIR_NAME);
+    const directory = path.join(this.platform.userDataDirectory(), PRESET_ROOT_DIR_NAME);
     await mkdir(directory, { recursive: true });
     return directory;
   }
@@ -412,12 +418,7 @@ export class PresetStorage {
             `.compass-copy-${randomUUID()}`,
           );
           try {
-            await cp(plan.sourcePath, stagingPath, {
-              recursive: true,
-              force: false,
-              errorOnExist: true,
-              mode: constants.COPYFILE_EXCL,
-            });
+            await this.copyPresetEntry(plan.sourcePath, stagingPath);
             await this.movePresetEntryWithoutReplacing({
               entryKind: plan.entry.entryKind,
               sourcePath: stagingPath,
@@ -446,6 +447,30 @@ export class PresetStorage {
     });
   }
 
+  // fs.cp was added after Max 8.5's Node 16.6. Keep the same staged,
+  // non-overwriting copy using APIs available in both Max and Electron.
+  private async copyPresetEntry(source: string, destination: string): Promise<void> {
+    const info = await lstat(source);
+    if (info.isDirectory()) {
+      await mkdir(destination);
+      for (const name of await readdir(source)) {
+        await this.copyPresetEntry(path.join(source, name), path.join(destination, name));
+      }
+    } else if (info.isFile()) {
+      await copyFile(source, destination, constants.COPYFILE_EXCL);
+    } else if (info.isSymbolicLink()) {
+      // Preserve links instead of traversing directories outside the preset tree.
+      const target = path.resolve(path.dirname(source), await readlink(source));
+      const targetInfo = await stat(source).catch((error: NodeJS.ErrnoException): Stats | null => {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+      });
+      await symlink(target, destination, targetInfo?.isDirectory() ? 'dir' : 'file');
+    } else {
+      throw new Error('Unsupported preset item type.');
+    }
+  }
+
   public async trashPresetEntries(
     entries: readonly PresetStorageEntry[],
   ): Promise<void> {
@@ -454,7 +479,7 @@ export class PresetStorage {
         await this.ensurePresetEntryKind(entry.filePath, entry.entryKind);
       }
       for (const entry of entries) {
-        await shell.trashItem(entry.filePath);
+        await this.platform.trashItem(entry.filePath);
       }
     });
   }

@@ -22,6 +22,7 @@
     onLoopToggle,
     scrubValue = $bindable(),
     onScrubInput,
+    canPreviewHardware,
     hardwareOutputs,
     selectedHardwareOutputId,
     isHardwareOutputAccessing,
@@ -39,6 +40,7 @@
     onLoopToggle: () => void;
     scrubValue: number;
     onScrubInput: () => void;
+    canPreviewHardware: boolean;
     hardwareOutputs: HardwareMidiOutput[];
     selectedHardwareOutputId: string | null;
     isHardwareOutputAccessing: boolean;
@@ -117,14 +119,16 @@
         onClick={handlePopout}
       />
     {/if}
-    <HardwarePreviewControls
-      outputs={hardwareOutputs}
-      selectedOutputId={selectedHardwareOutputId}
-      isAccessing={isHardwareOutputAccessing}
-      error={hardwareOutputError}
-      onRefreshOutputs={onRefreshHardwareOutputs}
-      onSelectOutput={onSelectHardwareOutput}
-    />
+    {#if canPreviewHardware}
+      <HardwarePreviewControls
+        outputs={hardwareOutputs}
+        selectedOutputId={selectedHardwareOutputId}
+        isAccessing={isHardwareOutputAccessing}
+        error={hardwareOutputError}
+        onRefreshOutputs={onRefreshHardwareOutputs}
+        onSelectOutput={onSelectHardwareOutput}
+      />
+    {/if}
   </div>
 </section>
 

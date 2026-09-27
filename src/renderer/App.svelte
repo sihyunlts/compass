@@ -77,10 +77,12 @@
   const INTERACTIVE_ELEMENT_SELECTOR = 'button, input, textarea';
 
   const bridgeClient = resolveCompassBridge();
-  const isWebFallback = !window.compass;
-  const resultDeliveryMode = isWebFallback ? 'midi-download' : 'ableton';
-  const hasWindowsTitlebarControls = bridgeClient.platform === 'windows';
-  const reserveBrowserTitlebarSpace = !isWebFallback && bridgeClient.platform === 'mac';
+  const isElectronApp = bridgeClient.runtime === 'electron';
+  const canPreviewHardware = bridgeClient.supportsHardwareMidi;
+  const canSendToLive = bridgeClient.runtime !== 'browser';
+  const resultDeliveryMode = canSendToLive ? 'ableton' : 'midi-file';
+  const hasWindowsTitlebarControls = isElectronApp && bridgeClient.platform === 'windows';
+  const reservePresetBrowserTitlebarSpace = isElectronApp && bridgeClient.platform === 'mac';
   const undoShortcut = resolveShortcutPresentation('undo', bridgeClient.platform);
   const redoShortcut = resolveShortcutPresentation('redo', bridgeClient.platform);
   let rackViewApi: RackViewApi | null = $state(null);
@@ -108,8 +110,8 @@
   const uiState = editorSession.state;
   const previewState = previewSession.state;
   const deliveryButtonMessageKeys = {
-    idle: isWebFallback ? 'status.download' : 'status.send',
-    working: isWebFallback ? 'status.downloading' : 'status.sending',
+    idle: canSendToLive ? 'status.send' : 'status.download',
+    working: canSendToLive ? 'status.sending' : 'status.downloading',
   } as const;
   const deliveryButtonText = $derived.by(() =>
     i18n.t(
@@ -141,7 +143,6 @@
   const presetController = createPresetController({
     bridgeClient,
     editorSession,
-    isWebFallback,
     showMessage: (message) => {
       headerIndicator.show(message);
     },
@@ -454,13 +455,13 @@
     onDuplicate: handleContextMenuDuplicate,
     onDelete: handleContextMenuDelete,
     onInfo: authoredInfoController.openFromContextTarget,
-    onShowInFolder: isWebFallback
+    onShowInFolder: bridgeClient.runtime === 'browser'
       ? undefined
       : (target: PresetEntryContextTarget) => presetController.handleShowPresetEntryInFolder(target),
   };
 
   const syncMainWindowAlwaysOnTop = async (): Promise<void> => {
-    if (isWebFallback) {
+    if (!isElectronApp) {
       return;
     }
 
@@ -472,7 +473,7 @@
   };
 
   const handleMainWindowAlwaysOnTopToggle = async (): Promise<void> => {
-    if (isWebFallback) {
+    if (!isElectronApp) {
       return;
     }
 
@@ -491,7 +492,7 @@
     });
     editorSession.initialize();
     playbackSession.initialize();
-    void hardwarePreview.refreshOutputs();
+    if (canPreviewHardware) void hardwarePreview.refreshOutputs();
     void presetController.loadTree();
     if (uiState.headerIndicatorText.trim()) {
       headerIndicator.show(uiState.headerIndicatorText);
@@ -567,12 +568,12 @@
         }
 
         if (request.action === 'refresh-hardware-outputs') {
-          void hardwarePreview.refreshOutputs();
+          if (canPreviewHardware) void hardwarePreview.refreshOutputs();
           return;
         }
 
         if (request.action === 'select-hardware-output') {
-          void hardwarePreview.selectOutput(request.outputId);
+          if (canPreviewHardware) void hardwarePreview.selectOutput(request.outputId);
           return;
         }
 
@@ -630,13 +631,13 @@
       settingsWidthPx={SETTINGS_SIDEBAR_WIDTH_PX}
       isResizing={uiState.isSidebarResizing}
       platform={bridgeClient.platform}
-      reserveTitlebarSpace={reserveBrowserTitlebarSpace}
-      canToggleWindowLayer={!isWebFallback}
+      reserveTitlebarSpace={reservePresetBrowserTitlebarSpace}
+      canToggleWindowLayer={isElectronApp}
       {mainWindowAlwaysOnTop}
       locale={i18n.locale}
       reduceAnimation={settingsState.reduceAnimation}
       reduceBlur={settingsState.reduceBlur}
-      canConfigureMidiSaveButton={!isWebFallback}
+      canConfigureMidiSaveButton={canSendToLive}
       showMidiSaveButton={settingsState.showMidiSaveButton}
       themePreset={settingsState.themePreset}
       themeHue={settingsState.themeHue}
@@ -794,7 +795,7 @@
           <ResultDeliveryButton
             text={deliveryButtonText}
             disabled={uiState.isDelivering}
-            showMidiSave={!isWebFallback && settingsState.showMidiSaveButton}
+            showMidiSave={canSendToLive && settingsState.showMidiSaveButton}
             onDeliver={() =>
               resultDeliveryFlow.deliver(presetState.currentRackDisplayName)}
             onSaveMidi={() => resultDeliveryFlow.saveMidi(presetState.currentRackDisplayName)}
@@ -841,7 +842,7 @@
           <PreviewPanel
             surfaceModel={previewState.surfaceModel}
             onPopout={() => playbackSession.openPreviewPopout()}
-            canPopout={!isWebFallback}
+            canPopout={isElectronApp}
             isPlaying={playbackSession.state.isPlaying}
             isGenerating={playbackSession.isPreviewGenerating}
             loopEnabled={uiState.isPreviewLoopEnabled}
@@ -849,6 +850,7 @@
             onLoopToggle={() => playbackSession.togglePreviewLoop()}
             bind:scrubValue={uiState.previewScrubValue}
             onScrubInput={() => playbackSession.seekPreview(uiState.previewScrubValue)}
+            {canPreviewHardware}
             hardwareOutputs={hardwarePreview.state.outputs}
             selectedHardwareOutputId={hardwarePreview.state.selectedOutputId}
             isHardwareOutputAccessing={hardwarePreview.state.isAccessing}
@@ -925,7 +927,7 @@
     description={presetState.pendingPresetDeleteTarget
       ? presetController.getPresetDeleteDescription(presetState.pendingPresetDeleteTarget)
       : null}
-    confirmLabel={i18n.t(isWebFallback ? 'context.delete' : 'rack.trash')}
+    confirmLabel={presetController.presetDeleteConfirmLabel}
     cancelLabel={i18n.t('app.cancel')}
     busy={presetState.isPresetDeletePending}
     defaultAction="confirm"

@@ -2,12 +2,12 @@ import { cloneChainForIpc } from '../../shared/model';
 import type { CompassApi } from '../../shared/contracts/ipc/api';
 import type { EditorSession } from '../features/editor/session.svelte';
 import type { HeaderIndicatorController } from './header-indicator.svelte';
-import { downloadGeneratedPreviewMidi } from './midi-download';
+import { createGeneratedPreviewMidiFile } from './midi-file';
 import type { PlaybackSessionController } from './playback-session.svelte';
 import { createPreviewSourceKey } from '../features/preview/generation-session.svelte';
 import { i18n } from '../i18n.svelte';
 
-type ResultDeliveryMode = 'ableton' | 'midi-download';
+type ResultDeliveryMode = 'ableton' | 'midi-file';
 
 interface ResultDeliveryFlowOptions {
   bridgeClient: CompassApi;
@@ -26,7 +26,7 @@ const DELIVERY_MESSAGE_KEYS_BY_MODE = {
     failed: 'status.sendFailed',
     unknownError: 'status.unknownSendError',
   },
-  'midi-download': {
+  'midi-file': {
     working: 'status.downloading',
     complete: 'status.downloadComplete',
     failed: 'status.downloadFailed',
@@ -48,7 +48,7 @@ class ResultDeliveryFlowController {
   }
 
   public saveMidi(clipName: string): Promise<void> {
-    return this.runDelivery(clipName, 'midi-download', false);
+    return this.runDelivery(clipName, 'midi-file', false);
   }
 
   private async runDelivery(
@@ -100,11 +100,14 @@ class ResultDeliveryFlowController {
         announce: false,
       });
 
-      if (mode === 'midi-download') {
-        downloadGeneratedPreviewMidi({
-          preview,
-          clipName,
-        });
+      if (mode === 'midi-file') {
+        const result = await bridgeClient.saveMidiFile(createGeneratedPreviewMidiFile({ preview, clipName }));
+        if (result.status === 'canceled') {
+          if (showDeliveryFeedback) headerIndicator.clear();
+          uiState.deliveryButtonState = 'idle';
+          return;
+        }
+        if (result.status === 'error') throw new Error(result.message);
       } else {
         await bridgeClient.sendGeneratedPreview({
           preview,

@@ -166,7 +166,8 @@ export const readBundledRackPreset = <K extends PresetFileKind>(
   return {
     status: 'loaded',
     filePath: null,
-    payload: structuredClone(entry.preset) as Extract<PresetFile, { presetType: K }>,
+    // Bundled presets contain JSON values only; keep a detached editable copy.
+    payload: JSON.parse(JSON.stringify(entry.preset)) as Extract<PresetFile, { presetType: K }>,
     needsSave: entry.needsSave,
   };
 };

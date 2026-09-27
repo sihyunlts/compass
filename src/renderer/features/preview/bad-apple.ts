@@ -2,15 +2,12 @@
 import type { PreviewWindowState } from '../../../shared/contracts/preview/window-state';
 import type { LaunchpadModel } from '../../../shared/model';
 import { resolvePreviewCellModels } from './view-model';
+import FRAME_DATA_URL from '../../../assets/easter-eggs/bad-apple-10x10-30fps.bin?url';
 
 const MAGIC = 'BA10';
 const HEADER_BYTES = 12;
 const SUPPORTED_VERSION = 1;
 const WHITE_RGB = '255 255 255';
-const FRAME_DATA_URL = new URL(
-  '../../../assets/easter-eggs/bad-apple-10x10-30fps.bin',
-  import.meta.url,
-);
 
 export interface BadAppleAnimation {
   fps: number;

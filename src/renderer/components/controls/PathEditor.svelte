@@ -2078,6 +2078,8 @@
 </ControlSurfaceFrame>
 
 <style lang="scss">
+  @use '../../styles/color-fallbacks' as colors;
+
   .path-editor-surface {
     touch-action: none;
     position: relative;
@@ -2087,6 +2089,14 @@
     border-radius: var(--radius-6);
     background: var(--color-surface);
     cursor: default;
+
+    @supports not (aspect-ratio: 1 / 1) {
+      &::before {
+        content: '';
+        display: block;
+        padding-top: 100%;
+      }
+    }
 
     &.is-drawing {
       cursor: crosshair;
@@ -2119,7 +2129,12 @@
     stroke: none;
 
     &.is-visible {
-      fill: color-mix(in oklch, var(--device-control-accent, var(--color-surface-inverse)) 22%, transparent);
+      @include colors.alpha(
+        fill,
+        var(--device-control-accent, var(--color-surface-inverse)),
+        var(--device-control-accent-rgb, var(--color-surface-inverse-rgb)),
+        0.22,
+      );
     }
   }
 
@@ -2154,7 +2169,12 @@
   }
 
   .path-editor-marquee {
-    fill: color-mix(in oklch, var(--device-control-accent, var(--color-surface-inverse)) 12%, transparent);
+    @include colors.alpha(
+      fill,
+      var(--device-control-accent, var(--color-surface-inverse)),
+      var(--device-control-accent-rgb, var(--color-surface-inverse-rgb)),
+      0.12,
+    );
     stroke-dasharray: 2 1;
   }
 

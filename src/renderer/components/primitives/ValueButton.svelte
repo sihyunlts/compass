@@ -86,6 +86,8 @@
 </div>
 
 <style lang="scss">
+  @use '../../styles/color-fallbacks' as colors;
+
   .value-button {
     position: relative;
     display: flex;
@@ -117,7 +119,7 @@
     }
 
     &.is-disabled {
-      color: color-mix(in oklch, var(--color-text-primary) 60%, transparent);
+      @include colors.alpha(color, var(--color-text-primary), var(--color-text-primary-rgb), 0.6);
     }
 
     &.has-clear .value-button-action {

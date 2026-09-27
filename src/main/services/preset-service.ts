@@ -1,7 +1,7 @@
 import { PresetNameConflictError } from '../../shared/preset/operation-error';
 import { PresetRepository } from '../../shared/preset/repository';
 import { NativePresetBackend } from './presets/native-preset-backend';
-import { shell, type BaseWindow } from 'electron';
+import { app, dialog, shell, type BaseWindow } from 'electron';
 import { watch, type FSWatcher } from 'node:fs';
 
 import type {
@@ -19,12 +19,11 @@ import type {
   UpdatePresetFileInfoResponse,
   UpdateRackFileInfoResponse,
 } from '../../shared/contracts/ipc/presets';
-import type { AuthoredMetadata } from '../../shared/model';
-import { withPresetAuthoredMetadata, type PresetFile, type PresetFileKind } from '../../shared/preset/file';
 
 import { PRESET_FILE_SPECS } from './presets/preset-config';
 
 import { PresetDialogs } from './presets/preset-dialogs';
+import { PresetFileOperations } from './presets/preset-file-operations';
 import { hasPresetExtension } from '../../shared/preset/paths';
 import { resolvePresetPath } from './presets/preset-paths';
 import {
@@ -45,13 +44,18 @@ const toErrorMessage = (error: unknown, fallback: string): string => {
 
 /** Orchestrates preset validation, dialogs, storage, and shell actions. */
 export class PresetService {
-  private readonly storage = new PresetStorage();
+  private readonly storage = new PresetStorage({
+    userDataDirectory: () => app.getPath('userData'),
+    trashItem: (filePath) => shell.trashItem(filePath),
+  });
 
-  private readonly dialogs = new PresetDialogs();
+  private readonly dialogs = new PresetDialogs(() => app.getPath('userData'));
 
   private readonly backend = new NativePresetBackend(this.storage);
 
   private readonly repository = new PresetRepository(this.backend);
+
+  private readonly files = new PresetFileOperations(this.storage, this.backend, this.repository);
 
   private browserTreeWatcher: FSWatcher | null = null;
 
@@ -113,13 +117,15 @@ export class PresetService {
       const dialogResult = await this.dialogs.showSavePresetFileDialog(
         parsedRequest,
         baseDirectory,
-        parentWindow,
+        (options) => parentWindow
+          ? dialog.showSaveDialog(parentWindow, options)
+          : dialog.showSaveDialog(options),
       );
       if (dialogResult.status === 'canceled') {
         return { status: 'canceled' };
       }
 
-      const savedPath = await this.saveAtPath(dialogResult.filePath, parsedRequest.payload);
+      const savedPath = await this.files.saveAtPath(dialogResult.filePath, parsedRequest.payload);
       await this.dialogs.rememberSaveDirectory(
         parsedRequest,
         dialogResult.filePath,
@@ -156,7 +162,7 @@ export class PresetService {
     }
 
     try {
-      const savedPath = await this.saveAtPath(parsedRequest.filePath, parsedRequest.payload);
+      const savedPath = await this.files.saveAtPath(parsedRequest.filePath, parsedRequest.payload);
       return {
         status: 'saved',
         filePath: savedPath,
@@ -190,7 +196,7 @@ export class PresetService {
     }
 
     try {
-      const updated = await this.updatePresetInfoAtPath(
+      const updated = await this.files.updatePresetInfoAtPath(
         'rack',
         parsedRequest.filePath,
         parsedRequest.fileName,
@@ -224,52 +230,6 @@ export class PresetService {
     request: unknown,
   ): Promise<UpdatePresetFileInfoResponse> {
     return this.repository.updatePresetFileInfo(request);
-  }
-
-  private async saveAtPath(filePath: string, payload: PresetFile): Promise<string> {
-    const entry = await this.backend.entryAtPath(payload.presetType, filePath);
-    if (!entry) {
-      await this.storage.writePresetFile(filePath, payload);
-      return filePath;
-    }
-    const result = await this.repository.savePresetAt(entry, payload, 'overwrite');
-    if (result.status !== 'saved') {
-      throw new Error(result.status === 'error' ? result.message : 'Preset could not be saved at that location.');
-    }
-    return result.filePath;
-  }
-
-  private async updatePresetInfoAtPath(
-    presetType: PresetFileKind,
-    filePath: string,
-    fileName: string,
-    metadata: AuthoredMetadata | undefined,
-  ): Promise<{ filePath: string; savedAtIso: string }> {
-    const entry = await this.backend.entryAtPath(presetType, filePath);
-    if (entry) {
-      const result = await this.repository.updatePresetFileInfo({ ...entry, source: 'user', fileName, metadata });
-      if (result.status === 'error') {
-        if (result.errorCode === 'name-conflict') throw new PresetNameConflictError();
-        throw new Error(result.message);
-      }
-      return { filePath: result.filePath, savedAtIso: result.savedAtIso };
-    }
-    const savedAtIso = new Date().toISOString();
-    const updatedPath = await this.storage.updatePresetFile(
-      presetType,
-      filePath,
-      fileName,
-      PRESET_FILE_SPECS[presetType].extension,
-      (payload) => withPresetAuthoredMetadata(
-        payload,
-        metadata,
-        savedAtIso,
-      ),
-    );
-    return {
-      filePath: updatedPath,
-      savedAtIso,
-    };
   }
 
   public async createPresetFolder(

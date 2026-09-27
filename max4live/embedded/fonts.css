@@ -1,0 +1,8 @@
+/* One variable WOFF2 replaces the desktop stylesheet's many static font files. */
+@font-face {
+  font-family: 'Pretendard JP Variable';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../../node_modules/pretendard-jp/dist/web/variable/woff2/PretendardJPVariable.woff2') format('woff2');
+}

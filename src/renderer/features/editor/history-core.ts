@@ -240,7 +240,7 @@ export class ChainHistory {
 
     for (const [index, entry] of previousEntries.entries()) {
       const snapshot = toSnapshot(transform(entry.chain));
-      const previousEntry = this.entries.at(-1);
+      const previousEntry = this.entries[this.entries.length - 1];
       if (previousEntry?.signature !== snapshot.signature) {
         this.entries.push({
           ...entry,

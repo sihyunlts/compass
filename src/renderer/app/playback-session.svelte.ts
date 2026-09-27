@@ -326,7 +326,7 @@ export class PlaybackSessionController {
     });
     editorSession.state.previewLoopLengthBeats = nextLoopLengthBeats;
 
-    if (this.options.bridgeClient.platform === 'mac') {
+    if (this.options.bridgeClient.runtime === 'electron' && this.options.bridgeClient.platform === 'mac') {
       this.pendingTimelineFrameStrip = buildTouchBarTimelineFrameStrip(
         input.preview,
         input.launchpadModel,

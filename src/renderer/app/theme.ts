@@ -4,6 +4,7 @@ import {
   type ThemeSettings,
 } from '../features/editor/persistence-storage';
 import { RENDERER_STATE_KEY } from '../persisted-state';
+import { applyThemeColors } from './theme-colors';
 
 const KAGUYA_HUE_CYCLE_MS = 2_000;
 
@@ -13,11 +14,7 @@ let kaguyaThemeStartTime = 0;
 let kaguyaThemeStartHue = 0;
 
 const applyThemeSettings = (settings: ThemeSettings): void => {
-  document.documentElement.style.setProperty('--theme-hue', String(settings.hue));
-  document.documentElement.style.setProperty(
-    '--theme-chroma-scale',
-    String(settings.saturation / 100),
-  );
+  applyThemeColors(settings.hue, settings.saturation / 100);
 };
 
 const renderKaguyaThemeFrame = (time: number): void => {

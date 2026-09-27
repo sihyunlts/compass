@@ -135,6 +135,8 @@
 </DeviceBodyLayout>
 
 <style lang="scss">
+  @use '../../renderer/styles/color-fallbacks' as colors;
+
   :global(.control-field.translate-controls) {
     --translate-button-size: 2rem;
     --translate-pad-width: calc(var(--translate-button-size) * 3 + var(--gap-4) * 2);
@@ -158,10 +160,12 @@
       content: '';
       position: absolute;
       inset: 0;
-      background: color-mix(
-        in srgb,
-        var(--device-control-accent, var(--color-surface-inverse)) 32%,
-        transparent
+      @include colors.alpha(
+        background,
+        var(--device-control-accent, var(--color-surface-inverse)),
+        var(--device-control-accent-rgb, var(--color-surface-inverse-rgb)),
+        0.32,
+        srgb,
       );
       transform: scaleX(var(--fill-ratio, 0));
       transform-origin: left;

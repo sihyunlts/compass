@@ -1,0 +1,29 @@
+@use 'sass:color';
+
+// Keep OKLCH as the source color; only the fallback is mapped into sRGB.
+// https://sass-lang.com/documentation/modules/color/#to-gamut
+@function srgb($value) {
+  @return color.to-space(color.to-gamut($value, $space: rgb, $method: clip), rgb);
+}
+
+@mixin token($name, $value) {
+  $rgb: srgb($value);
+  #{$name}-rgb: #{color.channel($rgb, 'red')}, #{color.channel($rgb, 'green')}, #{color.channel($rgb, 'blue')};
+  #{$name}: #{$rgb};
+
+  // Custom properties accept unsupported color syntax, so declaration order
+  // alone cannot provide a fallback. Guard the modern value explicitly.
+  @supports (color: oklch(50% 0.1 180)) {
+    #{$name}: #{$value};
+  }
+}
+
+// All current mixes fade an opaque color toward transparent. RGB channels let
+// older engines change just its alpha without fading children or borders.
+@mixin alpha($property, $value, $channels, $opacity, $space: oklch) {
+  #{$property}: rgba($channels, $opacity);
+
+  @supports (color: color-mix(in #{$space}, black, transparent)) {
+    #{$property}: color-mix(in #{$space}, #{$value} #{$opacity * 100%}, transparent);
+  }
+}

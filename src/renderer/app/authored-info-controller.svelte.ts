@@ -247,7 +247,7 @@ class AuthoredInfoController {
       return;
     }
 
-    const fileName = entry.relativePath.at(-1) ?? '';
+    const fileName = entry.relativePath[entry.relativePath.length - 1] ?? '';
     this.assignDraft(
       resolvePresetNameFromFileName(fileName, entry.presetType) ?? fileName,
       resolvePresetMetadata(response.payload),

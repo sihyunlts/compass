@@ -38,7 +38,7 @@ const renderFatal = (message: string): void => {
   fallback.style.margin = '24px';
   fallback.style.whiteSpace = 'pre-wrap';
   fallback.style.fontFamily = 'Menlo, Monaco, Consolas, monospace';
-  fallback.style.color = 'oklch(77% 0.136 21)';
+  fallback.style.color = 'var(--color-error)';
   fallback.textContent = `Renderer bootstrap failed:\n${message}`;
   document.body.innerHTML = '';
   document.body.appendChild(fallback);
@@ -56,13 +56,13 @@ const bootstrapRenderer = (root: HTMLElement): void => {
   bootstrapMainWindow(root);
 };
 
-const installWebFallbackFrame = (root: HTMLElement): void => {
-  if (window.compass) {
+const installPageFrame = (root: HTMLElement): void => {
+  if (window.compass?.runtime === 'electron') {
     return;
   }
 
-  document.body.setAttribute('data-runtime', 'web');
-  root.classList.add('is-web-fallback');
+  document.body.setAttribute('data-frame', 'in-page');
+  root.classList.add('has-in-page-frame');
 };
 
 try {
@@ -72,7 +72,7 @@ try {
   }
 
   installTabOnlyFocusMode();
-  installWebFallbackFrame(root);
+  installPageFrame(root);
   initializeTheme();
   bootstrapRenderer(root);
 } catch (error) {

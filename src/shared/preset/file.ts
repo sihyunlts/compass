@@ -249,7 +249,7 @@ interface ParsedPresetPayload {
 }
 
 const hasStoredName = (value: unknown): boolean =>
-  isRecord(value) && Object.hasOwn(value, 'name');
+  isRecord(value) && Object.prototype.hasOwnProperty.call(value, 'name');
 
 export const toStandaloneDevicePresetDevice = (
   device: GeneratorDeviceNode,

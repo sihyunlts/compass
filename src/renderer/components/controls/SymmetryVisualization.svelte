@@ -272,6 +272,8 @@
 </svg>
 
 <style lang="scss">
+  @use '../../styles/color-fallbacks' as colors;
+
   .symmetry-visualization {
     display: block;
     width: 100%;
@@ -279,10 +281,12 @@
   }
 
   .source-area {
-    fill: color-mix(
-      in srgb,
-      var(--device-control-accent, var(--color-surface-inverse)) 18%,
-      transparent
+    @include colors.alpha(
+      fill,
+      var(--device-control-accent, var(--color-surface-inverse)),
+      var(--device-control-accent-rgb, var(--color-surface-inverse-rgb)),
+      0.18,
+      srgb,
     );
   }
 

@@ -196,6 +196,8 @@
 {/if}
 
 <style lang="scss">
+  @use '../../styles/color-fallbacks' as colors;
+
   .modulation-indicator {
     --modulation-line-thickness: var(--gap-2);
     --modulation-base-indicator-width: calc(var(--gap-2) / 2);
@@ -204,6 +206,10 @@
     --modulation-indicator-accent: var(
       --device-control-accent,
       var(--color-category-utility)
+    );
+    --modulation-indicator-accent-rgb: var(
+      --device-control-accent-rgb,
+      var(--color-category-utility-rgb)
     );
 
     position: absolute;
@@ -258,10 +264,11 @@
     min-width: calc(var(--gap-2) / 2);
     transform: translateY(-50%);
     border-radius: var(--radius-round);
-    background: color-mix(
-      in oklch,
-      var(--modulation-indicator-accent) 40%,
-      transparent
+    @include colors.alpha(
+      background,
+      var(--modulation-indicator-accent),
+      var(--modulation-indicator-accent-rgb),
+      0.4,
     );
   }
 
@@ -293,11 +300,7 @@
 
   .modulation-ring-range {
     fill: none;
-    stroke: color-mix(
-      in oklch,
-      var(--modulation-indicator-accent) 40%,
-      transparent
-    );
+    @include colors.alpha(stroke, var(--modulation-indicator-accent), var(--modulation-indicator-accent-rgb), 0.4);
     stroke-width: 5;
     stroke-linecap: round;
   }

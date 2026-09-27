@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import path from 'node:path';
 
 import { IPC_CHANNELS } from '../../shared/contracts/ipc/channels';
 import type { PreviewWindowState } from '../../shared/contracts/preview/window-state';
@@ -20,6 +21,7 @@ import {
 import { GeneratorService } from '../services/generator-service';
 import { PresetService } from '../services/preset-service';
 import { UpdateCheckService } from '../services/update-check-service';
+import { saveMidiFile } from '../services/midi-file-service';
 import { isAppLocale } from '../../shared/i18n';
 import { setApplicationMenuLocale } from '../application-menu';
 import { performHapticFeedback } from '../native-haptics';
@@ -66,6 +68,26 @@ export const registerIpcHandlers = (
   presetService: PresetService,
   updateCheckService: UpdateCheckService,
 ): void => {
+  let lastMidiDirectory = app.getPath('downloads');
+  ipcMain.handle(IPC_CHANNELS.saveMidiFile, (_event, request: unknown) =>
+    saveMidiFile(request, async (fileName) => {
+      const options = {
+        defaultPath: path.join(lastMidiDirectory, fileName),
+        filters: [{ name: 'MIDI', extensions: ['mid'] }],
+        properties: ['createDirectory', 'showOverwriteConfirmation'] as const,
+      };
+      const parent = resolveDialogParentWindow();
+      const result = await (parent
+        ? dialog.showSaveDialog(parent, { ...options, properties: [...options.properties] })
+        : dialog.showSaveDialog({ ...options, properties: [...options.properties] }));
+      // Use the path confirmed by the OS; the service rejects another extension.
+      if (!result.canceled && result.filePath?.toLowerCase().endsWith('.mid')) {
+        lastMidiDirectory = path.dirname(result.filePath);
+      }
+      return result;
+    }),
+  );
+
   ipcMain.handle(
     IPC_CHANNELS.sendGeneratedPreview,
     (_event, request: SendGeneratedPreviewRequest) =>

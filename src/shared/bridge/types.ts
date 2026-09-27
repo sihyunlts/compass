@@ -11,7 +11,7 @@ export interface BridgeTarget {
 export interface LiveTempoUpdate {
   bpm: number;
   receivedAtIso: string;
-  source: 'm4l-udp';
+  source: 'm4l-udp' | 'max-for-live';
 }
 
 interface LiveBridgeBaseEnvelope {

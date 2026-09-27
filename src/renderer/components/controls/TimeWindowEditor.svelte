@@ -244,8 +244,11 @@
 </div>
 
 <style lang="scss">
+  @use '../../styles/color-fallbacks' as colors;
+
   .time-window-editor {
     --time-window-accent: var(--device-category-accent, var(--color-category-time));
+    --time-window-accent-rgb: var(--device-category-accent-rgb, var(--color-category-time-rgb));
     display: flex;
     flex-direction: column;
     gap: var(--gap-8);
@@ -301,7 +304,7 @@
     width: calc(var(--window-end, 0%) - var(--window-start, 0%));
     border: 1px solid var(--time-window-accent);
     border-radius: var(--radius-4);
-    background: color-mix(in srgb, var(--time-window-accent) 32%, transparent);
+    @include colors.alpha(background, var(--time-window-accent), var(--time-window-accent-rgb), 0.32, srgb);
   }
 
   .time-window-tick {

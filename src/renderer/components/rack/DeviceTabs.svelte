@@ -56,6 +56,8 @@
 </div>
 
 <style lang="scss">
+  @use '../../styles/color-fallbacks' as colors;
+
   .device-tabs {
     display: inline-flex;
     align-items: center;
@@ -80,7 +82,7 @@
     white-space: nowrap;
 
     &:disabled {
-      color: color-mix(in oklch, var(--color-text-secondary) 55%, transparent);
+      @include colors.alpha(color, var(--color-text-secondary), var(--color-text-secondary-rgb), 0.55);
     }
 
     &.is-active {

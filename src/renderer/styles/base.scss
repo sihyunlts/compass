@@ -19,9 +19,22 @@
   -electron-corner-smoothing: 80%;
 }
 
+/* Chromium before 121 needs its older scrollbar selector. Keep scrolling enabled. */
+@supports not (scrollbar-width: none) {
+  *::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* Hide default focus ring and re-enable for keyboard navigation mode */
 :focus-visible {
   outline: none;
+}
+
+@supports not selector(:where(*)) {
+  :focus {
+    outline: none;
+  }
 }
 
 body[data-focus-nav='tab'] :focus-visible {
@@ -59,7 +72,7 @@ html, body {
   overflow: hidden;
 }
 
-body[data-runtime='web'] {
+body[data-frame='in-page'] {
   display: flex;
   align-items: center;
 }
@@ -68,7 +81,7 @@ body[data-runtime='web'] {
   max-height: 280px;
   height: 100%;
 
-  &.is-web-fallback {
+  &.has-in-page-frame {
     width: 100%;
     border-top: 1px solid var(--color-border-tertiary);
     border-bottom: 1px solid var(--color-border-tertiary);

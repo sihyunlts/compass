@@ -10,5 +10,6 @@
     "outDir": "dist",
     "moduleResolution": "bundler",
     "resolveJsonModule": true
-  }
+  },
+  "exclude": ["node_modules", "out", "dist", "tmp"]
 }

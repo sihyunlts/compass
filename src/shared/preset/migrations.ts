@@ -198,7 +198,7 @@ const migrateGroupStateByIdFromVersion1 = (
       continue;
     }
     const groupId = device.groupId.trim();
-    if (!groupId || Object.hasOwn(migrated, groupId)) {
+    if (!groupId || Object.prototype.hasOwnProperty.call(migrated, groupId)) {
       continue;
     }
     migrated[groupId] = { enabled: true, mode: 'isolate' };

@@ -1,9 +1,3 @@
-import {
-  app,
-  dialog,
-  type BaseWindow,
-  type SaveDialogOptions,
-} from 'electron';
 import { randomUUID } from 'node:crypto';
 import {
   mkdir,
@@ -113,8 +107,18 @@ type SelectedFilePath =
   | { status: 'selected'; filePath: string }
   | { status: 'canceled' };
 
-/** Shows native open/save preset dialogs and returns the selected file path. */
+interface PresetSaveDialogOptions {
+  defaultPath: string;
+  title: string;
+  buttonLabel: string;
+  filters: { name: string; extensions: string[] }[];
+  properties: Array<'createDirectory'>;
+}
+
+/** Shares naming and directory history; the host supplies its native dialog. */
 export class PresetDialogs {
+  public constructor(private readonly userDataDirectory: () => string) {}
+
   private statePromise: Promise<PresetDialogState> | null = null;
 
   private stateWriteQueue: Promise<void> = Promise.resolve();
@@ -122,7 +126,7 @@ export class PresetDialogs {
   public async showSavePresetFileDialog(
     request: SavePresetFileRequest,
     baseDirectory: string,
-    parentWindow?: BaseWindow,
+    choosePath: (options: PresetSaveDialogOptions) => Promise<{ canceled: boolean; filePath?: string }>,
   ): Promise<SelectedFilePath> {
     const spec = PRESET_FILE_SPECS[request.payload.presetType];
     const fallbackDirectory = resolvePresetSaveDirectory(baseDirectory, request);
@@ -135,7 +139,7 @@ export class PresetDialogs {
       request.suggestedName,
       spec.defaultName,
     )}${spec.extension}`;
-    const dialogOptions: SaveDialogOptions = {
+    const dialogOptions: PresetSaveDialogOptions = {
       ...resolveDialogOptions(
         request.payload.presetType,
         path.join(directory, suggestedFileName),
@@ -145,9 +149,7 @@ export class PresetDialogs {
       title: `Save ${spec.defaultName}`,
     };
 
-    const result = parentWindow
-      ? await dialog.showSaveDialog(parentWindow, dialogOptions)
-      : await dialog.showSaveDialog(dialogOptions);
+    const result = await choosePath(dialogOptions);
     if (result.canceled || !result.filePath) {
       return { status: 'canceled' };
     }
@@ -248,6 +250,6 @@ export class PresetDialogs {
   }
 
   private resolveStateFilePath(): string {
-    return path.join(app.getPath('userData'), PRESET_DIALOG_STATE_FILE_NAME);
+    return path.join(this.userDataDirectory(), PRESET_DIALOG_STATE_FILE_NAME);
   }
 }

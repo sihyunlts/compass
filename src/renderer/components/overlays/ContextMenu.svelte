@@ -5,6 +5,7 @@
     canRenamePresetContextTarget,
     isPresetBrowserContextTarget,
     isRackSelectionContextTarget,
+    snapshotContextMenuTarget,
     type ModulationParameterContextTarget,
     type ContextMenuTarget,
     type PresetEntryContextTarget,
@@ -120,7 +121,7 @@
       return;
     }
 
-    target = structuredClone(nextTarget);
+    target = snapshotContextMenuTarget(nextTarget);
     anchorPoint = { x: clientX, y: clientY };
     isOpen = true;
   }

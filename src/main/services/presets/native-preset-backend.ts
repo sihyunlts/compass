@@ -27,13 +27,13 @@ export class NativePresetBackend implements PresetRepositoryBackend {
       listOccupiedPaths: (presetType) => this.tree.listOccupiedPaths(presetType),
       ensureEntry: async (entry) => files.ensurePresetEntryKind(await location(entry), entry.entryKind),
       read: async (entry) => files.readPresetFileByType(entry.presetType, await location(entry)),
-      createFolder: async (entry) => { await files.createPresetFolder(entry.presetType, entry.relativePath.slice(0, -1), entry.relativePath.at(-1)!); },
+      createFolder: async (entry) => { await files.createPresetFolder(entry.presetType, entry.relativePath.slice(0, -1), entry.relativePath[entry.relativePath.length - 1]!); },
       rename: async (entry, relativePath) => {
-        if (entry.entryKind === 'file') await files.renamePresetFile(await location(entry), relativePath.at(-1)!, PRESET_FILE_EXTENSIONS[entry.presetType]);
-        else await files.renamePresetFolder(entry.presetType, entry.relativePath, relativePath.at(-1)!);
+        if (entry.entryKind === 'file') await files.renamePresetFile(await location(entry), relativePath[relativePath.length - 1]!, PRESET_FILE_EXTENSIONS[entry.presetType]);
+        else await files.renamePresetFolder(entry.presetType, entry.relativePath, relativePath[relativePath.length - 1]!);
       },
       update: async (entry, relativePath, updatePayload) => {
-        await files.updatePresetFile(entry.presetType, await location(entry), relativePath.at(-1)!, PRESET_FILE_EXTENSIONS[entry.presetType], updatePayload);
+        await files.updatePresetFile(entry.presetType, await location(entry), relativePath[relativePath.length - 1]!, PRESET_FILE_EXTENSIONS[entry.presetType], updatePayload);
       },
       write: async (entry, payload) => files.writePresetFile(await location(entry), payload),
       revision: async (entry) => {

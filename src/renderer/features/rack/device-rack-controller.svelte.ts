@@ -572,7 +572,7 @@ class DeviceRackController {
 
     const memberDeviceIds = this.options.getGroupMemberIds(currentItem.id);
     const edgeDeviceId = direction > 0
-      ? memberDeviceIds.at(-1)
+      ? memberDeviceIds[memberDeviceIds.length - 1]
       : memberDeviceIds[0];
     if (!edgeDeviceId) {
       return -1;

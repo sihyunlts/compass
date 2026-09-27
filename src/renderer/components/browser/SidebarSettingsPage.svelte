@@ -339,6 +339,17 @@
 </section>
 
 <style lang="scss">
+  @use 'sass:list';
+  @use '../../styles/color-fallbacks' as colors;
+
+  $hue-colors: ();
+  $hue-fallbacks: ();
+  @each $hue in 0, 60, 120, 180, 240, 300, 360 {
+    $color: oklch(65% 0.14 $hue);
+    $hue-colors: list.append($hue-colors, $color, comma);
+    $hue-fallbacks: list.append($hue-fallbacks, colors.srgb($color), comma);
+  }
+
   .sidebar-settings-page {
     display: flex;
     flex-direction: column;
@@ -410,23 +421,17 @@
   }
 
   .sidebar-settings-hue-range {
-    --range-track-background: linear-gradient(
-      to right,
-      oklch(65% 0.14 0),
-      oklch(65% 0.14 60),
-      oklch(65% 0.14 120),
-      oklch(65% 0.14 180),
-      oklch(65% 0.14 240),
-      oklch(65% 0.14 300),
-      oklch(65% 0.14 360)
-    );
+    --range-track-background: linear-gradient(to right, #{$hue-fallbacks});
+    @supports (color: oklch(50% 0.1 180)) {
+      --range-track-background: linear-gradient(to right, #{$hue-colors});
+    }
   }
 
   .sidebar-settings-saturation-range {
     --range-track-background: linear-gradient(
       to right,
-      oklch(65% 0 var(--theme-hue)),
-      oklch(65% 0.14 var(--theme-hue))
+      var(--theme-saturation-muted),
+      var(--theme-saturation-color)
     );
   }
 

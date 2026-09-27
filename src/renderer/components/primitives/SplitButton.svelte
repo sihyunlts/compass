@@ -111,6 +111,8 @@
 </div>
 
 <style lang="scss">
+  @use '../../styles/color-fallbacks' as colors;
+
   .split-button {
     display: inline-flex;
     border-radius: var(--radius-6);
@@ -123,7 +125,7 @@
     &-primary {
       .split-button-segment:disabled {
         opacity: 1;
-        color: color-mix(in oklch, var(--color-text-inverse) 60%, transparent);
+        @include colors.alpha(color, var(--color-text-inverse), var(--color-text-inverse-rgb), 0.6);
       }
 
       background: var(--color-surface-inverse);
@@ -135,8 +137,28 @@
       outline: 1px solid var(--color-border-tertiary);
       outline-offset: -1px;
 
+      @supports not selector(:where(*)) {
+        position: relative;
+        outline: none;
+
+        // Older Chromium draws outlines with square corners. A border overlay
+        // follows the radius without shifting the two button segments.
+        &::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border: 1px solid var(--color-border-tertiary);
+          border-radius: inherit;
+          pointer-events: none;
+        }
+      }
+
       .split-button-trigger {
         border-left-color: var(--color-border-tertiary);
+
+        &::before {
+          display: none;
+        }
       }
     }
 
@@ -183,10 +205,31 @@
       flex: 0 0 1.75rem;
       width: 1.75rem;
       padding: 0;
-      border-left: 1px solid color-mix(in oklch, currentColor 16%, transparent);
+      border-left: 1px solid transparent;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+
+      @supports (color: color-mix(in oklch, black, transparent)) {
+        border-left-color: color-mix(in oklch, currentColor 16%, transparent);
+      }
+
+      @supports not (color: color-mix(in oklch, black, transparent)) {
+        position: relative;
+
+        // Fade only the divider, including inherited/disabled currentColor.
+        &::before {
+          content: '';
+          position: absolute;
+          left: -1px;
+          top: 0;
+          bottom: 0;
+          width: 1px;
+          background: currentColor;
+          opacity: 0.16;
+          pointer-events: none;
+        }
+      }
 
       &[aria-expanded='true'] {
         background: var(--split-button-expanded-background, var(--color-surface-active));

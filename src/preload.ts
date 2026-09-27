@@ -122,7 +122,10 @@ ipcRenderer.on(IPC_CHANNELS.appFocusUpdate, (_event, isFocused: boolean) => {
 });
 
 const api: CompassApi = {
+  runtime: 'electron',
   platform: resolveShortcutPlatform(process.platform),
+  supportsHardwareMidi: true,
+  saveMidiFile: (request) => ipcRenderer.invoke(IPC_CHANNELS.saveMidiFile, request),
   sendGeneratedPreview: (request) =>
     ipcRenderer.invoke(IPC_CHANNELS.sendGeneratedPreview, request),
   requestAppVersion: () =>

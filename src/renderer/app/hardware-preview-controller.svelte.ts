@@ -52,7 +52,8 @@ const removeRedundantLaunchpadEndpointAlias = (name: string): string => {
   if (portRoleIndex < 2 || !words[portRoleIndex - 1].toLowerCase().startsWith('lp')) {
     return name;
   }
-  return words.toSpliced(portRoleIndex - 1, 1).join(' ');
+  words.splice(portRoleIndex - 1, 1);
+  return words.join(' ');
 };
 
 const resolveOutputLabel = (output: MIDIOutput): string => {

@@ -82,7 +82,8 @@ const PRESET_APPLY_MESSAGE_KEY_BY_STATUS = {
 } as const satisfies Readonly<Record<PresetApplyStatus, MessageKey>>;
 
 const PRESET_DELETE_MESSAGE_KEYS = {
-  desktop: {
+  trash: {
+    confirmLabel: 'rack.trash',
     folderPrompt: 'preset.moveFolderPrompt',
     itemPrompt: 'preset.moveItemPrompt',
     itemsPrompt: 'preset.moveItemsPrompt',
@@ -91,7 +92,8 @@ const PRESET_DELETE_MESSAGE_KEYS = {
     itemsDescription: 'preset.moveItemsDescription',
     failed: 'status.moveToTrashFailed',
   },
-  web: {
+  delete: {
+    confirmLabel: 'context.delete',
     folderPrompt: 'preset.deleteFolderPrompt',
     itemPrompt: 'preset.deleteItemPrompt',
     itemsPrompt: 'preset.deleteItemsPrompt',
@@ -175,7 +177,6 @@ interface PresetControllerOptions {
   bridgeClient: RendererCompassApi;
   editorSession: EditorSession;
   showMessage: (message: string) => void;
-  isWebFallback: boolean;
 }
 
 const clonePresetBrowserPreview = (
@@ -1170,7 +1171,11 @@ export class PresetController {
   }
 
   private get presetDeleteMessageKeys() {
-    return PRESET_DELETE_MESSAGE_KEYS[this.options.isWebFallback ? 'web' : 'desktop'];
+    return PRESET_DELETE_MESSAGE_KEYS[this.options.bridgeClient.runtime === 'browser' ? 'delete' : 'trash'];
+  }
+
+  public get presetDeleteConfirmLabel(): string {
+    return i18n.t(this.presetDeleteMessageKeys.confirmLabel);
   }
 
   public async handleShowPresetEntryInFolder(target: PresetEntryTarget): Promise<void> {

@@ -102,7 +102,10 @@
   const isInlineRenaming = $derived(isRenaming && !isCollapsed);
   const deviceDefinition = $derived(getRendererDeviceDefinition(device.kind));
   const deviceCategory = $derived(getDeviceBrowserCategory(device.kind));
-  const deviceCardStyle = $derived(`--device-category-accent:var(${deviceCategory.accentColorVar});`);
+  const deviceCardStyle = $derived(
+    `--device-category-accent:var(${deviceCategory.accentColorVar});`
+    + `--device-category-accent-rgb:var(${deviceCategory.accentColorVar}-rgb);`,
+  );
   const DeviceEditor = $derived(deviceDefinition.editor);
   const deviceTabs = $derived.by((): readonly RendererDeviceTabDefinition[] =>
     deviceDefinition.tabs?.(device) ?? []);
@@ -315,7 +318,7 @@
           oncontextmenu={(event) => event.stopPropagation()}
         />
       {:else}
-        <span class="device-title">{localizedTitle}</span>
+        <span class="device-title" class:rack-vertical-label={isCollapsed}>{localizedTitle}</span>
       {/if}
     </div>
     {#if !isCollapsed && deviceTabs.length > 0}
@@ -364,7 +367,9 @@
 <style lang="scss">
   .device-card {
     --device-category-accent: var(--color-category-generate);
+    --device-category-accent-rgb: var(--color-category-generate-rgb);
     --device-control-accent: var(--device-category-accent);
+    --device-control-accent-rgb: var(--device-category-accent-rgb);
     --device-card-radius: var(--radius-8);
     --device-head-radius: max(0px, calc(var(--device-card-radius) - 1px));
     display: flex;
@@ -489,26 +494,20 @@
         padding: var(--gap-10) var(--gap-6);
         border-bottom: none;
         border-radius: var(--device-head-radius);
-      }
 
-      .device-head-left {
-        flex-direction: column;
-        align-items: center;
-        gap: var(--gap-12);
-      }
+        .device-head-left {
+          flex-direction: column;
+          align-items: center;
+          gap: var(--gap-12);
+        }
 
-      .device-head-controls {
-        flex-direction: column;
-      }
+        .device-head-controls {
+          flex-direction: column;
+        }
 
-      .device-title {
-        flex: 0 1 auto;
-        writing-mode: sideways-lr;
-      }
-
-      .device-title-input {
-        writing-mode: sideways-lr;
-        text-align: center;
+        .device-title {
+          flex: 0 1 auto;
+        }
       }
     }
 

@@ -158,9 +158,9 @@ export class RackSelection {
     }
 
     const fallbackItem = selectedGroupIds.length > 0
-      ? { kind: 'group' as const, id: selectedGroupIds.at(-1) as string }
+      ? { kind: 'group' as const, id: selectedGroupIds[selectedGroupIds.length - 1] as string }
       : this.state.selectedDeviceIds.length > 0
-        ? { kind: 'device' as const, id: this.state.selectedDeviceIds.at(-1) as string }
+        ? { kind: 'device' as const, id: this.state.selectedDeviceIds[this.state.selectedDeviceIds.length - 1] as string }
         : null;
     const anchor = selectedIndex < 0
       ? { kind: 'group' as const, id: groupId }
@@ -226,7 +226,7 @@ export class RackSelection {
       item.kind === 'device' ? [item.id] : []);
     const selectedGroupIds = index.topLevelItems.flatMap((item) =>
       item.kind === 'group' ? [item.id] : []);
-    const anchor = index.topLevelItems.at(-1) ?? null;
+    const anchor = index.topLevelItems[index.topLevelItems.length - 1] ?? null;
     this.commitSelection(
       selectedDeviceIds,
       selectedGroupIds,

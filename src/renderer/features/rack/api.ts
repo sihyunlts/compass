@@ -65,7 +65,7 @@ export const createRackViewApi = (
     options.focusSelectedItem();
   },
   setSelectedDeviceIds: (deviceIds) => {
-    const anchorId = deviceIds.at(-1) ?? null;
+    const anchorId = deviceIds[deviceIds.length - 1] ?? null;
     options.rackSelection.setSelectedRackItems(
       deviceIds,
       [],
@@ -75,7 +75,7 @@ export const createRackViewApi = (
     options.focusSelectedItem();
   },
   setSelectedGroupIds: (groupIds) => {
-    const anchorId = groupIds.at(-1) ?? null;
+    const anchorId = groupIds[groupIds.length - 1] ?? null;
     options.rackSelection.setSelectedRackItems(
       [],
       groupIds,

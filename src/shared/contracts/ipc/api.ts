@@ -36,6 +36,7 @@ import type {
 } from './generator';
 import type { UpdateCheckResponse } from './releases';
 import type { ShortcutPlatform } from '../../keyboard-shortcuts';
+import type { SaveMidiFileRequest, SaveMidiFileResponse } from './midi';
 
 export interface MainWindowDocumentState {
   edited: boolean;
@@ -102,7 +103,13 @@ export const parsePreviewWindowControlRequest = (
 export type HapticFeedbackPattern = 'generic' | 'alignment';
 
 export interface CompassApi {
+  /** Application host; independent of the operating system. */
+  runtime: 'electron' | 'browser' | 'max-for-live';
+  /** Operating-system conventions for shortcuts and native window layout. */
   platform: ShortcutPlatform;
+  /** Host eligibility; MIDI API availability and permissions are checked separately. */
+  supportsHardwareMidi: boolean;
+  saveMidiFile: (request: SaveMidiFileRequest) => Promise<SaveMidiFileResponse>;
   sendGeneratedPreview: (
     request: SendGeneratedPreviewRequest,
   ) => Promise<SendGeneratedPreviewResponse>;

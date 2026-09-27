@@ -62,7 +62,7 @@ const resolvePasteDropZone = (
   selection: RackSelectionSnapshot | null,
   clipboardKind: RackClipboard['kind'],
 ): RackDropZone => {
-  const selectedLastItem = selection?.items.at(-1) ?? null;
+  const selectedLastItem = selection?.items[selection.items.length - 1] ?? null;
   if (clipboardKind !== 'devices') {
     if (selectedLastItem?.kind === 'group') {
       return {

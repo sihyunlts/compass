@@ -53,6 +53,27 @@ export type ContextMenuTarget =
     }
   | PresetBrowserContextTarget;
 
+const copyPresetEntryTarget = (target: PresetEntryContextTarget): PresetEntryContextTarget => ({
+  ...target,
+  relativePath: [...target.relativePath],
+});
+
+/** Keep the menu's selection stable while the editor or browser selection changes. */
+export const snapshotContextMenuTarget = (target: ContextMenuTarget): ContextMenuTarget => {
+  switch (target.kind) {
+    case 'devices':
+      return { ...target, deviceIds: [...target.deviceIds] };
+    case 'group':
+      return { ...target, memberDeviceIds: [...target.memberDeviceIds] };
+    case 'modulation-parameter':
+      return { ...target, connections: target.connections.map((connection) => ({ ...connection })) };
+    case 'preset-entry':
+      return copyPresetEntryTarget(target);
+    case 'preset-entries':
+      return { ...target, entries: target.entries.map(copyPresetEntryTarget) };
+  }
+};
+
 export type ModulationParameterContextTarget = Extract<
   ContextMenuTarget,
   { kind: 'modulation-parameter' }

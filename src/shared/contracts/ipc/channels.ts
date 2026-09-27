@@ -1,4 +1,5 @@
 export const IPC_CHANNELS = {
+  saveMidiFile: 'midi:save-file',
   sendGeneratedPreview: 'bridge:send-generated-preview',
   requestAppVersion: 'bridge:request-app-version',
   setApplicationLocale: 'app:set-locale',

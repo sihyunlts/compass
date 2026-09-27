@@ -38,9 +38,9 @@ export const ROOT_LABELS: Record<PresetFileKind, string> = {
   group: 'Groups',
   rack: 'Racks',
 };
-export const presetBrowserTreeChangedListeners = new Set<() => void>();
+const presetBrowserTreeChangedListeners = new Set<() => void>();
 
-window.addEventListener('storage', (event) => {
+const handleStorageChange = (event: StorageEvent): void => {
   if (event.key !== STORAGE_KEY) {
     return;
   }
@@ -48,7 +48,16 @@ window.addEventListener('storage', (event) => {
   for (const listener of presetBrowserTreeChangedListeners) {
     listener();
   }
-});
+};
+
+export const subscribeBrowserPresetTreeChanged = (listener: () => void): (() => void) => {
+  presetBrowserTreeChangedListeners.add(listener);
+  if (presetBrowserTreeChangedListeners.size === 1) window.addEventListener('storage', handleStorageChange);
+  return () => {
+    presetBrowserTreeChangedListeners.delete(listener);
+    if (presetBrowserTreeChangedListeners.size === 0) window.removeEventListener('storage', handleStorageChange);
+  };
+};
 
 interface BrowserPresetEntry {
   presetType: PresetFileKind;
@@ -136,7 +145,7 @@ const readStore = (): BrowserPresetStore => {
         || !isPresetFileKind(file.presetType)
         || !Array.isArray(file.relativePath)
         || !file.relativePath.every((segment) => typeof segment === 'string')
-        || !Object.hasOwn(file, 'payload')
+        || !Object.prototype.hasOwnProperty.call(file, 'payload')
       ) {
         throw new Error('Invalid browser preset entry.');
       }

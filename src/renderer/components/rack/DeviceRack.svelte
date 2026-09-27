@@ -596,7 +596,7 @@
                       <span class="material-symbols-rounded" aria-hidden="true">save</span>
                     </button>
                   </div>
-                  <span class="group-label">{groupName}</span>
+                  <span class="group-label rack-vertical-label">{groupName}</span>
                   <button
                     class="preset-save-button group-isolate-toggle"
                     class:is-active={col.mode === 'isolate'}
@@ -825,7 +825,6 @@
   }
 
   .group-label {
-    writing-mode: sideways-lr;
     font-size: var(--text-12);
     pointer-events: none;
   }
@@ -836,7 +835,7 @@
     &.is-active {
       background: var(--color-surface-inverse);
       color: var(--color-text-inverse);
-      outline-color: var(--color-surface-inverse);
+      --preset-button-border-color: var(--color-surface-inverse);
     }
   }
 

@@ -45,8 +45,11 @@
 </TimelineVisualizer>
 
 <style lang="scss">
+  @use '../../styles/color-fallbacks' as colors;
+
   .repeat-block {
     --repeat-accent: var(--device-category-accent, var(--color-category-time));
+    --repeat-accent-rgb: var(--device-category-accent-rgb, var(--color-category-time-rgb));
 
     position: absolute;
     top: 0;
@@ -60,6 +63,6 @@
       var(--repeat-right-radius, var(--radius-4))
       var(--repeat-right-radius, var(--radius-4))
       var(--repeat-left-radius, var(--radius-4));
-    background: color-mix(in srgb, var(--repeat-accent) 32%, transparent);
+    @include colors.alpha(background, var(--repeat-accent), var(--repeat-accent-rgb), 0.32, srgb);
   }
 </style>

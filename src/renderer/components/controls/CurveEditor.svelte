@@ -687,6 +687,8 @@
 {/if}
 
 <style lang="scss">
+  @use '../../styles/color-fallbacks' as colors;
+
   .curve-editor {
     touch-action: none;
     &-wrap {
@@ -726,7 +728,12 @@
     }
 
     .curve-fill {
-      fill: color-mix(in oklch, var(--device-control-accent, var(--color-surface-inverse)) 22%, transparent);
+      @include colors.alpha(
+        fill,
+        var(--device-control-accent, var(--color-surface-inverse)),
+        var(--device-control-accent-rgb, var(--color-surface-inverse-rgb)),
+        0.22,
+      );
     }
 
     .curve-line {

@@ -7,6 +7,7 @@ import type {
   PreviewGenerationRequest,
   PreviewGenerationResponse,
 } from './generation-worker-protocol';
+import { createPreviewWorker } from './generation-worker-factory';
 
 interface PreviewGenerationInput {
   sourceChain: GeneratorChain;
@@ -83,9 +84,7 @@ class PreviewGenerationWorkerClient {
     this.nextRequestId += 1;
     // Retain the loaded engine after success. Only interrupted work, failures
     // and disposal terminate the worker, so obsolete work never queues up.
-    const worker = this.worker ?? new Worker(new URL('./generation-worker.ts', import.meta.url), {
-      type: 'module',
-    });
+    const worker = this.worker ?? createPreviewWorker();
     this.worker = worker;
 
     return new Promise<T>((resolve, reject) => {

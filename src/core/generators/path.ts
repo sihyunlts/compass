@@ -130,7 +130,7 @@ export const resolvePathBounds = (
       addSegmentBounds(anchors[index], anchors[index + 1]);
     }
     if (closed) {
-      addSegmentBounds(anchors.at(-1)!, anchors[0]);
+      addSegmentBounds(anchors[anchors.length - 1]!, anchors[0]);
     }
   }
 

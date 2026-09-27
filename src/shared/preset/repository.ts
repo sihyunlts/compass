@@ -64,7 +64,7 @@ const requireRequest = <T>(request: T | null): T => {
 };
 
 const ensureFileType = (entry: PresetEntryPath): void => {
-  if (!hasPresetExtension(entry.relativePath.at(-1) ?? '', PRESET_FILE_EXTENSIONS[entry.presetType])) {
+  if (!hasPresetExtension(entry.relativePath[entry.relativePath.length - 1] ?? '', PRESET_FILE_EXTENSIONS[entry.presetType])) {
     throw new Error('Unsupported preset file extension.');
   }
 };
@@ -99,7 +99,7 @@ export class PresetRepository {
   private async fileTarget(storage: PresetRepositoryStorage, entry: PresetEntryPath, name: string): Promise<string[]> {
     ensureFileType(entry);
     await storage.ensureEntry({ ...entry, entryKind: 'file' });
-    const fallback = resolvePresetNameFromFileName(entry.relativePath.at(-1) ?? '', entry.presetType) ?? 'Preset';
+    const fallback = resolvePresetNameFromFileName(entry.relativePath[entry.relativePath.length - 1] ?? '', entry.presetType) ?? 'Preset';
     const fileName = ensurePresetExtension(sanitizeFileStem(name, fallback), PRESET_FILE_EXTENSIONS[entry.presetType]);
     const relativePath = [...entry.relativePath.slice(0, -1), fileName];
     await this.ensureTargetAvailable(storage, entry, relativePath, true);
@@ -120,7 +120,7 @@ export class PresetRepository {
     const entry = parseReadPresetEntryRequest(request);
     if (!entry) return { status: 'error', errorCode: 'invalid-read-request', message: 'Invalid file read request.' };
     if (entry.source === 'bundled') return readBundledRackPreset(entry.presetType as K, entry.relativePath);
-    if (!hasPresetExtension(entry.relativePath.at(-1) ?? '', PRESET_FILE_EXTENSIONS[entry.presetType])) {
+    if (!hasPresetExtension(entry.relativePath[entry.relativePath.length - 1] ?? '', PRESET_FILE_EXTENSIONS[entry.presetType])) {
       return { status: 'error', errorCode: 'unsupported-file-extension', message: 'Unsupported file extension.' };
     }
     try { return await this.backend.storage.read({ ...entry, presetType: entry.presetType as K }); }
@@ -224,7 +224,7 @@ export class PresetRepository {
       const request = requireRequest(parseSavePresetFileRequest({ suggestedName: '', payload }));
       const path = requireRequest(parseReadPresetEntryRequest({ ...entry, source: 'user' }));
       if (request.payload.presetType !== path.presetType) throw new Error('Invalid preset type.');
-      if (!isValidPresetPathSegment(path.relativePath.at(-1) ?? '')) return { status: 'invalid-name' };
+      if (!isValidPresetPathSegment(path.relativePath[path.relativePath.length - 1] ?? '')) return { status: 'invalid-name' };
       ensureFileType(path);
       try { await storage.ensureEntry({ ...path, relativePath: path.relativePath.slice(0, -1), entryKind: 'directory' }); }
       catch { return { status: 'missing-folder' }; }

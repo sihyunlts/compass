@@ -69,6 +69,8 @@
 </button>
 
 <style lang="scss">
+  @use '../../styles/color-fallbacks' as colors;
+
   .button {
     border: 0;
     border-radius: var(--radius-6);
@@ -91,7 +93,7 @@
 
       &:disabled {
         opacity: 1;
-        color: color-mix(in oklch, var(--color-text-inverse) 60%, transparent);
+        @include colors.alpha(color, var(--color-text-inverse), var(--color-text-inverse-rgb), 0.6);
       }
     }
 
