@@ -146,8 +146,19 @@ export class PresetStorage {
   public async writePresetFile(filePath: string, payload: PresetFile): Promise<void> {
     await this.enqueuePresetEntryMutation(async () => {
       await mkdir(path.dirname(filePath), { recursive: true });
-      await writeFile(filePath, `${JSON.stringify(serializePresetFile(payload), null, 2)}\n`, 'utf8');
+      await this.replacePresetFile(filePath, payload);
     });
+  }
+
+  private async replacePresetFile(filePath: string, payload: PresetFile): Promise<void> {
+    // Publish complete files so other Compass instances cannot read a partial save.
+    const temporaryPath = path.join(path.dirname(filePath), `.compass-write-${randomUUID()}`);
+    try {
+      await writeFile(temporaryPath, `${JSON.stringify(serializePresetFile(payload), null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+      await rename(temporaryPath, filePath);
+    } finally {
+      await rm(temporaryPath, { force: true });
+    }
   }
 
   public async renamePresetFile(
@@ -211,11 +222,7 @@ export class PresetStorage {
       }
 
       try {
-        await writeFile(
-          targetPath,
-          `${JSON.stringify(serializePresetFile(payload), null, 2)}\n`,
-          'utf8',
-        );
+        await this.replacePresetFile(targetPath, payload);
       } catch (error) {
         if (shouldRename) {
           try {
