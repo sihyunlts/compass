@@ -87,8 +87,18 @@ jobs:
         with:
           path: release-assets
 
+      - name: Setup Node.js for bridge build
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Build Max for Live bridge
+        run: npm run bridge:build
+
       - name: Add Max for Live bridge
-        run: cp max4live/*.amxd release-assets/
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          cp "out/max4live/CompassBridge-v${version}.amxd" release-assets/
 
       - name: Create draft GitHub Release
         env:
