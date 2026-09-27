@@ -154,19 +154,26 @@ export class HardwarePreviewController {
     }
     this.state.error = null;
     try {
-      if (!this.midiAccess?.sysexEnabled) {
+      if (needsMidiAccess) {
+        let midiAccess = this.midiAccess;
         try {
-          this.setMidiAccess(await navigator.requestMIDIAccess({ sysex: true }));
+          midiAccess = await navigator.requestMIDIAccess({ sysex: true });
         } catch {
-          if (!this.midiAccess) {
-            this.setMidiAccess(await navigator.requestMIDIAccess());
+          if (!midiAccess) {
+            try {
+              midiAccess = await navigator.requestMIDIAccess();
+            } catch {
+              this.state.error = 'access-denied';
+              return;
+            }
           }
         }
+        this.setMidiAccess(midiAccess);
       }
       this.syncOutputs();
       await this.selectInitialOutput();
     } catch {
-      this.state.error = 'access-denied';
+      this.state.error = 'initialization-failed';
     } finally {
       if (needsMidiAccess) {
         this.state.isAccessing = false;

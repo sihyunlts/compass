@@ -262,6 +262,7 @@ export const ko = {
   'preview.disableLoop': '미리보기 반복 끄기',
   'preview.enableLoop': '미리보기 반복 켜기',
   'preview.hardware.error.access-denied': 'MIDI 접근이 거부되었습니다',
+  'preview.hardware.error.initialization-failed': 'MIDI 장치를 준비하지 못했습니다',
   'preview.hardware.error.output-open-failed': 'MIDI 출력을 열 수 없습니다',
   'preview.hardware.error.output-disconnected': 'MIDI 출력 연결이 끊겼습니다',
   'preview.hardware.error.output-failed': '하드웨어 출력에 실패했습니다',

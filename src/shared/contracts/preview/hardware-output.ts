@@ -6,6 +6,7 @@ export interface HardwareMidiOutput {
 export type HardwareMidiError =
   | 'unsupported'
   | 'access-denied'
+  | 'initialization-failed'
   | 'output-open-failed'
   | 'output-disconnected'
   | 'output-failed';

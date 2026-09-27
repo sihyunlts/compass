@@ -28,6 +28,7 @@
   const ERROR_MESSAGE_KEYS: Record<HardwareMidiError, MessageKey> = {
     'unsupported': 'preview.hardware.error.unsupported',
     'access-denied': 'preview.hardware.error.access-denied',
+    'initialization-failed': 'preview.hardware.error.initialization-failed',
     'output-open-failed': 'preview.hardware.error.output-open-failed',
     'output-disconnected': 'preview.hardware.error.output-disconnected',
     'output-failed': 'preview.hardware.error.output-failed',

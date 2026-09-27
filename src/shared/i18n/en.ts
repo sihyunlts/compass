@@ -259,6 +259,7 @@ export const en = {
   'preview.disableLoop': 'Disable preview loop',
   'preview.enableLoop': 'Enable preview loop',
   'preview.hardware.error.access-denied': 'MIDI access was denied',
+  'preview.hardware.error.initialization-failed': 'Could not initialize MIDI devices',
   'preview.hardware.error.output-open-failed': 'Could not open MIDI output',
   'preview.hardware.error.output-disconnected': 'MIDI output was disconnected',
   'preview.hardware.error.output-failed': 'Hardware output failed',
