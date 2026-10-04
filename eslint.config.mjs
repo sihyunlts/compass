@@ -12,7 +12,6 @@ export default [
       '**/out/**',
       'tmp/**',
       'max4live/**/*.js',
-      'max4live/embedded/**',
     ],
   },
   js.configs.recommended,

@@ -1,10 +1,10 @@
 import type { CompassApi } from '../../src/shared/contracts/ipc/api';
 import type { FileMethod, FileServiceApi } from './file-protocol';
-import { decodeMaxPacket, encodeMaxPacket, readMaxDictionary, writeMaxPacket } from './dictionary-transport';
+import { decodeMaxPacket, encodeMaxPacket, readMaxDictionary, writeMaxPacket, type MaxPacketDictionary } from './dictionary-transport';
 import type { MaxWebApi } from './web-api';
 
 interface PendingFileRequest {
-  packet: { json: string };
+  packet: MaxPacketDictionary;
   complete: (result?: unknown, error?: string) => void;
   setDialogOpen: (open: boolean) => void;
   submitted: boolean;

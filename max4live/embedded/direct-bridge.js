@@ -87,12 +87,14 @@ function compass_send(requestId) {
   var id = String(requestId);
   if (id !== embeddedRequestId || !embeddedPayload || embeddedApplying) return;
   try {
-    // Dict transports only a JSON string; boolean and array values stay intact.
-    var payloadText = embeddedPayload.get('json');
-    if (typeof payloadText !== 'string') throw new Error('Max received an invalid clip transfer.');
-    var payload = JSON.parse(payloadText);
-    if (!payload || !payload.requestId) throw new Error('Max received an empty transfer dictionary.');
-    if (payload.requestId !== id) throw new Error('Max received a different transfer request ID.');
+    // Reassemble bounded symbols in JS, never in a Max symbol or Dict.stringify().
+    var chunks = embeddedPayload.get('chunks');
+    if (typeof chunks === 'string') chunks = [chunks];
+    if (!Array.isArray(chunks) || !chunks.length || chunks.some(function (chunk) { return typeof chunk !== 'string'; })) {
+      throw new Error('Max received an invalid clip transfer.');
+    }
+    var payload = JSON.parse(chunks.join(''));
+    if (!payload || payload.requestId !== id) throw new Error('Max received a different transfer request ID.');
     if (!payload.envelope || payload.envelope.event !== 'clip_notes.replace' || !Array.isArray(payload.envelope.notes)) {
       throw new Error('Max received incomplete clip data.');
     }
