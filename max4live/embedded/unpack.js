@@ -1,5 +1,6 @@
-// Payload strings contain UTF-8 bytes as character codes 0..255. The builder
-// verifies reconstruction before embedding; no frozen-collective reads are needed.
+// Text chunks have UTF-8 byte lengths verified by the builder. Use Max's native
+// string I/O instead of converting and comparing every byte in legacy JS.
+// https://docs.cycling74.com/legacy/max7/vignettes/jsfileobject
 inlets = 1;
 outlets = 2;
 
@@ -77,27 +78,23 @@ function copyResourceChunk() {
       openResource();
     }
     var resource = resources[resourceIndex];
-    // Yield between batches so extraction or verification does not monopolize Max's UI.
-    for (var batch = 0; batch < 8 && nextChunk < resource.chunks.length; batch += 1) {
+    // Bound work by elapsed time, not file size: fast native I/O should not incur
+    // hundreds of scheduler round trips, while slow disks still yield to Max.
+    var batchStarted = Date.now();
+    do {
       var chunk = resource.chunks[nextChunk];
-      var bytes;
       if (checkingExistingFile) {
-        bytes = resourceFile.readbytes(chunk.length);
-        var matches = bytes.length === chunk.length;
-        for (var j = 0; matches && j < chunk.length; j += 1) matches = bytes[j] === chunk.charCodeAt(j);
-        if (!matches) {
+        if (resourceFile.readstring(chunk.size) !== chunk.text) {
           writeResource();
           continue;
         }
       } else {
-        bytes = new Array(chunk.length);
-        for (var i = 0; i < chunk.length; i += 1) bytes[i] = chunk.charCodeAt(i);
-        resourceFile.writebytes(bytes);
+        resourceFile.writestring(chunk.text);
       }
-      copiedBytes += bytes.length;
+      copiedBytes += chunk.size;
       nextChunk += 1;
       if (resourceFile.position !== copiedBytes) throw new Error('Could not process the complete resource chunk.');
-    }
+    } while (nextChunk < resource.chunks.length && Date.now() - batchStarted < 8);
     if (nextChunk < resource.chunks.length) {
       copyTask.schedule(1);
       return;
@@ -105,14 +102,15 @@ function copyResourceChunk() {
     if (copiedBytes !== resource.size || resourceFile.eof !== resource.size) throw new Error('Incomplete temporary app resource.');
     closeFile();
     releaseResource();
+    // Let CEF parse and render the page while the file service is prepared.
+    if (resourceIndex === 0) outlet(0, 'readfile', outputFolder + '/' + resource.name);
+    else outlet(1, 'files_start', outputFolder + '/' + resource.name);
     resourceIndex += 1;
     if (resourceIndex < resources.length) {
       copyTask.schedule(1);
       return;
     }
     releaseCopyTask();
-    outlet(1, 'files_start', outputFolder + '/' + resources[1].name);
-    outlet(0, 'readfile', outputFolder + '/' + resources[0].name);
   } catch (error) {
     failCopy(error);
   }

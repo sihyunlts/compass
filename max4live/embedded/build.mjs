@@ -84,16 +84,22 @@ const extractedFiles = [
   { name: `compass_embedded_files_${serviceHash}.js`, bytes: serviceBytes },
 ];
 const payload = extractedFiles.map(({ name, bytes }) => {
+  const text = bytes.toString('utf8');
   const chunks = [];
-  for (let start = 0; start < bytes.length; start += 8192) {
-    chunks.push(bytes.subarray(start, start + 8192).toString('latin1'));
+  for (let start = 0; start < text.length;) {
+    let end = Math.min(start + 8192, text.length);
+    const last = text.charCodeAt(end - 1);
+    if (last >= 0xd800 && last <= 0xdbff && end < text.length) end -= 1;
+    const chunk = text.slice(start, end);
+    chunks.push({ text: chunk, size: Buffer.byteLength(chunk, 'utf8') });
+    start = end;
   }
   return { name, size: bytes.length, chunks };
 });
 const payloadLiteral = JSON.stringify(payload).replace(/[\u007f-\uffff]/g,
   (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`);
 for (const [index, file] of JSON.parse(payloadLiteral).entries()) {
-  if (!Buffer.from(file.chunks.join(''), 'latin1').equals(extractedFiles[index].bytes)) {
+  if (!Buffer.from(file.chunks.map((chunk) => chunk.text).join(''), 'utf8').equals(extractedFiles[index].bytes)) {
     throw new Error(`Embedded payload does not reconstruct ${file.name} exactly.`);
   }
 }
