@@ -4,7 +4,7 @@ import {
   insertPathAnchorInSegment,
   deletePathAnchors,
 } from './path-editor-anchor-operations';
-import { PointerCaptureSession } from '../../features/rack/pointer-capture-session';
+import { ControlPointPointerSession, ControlPointSnapFeedback } from './control-point-interaction';
 import { isConsecutiveTap, TAP_WINDOW_MS } from '../../features/drag-gesture';
 import {
   IDENTITY_PATH_TRANSFORM,
@@ -13,7 +13,6 @@ import {
   sanitizePathTransform,
 } from '../../../devices/path/schema';
 import { clonePathAnchors, type PathAnchor, type PathTransform } from '../../../shared/model';
-import { performHapticFeedback } from '../../haptics';
 import { moveBezierHandle, type BezierHandleKind as HandleKind } from '../../../shared/bezier-handles';
 import {
   CONTROL_POINT_DRAG_THRESHOLD_PX,
@@ -49,7 +48,7 @@ import { createPathEditorView } from './path-editor-view.svelte';
 
 /** Owns edit state and gestures; initialize once within the component lifecycle. */
 export const createPathEditorController = (input: PathEditorInput) => {
-  const pointerSession = new PointerCaptureSession<Element>({ onChanged: () => {} });
+  const pointerSession = new ControlPointPointerSession();
   let pointerDownEvent: PointerEvent | null = null;
   let previousTap: PointerEvent | null = null;
   const resolvePressTarget = (event: PointerEvent): Element | null => event.target instanceof Element
@@ -57,8 +56,7 @@ export const createPathEditorController = (input: PathEditorInput) => {
     : null;
   const isRepeatedPress = (event: PointerEvent): boolean => isConsecutiveTap(previousTap, event)
     && previousTap !== null && resolvePressTarget(previousTap) === resolvePressTarget(event);
-  const canBeginPointer = (event: PointerEvent): boolean => !input.readonly && event.isPrimary
-    && event.button === 0 && !pointerSession.isActive();
+  const canBeginPointer = (event: PointerEvent): boolean => !input.readonly && pointerSession.canBegin(event);
   let editorEl = $state<HTMLDivElement | null>(null);
   let localAnchors = $state<PathAnchor[]>(sanitizePathAnchors([]));
   let localClosed = $state(false);
@@ -73,16 +71,7 @@ export const createPathEditorController = (input: PathEditorInput) => {
   let connectionOriginAnchorId = $state<string | null>(null);
   let pendingAppendEndpoint = $state<'start' | 'end' | null>(null);
   let alignmentGuides = $state<AlignmentGuides>({ x: null, y: null });
-  let lastPathSnapSignature: string | null = null;
-
-  const performPathSnapHaptic = (snapSignature: string | null): void => {
-    const reachedNewSnap = snapSignature !== null
-      && snapSignature !== lastPathSnapSignature;
-    if (reachedNewSnap) {
-      performHapticFeedback('alignment');
-    }
-    lastPathSnapSignature = snapSignature;
-  };
+  const snapFeedback = new ControlPointSnapFeedback();
 
   const toWorldPoint = (point: Readonly<EditorPoint>): EditorPoint => transformPoint(point, localTransform);
   const toLocalPoint = (point: Readonly<EditorPoint>): EditorPoint | null => inverseTransformPoint(point, localTransform);
@@ -353,8 +342,9 @@ export const createPathEditorController = (input: PathEditorInput) => {
 
   const beginDrag = (event: PointerEvent, target: DragTarget): void => {
     if (!canBeginPointer(event) || !editorEl) return;
+    snapFeedback.reset();
     pointerDownEvent = event;
-    pointerSession.begin(event.currentTarget instanceof Element ? event.currentTarget : editorEl, event.pointerId);
+    pointerSession.begin(event.currentTarget instanceof Element ? event.currentTarget : editorEl, event);
     editorEl.focus({ preventScroll: true });
     dragTarget = target;
     pointerDownClientX = event.clientX;
@@ -761,7 +751,7 @@ export const createPathEditorController = (input: PathEditorInput) => {
       event.shiftKey,
       !event.ctrlKey,
     ));
-    performPathSnapHaptic(scaleSnapSignature);
+    snapFeedback.update(scaleSnapSignature);
   };
 
   const updateSelectedAnchorsDrag = (
@@ -784,7 +774,7 @@ export const createPathEditorController = (input: PathEditorInput) => {
       alignmentGuides = update.alignmentGuides;
       emitGeometry(update.anchors, localClosed, false);
     }
-    performPathSnapHaptic([
+    snapFeedback.update([
       alignmentGuides.x === null ? '' : `x:${alignmentGuides.x}`,
       alignmentGuides.y === null ? '' : `y:${alignmentGuides.y}`,
     ].filter(Boolean).join('|') || null);
@@ -805,7 +795,7 @@ export const createPathEditorController = (input: PathEditorInput) => {
       event.shiftKey,
       !event.ctrlKey,
     ));
-    performPathSnapHaptic([
+    snapFeedback.update([
       alignmentGuides.x === null ? '' : `x:${alignmentGuides.x}`,
       alignmentGuides.y === null ? '' : `y:${alignmentGuides.y}`,
     ].filter(Boolean).join('|') || null);
@@ -831,7 +821,7 @@ export const createPathEditorController = (input: PathEditorInput) => {
       event.shiftKey,
       !event.ctrlKey,
     ));
-    performPathSnapHaptic(rotationSnapSignature);
+    snapFeedback.update(rotationSnapSignature);
   };
 
   const updateAnchorDrag = (
@@ -850,13 +840,13 @@ export const createPathEditorController = (input: PathEditorInput) => {
       target.anchorId,
       mergeTarget ? { x: mergeTarget.x, y: mergeTarget.y } : point,
     );
-    performPathSnapHaptic(mergeTarget
+    snapFeedback.update(mergeTarget
       ? `merge:${mergeTarget.id}`
       : snapSignature);
   };
 
   const handlePointerMove = (event: PointerEvent): void => {
-    if (!pointerSession.matches(event.pointerId) || !dragTarget) {
+    if (!dragTarget) {
       return;
     }
     if (!pointerDidMove && hasExceededControlPointDragThreshold(
@@ -912,12 +902,12 @@ export const createPathEditorController = (input: PathEditorInput) => {
           point,
           false,
         );
-        performPathSnapHaptic(snappedPoint?.snapSignature ?? null);
+        snapFeedback.update(snappedPoint?.snapSignature ?? null);
         break;
       case 'handle':
         pendingMergeTargetId = null;
         moveHandle(dragTarget.anchorId, dragTarget.handleKind, point, event.altKey);
-        performPathSnapHaptic(snappedPoint?.snapSignature ?? null);
+        snapFeedback.update(snappedPoint?.snapSignature ?? null);
         break;
     }
   };
@@ -959,21 +949,15 @@ export const createPathEditorController = (input: PathEditorInput) => {
       emitGeometry(localAnchors, localClosed, true);
     }
     pointerDidMove = false;
-    lastPathSnapSignature = null;
+    snapFeedback.reset();
   };
 
   const handlePointerUp = (event: PointerEvent): void => {
-    if (!pointerSession.matches(event.pointerId)) return;
     previousTap = pointerDownEvent && !pointerDidMove
       && event.timeStamp - pointerDownEvent.timeStamp <= TAP_WINDOW_MS
       && !isRepeatedPress(pointerDownEvent) ? pointerDownEvent : null;
     finishDrag(false);
   };
-  const handlePointerCancel = (event: PointerEvent): void => {
-    if (pointerSession.matches(event.pointerId)) finishDrag(true);
-  };
-  const handleWindowBlur = (): void => { finishDrag(true); };
-
   const handleWindowPointerDown = (event: PointerEvent): void => {
     if (input.readonly || !editorEl) {
       return;
@@ -987,21 +971,12 @@ export const createPathEditorController = (input: PathEditorInput) => {
     editorEl.blur();
   };
 
-  $effect(() => {
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerCancel);
-    window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('pointerdown', handleWindowPointerDown, { capture: true });
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerCancel);
-      window.removeEventListener('blur', handleWindowBlur);
-      pointerSession.finish();
-      window.removeEventListener('pointerdown', handleWindowPointerDown, true);
-    };
-  });
+  $effect(() => pointerSession.listen({
+    move: handlePointerMove,
+    up: handlePointerUp,
+    cancel: () => finishDrag(true),
+    outsidePress: handleWindowPointerDown,
+  }));
   return {
     view,
     get element() { return editorEl; },

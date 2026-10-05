@@ -5,7 +5,7 @@
    * Interactive curve editor shared by modulation and time-warp device cards.
    * Owns node editing and paired Bézier handles for shared curve controls.
    */
-  import { PointerCaptureSession } from '../../features/rack/pointer-capture-session';
+  import { ControlPointPointerSession, ControlPointSnapFeedback } from './control-point-interaction';
   import type { RendererControlChange } from '../../../devices/control-types';
   import {
     buildCurveSegments,
@@ -26,7 +26,6 @@
   import FloatingDropdown from '../primitives/FloatingDropdown.svelte';
   import type { DropdownValue } from '../primitives/dropdown-types';
   import FieldShell from '../fields/FieldShell.svelte';
-  import { performHapticFeedback } from '../../haptics';
   import {
     CONTROL_POINT_DRAG_THRESHOLD_PX,
     hasExceededControlPointDragThreshold,
@@ -93,7 +92,7 @@
     onControlChange: (change: RendererControlChange) => void;
   }>();
 
-  const pointerSession = new PointerCaptureSession<HTMLDivElement>({ onChanged: () => {} });
+  const pointerSession = new ControlPointPointerSession();
   let editorEl = $state<HTMLDivElement | null>(null);
   let selectedNodeId = $state<string | null>(null);
   let dragTarget = $state<DragTarget>(null);
@@ -106,8 +105,7 @@
   let localNodes = $state<CurveNode[]>([]);
   let isKeyboardDeleteEnabled = $state(false);
   let divisionsMenuPoint = $state<{ x: number; y: number } | null>(null);
-  let lastDragSnapSignature: string | null = null;
-  let hasInitializedDragSnap = false;
+  const snapFeedback = new ControlPointSnapFeedback();
 
   const NODE_DOUBLE_CLICK_WINDOW_MS = 300;
 
@@ -266,18 +264,6 @@
     targets.v !== null && roundCurveNumber(point.v) === targets.v ? `y:${targets.v}` : '',
   ].filter(Boolean).join('|') || null;
 
-  const performCurveSnapHaptic = (snapSignature: string | null): void => {
-    if (!hasInitializedDragSnap) {
-      hasInitializedDragSnap = true;
-      lastDragSnapSignature = snapSignature;
-      return;
-    }
-    if (snapSignature !== null && snapSignature !== lastDragSnapSignature) {
-      performHapticFeedback('alignment');
-    }
-    lastDragSnapSignature = snapSignature;
-  };
-
   const insertNodeAtPoint = (
     point: SnappedCurvePoint,
   ): void => {
@@ -293,10 +279,6 @@
       v: point.v,
     };
     emitNodes([...localNodes, nextNode]);
-    const insertedNode = localNodes.find((node) => node.id === nextNode.id);
-    if (insertedNode && resolveAppliedSnapSignature(insertedNode, point.snapTargets)) {
-      performHapticFeedback('alignment');
-    }
     selectedNodeId = nextNode.id;
   };
 
@@ -316,18 +298,17 @@
 
   const beginDrag = (event: PointerEvent, nextTarget: DragTarget): void => {
     if (!editorEl) return;
-    pointerSession.begin(editorEl, event.pointerId);
+    pointerSession.begin(editorEl, event);
     dragTarget = nextTarget;
     pointerDownClientX = event.clientX;
     pointerDownClientY = event.clientY;
     pointerDidMove = false;
-    lastDragSnapSignature = null;
-    hasInitializedDragSnap = false;
+    snapFeedback.reset();
     event.preventDefault();
   };
 
   const handleNodePointerDown = (event: PointerEvent, nodeId: string): void => {
-    if (event.button !== 0 || !event.isPrimary || pointerSession.isActive()) {
+    if (!pointerSession.canBegin(event)) {
       return;
     }
 
@@ -338,31 +319,13 @@
   };
 
   const handleHandlePointerDown = (event: PointerEvent, nodeId: string, handleKind: HandleKind): void => {
-    if (event.button !== 0 || !event.isPrimary || pointerSession.isActive()) return;
+    if (!pointerSession.canBegin(event)) return;
     isKeyboardDeleteEnabled = true;
     activePointerNodeId = null;
     beginDrag(event, { kind: 'handle', nodeId, handleKind });
   };
 
-  const markPointerMovedIfNeeded = (clientX: number, clientY: number): void => {
-    if (
-      !pointerDidMove
-      && (
-        hasExceededControlPointDragThreshold(
-          clientX,
-          clientY,
-          pointerDownClientX,
-          pointerDownClientY,
-        )
-      )
-    ) {
-      pointerDidMove = true;
-    }
-  };
-
   const updateDraggingNode = (nodeId: string, clientX: number, clientY: number): void => {
-    markPointerMovedIfNeeded(clientX, clientY);
-
     const point = resolvePoint(clientX, clientY);
     if (!point) {
       return;
@@ -390,7 +353,7 @@
       : node);
     emitNodes(next);
     const appliedNode = localNodes.find((node) => node.id === nodeId);
-    performCurveSnapHaptic(appliedNode ? resolveAppliedSnapSignature(appliedNode, {
+    snapFeedback.update(appliedNode ? resolveAppliedSnapSignature(appliedNode, {
       t: isEndpoint ? null : point.snapTargets.t,
       v: point.snapTargets.v,
     }) : null);
@@ -413,7 +376,6 @@
     event: PointerEvent,
     independent = event.altKey,
   ): void => {
-    markPointerMovedIfNeeded(event.clientX, event.clientY);
     const point = resolvePoint(event.clientX, event.clientY, { snapToDivisions: false, snapToCenterLine: false });
     const index = localNodes.findIndex((node) => node.id === nodeId);
     if (!point || index < 0) return;
@@ -438,8 +400,7 @@
     dragTarget = null;
     activePointerNodeId = null;
     pointerDidMove = false;
-    lastDragSnapSignature = null;
-    hasInitializedDragSnap = false;
+    snapFeedback.reset();
   };
 
   const handleEditorDoubleClick = (event: MouseEvent): void => {
@@ -506,8 +467,18 @@
 
   $effect(() => {
     const handlePointerMove = (event: PointerEvent): void => {
-      if (!pointerSession.matches(event.pointerId) || !dragTarget) {
+      if (!dragTarget) {
         return;
+      }
+
+      if (!pointerDidMove) {
+        pointerDidMove = hasExceededControlPointDragThreshold(
+          event.clientX,
+          event.clientY,
+          pointerDownClientX,
+          pointerDownClientY,
+        );
+        if (!pointerDidMove) return;
       }
 
       const target = dragTarget;
@@ -530,10 +501,6 @@
     };
 
     const handlePointerUp = (event: PointerEvent): void => {
-      if (!pointerSession.matches(event.pointerId)) {
-        return;
-      }
-
       if (activePointerNodeId && !pointerDidMove) {
         if (
           lastClickedNodeId === activePointerNodeId
@@ -568,22 +535,12 @@
       lastClickedAt = 0;
     };
 
-    window.addEventListener('pointerdown', handleWindowPointerDown, { capture: true });
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    const cancelPointer = (event: PointerEvent): void => {
-      if (pointerSession.matches(event.pointerId)) clearPointerState();
-    };
-    window.addEventListener('pointercancel', cancelPointer);
-    window.addEventListener('blur', clearPointerState);
-    return () => {
-      window.removeEventListener('pointerdown', handleWindowPointerDown, true);
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', cancelPointer);
-      window.removeEventListener('blur', clearPointerState);
-      pointerSession.finish();
-    };
+    return pointerSession.listen({
+      move: handlePointerMove,
+      up: handlePointerUp,
+      cancel: clearPointerState,
+      outsidePress: handleWindowPointerDown,
+    });
   });
 
   $effect(() => {
