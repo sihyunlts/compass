@@ -1,0 +1,9 @@
+@font-face {
+  font-family: 'Noto Sans CJK Variable';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  // Restrict this face to CJK so Latin letters and numbers use Interlude.
+  unicode-range: U+1100-11FF, U+2E80-33FF, U+3400-4DBF, U+4E00-9FFF, U+A960-A97F, U+AC00-D7FF, U+F900-FAFF, U+FE10-FE1F, U+FE30-FE4F, U+FF00-FFEF, U+1AFF0-1B16F, U+20000-323AF;
+  src: url('../../assets/fonts/noto-sans-cjk/NotoSansCJK-VF.woff2') format('woff2');
+}

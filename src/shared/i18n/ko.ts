@@ -238,6 +238,7 @@ export const ko = {
   'history.undoUnavailable': '실행 취소할 수 없음',
   'language.english': 'English',
   'language.korean': '한국어',
+  'language.chineseSimplified': '简体中文',
   'menu.aboutApp': '{app} 정보',
   'menu.bringAllToFront': '모두 앞으로 가져오기',
   'menu.closeWindow': '윈도우 닫기',

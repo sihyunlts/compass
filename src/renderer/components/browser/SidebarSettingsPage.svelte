@@ -79,6 +79,7 @@
   const localeOptions = $derived<readonly DropdownOption[]>([
     { value: 'en', label: i18n.t('language.english') },
     { value: 'ko', label: i18n.t('language.korean') },
+    { value: 'zh-Hans', label: i18n.t('language.chineseSimplified') },
   ]);
   const themeOptions = $derived<readonly DropdownOption[]>(
     THEME_PRESETS.map((preset) => ({

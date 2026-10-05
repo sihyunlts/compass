@@ -235,6 +235,7 @@ export const en = {
   'history.undoUnavailable': 'Undo unavailable',
   'language.english': 'English',
   'language.korean': '한국어',
+  'language.chineseSimplified': '简体中文',
   'menu.aboutApp': 'About {app}',
   'menu.bringAllToFront': 'Bring All to Front',
   'menu.closeWindow': 'Close Window',
