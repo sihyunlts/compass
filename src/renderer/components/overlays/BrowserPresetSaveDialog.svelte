@@ -4,7 +4,7 @@
   import { isDeviceBrowserSystemDirectoryPath } from '../../../devices/browser-categories';
   import type { PresetBrowserTreeFolderNode, PresetBrowserTreeNode } from '../../../shared/contracts/ipc/presets';
   import type { PendingPresetFolderDraft } from '../../features/browser/types';
-  import type { PresetController } from '../../app/preset-controller.svelte';
+  import type { PresetBrowserController } from '../../app/preset-browser-controller.svelte';
   import { resolvePresetNameFromFileName } from '../../../shared/preset/file';
   import { arePresetPathsEqual } from '../../../shared/preset/entry-selection';
   import { browserPresetSaveDialog as dialog } from '../../app/browser-preset-save-dialog.svelte';
@@ -36,7 +36,7 @@
     presetTree: readonly PresetBrowserTreeFolderNode[];
     menuActions: Pick<ComponentProps<typeof ContextMenu>,
       'onCopy' | 'onDelete' | 'onDuplicate' | 'onInfo' | 'onPaste' | 'onShowInFolder'>;
-    onCommitEntryDraft: PresetController['commitPresetEntryDraft'];
+    onCommitEntryDraft: PresetBrowserController['commitPresetEntryDraft'];
   }>();
 
   let name = $state('');

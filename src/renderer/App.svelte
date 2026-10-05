@@ -40,7 +40,8 @@
   import ModalDialog from './components/overlays/ModalDialog.svelte';
   import AuthoredInfoDialog from './components/overlays/AuthoredInfoDialog.svelte';
   import WorkspaceRackTitle from './components/rack/WorkspaceRackTitle.svelte';
-  import { createPresetController } from './app/preset-controller.svelte';
+  import { createPresetBrowserController } from './app/preset-browser-controller.svelte';
+  import { createRackDocumentController } from './app/rack-document-controller.svelte';
   import { createSettingsController } from './app/settings-controller.svelte';
   import { mountBridgeSubscriptions } from './app/bridge-subscriptions';
   import { resolveCompassBridge } from './app/browser-bridge';
@@ -138,7 +139,14 @@
       uiState.headerIndicatorText = '';
     },
   });
-  const presetController = createPresetController({
+  const rackDocument = createRackDocumentController({
+    bridgeClient,
+    editorSession,
+    showMessage: (message) => headerIndicator.show(message),
+    onFileChanged: () => presetController.loadTree(),
+  });
+  const presetController = createPresetBrowserController({
+    rackDocument,
     bridgeClient,
     editorSession,
     isWebFallback,
@@ -150,6 +158,7 @@
     bridgeClient,
     editorSession,
     presetController,
+    rackDocument,
     showMessage: (message) => {
       headerIndicator.show(message);
     },
@@ -160,6 +169,7 @@
     editorSession,
   });
   const presetState = presetController.state;
+  const rackDocumentState = rackDocument.state;
   const settingsState = settingsController.state;
   const paletteDescription = $derived.by(() => {
     if (settingsState.paletteDescriptionOverride) {
@@ -205,7 +215,7 @@
     resolveHardwareOutputState: () => hardwarePreview.createOutputStateSnapshot(),
     resolvePreviewVisual: ({ elapsedMs, launchpadModel }) => {
       if (
-        presetState.currentRackDisplayName.trim().toLowerCase() !== 'bad apple'
+        rackDocumentState.currentRackDisplayName.trim().toLowerCase() !== 'bad apple'
         || !badAppleAnimation
       ) {
         return null;
@@ -235,10 +245,10 @@
   let rackMiniMapContentRevision = $state(0);
   const currentPreviewBeatBeats = $derived(playbackSession.state.currentBeat);
   const isKaguyaRack = $derived(
-    presetState.currentRackDisplayName.trim().toLowerCase() === 'kaguya',
+    rackDocumentState.currentRackDisplayName.trim().toLowerCase() === 'kaguya',
   );
   const isBadAppleRack = $derived(
-    presetState.currentRackDisplayName.trim().toLowerCase() === 'bad apple',
+    rackDocumentState.currentRackDisplayName.trim().toLowerCase() === 'bad apple',
   );
   const currentPreviewProgress01 = $derived.by(() => {
     const sourceTimelineEndBeat = previewState.sourceTimelineEndBeat;
@@ -252,9 +262,9 @@
   $effect(() => {
     void uiState.chainRevision;
     void uiState.collapsedDeviceIds;
-    void presetState.currentRackFilePath;
-    void presetState.isRackDirty;
-    presetController.syncMainWindowDocumentState();
+    void rackDocumentState.currentRackFilePath;
+    void rackDocumentState.isRackDirty;
+    rackDocument.syncMainWindowDocumentState();
   });
 
   $effect(() => {
@@ -373,7 +383,7 @@
 
   const confirmRackRevertDialog = (): void => {
     isRackRevertDialogOpen = false;
-    presetController.handleRevertRack();
+    rackDocument.handleRevertRack();
   };
 
   const handlePreviewLengthChange = (nextValue: string | number): void => {
@@ -514,16 +524,16 @@
       platform: bridgeClient.platform,
       closeContextMenu,
       interactiveElementSelector: INTERACTIVE_ELEMENT_SELECTOR,
-      onNewRack: () => presetController.handleNewRack(),
-      onSaveRack: () => presetController.handleSaveRack(),
-      onSaveRackAs: () => presetController.handleSaveRackAs(),
+      onNewRack: () => rackDocument.handleNewRack(),
+      onSaveRack: () => rackDocument.handleSaveRack(),
+      onSaveRackAs: () => rackDocument.handleSaveRackAs(),
       onBeforeUnload: () => {
         disposeBridgeSubscriptions();
         hardwarePreview.dispose();
       },
     });
     const disposeMainWindowCloseRequest = bridgeClient.subscribeMainWindowCloseRequest(() => {
-      void presetController.handleMainWindowCloseRequest();
+      void rackDocument.handleMainWindowCloseRequest();
     });
     const disposePresetBrowserTreeChanged =
       bridgeClient.subscribePresetBrowserTreeChanged(() => {
@@ -532,16 +542,16 @@
     const disposeMainWindowRackFileMenuRequest = bridgeClient.subscribeMainWindowRackFileMenuRequest(
       (action) => {
         if (action === 'new') {
-          void presetController.handleNewRack();
+          void rackDocument.handleNewRack();
           return;
         }
 
         if (action === 'save') {
-          void presetController.handleSaveRack();
+          void rackDocument.handleSaveRack();
           return;
         }
 
-        void presetController.handleSaveRackAs();
+        void rackDocument.handleSaveRackAs();
       },
     );
     const disposePreviewWindowControlRequest = bridgeClient.subscribePreviewWindowControlRequest(
@@ -552,7 +562,7 @@
         }
 
         if (request.action === 'deliver') {
-          void resultDeliveryFlow.deliver(presetState.currentRackDisplayName);
+          void resultDeliveryFlow.deliver(rackDocumentState.currentRackDisplayName);
           return;
         }
 
@@ -664,7 +674,7 @@
       onMainWindowAlwaysOnTopToggle={() => void handleMainWindowAlwaysOnTopToggle()}
       onLocaleChange={(locale) => {
         i18n.setLocale(locale);
-        presetController.syncLocaleDependentDefaults();
+        rackDocument.syncLocaleDependentDefaults();
         playbackSession.renderPreviewFrame();
         void bridgeClient.setApplicationLocale(locale);
       }}
@@ -733,15 +743,15 @@
           />
 
           <WorkspaceRackTitle
-            title={presetState.currentRackDisplayName}
+            title={rackDocumentState.currentRackDisplayName}
             platform={bridgeClient.platform}
-            dirty={presetState.isRackDirty}
-            disabled={presetState.isRackPresetLoadPending}
-            onNewRack={() => presetController.handleNewRack()}
-            onSaveRack={() => presetController.handleSaveRack()}
-            onSaveRackAs={() => presetController.handleSaveRackAs()}
+            dirty={rackDocumentState.isRackDirty}
+            disabled={rackDocumentState.isTransitionPending}
+            onNewRack={() => rackDocument.handleNewRack()}
+            onSaveRack={() => rackDocument.handleSaveRack()}
+            onSaveRackAs={() => rackDocument.handleSaveRackAs()}
             onRevertRack={openRackRevertDialog}
-            canRevertRack={presetState.canRevertRack && presetState.isRackDirty}
+            canRevertRack={rackDocumentState.canRevertRack && rackDocumentState.isRackDirty}
             onEditRackInfo={authoredInfoController.openRack}
           />
 
@@ -796,8 +806,8 @@
             disabled={uiState.isDelivering}
             showMidiSave={!isWebFallback && settingsState.showMidiSaveButton}
             onDeliver={() =>
-              resultDeliveryFlow.deliver(presetState.currentRackDisplayName)}
-            onSaveMidi={() => resultDeliveryFlow.saveMidi(presetState.currentRackDisplayName)}
+              resultDeliveryFlow.deliver(rackDocumentState.currentRackDisplayName)}
+            onSaveMidi={() => resultDeliveryFlow.saveMidi(rackDocumentState.currentRackDisplayName)}
           />
         </div>
       </header>
@@ -934,19 +944,17 @@
   />
 
   <ModalDialog
-    open={presetState.pendingRackPresetLoadTarget !== null}
-    title={presetState.pendingRackPresetLoadTarget
-      ? presetController.getRackSavePromptTitle(presetState.pendingRackPresetLoadTarget)
+    open={rackDocumentState.pendingTransition !== null}
+    title={rackDocumentState.pendingTransition
+      ? rackDocument.getRackSavePromptTitle(rackDocumentState.pendingTransition)
       : ''}
-    description={presetState.pendingRackPresetLoadTarget
-      ? presetController.getRackPresetLoadDescription(presetState.pendingRackPresetLoadTarget)
-      : null}
+    description={i18n.t('rack.unsavedChangesLost')}
     confirmLabel={i18n.t('rack.save')}
     secondaryLabel={i18n.t('rack.dontSave')}
     cancelLabel={i18n.t('app.cancel')}
-    busy={presetState.isRackPresetLoadPending}
+    busy={rackDocumentState.isTransitionPending}
     defaultAction="confirm"
-    onConfirm={() => presetController.confirmRackSaveBeforeLoad()}
-    onSecondary={() => presetController.confirmRackDiscardBeforeLoad()}
-    onCancel={() => presetController.closeRackPresetLoadDialog()}
+    onConfirm={() => rackDocument.confirmSaveBeforeTransition()}
+    onSecondary={() => rackDocument.confirmDiscardBeforeTransition()}
+    onCancel={() => rackDocument.cancelTransition()}
   />
