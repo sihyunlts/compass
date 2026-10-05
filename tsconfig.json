@@ -5,8 +5,8 @@
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
+    "strict": false,
     "noImplicitAny": true,
-    "baseUrl": ".",
     "outDir": "dist",
     "moduleResolution": "bundler",
     "resolveJsonModule": true
