@@ -6,6 +6,7 @@
 
   /* Form elements do not inherit font-family by default */
   font-family: inherit;
+  letter-spacing: inherit;
 
   /* Hide scrollbars */
   scrollbar-width: none;
@@ -55,7 +56,9 @@ html, body {
   height: 100vh;
   background: var(--color-background);
   color: var(--color-text-primary);
-  font-family: "Pretendard JP Variable", "Pretendard JP", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Hiragino Sans", "Apple SD Gothic Neo", Meiryo, "Noto Sans JP", "Noto Sans KR", "Malgun Gothic", Osaka, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
+  font-family: "Interlude Variable", "Pretendard JP Variable", "Pretendard JP", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Hiragino Sans", "Apple SD Gothic Neo", Meiryo, "Noto Sans JP", "Noto Sans KR", "Malgun Gothic", Osaka, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
   overflow: hidden;
 }
 

@@ -1,3 +1,4 @@
+import 'interlude-ui/css/dynamic-subset';
 import './renderer/styles/index.scss';
 import { bootstrapMainWindow } from './renderer/bootstrap';
 import { bootstrapPreviewWindow } from './renderer/preview-window/bootstrap';
