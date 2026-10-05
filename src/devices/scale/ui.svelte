@@ -1,13 +1,17 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver } from '../../renderer/device-i18n';
+  import { scaleDeviceControls } from './controls';
+
   import type { GeneratorDeviceNode } from '../../shared/model';
   import CenterPointPicker from '../../renderer/components/controls/CenterPointPicker.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { SCALE_NUMERIC_PARAMETERS } from './schema';
-  import { i18n } from '../../renderer/i18n.svelte';
+
+  const controlLabel = createDeviceControlLabelResolver(scaleDeviceControls);
 
   type ScaleDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'scale' }>;
@@ -29,7 +33,7 @@
   {/snippet}
   {#snippet settings()}
     <NumberField
-      label={i18n.t('control.scaleX')}
+      label={controlLabel('set-scale-param', 'scaleX')}
       parameter={SCALE_NUMERIC_PARAMETERS.scaleX}
       value={device.params.scaleX}
       dataAction="set-scale-param"
@@ -39,7 +43,7 @@
       {onControlChange}
     />
     <NumberField
-      label={i18n.t('control.scaleY')}
+      label={controlLabel('set-scale-param', 'scaleY')}
       parameter={SCALE_NUMERIC_PARAMETERS.scaleY}
       value={device.params.scaleY}
       dataAction="set-scale-param"

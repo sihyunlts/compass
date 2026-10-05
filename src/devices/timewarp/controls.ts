@@ -9,9 +9,11 @@ import { sanitizeTimeWarpCurveNodes } from '../../core/timewarp/curve';
 export const timeWarpDeviceControls = {
   descriptors: {
     'set-timewarp-divisions': {
+      parameterLabel: 'control.divisions',
       resolveMergeKey: createMergeKeyResolver('set-timewarp-divisions'),
     },
     'set-timewarp-curve-nodes': {
+      parameterLabel: 'tab.curve',
       resolveMergeKey: createMergeKeyResolver('set-timewarp-curve-nodes'),
     },
   },

@@ -1,6 +1,9 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver } from '../../renderer/device-i18n';
+  import { pathDeviceControls } from './controls';
+
   import {
     COMPOSITION_CENTER,
   } from '../../core/geometry';
@@ -17,6 +20,8 @@
   import {
     resolvePathTransformMetrics,
   } from './transform';
+
+  const controlLabel = createDeviceControlLabelResolver(pathDeviceControls);
 
   type PathDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'path' }>;
@@ -182,13 +187,13 @@
           {onControlChange}
         />
         <FieldShell
-          label={i18n.t('control.pathFill')}
+          label={controlLabel('set-path-fill')}
           fill={true}
           class="path-paired-field"
         >
           <Switch
             checked={device.params.fill}
-            label={i18n.t('control.pathFill')}
+            label={controlLabel('set-path-fill')}
             disabled={device.params.anchors.length < 3}
             onCheckedChange={(checked) => onControlChange({
               action: 'set-path-fill',
@@ -200,10 +205,10 @@
         </FieldShell>
       </div>
     {:else}
-      <FieldShell label={i18n.t('control.pathAnimate')}>
+      <FieldShell label={controlLabel('set-path-animation-enabled')}>
         <Switch
           checked={device.params.animation.enabled}
-          label={i18n.t('control.pathAnimate')}
+          label={controlLabel('set-path-animation-enabled')}
           onCheckedChange={(checked) => onControlChange({
             action: 'set-path-animation-enabled',
             deviceId: device.id,
@@ -213,14 +218,14 @@
         />
       </FieldShell>
       <SelectField
-        label={i18n.t('control.pathDirection')}
+        label={controlLabel('set-path-animation-direction')}
         value={device.params.animation.direction}
         options={directionOptions}
         dataAction="set-path-animation-direction"
         dataId={device.id}
         onControlChange={onControlChange}
       />
-      <FieldShell label={i18n.t('control.pathStartPoint')}>
+      <FieldShell label={controlLabel('set-path-animation-start-anchor')}>
         <span class="path-start-value">
           {device.params.closed
             ? i18n.t('control.pathAnchorValue', {

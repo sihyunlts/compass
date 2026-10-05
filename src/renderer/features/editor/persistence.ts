@@ -37,8 +37,8 @@ export const createInitialEditorState = (): EditorSessionState => {
     clipboardAvailable: false,
     canUndo: false,
     canRedo: false,
-    undoActionKind: null,
-    redoActionKind: null,
+    undoAction: null,
+    redoAction: null,
   };
 };
 

@@ -19,6 +19,10 @@ const isRepeatDevice = (
 export const repeatDeviceControls = {
   descriptors: {
     'set-repeat-param': {
+      parameterLabel: {
+        count: 'control.repeats',
+        intervalPercent: 'control.interval',
+      },
       resolveMergeKey: createMergeKeyResolver('set-repeat-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         REPEAT_NUMERIC_PARAMETERS,

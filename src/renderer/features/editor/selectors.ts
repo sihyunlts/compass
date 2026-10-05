@@ -7,7 +7,7 @@ import type { GeneratorChain } from '../../../shared/model';
 import { normalizeOptionalId } from '../../../shared/normalize-id';
 import { resolveExistingOrderedDeviceIds } from './chain-ops';
 import { sanitizePreviewBpm } from './persistence-storage';
-import type { ChainHistoryKind } from './history-core';
+import type { ChainHistoryAction } from './history-core';
 
 export type RackSelectionItemSnapshot =
   | {
@@ -31,13 +31,13 @@ export const selectPreviewBpmText = (previewBpm: number): string =>
 export const selectHistoryControls = (state: {
   canUndo: boolean;
   canRedo: boolean;
-  undoActionKind: ChainHistoryKind | null;
-  redoActionKind: ChainHistoryKind | null;
+  undoAction: ChainHistoryAction | null;
+  redoAction: ChainHistoryAction | null;
 }) => ({
   canUndo: state.canUndo,
   canRedo: state.canRedo,
-  undoActionKind: state.undoActionKind,
-  redoActionKind: state.redoActionKind,
+  undoAction: state.undoAction,
+  redoAction: state.redoAction,
 });
 
 export const selectClipboardAvailable = (state: {

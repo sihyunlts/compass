@@ -23,9 +23,17 @@ const PATH_TRANSFORM_PARAM_KEYS = ['x', 'y', 'rotation', 'width', 'height'] as c
 export const pathDeviceControls = {
   descriptors: {
     'set-path-geometry': {
+      parameterLabel: 'tab.path',
       resolveMergeKey: createMergeKeyResolver('set-path-geometry'),
     },
     'set-path-transform-param': {
+      parameterLabel: {
+        x: 'control.offsetX',
+        y: 'control.offsetY',
+        rotation: 'control.rotation',
+        width: 'control.width',
+        height: 'control.height',
+      },
       resolveMergeKey: createMergeKeyResolver(
         'set-path-transform-param',
         resolveNumericControlParam,
@@ -46,15 +54,19 @@ export const pathDeviceControls = {
       },
     },
     'set-path-fill': {
+      parameterLabel: 'control.pathFill',
       resolveMergeKey: createMergeKeyResolver('set-path-fill'),
     },
     'set-path-animation-enabled': {
+      parameterLabel: 'control.pathAnimate',
       resolveMergeKey: createMergeKeyResolver('set-path-animation-enabled'),
     },
     'set-path-animation-direction': {
+      parameterLabel: 'control.pathDirection',
       resolveMergeKey: createMergeKeyResolver('set-path-animation-direction'),
     },
     'set-path-animation-start-anchor': {
+      parameterLabel: 'control.pathStartPoint',
       resolveMergeKey: createMergeKeyResolver('set-path-animation-start-anchor'),
     },
   },

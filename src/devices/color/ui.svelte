@@ -1,6 +1,9 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver } from '../../renderer/device-i18n';
+  import { colorDeviceControls } from './controls';
+
   import type { GeneratorDeviceNode } from '../../shared/model';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import { resolveLedSurfaceRgb } from '../../shared/led-surface-color';
@@ -10,10 +13,11 @@
     COLOR_SLOT_COUNT_DRAG_PIXELS_PER_STEP,
     MAX_COLOR_SLOT_COUNT,
   } from './schema';
-  import { i18n } from '../../renderer/i18n.svelte';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
   import DeviceControlColumn from '../../renderer/components/rack/DeviceControlColumn.svelte';
   import { hint } from '../../renderer/components/overlays/hint';
+
+  const controlLabel = createDeviceControlLabelResolver(colorDeviceControls);
 
   const BLACK_RGB = '0 0 0';
 
@@ -92,7 +96,7 @@
 <DeviceBodyLayout kind="content">
   <DeviceControlColumn>
     <NumberField
-      label={i18n.t('control.noteLength')}
+      label={controlLabel('set-color-note-length-percent')}
       parameter={COLOR_NUMERIC_PARAMETERS.noteLengthPercent}
       value={device.params.noteLengthPercent}
       dataAction="set-color-note-length-percent"
@@ -103,7 +107,7 @@
     />
 
     <NumberField
-      label={i18n.t('control.gap')}
+      label={controlLabel('set-color-gap-percent')}
       parameter={COLOR_NUMERIC_PARAMETERS.gapPercent}
       value={device.params.gapPercent}
       dataAction="set-color-gap-percent"
@@ -114,7 +118,7 @@
     />
 
     <NumberField
-      label={i18n.t('control.colors')}
+      label={controlLabel('set-color-slot')}
       min="1"
       max={String(MAX_COLOR_SLOT_COUNT)}
       step="1"
@@ -122,7 +126,7 @@
       value={device.params.velocities.length}
       dataAction="set-color-slot-count"
       dataId={device.id}
-      ariaLabel={i18n.t('control.colors')}
+      ariaLabel={controlLabel('set-color-slot')}
       {onControlChange}
     />
   </DeviceControlColumn>

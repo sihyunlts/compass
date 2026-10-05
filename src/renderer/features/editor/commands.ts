@@ -51,7 +51,7 @@ export const EDITOR_HISTORY_META = {
   insertDevicePreset: { kind: 'insert-device-preset' },
   insertGroupPreset: { kind: 'insert-group-preset' },
   loadRackPreset: { kind: 'load-rack-preset' },
-  deviceToggleEnabled: { kind: 'control-edit', finalize: true },
+  deviceToggleEnabled: { kind: 'control-edit', parameterLabelKey: 'control.deviceEnabled', finalize: true },
 } as const satisfies Record<string, ChainMutationMeta>;
 
 const allocateDeviceId = (kind: GeneratorDeviceNode['kind']): string =>

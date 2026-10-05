@@ -21,12 +21,18 @@ const isSymmetryDevice = (
 export const symmetryDeviceControls = {
   descriptors: {
     'set-symmetry-mode': {
+      parameterLabel: 'control.symmetryMode',
       resolveMergeKey: createMergeKeyResolver('set-symmetry-mode'),
     },
     'set-symmetry-source-scope': {
+      parameterLabel: 'control.symmetrySource',
       resolveMergeKey: createMergeKeyResolver('set-symmetry-source-scope'),
     },
     'set-symmetry-param': {
+      parameterLabel: {
+        count: 'control.count',
+        directionDeg: 'control.symmetryDirection',
+      },
       resolveMergeKey: createMergeKeyResolver('set-symmetry-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         SYMMETRY_NUMERIC_PARAMETERS,
@@ -34,6 +40,10 @@ export const symmetryDeviceControls = {
       ),
     },
     'set-center-picker-param': {
+      parameterLabel: {
+        centerX: 'control.centerX',
+        centerY: 'control.centerY',
+      },
       resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         SYMMETRY_NUMERIC_PARAMETERS,

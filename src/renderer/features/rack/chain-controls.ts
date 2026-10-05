@@ -4,7 +4,7 @@ import {
   getRendererModulationTargetParamDefinitions,
   RENDERER_DEVICE_KINDS,
 } from '../../../devices';
-import { createMergeKeyResolver } from '../../../devices/control-helpers';
+import { createMergeKeyResolver, resolveControlParameterLabelKey } from '../../../devices/control-helpers';
 import type {
   RendererControlChange,
   RendererControlContext,
@@ -23,6 +23,7 @@ type ChainControlContext = Pick<
 
 const GENERIC_CONTROL_DESCRIPTORS: Readonly<Record<string, RendererControlDescriptor>> = {
   'set-device-enabled': {
+    parameterLabel: 'control.deviceEnabled',
     resolveMergeKey: createMergeKeyResolver('set-device-enabled'),
   },
 };
@@ -176,4 +177,13 @@ export const resetNumericControlToDefault = (
     ...baseChange,
     value: defaultValue,
   };
+};
+
+export const resolveChainControlParameterLabelKey = (
+  change: RendererControlChange,
+  device: GeneratorDeviceNode,
+) => {
+  const descriptor = getRendererDeviceControlDefinition(device.kind)?.descriptors?.[change.action]
+    ?? GENERIC_CONTROL_DESCRIPTORS[change.action];
+  return resolveControlParameterLabelKey(descriptor, change.paramKey);
 };

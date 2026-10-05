@@ -119,8 +119,8 @@
     ));
   const historyControls = $derived.by(() => selectHistoryControls(uiState));
   const localizedRedoActionLabel = $derived(
-    historyControls.redoActionKind
-      ? resolveHistoryActionLabel(historyControls.redoActionKind)
+    historyControls.redoAction
+      ? resolveHistoryActionLabel(historyControls.redoAction)
       : '',
   );
   const historyEntries = $derived.by(() => {
@@ -759,7 +759,7 @@
         <div class="workspace-actions">
           <UndoHistoryControl
             canUndo={historyControls.canUndo}
-            undoActionKind={historyControls.undoActionKind}
+            undoAction={historyControls.undoAction}
             {historyEntries}
             shortcut={undoShortcut}
             onUndo={handleUndoClick}

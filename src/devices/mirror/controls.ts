@@ -19,6 +19,9 @@ const isMirrorDevice = (
 export const mirrorDeviceControls = {
   descriptors: {
     'set-angle-param': {
+      parameterLabel: {
+        angleDeg: 'control.mirrorAxis',
+      },
       resolveMergeKey: createMergeKeyResolver('set-angle-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         MIRROR_NUMERIC_PARAMETERS,

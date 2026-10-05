@@ -49,12 +49,14 @@ const resolveColorSlotIndex = (raw: string | undefined): number | null => {
 export const colorDeviceControls = {
   descriptors: {
     'set-color-slot': {
+      parameterLabel: 'control.colors',
       resolveMergeKey: createMergeKeyResolver(
         'set-color-slot',
         (change) => change.paramKey ?? null,
       ),
     },
     'set-color-note-length-percent': {
+      parameterLabel: 'control.noteLength',
       resolveMergeKey: createMergeKeyResolver('set-color-note-length-percent'),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         COLOR_NUMERIC_PARAMETERS,
@@ -62,6 +64,7 @@ export const colorDeviceControls = {
       ),
     },
     'set-color-gap-percent': {
+      parameterLabel: 'control.gap',
       resolveMergeKey: createMergeKeyResolver('set-color-gap-percent'),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         COLOR_NUMERIC_PARAMETERS,
@@ -69,6 +72,7 @@ export const colorDeviceControls = {
       ),
     },
     'set-color-slot-count': {
+      parameterLabel: 'control.count',
       resolveMergeKey: createMergeKeyResolver('set-color-slot-count'),
       resolveDefaultValue: (defaultDevice) =>
         defaultDevice.kind === 'color'

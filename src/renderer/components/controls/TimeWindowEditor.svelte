@@ -17,6 +17,8 @@
 
   let {
     deviceId,
+    startLabel,
+    endLabel,
     dataAction,
     start,
     end,
@@ -27,6 +29,8 @@
     onControlChange,
   } = $props<{
     deviceId: string;
+    startLabel: string;
+    endLabel: string;
     dataAction: string;
     start: number;
     end: number;
@@ -218,7 +222,7 @@
 
   <div class="time-window-inputs">
     <NumberField
-      label={i18n.t('control.start')}
+      label={startLabel}
       {parameter}
       value={resolvedStart}
       dataAction={dataAction}
@@ -228,7 +232,7 @@
       {onControlChange}
     />
     <NumberField
-      label={i18n.t('control.end')}
+      label={endLabel}
       {parameter}
       value={resolvedEnd}
       dataAction={dataAction}

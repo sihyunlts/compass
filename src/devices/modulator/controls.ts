@@ -29,12 +29,15 @@ const findTargetById = (
 export const modulatorDeviceControls = {
   descriptors: {
     'assign-modulation-target-slot': {
+      parameterLabel: 'control.mapTarget',
       resolveMergeKey: () => null,
     },
     'clear-modulation-target-slot': {
+      parameterLabel: 'control.mapTarget',
       resolveMergeKey: () => null,
     },
     'set-modulation-target-amount': {
+      parameterLabel: 'control.amount',
       resolveMergeKey: createMergeKeyResolver('set-modulation-target-amount', readTargetId),
       resolveDefaultValue: (defaultDevice, change) =>
         defaultDevice.kind === 'modulator' && readTargetId(change)
@@ -42,9 +45,11 @@ export const modulatorDeviceControls = {
           : null,
     },
     'set-modulation-divisions': {
+      parameterLabel: 'control.divisions',
       resolveMergeKey: createMergeKeyResolver('set-modulation-divisions'),
     },
     'set-modulation-curve-nodes': {
+      parameterLabel: 'tab.curve',
       resolveMergeKey: createMergeKeyResolver('set-modulation-curve-nodes'),
     },
   },

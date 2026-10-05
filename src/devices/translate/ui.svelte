@@ -1,6 +1,9 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver } from '../../renderer/device-i18n';
+  import { translateDeviceControls } from './controls';
+
   import { COMPOSITION_CENTER } from '../../core/geometry';
   import { addDecimalStep } from '../../shared/math';
   import type { GeneratorDeviceNode } from '../../shared/model';
@@ -11,6 +14,8 @@
   import { TRANSLATE_NUMERIC_PARAMETERS } from './schema';
   import { i18n } from '../../renderer/i18n.svelte';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
+
+  const controlLabel = createDeviceControlLabelResolver(translateDeviceControls);
 
   type TranslateDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'translate' }>;
@@ -64,7 +69,7 @@
         dataAction="set-translate-param"
         dataId={device.id}
         dataParam="offsetX"
-        ariaLabel={i18n.t('control.offsetX')}
+        ariaLabel={controlLabel('set-translate-param', 'offsetX')}
         {modulationStateByParameter}
         {onControlChange}
       />
@@ -78,7 +83,7 @@
         dataAction="set-translate-param"
         dataId={device.id}
         dataParam="offsetY"
-        ariaLabel={i18n.t('control.offsetY')}
+        ariaLabel={controlLabel('set-translate-param', 'offsetY')}
         {modulationStateByParameter}
         {onControlChange}
       />

@@ -1,14 +1,18 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver } from '../../renderer/device-i18n';
+  import { rainDeviceControls } from './controls';
+
   import type { GeneratorDeviceNode } from '../../shared/model';
   import AnglePicker from '../../renderer/components/controls/AnglePicker.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { RAIN_NUMERIC_PARAMETERS } from './schema';
-  import { i18n } from '../../renderer/i18n.svelte';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
   import DeviceControlColumn from '../../renderer/components/rack/DeviceControlColumn.svelte';
+
+  const controlLabel = createDeviceControlLabelResolver(rainDeviceControls);
 
   type RainDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'rain' }>;
@@ -19,7 +23,7 @@
 
 <DeviceBodyLayout kind="fields">
   <AnglePicker
-    label={i18n.t('control.direction')}
+    label={controlLabel('set-angle-param', 'angleDeg')}
     value={device.params.angleDeg}
     dataAction="set-angle-param"
     dataId={device.id}
@@ -30,7 +34,7 @@
   />
   <DeviceControlColumn>
     <NumberField
-      label={i18n.t('control.seed')}
+      label={controlLabel('set-rain-param', 'seed')}
       parameter={RAIN_NUMERIC_PARAMETERS.seed}
       value={device.params.seed}
       dataAction="set-rain-param"
@@ -40,7 +44,7 @@
       {onControlChange}
     />
     <NumberField
-      label={i18n.t('control.density')}
+      label={controlLabel('set-rain-param', 'density')}
       parameter={RAIN_NUMERIC_PARAMETERS.density}
       value={device.params.density}
       dataAction="set-rain-param"
@@ -50,7 +54,7 @@
       {onControlChange}
     />
     <NumberField
-      label={i18n.t('control.speed')}
+      label={controlLabel('set-rain-param', 'speed')}
       parameter={RAIN_NUMERIC_PARAMETERS.speed}
       value={device.params.speed}
       dataAction="set-rain-param"

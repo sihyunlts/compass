@@ -4,15 +4,19 @@ import type { RendererKindControlDefinition } from '../control-types';
 export const maskDeviceControls = {
   descriptors: {
     'set-mask-mode': {
+      parameterLabel: 'control.maskSelection',
       resolveMergeKey: createMergeKeyResolver('set-mask-mode'),
     },
     'set-mask-source-visibility': {
+      parameterLabel: 'control.sourceDisplay',
       resolveMergeKey: createMergeKeyResolver('set-mask-source-visibility'),
     },
     'set-mask-source-kind': {
+      parameterLabel: 'control.source',
       resolveMergeKey: createMergeKeyResolver('set-mask-source-kind'),
     },
     'set-mask-source-id': {
+      parameterLabel: 'control.source',
       resolveMergeKey: createMergeKeyResolver('set-mask-source-id'),
     },
   },

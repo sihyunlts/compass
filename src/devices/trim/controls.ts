@@ -19,6 +19,10 @@ const isTrimDevice = (
 export const trimDeviceControls = {
   descriptors: {
     'set-trim-param': {
+      parameterLabel: {
+        start: 'control.start',
+        end: 'control.end',
+      },
       resolveMergeKey: createMergeKeyResolver('set-trim-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         TRIM_NUMERIC_PARAMETERS,

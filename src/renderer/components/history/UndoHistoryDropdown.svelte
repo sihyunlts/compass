@@ -6,7 +6,7 @@
   import DropdownOptionList from '../primitives/DropdownOptionList.svelte';
   import type { DropdownOption, DropdownValue } from '../primitives/dropdown-types';
   import { i18n } from '../../i18n.svelte';
-  import { resolveHistoryActionLabel } from '../../features/editor/history-i18n';
+  import { resolveHistoryActionPresentation } from '../../features/editor/history-i18n';
 
   let {
     open = false,
@@ -31,13 +31,20 @@
   }));
   const displayItems = $derived.by(() => [...items].reverse());
   const currentItem = $derived.by(() => displayItems.find((item) => item.isCurrent) ?? null);
-  const options = $derived.by((): DropdownOption[] =>
-    displayItems.map((item) => ({
-      value: item.id,
-      label: resolveHistoryActionLabel(item.kind),
-      meta: timestampFormatter.format(new Date(item.createdAt)),
-      disabled: item.isCurrent,
-    })));
+  type HistoryOption = DropdownOption & {
+    parts: ReturnType<typeof resolveHistoryActionPresentation>;
+  };
+  const options = $derived.by((): HistoryOption[] =>
+    displayItems.map((item) => {
+      const parts = resolveHistoryActionPresentation(item);
+      return {
+        value: item.id,
+        label: parts.label,
+        parts,
+        meta: timestampFormatter.format(new Date(item.createdAt)),
+        disabled: item.isCurrent,
+      };
+    }));
 
   const closeDropdown = (restoreFocus: boolean): void => {
     onClose();
@@ -68,7 +75,22 @@
     class="undo-history-list"
     onSelect={handleSelect}
     onClose={() => closeDropdown(true)}
-  />
+  >
+    {#snippet optionLabel(option)}
+      {#if option.parts.beforeTarget.trim()}
+        <span class="history-edit-label">{option.parts.beforeTarget.trim()}</span>
+      {/if}
+      {#if option.parts.targetName}
+        <span class="history-target-name">{option.parts.targetName}</span>
+      {/if}
+      {#if option.parts.additionalTargets}
+        <span class="history-edit-label">{option.parts.additionalTargets}</span>
+      {/if}
+      {#if option.parts.afterTarget.trim()}
+        <span class="history-edit-label">{option.parts.afterTarget.trim()}</span>
+      {/if}
+    {/snippet}
+  </DropdownOptionList>
 </FloatingDropdown>
 
 <style lang="scss">
@@ -80,5 +102,25 @@
     flex: 1 1 auto;
     width: 100%;
     gap: var(--gap-16);
+  }
+
+  :global(.undo-history-dropdown .undo-history-list .dropdown-option-label) {
+    display: flex;
+    gap: 0.25em;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .history-target-name {
+    min-width: 0;
+    max-width: 8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .history-edit-label {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 </style>

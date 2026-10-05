@@ -1,12 +1,16 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver } from '../../renderer/device-i18n';
+  import { timeWarpDeviceControls } from './controls';
+
   import CurveEditor from '../../renderer/components/controls/CurveEditor.svelte';
   import { sanitizeTimeWarpCurveNodes } from '../../core/timewarp/curve';
   import type { GeneratorDeviceNode } from '../../shared/model';
   import type { RendererDeviceEditorPropsBase } from '../types';
-  import { i18n } from '../../renderer/i18n.svelte';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
+
+  const controlLabel = createDeviceControlLabelResolver(timeWarpDeviceControls);
 
   type TimeWarpDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'timewarp' }>;
@@ -17,7 +21,8 @@
 
 <DeviceBodyLayout kind="graph">
   <CurveEditor
-    label={i18n.t('tab.curve')}
+      divisionsLabel={controlLabel('set-timewarp-divisions')}
+    label={controlLabel('set-timewarp-curve-nodes')}
     deviceId={device.id}
     curve={device.params.curve}
     controlAction="set-timewarp-curve-nodes"

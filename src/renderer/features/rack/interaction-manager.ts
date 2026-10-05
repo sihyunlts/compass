@@ -10,6 +10,7 @@ import {
   applyChainControlChange,
   createChainControlHandlers,
   resolveChainControlMergeKey,
+  resolveChainControlParameterLabelKey,
   resetNumericControlToDefault,
 } from './chain-controls';
 import type { RendererControlChange } from '../../../devices/control-types';
@@ -77,15 +78,17 @@ export class RackInteractionManager {
       blurActiveTextEditingElement: this.blurActiveTextEditingElement.bind(this),
       closeContextMenu: this.closeContextMenu,
       requestTransientPreview: this.requestTransientPreview,
-      persistChange: () => {
+      persistChange: (deviceId) => {
         this.commitChainChange({
           kind: 'center-picker-edit',
+          deviceIds: [deviceId],
           finalize: true,
         });
       },
-      commitReset: () => {
+      commitReset: (deviceId) => {
         this.commitChainChange({
           kind: 'center-picker-edit',
+          deviceIds: [deviceId],
           finalize: true,
         });
       },
@@ -97,9 +100,10 @@ export class RackInteractionManager {
       blurActiveTextEditingElement: this.blurActiveTextEditingElement.bind(this),
       closeContextMenu: this.closeContextMenu,
       requestTransientPreview: this.requestTransientPreview,
-      commitChange: () => {
+      commitChange: (deviceId) => {
         this.commitChainChange({
           kind: 'mask-tile-edit',
+          deviceIds: [deviceId],
           finalize: true,
         });
       },
@@ -137,6 +141,8 @@ export class RackInteractionManager {
     this.commitChainChange(
       {
         kind: 'control-edit',
+        deviceIds: [change.deviceId],
+        parameterLabelKey: resolveChainControlParameterLabelKey(change, this.findDeviceById(change.deviceId)!),
         mergeKey,
         finalize: change.finalize,
       },

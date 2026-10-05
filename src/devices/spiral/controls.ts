@@ -20,6 +20,9 @@ const isSpiralDevice = (
 export const spiralDeviceControls = {
   descriptors: {
     'set-spiral-param': {
+      parameterLabel: {
+        turns: 'control.turns',
+      },
       resolveMergeKey: createMergeKeyResolver('set-spiral-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         SPIRAL_NUMERIC_PARAMETERS,
@@ -27,6 +30,10 @@ export const spiralDeviceControls = {
       ),
     },
     'set-center-picker-param': {
+      parameterLabel: {
+        centerX: 'control.centerX',
+        centerY: 'control.centerY',
+      },
       resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         SPIRAL_NUMERIC_PARAMETERS,

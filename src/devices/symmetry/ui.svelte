@@ -1,6 +1,9 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver } from '../../renderer/device-i18n';
+  import { symmetryDeviceControls } from './controls';
+
   import type { GeneratorDeviceNode } from '../../shared/model';
   import CenterPointPicker from '../../renderer/components/controls/CenterPointPicker.svelte';
   import SymmetryVisualization from '../../renderer/components/controls/SymmetryVisualization.svelte';
@@ -12,6 +15,8 @@
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { SYMMETRY_NUMERIC_PARAMETERS } from './schema';
   import { i18n } from '../../renderer/i18n.svelte';
+
+  const controlLabel = createDeviceControlLabelResolver(symmetryDeviceControls);
 
   type SymmetryDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'symmetry' }>;
@@ -35,7 +40,7 @@
     centerX={device.params.centerX}
     centerY={device.params.centerY}
     visualizationLabel={i18n.t('control.symmetrySourceArea')}
-    directionLabel={i18n.t('control.symmetryDirection')}
+    directionLabel={controlLabel('set-symmetry-param', 'directionDeg')}
     directionStep={SYMMETRY_NUMERIC_PARAMETERS.directionDeg.input.step}
     onDirectionChange={(value, finalize) => onControlChange({
       action: 'set-symmetry-param',
@@ -55,7 +60,7 @@
       centerX={device.params.centerX}
       centerY={device.params.centerY}
       parameter={SYMMETRY_NUMERIC_PARAMETERS.centerX}
-      label={i18n.t('control.symmetrySource')}
+      label={controlLabel('set-symmetry-source-scope')}
       areaLabel={i18n.t('control.symmetrySourceArea')}
       overlay={symmetryOverlay}
       {modulationStateByParameter}
@@ -66,7 +71,7 @@
   {#snippet settings()}
     <div class="symmetry-settings">
       <SelectField
-        label={i18n.t('control.symmetryMode')}
+        label={controlLabel('set-symmetry-mode')}
         value={device.params.mode}
         options={modeOptions}
         class="symmetry-mode"
@@ -75,7 +80,7 @@
         {onControlChange}
       />
       <NumberField
-        label={i18n.t('control.count')}
+        label={controlLabel('set-symmetry-param', 'count')}
         value={device.params.count}
         dataAction="set-symmetry-param"
         dataId={device.id}
@@ -87,7 +92,7 @@
       />
       {#if device.params.sourceScope === 'sector'}
         <NumberField
-          label={i18n.t('control.symmetryDirection')}
+          label={controlLabel('set-symmetry-param', 'directionDeg')}
           value={device.params.directionDeg}
           dataAction="set-symmetry-param"
           dataId={device.id}

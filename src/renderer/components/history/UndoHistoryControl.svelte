@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import type { EditorHistoryListEntry } from '../../features/editor/editor-history';
-  import type { ChainHistoryKind } from '../../features/editor/history-core';
+  import type { ChainHistoryAction } from '../../features/editor/history-core';
   import { resolveHistoryActionLabel } from '../../features/editor/history-i18n';
   import type { ShortcutPresentation } from '../../../shared/keyboard-shortcuts';
   import SplitButton from '../primitives/SplitButton.svelte';
@@ -11,14 +11,14 @@
 
   let {
     canUndo,
-    undoActionKind,
+    undoAction,
     historyEntries,
     shortcut,
     onUndo,
     onCheckout,
   } = $props<{
     canUndo: boolean;
-    undoActionKind: ChainHistoryKind | null;
+    undoAction: ChainHistoryAction | null;
     historyEntries: EditorHistoryListEntry[];
     shortcut: ShortcutPresentation;
     onUndo: () => void;
@@ -31,7 +31,7 @@
   const canCheckoutHistory = $derived.by(() =>
     historyEntries.some((entry: EditorHistoryListEntry) => !entry.isCurrent));
   const localizedUndoActionLabel = $derived(
-    undoActionKind ? resolveHistoryActionLabel(undoActionKind) : '',
+    undoAction ? resolveHistoryActionLabel(undoAction) : '',
   );
 
   const handleUndoClick = (): void => {

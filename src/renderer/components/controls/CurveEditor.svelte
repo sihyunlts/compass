@@ -26,7 +26,6 @@
   import FloatingDropdown from '../primitives/FloatingDropdown.svelte';
   import type { DropdownValue } from '../primitives/dropdown-types';
   import FieldShell from '../fields/FieldShell.svelte';
-  import { i18n } from '../../i18n.svelte';
   import { performHapticFeedback } from '../../haptics';
   import {
     CONTROL_POINT_DRAG_THRESHOLD_PX,
@@ -76,6 +75,7 @@
     valueMin = -1,
     valueMax = 1,
     guideValue = 0,
+    divisionsLabel,
     divisionsControlAction,
     onControlChange,
   } = $props<{
@@ -88,6 +88,7 @@
     valueMin?: number;
     valueMax?: number;
     guideValue?: number | null;
+    divisionsLabel: string;
     divisionsControlAction?: string;
     onControlChange: (change: RendererControlChange) => void;
   }>();
@@ -667,8 +668,8 @@
       <DropdownOptionList
         options={divisionDropdownOptions}
         value={divisions}
-        ariaLabel={i18n.t('control.divisions')}
-        heading={i18n.t('control.divisions')}
+        ariaLabel={divisionsLabel}
+        heading={divisionsLabel}
         onSelect={handleDivisionSelect}
         onClose={() => divisionsMenuPoint = null}
       />
