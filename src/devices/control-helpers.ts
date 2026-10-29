@@ -1,6 +1,8 @@
+import type { MessageKey } from '../shared/i18n';
 import type { GeneratorDeviceNode } from '../shared/model';
 import type {
   RendererControlChange,
+  RendererControlDescriptor,
   RendererControlHandler,
 } from './control-types';
 import type { NumericParameterRules } from './numeric-parameters';
@@ -103,4 +105,14 @@ export const createNumericParameterSetter = <
     change.value,
     { step: change.step },
   ) !== null;
+};
+
+export const resolveControlParameterLabelKey = (
+  { parameterLabel }: RendererControlDescriptor,
+  paramKey?: string,
+): MessageKey => {
+  if (typeof parameterLabel === 'string') return parameterLabel;
+  const label = paramKey ? parameterLabel[paramKey] : undefined;
+  if (!label) throw new Error(`Missing parameter label for ${paramKey}`);
+  return label;
 };

@@ -20,6 +20,10 @@ const isScaleDevice = (
 export const scaleDeviceControls = {
   descriptors: {
     'set-scale-param': {
+      parameterLabel: {
+        scaleX: 'control.scaleX',
+        scaleY: 'control.scaleY',
+      },
       resolveMergeKey: createMergeKeyResolver('set-scale-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         SCALE_NUMERIC_PARAMETERS,
@@ -27,6 +31,10 @@ export const scaleDeviceControls = {
       ),
     },
     'set-center-picker-param': {
+      parameterLabel: {
+        centerX: 'control.centerX',
+        centerY: 'control.centerY',
+      },
       resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         SCALE_NUMERIC_PARAMETERS,

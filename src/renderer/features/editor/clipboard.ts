@@ -106,7 +106,10 @@ export const cutSelection = (
     return false;
   }
 
-  return context.deleteDevicesById(selection.deviceIds, EDITOR_HISTORY_META.clipboardCut);
+  return context.deleteDevicesById(selection.deviceIds, {
+    ...EDITOR_HISTORY_META.clipboardCut,
+    groupIds: selection.items.flatMap((item) => item.kind === 'group' ? [item.groupId] : []),
+  });
 };
 
 export const pasteClipboard = (
@@ -131,7 +134,10 @@ export const pasteClipboard = (
     selection,
   );
   const previousChain = context.state.chainState;
-  context.applyChainMutation(result.chain, meta);
+  const previousGroupIds = new Set(previousChain.devices.map((device) => device.groupId));
+  const groupIds = clipboard.kind === 'devices' ? [] : [...new Set(result.chain.devices
+    .flatMap((device) => device.groupId && !previousGroupIds.has(device.groupId) ? [device.groupId] : []))];
+  context.applyChainMutation(result.chain, { ...meta, groupIds });
   context.applyInsertedSelection(
     clipboard,
     previousChain,

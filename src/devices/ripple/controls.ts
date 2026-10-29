@@ -20,6 +20,9 @@ const isRippleDevice = (
 export const rippleDeviceControls = {
   descriptors: {
     'set-ripple-param': {
+      parameterLabel: {
+        curvature: 'control.curvature',
+      },
       resolveMergeKey: createMergeKeyResolver(
         'set-ripple-param',
         resolveNumericControlParam,
@@ -30,6 +33,10 @@ export const rippleDeviceControls = {
       ),
     },
     'set-center-picker-param': {
+      parameterLabel: {
+        centerX: 'control.centerX',
+        centerY: 'control.centerY',
+      },
       resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         RIPPLE_NUMERIC_PARAMETERS,

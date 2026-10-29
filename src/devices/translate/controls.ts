@@ -19,6 +19,10 @@ const isTranslateDevice = (
 export const translateDeviceControls = {
   descriptors: {
     'set-translate-param': {
+      parameterLabel: {
+        offsetX: 'control.offsetX',
+        offsetY: 'control.offsetY',
+      },
       resolveMergeKey: createMergeKeyResolver('set-translate-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         TRANSLATE_NUMERIC_PARAMETERS,
@@ -26,6 +30,7 @@ export const translateDeviceControls = {
       ),
     },
     'reset-translate-offset': {
+      parameterLabel: 'control.position',
       resolveMergeKey: createMergeKeyResolver('reset-translate-offset'),
     },
   },

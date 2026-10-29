@@ -21,8 +21,8 @@ interface CenterPickerControllerOptions {
   blurActiveTextEditingElement: () => void;
   closeContextMenu: () => void;
   requestTransientPreview: (delayMs?: number) => void;
-  persistChange: () => void;
-  commitReset: () => void;
+  persistChange: (deviceId: string) => void;
+  commitReset: (deviceId: string) => void;
   onAdjustmentChange: () => void;
   onAlignmentReached: () => void;
 }
@@ -111,16 +111,19 @@ export class CenterPickerController {
 
   private readonly requestTransientPreview: (delayMs?: number) => void;
 
-  private readonly persistChange: () => void;
+  private readonly persistChange: (deviceId: string) => void;
 
-  private readonly commitReset: () => void;
+  private readonly commitReset: (deviceId: string) => void;
 
   private readonly onAdjustmentChange: () => void;
 
   private readonly onAlignmentReached: () => void;
 
   private readonly pointerSession = new PointerCaptureSession<HTMLElement>({
-    onChanged: () => this.persistChange(),
+    onChanged: () => {
+      const deviceId = this.pointerSession.target?.dataset.deviceId;
+      if (deviceId) this.persistChange(deviceId);
+    },
     beforeRelease: (surface) => {
       delete surface.dataset.centerPickerInteraction;
     },
@@ -203,7 +206,7 @@ export class CenterPickerController {
     this.blurActiveTextEditingElement();
     this.closeContextMenu();
     if (this.resetToMidpoint(surface)) {
-      this.commitReset();
+      this.commitReset(surface.dataset.deviceId!);
     }
     return true;
   }

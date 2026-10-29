@@ -20,6 +20,9 @@ const isRotateDevice = (
 export const rotateDeviceControls = {
   descriptors: {
     'set-rotate-param': {
+      parameterLabel: {
+        angleDeg: 'control.angle',
+      },
       resolveMergeKey: createMergeKeyResolver('set-rotate-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         ROTATE_NUMERIC_PARAMETERS,
@@ -27,6 +30,10 @@ export const rotateDeviceControls = {
       ),
     },
     'set-center-picker-param': {
+      parameterLabel: {
+        centerX: 'control.centerX',
+        centerY: 'control.centerY',
+      },
       resolveMergeKey: createMergeKeyResolver('set-center-picker-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         ROTATE_NUMERIC_PARAMETERS,

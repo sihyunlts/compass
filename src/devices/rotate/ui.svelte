@@ -1,13 +1,17 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver } from '../../renderer/device-i18n';
+  import { rotateDeviceControls } from './controls';
+
   import type { GeneratorDeviceNode } from '../../shared/model';
   import AnglePicker from '../../renderer/components/controls/AnglePicker.svelte';
   import CenterPointPicker from '../../renderer/components/controls/CenterPointPicker.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { ROTATE_NUMERIC_PARAMETERS } from './schema';
-  import { i18n } from '../../renderer/i18n.svelte';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
+
+  const controlLabel = createDeviceControlLabelResolver(rotateDeviceControls);
 
   type RotateDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'rotate' }>;
@@ -33,7 +37,7 @@
   {#snippet settings()}
     <div class="rotate-settings">
       <AnglePicker
-        label={i18n.t('control.angle')}
+        label={controlLabel('set-rotate-param', 'angleDeg')}
         value={device.params.angleDeg}
         dataAction="set-rotate-param"
         dataId={device.id}

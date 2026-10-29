@@ -1,13 +1,17 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver } from '../../renderer/device-i18n';
+  import { rippleDeviceControls } from './controls';
+
   import type { GeneratorDeviceNode } from '../../shared/model';
   import CenterPointPicker from '../../renderer/components/controls/CenterPointPicker.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
-  import { i18n } from '../../renderer/i18n.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { RIPPLE_NUMERIC_PARAMETERS } from './schema';
+
+  const controlLabel = createDeviceControlLabelResolver(rippleDeviceControls);
 
   type RippleDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'ripple' }>;
@@ -29,7 +33,7 @@
   {/snippet}
   {#snippet settings()}
     <NumberField
-      label={i18n.t('control.curvature')}
+      label={controlLabel('set-ripple-param', 'curvature')}
       parameter={RIPPLE_NUMERIC_PARAMETERS.curvature}
       value={device.params.curvature}
       dataAction="set-ripple-param"

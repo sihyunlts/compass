@@ -19,6 +19,9 @@ const isScannerDevice = (
 export const scannerDeviceControls = {
   descriptors: {
     'set-angle-param': {
+      parameterLabel: {
+        angleDeg: 'control.direction',
+      },
       resolveMergeKey: createMergeKeyResolver('set-angle-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         SCANNER_NUMERIC_PARAMETERS,

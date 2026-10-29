@@ -1,13 +1,17 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver } from '../../renderer/device-i18n';
+  import { spiralDeviceControls } from './controls';
+
   import type { GeneratorDeviceNode } from '../../shared/model';
   import CenterPointPicker from '../../renderer/components/controls/CenterPointPicker.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { SPIRAL_NUMERIC_PARAMETERS } from './schema';
-  import { i18n } from '../../renderer/i18n.svelte';
+
+  const controlLabel = createDeviceControlLabelResolver(spiralDeviceControls);
 
   type SpiralDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'spiral' }>;
@@ -29,7 +33,7 @@
   {/snippet}
   {#snippet settings()}
     <NumberField
-      label={i18n.t('control.turns')}
+      label={controlLabel('set-spiral-param', 'turns')}
       parameter={SPIRAL_NUMERIC_PARAMETERS.turns}
       value={device.params.turns}
       dataAction="set-spiral-param"

@@ -13,7 +13,7 @@ let previewWindowRef: BrowserWindow | null = null;
 let mainWindowCloseConfirmed = false;
 let mainWindowDocumentEdited = false;
 const WINDOW_BACKGROUND_COLOR = '#0d0e0f';
-const PRELOAD_ENTRY_PATH = path.join(__dirname, 'preload.js');
+const PRELOAD_ENTRY_PATH = path.join(__dirname, 'preload.cjs');
 const MAIN_RENDERER_FILE_PATH = path.join(
   __dirname,
   `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`,

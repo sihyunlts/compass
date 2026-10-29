@@ -1,7 +1,7 @@
 <svelte:options runes={true} />
 
-<script lang="ts">
-  import { tick } from 'svelte';
+<script lang="ts" generics="Option extends DropdownOption">
+  import { tick, type Snippet } from 'svelte';
   import type { DropdownOption, DropdownValue } from './dropdown-types';
 
   let {
@@ -9,11 +9,13 @@
     value = null,
     ariaLabel,
     heading,
+    optionLabel,
     class: className = '',
     onSelect,
     onClose,
   } = $props<{
-    options: readonly DropdownOption[];
+    options: readonly Option[];
+    optionLabel?: Snippet<[Option]>;
     value?: DropdownValue | null;
     ariaLabel: string;
     heading?: string;
@@ -123,6 +125,7 @@
       class:is-selected={selected}
       class:is-disabled={option.disabled}
       role="option"
+      aria-label={option.label}
       aria-selected={selected ? 'true' : 'false'}
       aria-disabled={option.disabled ? 'true' : undefined}
       tabindex={option.disabled ? -1 : (activeIndex === index ? 0 : -1)}
@@ -135,7 +138,13 @@
         {selected ? 'check' : ''}
       </span>
       <span class="dropdown-option-main">
-        <span class="dropdown-option-label">{option.label}</span>
+        <span class="dropdown-option-label">
+          {#if optionLabel}
+            {@render optionLabel(option)}
+          {:else}
+            {option.label}
+          {/if}
+        </span>
         {#if option.meta}
           <span class="dropdown-option-meta">{option.meta}</span>
         {/if}

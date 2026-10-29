@@ -70,7 +70,7 @@ xattr -dr com.apple.quarantine /Applications/Compass.app
 Requirements:
 
 - Node.js `24.13.1`
-- npm `11.5.1`
+- npm `11.19.1`
 
 Install:
 

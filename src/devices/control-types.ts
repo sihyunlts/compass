@@ -1,3 +1,4 @@
+import type { MessageKey } from '../shared/i18n';
 import type { GeneratorDeviceNode } from '../shared/model';
 import type { ModulationParameterDefinition } from './numeric-parameters';
 import type { RendererDeviceKind } from './types';
@@ -26,6 +27,7 @@ export interface RendererControlContext {
 }
 
 export interface RendererControlDescriptor {
+  parameterLabel: MessageKey | Readonly<Record<string, MessageKey>>;
   resolveMergeKey: (change: RendererControlChange) => string | null;
   resolveDefaultValue?: (
     defaultDevice: GeneratorDeviceNode,

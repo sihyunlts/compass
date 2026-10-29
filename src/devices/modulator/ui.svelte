@@ -1,6 +1,9 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver } from '../../renderer/device-i18n';
+  import { modulatorDeviceControls } from './controls';
+
   import type { GeneratorDeviceNode, ModulationTarget } from '../../shared/model';
   import CurveEditor from '../../renderer/components/controls/CurveEditor.svelte';
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
@@ -17,6 +20,8 @@
   import { i18n } from '../../renderer/i18n.svelte';
   import { getDeviceMessageKey } from '../../renderer/device-i18n';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
+
+  const controlLabel = createDeviceControlLabelResolver(modulatorDeviceControls);
 
   type ModulatorDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'modulator' }>;
@@ -135,6 +140,7 @@
 <DeviceBodyLayout kind="graph">
   {#if activeTab === 'curve'}
     <CurveEditor
+      divisionsLabel={controlLabel('set-modulation-divisions')}
       label={modulationReadoutText}
       deviceId={device.id}
       curve={device.params.curve}
@@ -150,11 +156,11 @@
       <div class="modulation-target-labels" aria-hidden="true">
         <div class="modulation-target-label-group">
           <span>{i18n.t('control.parameter')}</span>
-          <span>{i18n.t('control.amount')}</span>
+          <span>{controlLabel('set-modulation-target-amount')}</span>
         </div>
         <div class="modulation-target-label-group">
           <span>{i18n.t('control.parameter')}</span>
-          <span>{i18n.t('control.amount')}</span>
+          <span>{controlLabel('set-modulation-target-amount')}</span>
         </div>
       </div>
       <div class="modulation-target-list">
@@ -180,7 +186,7 @@
                 onClear={() => clearTargetSlot(slotIndex)}
               />
               <NumberField
-                label={i18n.t('control.amount')}
+                label={controlLabel('set-modulation-target-amount')}
                 size="compact"
                 labelVisibility="hidden"
                 fill={true}
@@ -196,7 +202,7 @@
             {:else}
               <ValueButton
                 text=""
-                label={i18n.t('control.mapTarget')}
+                label={controlLabel('assign-modulation-target-slot')}
                 placeholder={i18n.t('control.map')}
                 pressed={isActiveTargetSlot}
                 outlinePulse={isActiveTargetSlot}

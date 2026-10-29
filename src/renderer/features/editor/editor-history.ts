@@ -3,18 +3,17 @@ import {
   createChainHistory,
   type ChainHistory,
   type ChainHistoryEntry,
-  type ChainHistoryKind,
+  type ChainHistoryAction,
   type ChainHistoryListItem,
   type ChainMutationMeta,
 } from './history-core';
 
 type EditorHistoryOptions = Parameters<typeof createChainHistory>[1];
 
-interface EditorHistoryEntryMeta {
+interface EditorHistoryEntryMeta extends ChainHistoryAction {
   id: string;
   revision: number;
   createdAt: number;
-  kind: ChainHistoryKind;
 }
 
 export interface EditorHistoryListEntry extends EditorHistoryEntryMeta {
@@ -182,6 +181,8 @@ class EditorHistoryImpl implements EditorHistory {
       revision: metadata.revision,
       createdAt: metadata.createdAt,
       kind: item.kind,
+      parameterLabelKey: item.parameterLabelKey,
+      targets: item.targets,
       isCurrent: item.isCurrent,
     };
   }
@@ -194,6 +195,8 @@ class EditorHistoryImpl implements EditorHistory {
       revision: metadata.revision,
       createdAt: metadata.createdAt,
       kind: entry.kind,
+      parameterLabelKey: entry.parameterLabelKey,
+      targets: entry.targets,
       chain: entry.chain,
     };
   }

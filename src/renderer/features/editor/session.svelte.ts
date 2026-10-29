@@ -113,7 +113,7 @@ import {
   resolveCurrentSelectionSnapshot,
   type RackSelectionSnapshot,
 } from './selectors';
-import type { ChainHistoryKind } from './history-core';
+import type { ChainHistoryAction } from './history-core';
 import type { ScheduledPreviewUpdateReason } from '../preview/update-reason';
 
 const DEFAULT_AUTO_PREVIEW_DEBOUNCE_MS = 120;
@@ -142,8 +142,8 @@ export interface EditorSessionState {
   clipboardAvailable: boolean;
   canUndo: boolean;
   canRedo: boolean;
-  undoActionKind: ChainHistoryKind | null;
-  redoActionKind: ChainHistoryKind | null;
+  undoAction: ChainHistoryAction | null;
+  redoAction: ChainHistoryAction | null;
 }
 
 export interface EditorRackBinding {
@@ -288,7 +288,14 @@ export class EditorSession {
       this.applyChainMutation(
         nextChain,
         commit.kind === 'move'
-          ? EDITOR_HISTORY_META.moveDevices
+          ? {
+            ...EDITOR_HISTORY_META.moveDevices,
+            deviceIds: commit.sourceIds,
+            groupIds: commit.sourceKind === 'group'
+              ? [...new SvelteSet(previousChain.devices.filter((device) => commit.sourceIds.includes(device.id))
+                .flatMap((device) => device.groupId ? [device.groupId] : []))]
+              : [],
+          }
           : commit.kind === 'insert-devices'
             ? EDITOR_HISTORY_META.insertDevices
             : EDITOR_HISTORY_META.insertDevice,
@@ -326,6 +333,8 @@ export class EditorSession {
       if (changed) {
         this.applyChainMutation(nextChain, {
           kind: 'control-edit',
+          parameterLabelKey: 'control.mapTarget',
+          deviceIds: [target.deviceId],
           finalize: true,
         });
       }
@@ -662,7 +671,11 @@ export class EditorSession {
       return false;
     }
 
-    this.applyChainMutation(nextChain, EDITOR_HISTORY_META.deviceToggleEnabled);
+    this.applyChainMutation(nextChain, {
+      ...EDITOR_HISTORY_META.deviceToggleEnabled,
+      deviceIds: selection.items.flatMap((item) => item.kind === 'device' ? [item.deviceId] : []),
+      groupIds: selection.items.flatMap((item) => item.kind === 'group' ? [item.groupId] : []),
+    });
     return true;
   }
 
@@ -754,7 +767,7 @@ export class EditorSession {
       return false;
     }
 
-    this.persistChainMutation(nextChain, EDITOR_HISTORY_META.renameDevice);
+    this.persistChainMutation(nextChain, { ...EDITOR_HISTORY_META.renameDevice, deviceIds: [deviceId] });
     return true;
   }
 
@@ -764,7 +777,7 @@ export class EditorSession {
       return false;
     }
 
-    this.persistChainMutation(nextChain, EDITOR_HISTORY_META.renameGroup);
+    this.persistChainMutation(nextChain, { ...EDITOR_HISTORY_META.renameGroup, groupIds: [groupId] });
     return true;
   }
 
@@ -778,7 +791,7 @@ export class EditorSession {
       return false;
     }
 
-    this.persistChainMutation(nextChain, EDITOR_HISTORY_META.editDeviceInfo);
+    this.persistChainMutation(nextChain, { ...EDITOR_HISTORY_META.editDeviceInfo, deviceIds: [deviceId] });
     return true;
   }
 
@@ -792,7 +805,7 @@ export class EditorSession {
       return false;
     }
 
-    this.persistChainMutation(nextChain, EDITOR_HISTORY_META.editGroupInfo);
+    this.persistChainMutation(nextChain, { ...EDITOR_HISTORY_META.editGroupInfo, groupIds: [groupId] });
     return true;
   }
 
@@ -908,7 +921,7 @@ export class EditorSession {
       return result;
     }
 
-    this.applyChainMutation(result.chain, EDITOR_HISTORY_META.insertGroupPreset);
+    this.applyChainMutation(result.chain, { ...EDITOR_HISTORY_META.insertGroupPreset, groupIds: [result.groupId] });
     mergeCollapsedDeviceIds(this.state, result.collapsedDeviceIds);
     this.selectGroupIds([result.groupId]);
     return result;

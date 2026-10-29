@@ -1,3 +1,5 @@
+import type { DeviceNameSnapshot, GroupNameSnapshot } from '../rack/display-names';
+import type { MessageKey } from '../../../shared/i18n';
 import { cloneChainForIpc, type GeneratorChain } from '../../../shared/model';
 
 const DEFAULT_MAX_ENTRIES = 100;
@@ -29,25 +31,30 @@ export type ChainHistoryKind =
   | 'center-picker-edit'
   | 'mask-tile-edit';
 
-export interface ChainMutationMeta {
+export interface ChainHistoryAction {
   kind: ChainHistoryKind;
+  parameterLabelKey?: MessageKey;
+  targets?: readonly (DeviceNameSnapshot | GroupNameSnapshot)[];
+}
+
+export interface ChainMutationMeta extends ChainHistoryAction {
+  deviceIds?: readonly string[];
+  groupIds?: readonly string[];
   mergeKey?: string | null;
   finalize?: boolean;
   mergeIdleMs?: number;
 }
 
-export interface ChainHistoryEntry {
+export interface ChainHistoryEntry extends ChainHistoryAction {
   id: string;
   timestampMs: number;
-  kind: ChainHistoryKind;
   chain: GeneratorChain;
 }
 
-export interface ChainHistoryListItem {
+export interface ChainHistoryListItem extends ChainHistoryAction {
   id: string;
   index: number;
   timestampMs: number;
-  kind: ChainHistoryKind;
   isCurrent: boolean;
 }
 
@@ -177,6 +184,8 @@ export class ChainHistory {
       index,
       timestampMs: entry.timestampMs,
       kind: entry.kind,
+      parameterLabelKey: entry.parameterLabelKey,
+      targets: entry.targets,
       isCurrent: index === this.cursor,
     }));
   }
@@ -187,7 +196,8 @@ export class ChainHistory {
     const isActiveMergeSession = !!mergeKey
       && this.pendingMergeKey === mergeKey
       && this.pendingMergeIndex === this.cursor
-      && currentEntry.kind === meta.kind;
+      && currentEntry.kind === meta.kind
+      && currentEntry.parameterLabelKey === meta.parameterLabelKey;
 
     if (isActiveMergeSession) {
       this.stagePendingMerge(chain, mergeKey, meta);
@@ -300,6 +310,8 @@ export class ChainHistory {
       id: entry.id,
       timestampMs: entry.timestampMs,
       kind: entry.kind,
+      parameterLabelKey: entry.parameterLabelKey,
+      targets: entry.targets,
       chain: cloneChainForIpc(entry.chain),
     };
   }
@@ -322,6 +334,8 @@ export class ChainHistory {
       id: this.createEntryId(),
       timestampMs: Date.now(),
       kind: meta.kind,
+      parameterLabelKey: meta.parameterLabelKey,
+      targets: meta.targets,
       chain: snapshot.chain,
       signature: snapshot.signature,
     });

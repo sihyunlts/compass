@@ -77,7 +77,7 @@ export const toggleGroupEnabled = (
     return;
   }
 
-  context.applyChainMutation(nextChain, EDITOR_HISTORY_META.groupToggleEnabled);
+  context.applyChainMutation(nextChain, { ...EDITOR_HISTORY_META.groupToggleEnabled, groupIds: [groupId] });
 };
 
 export const toggleGroupIsolated = (
@@ -94,7 +94,7 @@ export const toggleGroupIsolated = (
     return;
   }
 
-  context.applyChainMutation(nextChain, EDITOR_HISTORY_META.groupToggleIsolate);
+  context.applyChainMutation(nextChain, { ...EDITOR_HISTORY_META.groupToggleIsolate, groupIds: [groupId] });
 };
 
 export const deleteGroup = (
@@ -107,7 +107,7 @@ export const deleteGroup = (
     return false;
   }
 
-  return deleteDevicesById(context, memberIds, meta);
+  return deleteDevicesById(context, memberIds, { ...meta, groupIds: [rawGroupId] });
 };
 
 const setGroupIdForDevices = (
@@ -135,7 +135,7 @@ export const ungroupGroup = (
     return false;
   }
 
-  return setGroupIdForDevices(context, memberIds, null, meta);
+  return setGroupIdForDevices(context, memberIds, null, { ...meta, groupIds: [rawGroupId] });
 };
 
 export const deleteCurrentSelection = (
@@ -155,7 +155,10 @@ export const deleteCurrentSelection = (
     return false;
   }
 
-  return deleteDevicesById(context, targetIds);
+  return deleteDevicesById(context, targetIds, {
+    ...EDITOR_HISTORY_META.deleteDevices,
+    groupIds: rackBinding.getSelectedGroupContexts().map((group) => group.groupId),
+  });
 };
 
 export const groupDeviceIds = (
@@ -171,7 +174,7 @@ export const groupDeviceIds = (
     context,
     targetIds,
     groupId,
-    EDITOR_HISTORY_META.groupCreate,
+    { ...EDITOR_HISTORY_META.groupCreate, groupIds: [groupId] },
   );
   if (!didChange) {
     return false;

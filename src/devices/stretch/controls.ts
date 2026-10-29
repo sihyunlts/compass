@@ -19,6 +19,10 @@ const isStretchDevice = (
 export const stretchDeviceControls = {
   descriptors: {
     'set-stretch-param': {
+      parameterLabel: {
+        start: 'control.start',
+        end: 'control.end',
+      },
       resolveMergeKey: createMergeKeyResolver('set-stretch-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         STRETCH_NUMERIC_PARAMETERS,

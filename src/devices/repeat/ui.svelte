@@ -1,6 +1,9 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver } from '../../renderer/device-i18n';
+  import { repeatDeviceControls } from './controls';
+
   import NumberField from '../../renderer/components/fields/NumberField.svelte';
   import RepeatTimeline from '../../renderer/components/controls/RepeatTimeline.svelte';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
@@ -8,6 +11,8 @@
   import type { GeneratorDeviceNode } from '../../shared/model';
   import type { RendererDeviceEditorPropsBase } from '../types';
   import { REPEAT_NUMERIC_PARAMETERS } from './schema';
+
+  const controlLabel = createDeviceControlLabelResolver(repeatDeviceControls);
 
   type RepeatDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'repeat' }>;
@@ -31,7 +36,7 @@
 
     <div class="repeat-inputs">
       <NumberField
-        label={i18n.t('control.repeats')}
+        label={controlLabel('set-repeat-param', 'count')}
         parameter={REPEAT_NUMERIC_PARAMETERS.count}
         value={device.params.count}
         dataAction="set-repeat-param"
@@ -40,7 +45,7 @@
         {onControlChange}
       />
       <NumberField
-        label={i18n.t('control.interval')}
+        label={controlLabel('set-repeat-param', 'intervalPercent')}
         parameter={REPEAT_NUMERIC_PARAMETERS.intervalPercent}
         value={device.params.intervalPercent}
         dataAction="set-repeat-param"

@@ -1,6 +1,9 @@
 <svelte:options runes={true} />
 
 <script lang="ts">
+  import { createDeviceControlLabelResolver, getDeviceMessageKey } from '../../renderer/device-i18n';
+  import { maskDeviceControls } from './controls';
+
   import type { GeneratorDeviceNode } from '../../shared/model';
   import { isIsolatedGroupMode } from '../../shared/group-state';
   import { normalizeOptionalId } from '../../shared/normalize-id';
@@ -8,10 +11,11 @@
   import SelectField from '../../renderer/components/fields/SelectField.svelte';
   import { getRendererDeviceGroup } from '../schema-registry';
   import type { RendererDeviceEditorPropsBase } from '../types';
-  import { getDeviceMessageKey } from '../../renderer/device-i18n';
   import { i18n } from '../../renderer/i18n.svelte';
   import DeviceBodyLayout from '../../renderer/components/rack/DeviceBodyLayout.svelte';
   import DeviceControlColumn from '../../renderer/components/rack/DeviceControlColumn.svelte';
+
+  const controlLabel = createDeviceControlLabelResolver(maskDeviceControls);
 
   type MaskDeviceEditorProps = RendererDeviceEditorPropsBase & {
     device: Extract<GeneratorDeviceNode, { kind: 'mask' }>;
@@ -85,7 +89,7 @@
 <DeviceBodyLayout kind="content" size="regular">
   <DeviceControlColumn>
     <SelectField
-      label={i18n.t('control.maskSelection')}
+      label={controlLabel('set-mask-mode')}
       value={device.params.mode}
       options={maskModeOptions}
       dataAction="set-mask-mode"
@@ -93,7 +97,7 @@
       {onControlChange}
     />
     <SelectField
-      label={i18n.t('control.source')}
+      label={controlLabel('set-mask-source-kind')}
       value={device.params.sourceKind}
       options={maskSourceKindOptions}
       dataAction="set-mask-source-kind"
@@ -101,7 +105,7 @@
       {onControlChange}
     />
     <SelectField
-      label={i18n.t('control.sourceDisplay')}
+      label={controlLabel('set-mask-source-visibility')}
       value={device.params.sourceVisibility}
       options={maskSourceVisibilityOptions}
       dataAction="set-mask-source-visibility"

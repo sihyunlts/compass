@@ -1475,7 +1475,13 @@
         />
       {:else}
         {#if !presetErrorText && visibleRows.length === 0 && emptyTreeMessage}
-          <p class="browser-status browser-empty-state">{emptyTreeMessage}</p>
+          <p
+            class="browser-status browser-empty-state"
+            style:width={`calc(100% + ${libraryWidthPx}px - ${currentWidthPx}px)`}
+          >
+            <span class="browser-empty-icon material-symbols-rounded" aria-hidden="true">folder_open</span>
+            <span>{emptyTreeMessage}</span>
+          </p>
         {/if}
         {#if presetErrorText}
           <p class="browser-status browser-status-error">{presetErrorText}</p>
@@ -1776,6 +1782,7 @@
   .browser-status {
     font-size: var(--text-12);
     color: var(--color-text-secondary);
+    word-break: keep-all;
 
     &-error {
       color: var(--color-text-primary);
@@ -1784,13 +1791,22 @@
 
   .browser-empty-state {
     flex: 1;
+    align-self: center;
     margin: 0;
     padding: var(--gap-12);
     display: flex;
+    flex-direction: column;
+    gap: var(--gap-8);
     align-items: center;
     justify-content: center;
     text-align: center;
     pointer-events: none;
+  }
+
+  .browser-empty-icon {
+    font-size: var(--text-20);
+    font-variation-settings: 'FILL' 1, 'wght' 400;
+    color: var(--color-text-tertiary);
   }
 
   :global(html.is-browser-preset-moving),

@@ -20,6 +20,11 @@ const isRainDevice = (
 export const rainDeviceControls = {
   descriptors: {
     'set-rain-param': {
+      parameterLabel: {
+        seed: 'control.seed',
+        density: 'control.density',
+        speed: 'control.speed',
+      },
       resolveMergeKey: createMergeKeyResolver('set-rain-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         RAIN_NUMERIC_PARAMETERS,
@@ -27,6 +32,9 @@ export const rainDeviceControls = {
       ),
     },
     'set-angle-param': {
+      parameterLabel: {
+        angleDeg: 'control.direction',
+      },
       resolveMergeKey: createMergeKeyResolver('set-angle-param', resolveNumericControlParam),
       resolveDefaultValue: createNumericParameterDefaultResolver(
         RAIN_NUMERIC_PARAMETERS,

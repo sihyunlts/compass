@@ -17,7 +17,9 @@ import {
   resolveEditableDeviceName,
   resolveEditableGroupName,
 } from '../features/rack/rename';
-import type { PresetController, PresetInfoUpdateResult } from './preset-controller.svelte';
+import type { PresetBrowserController } from './preset-browser-controller.svelte';
+import type { RackDocumentController } from './rack-document-controller.svelte';
+import type { PresetInfoUpdateResult } from './preset-operation-feedback';
 
 type AuthoredInfoTarget =
   | { kind: 'rack' }
@@ -38,7 +40,8 @@ interface AuthoredInfoControllerState {
 interface AuthoredInfoControllerOptions {
   bridgeClient: CompassApi;
   editorSession: EditorSession;
-  presetController: PresetController;
+  presetController: PresetBrowserController;
+  rackDocument: RackDocumentController;
   showMessage: (message: string) => void;
 }
 
@@ -100,11 +103,11 @@ class AuthoredInfoController {
 
   public openRack = (): void => {
     this.loadToken += 1;
-    const { presetController, editorSession } = this.options;
+    const { rackDocument, editorSession } = this.options;
     this.assignDraft(
-      presetController.state.currentRackDisplayName,
+      rackDocument.state.currentRackDisplayName,
       editorSession.state.chainState.metadata,
-      presetController.state.currentRackSavedAtIso,
+      rackDocument.state.currentRackSavedAtIso,
     );
     this.state.target = { kind: 'rack' };
   };
@@ -146,7 +149,7 @@ class AuthoredInfoController {
     this.state.isPending = true;
     try {
       if (target.kind === 'rack') {
-        const updated = await this.options.presetController.updateCurrentRackInfo(
+        const updated = await this.options.rackDocument.updateCurrentRackInfo(
           this.state.name,
           normalizeAuthoredMetadata({
             author: this.state.author,
@@ -241,7 +244,7 @@ class AuthoredInfoController {
     if (
       response.filePath !== null
       && response.payload.presetType === 'rack'
-      && response.filePath === this.options.presetController.state.currentRackFilePath
+      && response.filePath === this.options.rackDocument.state.currentRackFilePath
     ) {
       this.openRack();
       return;

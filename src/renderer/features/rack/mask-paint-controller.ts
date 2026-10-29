@@ -14,7 +14,7 @@ interface MaskTilePaintControllerOptions {
   blurActiveTextEditingElement: () => void;
   closeContextMenu: () => void;
   requestTransientPreview: (delayMs?: number) => void;
-  commitChange: () => void;
+  commitChange: (deviceId: string) => void;
   onTileChange: () => void;
 }
 
@@ -96,14 +96,16 @@ export class MaskTilePaintController {
 
   private readonly requestTransientPreview: (delayMs?: number) => void;
 
-  private readonly commitChange: () => void;
+  private readonly commitChange: (deviceId: string) => void;
 
   private readonly onTileChange: () => void;
 
   private readonly state = createMaskTilePaintState();
 
   private readonly pointerSession = new PointerCaptureSession<HTMLElement>({
-    onChanged: () => this.commitChange(),
+    onChanged: () => {
+      if (this.state.deviceId) this.commitChange(this.state.deviceId);
+    },
     afterFinish: () => {
       Object.assign(this.state, createMaskTilePaintState());
     },
