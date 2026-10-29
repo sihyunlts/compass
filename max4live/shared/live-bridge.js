@@ -16,10 +16,10 @@ var BRIDGE_VERSION = "v1.1.0";
 var TEMPO_POLL_INTERVAL_MS = 250;
 var expectedOscPath = DEFAULT_INCOMING_OSC_PATH;
 
-var pendingChunkTransferId = "";
-var pendingChunkCount = 0;
-var pendingChunkNotesByIndex = [];
-var pendingChunkReceived = 0;
+// Records live until the sender's deadline; expired packets cannot start again.
+var clipTransfers = {};
+var activeClipTransferId = "";
+var lastClipApplyError = "";
 
 var lastSentTempo = null;
 var tempoPollTask = null;
@@ -68,6 +68,12 @@ function handleIncomingTokens(tokens) {
       return;
     }
 
+    if (envelope.event === "clip_transfer.probe") {
+      if (envelope.path !== expectedOscPath) return;
+      sendClipTransferReply({ id: envelope.chunkTransferId, state: "ready" }, -1);
+      return;
+    }
+
     if (envelope.event !== "clip_notes.replace") {
       status("ignored_event", envelope.event);
       return;
@@ -79,7 +85,19 @@ function handleIncomingTokens(tokens) {
     }
 
     envelope = collectChunkedClipNotesEnvelope(envelope);
-    if (envelope) applyClipNotesEnvelope(envelope);
+    if (envelope) {
+      var transfer = clipTransfers[envelope.chunkTransferId];
+      transfer.state = "applying";
+      lastClipApplyError = "";
+      try {
+        applyClipNotesEnvelope(envelope, function (success, message) {
+          finishClipTransfer(transfer, success ? "applied" : "error",
+            success ? "" : lastClipApplyError || message);
+        });
+      } catch (e) {
+        finishClipTransfer(transfer, "error", safeErrorMessage(e));
+      }
+    }
   } catch (e) {
     errorOut("handleIncomingTokens", safeErrorMessage(e));
   }
@@ -125,71 +143,97 @@ function parseJsonEnvelope(payloadText) {
   }
 }
 
-function collectChunkedClipNotesEnvelope(envelope) {
-  // Live 10's legacy note sequence is replace-based, so transport chunks must be
-  // reassembled before writing notes to avoid later chunks replacing earlier ones.
-  var chunkCount = Math.floor(toNumber(envelope.chunkCount, 1));
-  if (!isFinite(chunkCount) || chunkCount <= 1) {
-    return envelope;
-  }
-
-  var chunkIndex = Math.floor(toNumber(envelope.chunkIndex, -1));
-  var transferId =
-    typeof envelope.chunkTransferId === "string" ? envelope.chunkTransferId : "";
-  if (!transferId || !isFinite(chunkIndex) || chunkIndex < 0 || chunkIndex >= chunkCount) {
-    resetPendingChunkTransfer();
-    errorOut("invalid_chunk", chunkIndex, "count", chunkCount);
-    return null;
-  }
-
-  if (pendingChunkTransferId !== transferId) {
-    pendingChunkTransferId = transferId;
-    pendingChunkCount = chunkCount;
-    pendingChunkNotesByIndex = [];
-    pendingChunkReceived = 0;
-  }
-
-  if (pendingChunkCount !== chunkCount) {
-    resetPendingChunkTransfer();
-    errorOut("chunk_count_changed", transferId);
-    return null;
-  }
-
-  if (!(pendingChunkNotesByIndex[chunkIndex] instanceof Array)) {
-    pendingChunkReceived += 1;
-  }
-  pendingChunkNotesByIndex[chunkIndex] = envelope.notes ? envelope.notes.slice(0) : [];
-
-  if (pendingChunkReceived < pendingChunkCount) {
-    status("chunk_received", chunkIndex + 1, "of", pendingChunkCount);
-    return null;
-  }
-
-  var notes = [];
-  for (var i = 0; i < pendingChunkCount; i++) {
-    var chunkNotes = pendingChunkNotesByIndex[i];
-    if (!(chunkNotes instanceof Array)) {
-      resetPendingChunkTransfer();
-      errorOut("missing_chunk", transferId, i);
-      return null;
-    }
-
-    for (var j = 0; j < chunkNotes.length; j++) {
-      notes.push(chunkNotes[j]);
-    }
-  }
-
-  envelope.notes = notes;
-  resetPendingChunkTransfer();
-  status("chunk_assembled", "chunks", chunkCount, "notes", notes.length);
-  return envelope;
+function sendClipTransferReply(transfer, chunkIndex) {
+  outlet(2, STATUS_OSC_PATH, JSON.stringify({
+    event: "clip_transfer",
+    transferId: transfer.id,
+    state: transfer.state === "receiving" || transfer.state === "applying"
+      ? "received" : transfer.state,
+    chunkIndex: chunkIndex,
+    message: transfer.message || "",
+  }));
 }
 
-function resetPendingChunkTransfer() {
-  pendingChunkTransferId = "";
-  pendingChunkCount = 0;
-  pendingChunkNotesByIndex = [];
-  pendingChunkReceived = 0;
+function finishClipTransfer(transfer, state, message) {
+  transfer.state = state;
+  transfer.message = message;
+  transfer.notesByIndex = [];
+  if (activeClipTransferId === transfer.id) activeClipTransferId = "";
+  sendClipTransferReply(transfer, transfer.count - 1);
+}
+
+function expireClipTransfers() {
+  var now = nowMs();
+  for (var id in clipTransfers) {
+    if (!Object.prototype.hasOwnProperty.call(clipTransfers, id)) continue;
+    var transfer = clipTransfers[id];
+    if (now >= transfer.expiresAt) {
+      if (activeClipTransferId === id) activeClipTransferId = "";
+      delete clipTransfers[id];
+    } else if (transfer.state === "receiving" && now - transfer.lastReceivedAt > 15000) {
+      finishClipTransfer(transfer, "error", "Clip transfer stopped before all chunks arrived");
+    }
+  }
+}
+
+function collectChunkedClipNotesEnvelope(envelope) {
+  expireClipTransfers();
+  var id = envelope.chunkTransferId;
+  var count = envelope.chunkCount;
+  var index = envelope.chunkIndex;
+  var expiresAt = envelope.transferExpiresAt;
+  // A deadline also prevents late packets from reapplying an evicted transfer.
+  if (typeof id !== "string" || !/^[0-9a-f-]{36}$/.test(id)
+    || typeof count !== "number" || !isFinite(count) || count < 1 || count !== Math.floor(count)
+    || typeof index !== "number" || index < 0 || index >= count || index !== Math.floor(index)
+    || typeof expiresAt !== "number" || !isFinite(expiresAt)
+    || expiresAt <= nowMs() || expiresAt > nowMs() + 125000
+    || !(envelope.notes instanceof Array)) {
+    errorOut("invalid_transfer", "Use matching updated Compass and Compass Bridge versions");
+    return null;
+  }
+  var transfer = clipTransfers[id];
+  if (!transfer) {
+    transfer = {
+      id: id, count: count, expiresAt: expiresAt, state: "receiving",
+      notesByIndex: [], received: 0, lastReceivedAt: nowMs(),
+      clipName: envelope.clipName, targetLengthBeats: envelope.targetLengthBeats,
+      autoCreateLengthBeats: envelope.autoCreateLengthBeats,
+    };
+    clipTransfers[id] = transfer;
+    if (activeClipTransferId) {
+      finishClipTransfer(transfer, "error", "Another clip transfer is in progress");
+      return null;
+    }
+    activeClipTransferId = id;
+  }
+  if (transfer.state !== "receiving") {
+    sendClipTransferReply(transfer, index);
+    return null;
+  }
+  if (transfer.count !== count || transfer.expiresAt !== expiresAt
+    || transfer.clipName !== envelope.clipName
+    || transfer.targetLengthBeats !== envelope.targetLengthBeats
+    || transfer.autoCreateLengthBeats !== envelope.autoCreateLengthBeats) {
+    finishClipTransfer(transfer, "error", "Clip transfer metadata changed");
+    return null;
+  }
+  transfer.lastReceivedAt = nowMs();
+  if (!(transfer.notesByIndex[index] instanceof Array)) {
+    transfer.notesByIndex[index] = envelope.notes;
+    transfer.received++;
+  }
+  sendClipTransferReply(transfer, index);
+  if (transfer.received < count) return null;
+  var notes = [];
+  for (var i = 0; i < count; i++) {
+    var chunkNotes = transfer.notesByIndex[i];
+    for (var j = 0; j < chunkNotes.length; j++) notes.push(chunkNotes[j]);
+  }
+  envelope.notes = notes;
+  transfer.notesByIndex = [];
+  status("chunk_assembled", "chunks", count, "notes", notes.length);
+  return envelope;
 }
 
 function handleTempoRequest(envelope) {
@@ -219,6 +263,7 @@ function ensureTempoPolling() {
 }
 
 function pollTempoTaskTick() {
+  expireClipTransfers();
   try {
     sendTempoUpdate(false);
   } catch (_e) {}
@@ -252,6 +297,7 @@ function status() {
 
 function errorOut(code, message) {
   var msg = code + ": " + message;
+  lastClipApplyError = msg;
   outlet(0, "error", msg);
   outlet(1, "error", msg);
   emitBridgeStatus("error", [msg]);

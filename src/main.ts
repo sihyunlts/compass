@@ -9,7 +9,8 @@ import {
   isCompassRendererUrl,
 } from './main/app-window';
 import { installApplicationMenu } from './main/application-menu';
-import { LiveTempoListener } from './main/bridge/live-tempo-listener';
+import { UdpLiveBridge } from './main/bridge/udp-live-bridge';
+import { LiveBridgeListener } from './main/bridge/live-bridge-listener';
 import { registerIpcHandlers } from './main/ipc/handlers';
 import { GeneratorService } from './main/services/generator-service';
 import { PresetService } from './main/services/preset-service';
@@ -160,10 +161,11 @@ if (process.platform === 'win32') {
 }
 
 const startApplication = (): void => {
-  const generatorService = new GeneratorService();
+  const liveBridge = new UdpLiveBridge();
+  const generatorService = new GeneratorService(liveBridge);
   const presetService = new PresetService();
   const updateCheckService = new UpdateCheckService();
-  const liveTempoListener = new LiveTempoListener();
+  const liveBridgeListener = new LiveBridgeListener();
   registerIpcHandlers(generatorService, presetService, updateCheckService);
 
   app.on('second-instance', focusOrCreateMainWindow);
@@ -174,9 +176,9 @@ const startApplication = (): void => {
     configureCompassPermissions();
     installApplicationMenu();
 
-    liveTempoListener.start((update) => {
+    liveBridgeListener.start((update) => {
       sendToAllWindows(IPC_CHANNELS.liveTempoUpdate, update);
-    });
+    }, (reply) => liveBridge.acceptTransferReply(reply));
     void presetService.startWatchingBrowserTree(() => {
       sendToAllWindows(IPC_CHANNELS.presetBrowserTreeChanged, undefined);
     });
@@ -195,7 +197,7 @@ const startApplication = (): void => {
       appFocusBroadcastTimer = null;
     }
     presetService.stopWatchingBrowserTree();
-    liveTempoListener.stop();
+    liveBridgeListener.stop();
   });
 };
 

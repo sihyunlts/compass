@@ -4,7 +4,7 @@ import {
   LIVE_BRIDGE_STATUS_ADDRESS,
   LIVE_TEMPO_ENDPOINT,
 } from '../../shared/bridge/protocol';
-import type { LiveTempoUpdate } from '../../shared/bridge/types';
+import type { LiveBridgeTransferReply, LiveTempoUpdate } from '../../shared/bridge/types';
 
 const OSC_ALIGNMENT = 4;
 const TEMPO_EPSILON = 0.001;
@@ -16,8 +16,8 @@ interface OscStringReadResult {
   nextOffset: number;
 }
 
-const reportTempoListenerError = (message: string, error: unknown): void => {
-  console.error(`[live-tempo-listener] ${message}`, error);
+const reportBridgeListenerError = (message: string, error: unknown): void => {
+  console.error(`[live-bridge-listener] ${message}`, error);
 };
 
 const alignOscOffset = (value: number): number => (value + (OSC_ALIGNMENT - 1)) & ~(OSC_ALIGNMENT - 1);
@@ -70,7 +70,10 @@ const parseTempoBpmFromJson = (raw: string): number | null => {
   return Number.isFinite(bpm) ? bpm : null;
 };
 
-const reportBridgeStatusFromJson = (raw: string): void => {
+const handleBridgeStatusFromJson = (
+  raw: string,
+  onTransferReply: (reply: LiveBridgeTransferReply) => void,
+): void => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -83,6 +86,15 @@ const reportBridgeStatusFromJson = (raw: string): void => {
   }
 
   const event = (parsed as { event?: unknown }).event;
+  if (event === 'clip_transfer') {
+    const reply = parsed as Partial<LiveBridgeTransferReply>;
+    if (typeof reply.transferId === 'string' && Number.isInteger(reply.chunkIndex)
+      && (reply.state === 'ready' || reply.state === 'received' || reply.state === 'applied' || reply.state === 'error')
+      && (reply.message === undefined || typeof reply.message === 'string')) {
+      onTransferReply(reply as LiveBridgeTransferReply);
+    }
+    return;
+  }
   if (event !== 'bridge_status') {
     return;
   }
@@ -101,7 +113,10 @@ const reportBridgeStatusFromJson = (raw: string): void => {
   console.log(prefix, message);
 };
 
-const parseTempoBpmFromOsc = (buffer: Buffer): number | null => {
+const parseTempoBpmFromOsc = (
+  buffer: Buffer,
+  onTransferReply: (reply: LiveBridgeTransferReply) => void,
+): number | null => {
   const addressField = readOscString(buffer, 0);
   if (!addressField) {
     return null;
@@ -118,7 +133,7 @@ const parseTempoBpmFromOsc = (buffer: Buffer): number | null => {
   }
 
   if (addressField.value === LIVE_BRIDGE_STATUS_ADDRESS) {
-    reportBridgeStatusFromJson(argumentField.value);
+    handleBridgeStatusFromJson(argumentField.value, onTransferReply);
     return null;
   }
 
@@ -132,20 +147,24 @@ const parseTempoBpmFromOsc = (buffer: Buffer): number | null => {
 const normalizeTempoBpm = (rawBpm: number): number =>
   Number(Math.min(MAX_BPM, Math.max(MIN_BPM, rawBpm)).toFixed(3));
 
-/** Listens for Live tempo events from the local M4L UDP bridge. */
-export class LiveTempoListener {
+/** Receives tempo updates and correlated clip-transfer replies from the local M4L bridge. */
+export class LiveBridgeListener {
   private socket: dgram.Socket | null = null;
 
   private lastBpm: number | null = null;
 
-  public start(onTempo: (update: LiveTempoUpdate) => void): void {
+  public start(
+    onTempo: (update: LiveTempoUpdate) => void,
+    onTransferReply: (reply: LiveBridgeTransferReply) => void,
+  ): void {
     if (this.socket) {
       return;
     }
 
     const socket = dgram.createSocket('udp4');
-    socket.on('message', (buffer) => {
-      const bpm = parseTempoBpmFromOsc(buffer);
+    socket.on('message', (buffer, remote) => {
+      if (remote.address !== LIVE_TEMPO_ENDPOINT.host) return;
+      const bpm = parseTempoBpmFromOsc(buffer, onTransferReply);
       if (bpm === null) {
         return;
       }
@@ -167,7 +186,7 @@ export class LiveTempoListener {
     });
 
     socket.on('error', (error) => {
-      reportTempoListenerError('UDP socket error', error);
+      reportBridgeListenerError('UDP socket error', error);
     });
 
     socket.bind(LIVE_TEMPO_ENDPOINT.port, LIVE_TEMPO_ENDPOINT.host);
@@ -182,7 +201,7 @@ export class LiveTempoListener {
     try {
       this.socket.close();
     } catch (error) {
-      reportTempoListenerError('Socket close failed during stop()', error);
+      reportBridgeListenerError('Socket close failed during stop()', error);
     }
 
     this.socket = null;

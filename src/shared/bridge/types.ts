@@ -24,6 +24,7 @@ export interface LiveBridgeNotesEnvelope extends LiveBridgeBaseEnvelope {
   event: 'clip_notes.replace';
   applyMode?: 'replace';
   chunkTransferId?: string;
+  transferExpiresAt?: number;
   chunkIndex?: number;
   chunkCount?: number;
   targetLengthBeats?: number;
@@ -45,4 +46,14 @@ export interface LiveBridgeTempoRequestEnvelope extends LiveBridgeBaseEnvelope {
 
 export type LiveBridgeEnvelope =
   | LiveBridgeNotesEnvelope
-  | LiveBridgeTempoRequestEnvelope;
+  | LiveBridgeTempoRequestEnvelope
+  | (LiveBridgeBaseEnvelope & { event: 'clip_transfer.probe'; chunkTransferId: string });
+
+/** Correlated transport acknowledgements, separate from diagnostic status messages. */
+export interface LiveBridgeTransferReply {
+  event: 'clip_transfer';
+  transferId: string;
+  state: 'ready' | 'received' | 'applied' | 'error';
+  chunkIndex: number;
+  message?: string;
+}
