@@ -11,7 +11,7 @@
   },
   "scripts": {
     "native:build": "node scripts/build-native-modules.mjs",
-    "bridge:build": "node max4live/bridge/build.mjs",
+    "max:build": "node max4live/bridge/build.mjs && node max4live/embedded/build.mjs",
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",

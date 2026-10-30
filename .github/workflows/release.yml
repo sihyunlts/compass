@@ -87,18 +87,23 @@ jobs:
         with:
           path: release-assets
 
-      - name: Setup Node.js for bridge build
+      - name: Setup Node.js for Max for Live builds
         uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
+          cache: npm
 
-      - name: Build Max for Live bridge
-        run: npm run bridge:build
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Add Max for Live bridge
+      - name: Build Max for Live devices
+        run: npm run max:build
+
+      - name: Add Max for Live devices
         run: |
           version="$(node -p "require('./package.json').version")"
           cp "out/max4live/CompassBridge-v${version}.amxd" release-assets/
+          cp "out/max4live/CompassMax-v${version}.amxd" release-assets/
 
       - name: Create draft GitHub Release
         env:
