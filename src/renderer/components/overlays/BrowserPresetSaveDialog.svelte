@@ -238,7 +238,7 @@
         return;
       }
       if (draft.entryKind === 'file') {
-        name = resolvePresetNameFromFileName(response.relativePath.at(-1) ?? '', draft.presetType) ?? '';
+        name = resolvePresetNameFromFileName(response.relativePath[response.relativePath.length - 1] ?? '', draft.presetType) ?? '';
       }
       cancelEntryDraft();
       const entry = entries.find((entry) => arePresetPathsEqual(entry.relativePath, response.relativePath));

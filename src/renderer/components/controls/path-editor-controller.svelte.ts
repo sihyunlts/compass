@@ -287,7 +287,7 @@ export const createPathEditorController = (input: PathEditorInput) => {
 
   const resolveNearestEndpoint = (point: EditorPoint): 'start' | 'end' => {
     const start = localAnchors[0];
-    const end = localAnchors.at(-1);
+    const end = localAnchors[localAnchors.length - 1];
     if (!start || !end) {
       return 'end';
     }
@@ -518,7 +518,7 @@ export const createPathEditorController = (input: PathEditorInput) => {
       connectionOriginAnchorId = drawingEndpoint === 'start'
         ? localAnchors[0]?.id ?? null
         : drawingEndpoint === 'end'
-          ? localAnchors.at(-1)?.id ?? null
+          ? localAnchors[localAnchors.length - 1]?.id ?? null
           : null;
     }
     const currentAnchorIds = selection?.kind === 'anchors'
@@ -568,7 +568,7 @@ export const createPathEditorController = (input: PathEditorInput) => {
       return;
     }
     const startAnchorId = localAnchors[0]?.id;
-    const endAnchorId = localAnchors.at(-1)?.id;
+    const endAnchorId = localAnchors[localAnchors.length - 1]?.id;
     const closesPath = (
       connectionOriginAnchorId === startAnchorId && anchorId === endAnchorId
     ) || (

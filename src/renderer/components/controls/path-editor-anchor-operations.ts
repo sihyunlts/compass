@@ -17,7 +17,7 @@ export const resolveDraggedHandleKind = (
     return 'handleOut';
   }
   const previous = anchors[index - 1]
-    ?? (closed ? anchors.at(-1) : undefined);
+    ?? (closed ? anchors[anchors.length - 1] : undefined);
   const next = anchors[index + 1]
     ?? (closed ? anchors[0] : undefined);
   const drag = { x: point.x - anchor.x, y: point.y - anchor.y };

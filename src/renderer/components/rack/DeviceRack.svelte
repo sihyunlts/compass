@@ -464,7 +464,7 @@
         {:else if item.kind === 'group'}
           {@const isGroupSelected = selectedGroupIds.includes(item.groupId)}
           {@const firstGroupDeviceId = item.devices[0]?.id}
-          {@const lastGroupDeviceId = item.devices.at(-1)?.id}
+          {@const lastGroupDeviceId = item.devices[item.devices.length - 1]?.id}
           <div class="device-group-body">
             {#each buildGroupColumns(item) as col (col.key)}
               <!-- svelte-ignore a11y_click_events_have_key_events -->
